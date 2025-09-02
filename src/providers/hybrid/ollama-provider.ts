@@ -3,7 +3,7 @@
  * Optimized for complex analysis, architecture, and security tasks requiring deep reasoning
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 import {
   LLMProvider,
   LLMResponse,

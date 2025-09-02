@@ -5,7 +5,7 @@
 
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { ModernInputSanitizer } from '../../infrastructure/security/modern-input-sanitizer.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 export interface SecurityPolicy {
   maxConcurrentOperations: number;

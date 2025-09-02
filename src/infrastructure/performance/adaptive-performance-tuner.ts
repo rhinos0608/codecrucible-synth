@@ -3,7 +3,7 @@
  * Dynamically adjusts system performance based on current load and resource usage
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { EventEmitter } from 'events';
 
 export interface PerformanceMetrics {

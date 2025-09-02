@@ -9,12 +9,11 @@
  * - No module-level mutable state
  */
 
-import { promises as fs, constants, Stats } from 'fs';
+import { Stats, constants, createReadStream, createWriteStream, promises as fs } from 'fs';
 import * as fsSync from 'fs';
-import { join, resolve, dirname, basename, extname, relative } from 'path';
+import path, { dirname, extname, join, relative, resolve } from 'path';
 import { EventEmitter } from 'events';
 import { glob } from 'glob';
-import { createReadStream, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 
 export interface FileSystemConfig {
@@ -75,8 +74,8 @@ export interface FileWatchEvent {
  * Handles file system operations without business logic
  */
 export class FileSystemClient extends EventEmitter {
-  private config: FileSystemConfig;
-  private watchers: Map<string, any> = new Map();
+  private readonly config: FileSystemConfig;
+  private readonly watchers: Map<string, fsSync.FSWatcher> = new Map();
   private operationHistory: FileOperation[] = [];
 
   constructor(config: FileSystemConfig) {
@@ -87,7 +86,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Initialize the file system client
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     try {
       // Ensure root path exists
       await this.ensureDirectory(this.config.rootPath);
@@ -559,7 +558,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Watch file or directory for changes
    */
-  async watchPath(filePath: string, recursive: boolean = false): Promise<void> {
+  public async watchPath(filePath: string, recursive: boolean = false): Promise<void> {
     if (!this.config.enableWatching) {
       throw new Error('File watching is disabled in configuration');
     }
@@ -567,7 +566,10 @@ export class FileSystemClient extends EventEmitter {
     const absolutePath = this.resolveAbsolutePath(filePath);
 
     try {
-      const watcher = fsSync.watch(absolutePath, { recursive: recursive });
+      // Verify the path exists before watching
+      await fs.access(absolutePath);
+      
+      const watcher = fsSync.watch(absolutePath, { recursive });
       watcher.addListener('change', (eventType: string, filename: string | null) => {
         if (filename) {
           const fullPath = join(absolutePath, filename);
@@ -591,7 +593,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Stop watching a path
    */
-  async unwatchPath(filePath: string): Promise<void> {
+  public unwatchPath(filePath: string): void {
     const absolutePath = this.resolveAbsolutePath(filePath);
     const watcher = this.watchers.get(absolutePath);
 
@@ -650,7 +652,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Close all watchers and cleanup
    */
-  async close(): Promise<void> {
+  public close(): void {
     for (const watcher of this.watchers.values()) {
       watcher.close();
     }
@@ -661,7 +663,7 @@ export class FileSystemClient extends EventEmitter {
   // Private helper methods
 
   private resolveAbsolutePath(filePath: string): string {
-    if (require('path').isAbsolute(filePath)) {
+    if (path.isAbsolute(filePath)) {
       return resolve(filePath);
     }
     return resolve(this.config.rootPath, filePath);
@@ -674,8 +676,8 @@ export class FileSystemClient extends EventEmitter {
   private async ensureDirectory(dirPath: string): Promise<void> {
     try {
       await fs.mkdir(dirPath, { recursive: true });
-    } catch (error: any) {
-      if (error.code !== 'EEXIST') {
+    } catch (error: unknown) {
+      if ((error as { code?: string }).code !== 'EEXIST') {
         throw error;
       }
     }
@@ -692,17 +694,23 @@ export class FileSystemClient extends EventEmitter {
     try {
       await fs.access(filePath, constants.R_OK);
       readable = true;
-    } catch {}
+    } catch {
+      // Intentionally left empty as permission check failure is expected
+    }
 
     try {
       await fs.access(filePath, constants.W_OK);
       writable = true;
-    } catch {}
+    } catch {
+      // Permission check failure is expected and handled silently
+    }
 
     try {
       await fs.access(filePath, constants.X_OK);
       executable = true;
-    } catch {}
+    } catch {
+      // Intentionally left empty as permission check failure is expected
+    }
 
     return {
       path: relativePath,

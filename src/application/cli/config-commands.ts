@@ -73,7 +73,7 @@ export class ConfigCommands {
         }
       }
     } catch (error) {
-      console.error('❌ Failed to load configuration:', error.message);
+      console.error('❌ Failed to load configuration:', error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   }
@@ -120,7 +120,7 @@ export class ConfigCommands {
         process.exit(1);
       }
     } catch (error) {
-      console.error('❌ Validation failed:', error.message);
+      console.error('❌ Validation failed:', error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   }
@@ -193,7 +193,7 @@ export class ConfigCommands {
         });
       }
     } catch (error) {
-      console.error('❌ Analysis failed:', error.message);
+      console.error('❌ Analysis failed:', error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   }
@@ -274,7 +274,7 @@ export class ConfigCommands {
         process.exit(1);
       }
     } catch (error) {
-      console.error('❌ Migration failed:', error.message);
+      console.error('❌ Migration failed:', error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   }
@@ -301,7 +301,7 @@ export class ConfigCommands {
 
       console.log(`✅ Configuration exported to ${filePath} (${format})`);
     } catch (error) {
-      console.error('❌ Export failed:', error.message);
+      console.error('❌ Export failed:', error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   }

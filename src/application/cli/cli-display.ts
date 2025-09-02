@@ -5,7 +5,7 @@
 
 import chalk from 'chalk';
 // import ora from 'ora';
-import { SynthesisResult } from '../integration/unified-data-models.js';
+import { SynthesisResult } from '../../voices/voice-system-coordinator.js';
 
 export class CLIDisplay {
   /**
@@ -13,12 +13,12 @@ export class CLIDisplay {
    */
   static displayResults(synthesis: SynthesisResult, responses: any[]): void {
     console.log(chalk.green('\n🎯 Synthesis Complete!'));
-    console.log(chalk.gray(`   Quality Score: ${(synthesis.qualityScore * 100).toFixed(0)}/100`));
+    console.log(chalk.gray(`   Consensus: ${(synthesis.consensus * 100).toFixed(0)}/100`));
     console.log(chalk.gray(`   Voices Used: ${synthesis.voicesUsed?.join(', ') || 'N/A'}`));
 
     // Show combined result
     console.log(chalk.bold('\n📄 Final Synthesis:'));
-    console.log(synthesis.content || synthesis.combinedCode || 'No content available');
+    console.log(synthesis.finalDecision || 'No decision available');
 
     // Show individual responses
     if (responses && responses.length > 0) {

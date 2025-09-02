@@ -1,5 +1,5 @@
-import { logger } from './logger.js';
-import { ModelResponse } from './types.js';
+import { logger } from '../infrastructure/logging/logger.js';
+import { ModelResponse } from '../domain/interfaces/model-client.js';
 
 /**
  * ResponseNormalizer - Unified utility for ensuring all responses are properly formatted

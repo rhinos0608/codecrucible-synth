@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
-import { join, relative, isAbsolute, dirname, extname } from 'path';
+import { dirname, extname, isAbsolute, join } from 'path';
 import { UnifiedModelClient } from '../../application/services/client.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -26,9 +26,9 @@ const GenerateTestSchema = z.object({
 export class TestGeneratorTool extends BaseTool {
   private modelClient: UnifiedModelClient;
 
-  constructor(
-    private agentContext: { workingDirectory: string },
-    modelClient: UnifiedModelClient
+  public constructor(
+    private readonly agentContext: { workingDirectory: string },
+    readonly modelClient: UnifiedModelClient
   ) {
     super({
       name: 'generateTests',
@@ -189,7 +189,7 @@ import { test, expect } from '@playwright/test';
     const testExt = testExtensions[framework as keyof typeof testExtensions] || '.test.ts';
 
     // Place tests in __tests__ directory or alongside source
-    const testDir = join(dirname(sourceFilePath), '__tests__');
+    // Removed unused variable 'testDir'
     const fileName = `${baseName}${testExt}`;
 
     return fileName.replace(/^src\//, 'src/__tests__/');
@@ -250,7 +250,7 @@ export class TestRunnerTool extends BaseTool {
     });
   }
 
-  async execute(args: z.infer<typeof RunTestsSchema>): Promise<string> {
+  public async execute(args: z.infer<typeof RunTestsSchema>): Promise<string> {
     try {
       const { testPattern, testFramework, coverage, watch, verbose, timeout } = args;
 
@@ -269,10 +269,10 @@ export class TestRunnerTool extends BaseTool {
       if (stderr) result += `STDERR:\n${stderr}\n`;
 
       return result || 'Tests completed successfully with no output.';
-    } catch (error: any) {
-      const errorMessage = error.message || 'Unknown error';
-      const stdout = error.stdout || '';
-      const stderr = error.stderr || '';
+    } catch (error) {
+      const errorMessage = (error instanceof Error && error.message) || 'Unknown error';
+      const stdout = (error as { stdout?: string }).stdout || '';
+      const stderr = (error as { stderr?: string }).stderr || '';
 
       return `Test execution failed:\nError: ${errorMessage}\n${stdout ? `STDOUT:\n${stdout}\n` : ''}${stderr ? `STDERR:\n${stderr}\n` : ''}`;
     }
@@ -352,9 +352,9 @@ export class CoverageAnalyzerTool extends BaseTool {
     });
   }
 
-  async execute(args: z.infer<typeof AnalyzeCoverageSchema>): Promise<string> {
+  public async execute(args: Readonly<z.infer<typeof AnalyzeCoverageSchema>>): Promise<string> {
     try {
-      const { coverageFormat, threshold, includeUncovered } = args;
+      const { coverageFormat, threshold, includeUncovered: _includeUncovered } = args;
 
       // Run tests with coverage
       const coverageCommand = this.buildCoverageCommand(coverageFormat);
@@ -397,8 +397,11 @@ export class CoverageAnalyzerTool extends BaseTool {
       }
 
       return result;
-    } catch (error: any) {
-      return `Coverage analysis failed: ${error.message}`;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        return `Coverage analysis failed: ${error.message}`;
+      }
+      return 'Coverage analysis failed: Unknown error';
     }
   }
 

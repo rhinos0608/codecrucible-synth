@@ -120,7 +120,7 @@ export class DatabaseAdapter extends EventEmitter {
 
     try {
       const result = await this.client.query(query, params);
-      const id = result.rows[0].id;
+      const id = result.rows[0]?.['id'];
 
       this.emit('voiceInteractionStored', { id, sessionId: interaction.sessionId });
       return id;
@@ -242,12 +242,12 @@ export class DatabaseAdapter extends EventEmitter {
       // Use domain service to analyze the data
       const analytics = this.analyticsService.analyzeVoiceInteractions(
         result.rows.map(row => ({
-          sessionId: row.session_id,
-          voiceName: row.voice_name,
-          confidence: row.confidence,
-          tokensUsed: row.tokens_used,
-          createdAt: row.created_at,
-          responseTime: row.response_time,
+          sessionId: row['session_id'],
+          voiceName: row['voice_name'],
+          confidence: row['confidence'],
+          tokensUsed: row['tokens_used'],
+          createdAt: row['created_at'],
+          responseTime: row['response_time'],
         }))
       );
 
@@ -290,7 +290,7 @@ export class DatabaseAdapter extends EventEmitter {
 
     try {
       const result = await this.client.query(query, params);
-      const id = result.rows[0].id;
+      const id = result.rows[0]?.['id'];
 
       this.emit('codeAnalysisStored', { id, projectId: analysis.projectId });
       return id;
@@ -349,11 +349,11 @@ export class DatabaseAdapter extends EventEmitter {
 
       const analytics = this.analyticsService.analyzeCodeAnalysisResults(
         result.rows.map(row => ({
-          projectId: row.project_id,
-          filePath: row.file_path,
-          analysisType: row.analysis_type,
-          qualityScore: row.quality_score,
-          createdAt: row.created_at,
+          projectId: row['project_id'],
+          filePath: row['file_path'],
+          analysisType: row['analysis_type'],
+          qualityScore: row['quality_score'],
+          createdAt: row['created_at'],
           results: {}, // Results not needed for analytics
         }))
       );
@@ -397,7 +397,7 @@ export class DatabaseAdapter extends EventEmitter {
 
     try {
       const result = await this.client.query(query, params);
-      const id = result.rows[0].id;
+      const id = result.rows[0]?.['id'];
 
       // Clear project-related caches
       await this.client.clearCache('project_*');

@@ -3,7 +3,7 @@
  * Optimized for fast code generation, templates, and quick edits
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 import {
   LLMProvider,
   LLMResponse,

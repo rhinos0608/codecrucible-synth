@@ -416,7 +416,7 @@ ${reflectionContent}
       return qualityScore;
     } catch (error) {
       this.logger?.warn('Quality calculation failed, using basic assessment', {
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
       return this.calculateBasicQuality(output);
     }

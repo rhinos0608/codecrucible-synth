@@ -5,7 +5,7 @@
  * external API call optimization with retry mechanisms.
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import {
   ErrorFactory,
   ErrorCategory,

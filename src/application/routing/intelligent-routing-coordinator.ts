@@ -18,8 +18,8 @@
  */
 
 import { EventEmitter } from 'events';
-import { ProviderType } from '../interfaces/provider-interfaces.js';
-import { logger } from '../logger.js';
+import { ProviderType } from '../../providers/provider-selection-strategy.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 
 // Domain imports
 import {
@@ -37,12 +37,12 @@ import {
   IProviderSelectionStrategy,
   SelectionContext,
   SelectionResult,
-} from '../providers/provider-selection-strategy.js';
+} from '../../providers/provider-selection-strategy.js';
 import {
   HybridLLMRouter,
   RoutingDecision,
   TaskComplexityMetrics,
-} from '../hybrid/hybrid-llm-router.js';
+} from '../../providers/hybrid/hybrid-llm-router.js';
 import { PerformanceMonitor } from '../../utils/performance.js';
 
 export interface RoutingContext {

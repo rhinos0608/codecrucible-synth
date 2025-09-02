@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { createLogger } from '../logger.js';
+import { createLogger } from '../logging/logger.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { ErrorRecoverySystem, ErrorContext, RecoveryAction } from './error-recovery-system.js';
 import chalk from 'chalk';

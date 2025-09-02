@@ -18,7 +18,6 @@ import {
 import {
   FileSecurityService,
   FileSecurityPolicy,
-  FileAccessRequest,
   FileOperation as SecurityFileOperation,
   PolicyUseCase,
   RiskLevel,
@@ -155,9 +154,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.READ,
-          userId: request.userId,
-          userRole: request.userRole,
-          context: request.context,
+          userId: request.userId || 'anonymous',
+          userRole: request.userRole || 'user',
+          context: request.context || 'file-operation',
         },
         request.policy
       );
@@ -247,9 +246,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.WRITE,
-          userId: request.userId,
-          userRole: request.userRole,
-          context: request.context,
+          userId: request.userId || 'anonymous',
+          userRole: request.userRole || 'user',
+          context: request.context || 'file-operation',
         },
         request.policy
       );
@@ -343,9 +342,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.DELETE,
-          userId: request.userId,
-          userRole: request.userRole,
-          context: request.context,
+          userId: request.userId || 'anonymous',
+          userRole: request.userRole || 'user',
+          context: request.context || 'file-operation',
         },
         request.policy
       );
@@ -408,9 +407,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.READ,
-          userId: request.userId,
-          userRole: request.userRole,
-          context: request.context,
+          userId: request.userId || 'anonymous',
+          userRole: request.userRole || 'user',
+          context: request.context || 'file-operation',
         },
         request.policy
       );
@@ -420,9 +419,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.targetPath,
           operation: SecurityFileOperation.WRITE,
-          userId: request.userId,
-          userRole: request.userRole,
-          context: request.context,
+          userId: request.userId || 'anonymous',
+          userRole: request.userRole || 'user',
+          context: request.context || 'file-operation',
         },
         request.policy
       );
@@ -508,9 +507,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.DELETE, // Moving requires delete permission on source
-          userId: request.userId,
-          userRole: request.userRole,
-          context: request.context,
+          userId: request.userId || 'anonymous',
+          userRole: request.userRole || 'user',
+          context: request.context || 'file-operation',
         },
         request.policy
       );
@@ -520,9 +519,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.targetPath,
           operation: SecurityFileOperation.WRITE,
-          userId: request.userId,
-          userRole: request.userRole,
-          context: request.context,
+          userId: request.userId || 'anonymous',
+          userRole: request.userRole || 'user',
+          context: request.context || 'file-operation',
         },
         request.policy
       );
@@ -668,9 +667,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.READ,
-          userId: request.userId,
-          userRole: request.userRole,
-          context: request.context,
+          userId: request.userId || 'anonymous',
+          userRole: request.userRole || 'user',
+          context: request.context || 'file-operation',
         },
         request.policy
       );
@@ -753,9 +752,11 @@ export class FileOperationsAdapter extends EventEmitter {
 
     try {
       // Perform the search
-      const matches = await this.fileSystemClient.findFiles(options.pattern, {
-        maxResults: options.maxResults,
-      });
+      const findOptions: { maxResults?: number } = {};
+      if (options.maxResults !== undefined) {
+        findOptions.maxResults = options.maxResults;
+      }
+      const matches = await this.fileSystemClient.findFiles(options.pattern, findOptions);
 
       // Filter results based on security policy
       const secureMatches: string[] = [];
@@ -926,7 +927,7 @@ export class FileOperationsAdapter extends EventEmitter {
   private isHiddenFile(filePath: string): boolean {
     const parts = filePath.split('/');
     const filename = parts[parts.length - 1];
-    return filename.startsWith('.') && filename !== '.' && filename !== '..';
+    return filename ? filename.startsWith('.') && filename !== '.' && filename !== '..' : false;
   }
 }
 

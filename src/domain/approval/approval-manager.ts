@@ -1,7 +1,7 @@
-import { logger } from '../logger.js';
-import { SandboxMode } from '../sandbox/sandbox-manager.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 import * as readline from 'readline';
 
+export type SandboxMode = 'read-only' | 'workspace-write' | 'full-access';
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 export type OperationType =
   | 'file-read'

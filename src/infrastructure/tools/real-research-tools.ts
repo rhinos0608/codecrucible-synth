@@ -3,27 +3,61 @@ import { BaseTool } from './base-tool.js';
 import { logger } from '../logging/logger.js';
 import axios from 'axios';
 
+interface SearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  type: string;
+  relevance?: number;
+}
+
+interface SearchResponse {
+  success: boolean;
+  query: string;
+  results: SearchResult[];
+  source: string;
+  error?: string;
+  totalResults?: number;
+}
+
+interface UrlReadResponse {
+  success: boolean;
+  url: string;
+  content?: string;
+  status?: number;
+  contentType?: string;
+  source: string;
+  error?: string;
+}
+
+interface MCPGlobal {
+  mcp__exa__web_search_exa?: (params: { query: string; numResults?: number }) => Promise<SearchResponse>;
+  mcp__ref_tools_ref_tools_mcp__ref_search_documentation?: (params: { query: string }) => Promise<SearchResponse>;
+  mcp__ref_tools_ref_tools_mcp__ref_read_url?: (params: { url: string }) => Promise<UrlReadResponse>;
+}
+
+declare const global: typeof globalThis & MCPGlobal;
+
 export class GoogleWebSearchTool extends BaseTool {
   constructor(private agentContext: { workingDirectory: string }) {
     super({
       name: 'googleWebSearch',
-      description:
-        'Search the web for current information, documentation, and solutions using Google Search.',
+      description: 'Search the web using Google search capabilities.',
       category: 'Research',
       parameters: z.object({
-        query: z.string().describe('Search query for web research'),
+        query: z.string().describe('Web search query'),
       }),
     });
   }
 
-  async execute(params: { query: string }): Promise<any> {
+  public async execute(params: { query: string }): Promise<SearchResponse> {
     try {
       logger.info(`🔍 Google Web Search: ${params.query}`);
 
       // Try to use MCP Exa search if available
       try {
-        if (typeof (global as any).mcp__exa__web_search_exa !== 'undefined') {
-          return await (global as any).mcp__exa__web_search_exa({ query: params.query });
+        if (typeof global.mcp__exa__web_search_exa !== 'undefined' && global.mcp__exa__web_search_exa) {
+          return await global.mcp__exa__web_search_exa({ query: params.query });
         }
       } catch (e) {
         logger.debug('MCP Exa search not available, using fallback');
@@ -46,8 +80,11 @@ export class GoogleWebSearchTool extends BaseTool {
     } catch (error) {
       logger.error('Google Web Search failed:', error);
       return {
+        success: false,
         error: `Google Web Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         query: params.query,
+        results: [],
+        source: 'error',
       };
     }
   }
@@ -65,17 +102,17 @@ export class RefDocumentationTool extends BaseTool {
     });
   }
 
-  async execute(params: { query: string }): Promise<any> {
+  public async execute(params: { query: string }): Promise<SearchResponse> {
     try {
       logger.info(`📚 Ref Documentation Search: ${params.query}`);
 
       // Try to use MCP ref search if available
       try {
         if (
-          typeof (global as any).mcp__ref_tools_ref_tools_mcp__ref_search_documentation !==
-          'undefined'
+          typeof global.mcp__ref_tools_ref_tools_mcp__ref_search_documentation !==
+          'undefined' && global.mcp__ref_tools_ref_tools_mcp__ref_search_documentation
         ) {
-          return await (global as any).mcp__ref_tools_ref_tools_mcp__ref_search_documentation({
+          return await global.mcp__ref_tools_ref_tools_mcp__ref_search_documentation({
             query: params.query,
           });
         }
@@ -100,8 +137,11 @@ export class RefDocumentationTool extends BaseTool {
     } catch (error) {
       logger.error('Ref Documentation Search failed:', error);
       return {
+        success: false,
         error: `Ref Documentation Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         query: params.query,
+        results: [],
+        source: 'error',
       };
     }
   }
@@ -119,14 +159,14 @@ export class RefReadUrlTool extends BaseTool {
     });
   }
 
-  async execute(params: { url: string }): Promise<any> {
+  public async execute(params: { url: string }): Promise<UrlReadResponse> {
     try {
       logger.info(`📖 Reading URL: ${params.url}`);
 
       // Try to use MCP ref read if available
       try {
-        if (typeof (global as any).mcp__ref_tools_ref_tools_mcp__ref_read_url !== 'undefined') {
-          return await (global as any).mcp__ref_tools_ref_tools_mcp__ref_read_url({
+        if (typeof global.mcp__ref_tools_ref_tools_mcp__ref_read_url !== 'undefined' && global.mcp__ref_tools_ref_tools_mcp__ref_read_url) {
+          return await global.mcp__ref_tools_ref_tools_mcp__ref_read_url({
             url: params.url,
           });
         }
@@ -143,12 +183,14 @@ export class RefReadUrlTool extends BaseTool {
           },
         });
 
+        const content = typeof response.data === 'string' ? response.data : String(response.data);
+
         return {
           success: true,
           url: params.url,
-          content: response.data.substring(0, 5000), // Limit content
+          content: content.substring(0, 5000), // Limit content
           status: response.status,
-          contentType: response.headers['content-type'],
+          contentType: response.headers['content-type'] as string | undefined,
           source: 'http_fetch',
         };
       } catch (fetchError) {
@@ -162,8 +204,10 @@ export class RefReadUrlTool extends BaseTool {
     } catch (error) {
       logger.error('Ref Read URL failed:', error);
       return {
+        success: false,
         error: `Ref Read URL failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         url: params.url,
+        source: 'error',
       };
     }
   }
@@ -182,14 +226,14 @@ export class ExaWebSearchTool extends BaseTool {
     });
   }
 
-  async execute(params: { query: string; numResults?: number }): Promise<any> {
+  public async execute(params: { query: string; numResults?: number }): Promise<SearchResponse> {
     try {
       logger.info(`🔍 Exa Web Search: ${params.query}`);
 
       // Try to use MCP Exa search if available
       try {
-        if (typeof (global as any).mcp__exa__web_search_exa !== 'undefined') {
-          return await (global as any).mcp__exa__web_search_exa({
+        if (typeof global.mcp__exa__web_search_exa !== 'undefined' && global.mcp__exa__web_search_exa) {
+          return await global.mcp__exa__web_search_exa({
             query: params.query,
             numResults: params.numResults,
           });
@@ -222,8 +266,11 @@ export class ExaWebSearchTool extends BaseTool {
     } catch (error) {
       logger.error('Exa Web Search failed:', error);
       return {
+        success: false,
         error: `Exa Web Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         query: params.query,
+        results: [],
+        source: 'error',
       };
     }
   }

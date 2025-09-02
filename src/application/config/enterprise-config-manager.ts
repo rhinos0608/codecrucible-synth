@@ -3,7 +3,7 @@
  * Provides centralized configuration management for enterprise features
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 
 export interface EnterpriseConfig {
   security: {

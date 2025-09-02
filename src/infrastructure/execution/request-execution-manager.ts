@@ -11,7 +11,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { getErrorMessage, toError } from '../../utils/error-utils.js';
 import { ModelRequest, ModelResponse } from '../../domain/interfaces/model-client.js';
 import { ProjectContext, ComplexityAnalysis, TaskType } from '../../domain/types/unified-types.js';

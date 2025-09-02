@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { logger } from '../logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 
 export interface TaskComplexityMetrics {
   linesOfCode?: number;

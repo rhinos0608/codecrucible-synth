@@ -11,8 +11,8 @@
  */
 
 import { EventEmitter } from 'events';
-import { logger } from '../logger.js';
-import { PerformanceMonitor } from '../../utils/performance.js';
+import { logger } from '../infrastructure/logging/logger.js';
+import { PerformanceMonitor } from '../utils/performance.js';
 
 export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
 export type ExecutionMode = 'fast' | 'quality' | 'balanced';

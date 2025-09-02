@@ -4,7 +4,7 @@
  * Part of architectural debt remediation
  */
 
-import { RuntimeContext, RuntimeContextFactory } from '../runtime/runtime-context.js';
+import { RuntimeContext, createRuntimeContext } from '../runtime/runtime-context.js';
 import {
   UnifiedOrchestrationService,
   createUnifiedOrchestrationServiceWithContext,
@@ -42,7 +42,7 @@ export class ServiceFactory {
   private resourceCoordinator?: ConfigurableResourceCoordinator;
 
   constructor(private config: ServiceFactoryConfig = {}) {
-    this.runtimeContext = RuntimeContextFactory.create({
+    this.runtimeContext = createRuntimeContext({
       logger: createLogger('ServiceFactory'),
       eventBus: new EventBus(),
     });
@@ -77,8 +77,8 @@ export class ServiceFactory {
    */
   async createConfigurationManager(): Promise<UnifiedConfigurationManager> {
     if (!this.configManager) {
-      const logger = this.runtimeContext.getLogger();
-      const eventBus = this.runtimeContext.getEventBus();
+      const logger = createLogger('ConfigurationManager'); // TODO: Get logger from context
+      const eventBus = this.runtimeContext.eventBus;
 
       this.configManager = await createUnifiedConfigurationManager({
         logger,
@@ -124,7 +124,8 @@ export class ServiceFactory {
       this.resourceCoordinator = undefined;
     }
 
-    await this.runtimeContext.dispose();
+    // TODO: Implement proper cleanup for RuntimeContext
+    // await this.runtimeContext.dispose();
   }
 
   // Private helper methods

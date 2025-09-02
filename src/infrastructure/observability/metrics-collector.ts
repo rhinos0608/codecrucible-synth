@@ -1,4 +1,4 @@
-import { createLogger } from '../logger.js';
+import { createLogger } from '../logging/logger.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 
 export interface MetricPoint {

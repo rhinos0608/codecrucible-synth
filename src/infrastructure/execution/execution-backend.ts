@@ -13,7 +13,7 @@ import { promisify } from 'util';
 import { writeFile, readFile, unlink, mkdir } from 'fs/promises';
 import { join, resolve } from 'path';
 import { randomBytes } from 'crypto';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import {
   ErrorFactory,
   ErrorCategory,

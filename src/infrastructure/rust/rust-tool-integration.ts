@@ -15,16 +15,6 @@ import type {
 } from '../../domain/interfaces/tool-system.js';
 
 
-import type { ToolDefinition, ToolExecutionContext } from '../../domain/interfaces/tool-system.js';
-
-
-import type {
-  ITool,
-  ToolDefinition,
-  ToolExecutionContext,
-} from '../../domain/interfaces/tool-system.js';
-
-
 export interface RustToolDefinition extends ToolDefinition {
   rustImplementation: string;
   nativeOptimizations: string[];
@@ -82,9 +72,9 @@ export abstract class RustTool<Args extends Record<string, unknown>> implements 
   /**
    * Execute the tool with automatic fallback
    */
-  async execute(
-    args: Record<string, unknown>,
-    context: ToolExecutionContext
+  public async execute(
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<RustToolExecutionResult> {
     const typedArgs = args as Args;
     const startTime = Date.now();
@@ -140,7 +130,7 @@ export abstract class RustTool<Args extends Record<string, unknown>> implements 
   /**
    * Validate arguments against the tool's parameter schema
    */
-  validateArguments(args: Record<string, unknown>): {
+  public validateArguments(args: Record<string, unknown>): {
     valid: boolean;
     errors?: string[];
   } {
@@ -179,14 +169,14 @@ export abstract class RustTool<Args extends Record<string, unknown>> implements 
 
     return {
       valid: errors.length === 0,
-      errors: errors.length > 0 ? errors : undefined,
+      ...(errors.length > 0 ? { errors } : {}),
     };
   }
 
   /**
    * Check if the tool can be executed in the given context
    */
-  canExecute(context: ToolExecutionContext): boolean {
+  public canExecute(context: Readonly<ToolExecutionContext>): boolean {
     // Check security level compatibility
     if (this.definition.securityLevel === 'dangerous' && context.securityLevel === 'low') {
       return false;
@@ -195,7 +185,7 @@ export abstract class RustTool<Args extends Record<string, unknown>> implements 
     // Check required permissions
     for (const requiredPermission of this.definition.permissions) {
       const hasPermission = context.permissions.some(
-        p =>
+        (p: Readonly<any>) =>
           p.type === requiredPermission.type &&
           p.scope === requiredPermission.scope &&
           (p.resource === requiredPermission.resource || p.resource === '*')
@@ -225,33 +215,25 @@ export abstract class RustTool<Args extends Record<string, unknown>> implements 
 
   protected abstract executeRust(
 
-    args: Args,
-    context: ToolExecutionContext
+    args: Readonly<Args>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<RustToolExecutionResult>;
   protected abstract executeTypescript(
-    args: Args,
-    context: ToolExecutionContext
-
-    args: any,
-    context?: ToolExecutionContext
-  ): Promise<RustToolExecutionResult>;
-  protected abstract executeTypescript(
-    args: any,
-    context?: ToolExecutionContext
-
+    args: Readonly<Args>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<RustToolExecutionResult>;
 }
 
 /**
  * Example concrete Rust tool implementation - File Analysis Tool
  */
-export interface FileAnalyzerArgs {
+export interface FileAnalyzerArgs extends Record<string, unknown> {
   filePath: string;
   analysisDepth?: number;
 }
 
 export class RustFileAnalyzer extends RustTool<FileAnalyzerArgs> {
-  constructor() {
+  public constructor() {
     super({
       id: 'rust-file-analyzer',
       name: 'High-Performance File Analyzer',
@@ -289,13 +271,8 @@ export class RustFileAnalyzer extends RustTool<FileAnalyzerArgs> {
   }
 
   protected async executeRust(
-
-    args: FileAnalyzerArgs,
-    context: ToolExecutionContext
-
-    args: any,
-    context?: ToolExecutionContext
-
+    args: Readonly<FileAnalyzerArgs>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<RustToolExecutionResult> {
     const request = {
       type: 'code-analysis',
@@ -305,7 +282,16 @@ export class RustFileAnalyzer extends RustTool<FileAnalyzerArgs> {
       context,
     };
 
-    const result = await this.providerClient.execute(request);
+    interface ProviderExecutionResult {
+      result: unknown;
+      performance?: {
+        cpuUsage: number;
+        memoryUsage: number;
+        operationCount: number;
+      };
+    }
+
+    const result = await this.providerClient.execute(request) as ProviderExecutionResult;
 
     return {
       success: true,
@@ -321,13 +307,8 @@ export class RustFileAnalyzer extends RustTool<FileAnalyzerArgs> {
   }
 
   protected async executeTypescript(
-
-    args: FileAnalyzerArgs,
-    context: ToolExecutionContext
-
-    args: any,
-    context?: ToolExecutionContext
-
+    args: Readonly<FileAnalyzerArgs>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<RustToolExecutionResult> {
     // TypeScript fallback implementation
     const fs = await import('fs/promises');

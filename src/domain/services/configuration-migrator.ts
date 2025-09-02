@@ -217,7 +217,7 @@ export class ConfigurationMigrator {
       };
     } catch (error) {
       this.logger.error('Migration failed:', error);
-      errors.push(`Migration failed: ${error.message}`);
+      errors.push(`Migration failed: ${error instanceof Error ? error.message : String(error)}`);
 
       return {
         success: false,
@@ -391,7 +391,7 @@ If you encounter issues:
     } catch (error) {
       issues.push({
         type: 'invalid',
-        message: `Failed to parse file: ${error.message}`,
+        message: `Failed to parse file: ${error instanceof Error ? error.message : String(error)}`,
         suggestion: 'Fix syntax errors before migration',
       });
     }

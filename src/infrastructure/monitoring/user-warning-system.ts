@@ -4,7 +4,7 @@
  * Never terminate processes - only provide helpful guidance
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import chalk from 'chalk';
 
 export interface WarningConfig {

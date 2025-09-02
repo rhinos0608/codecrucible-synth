@@ -1,5 +1,5 @@
 import { Sandbox } from '@e2b/code-interpreter';
-import { logger } from '../logger.js';
+import { logger } from '../../logging/logger.js';
 
 /**
  * Execution result from E2B sandbox
@@ -24,6 +24,38 @@ export interface ResourceUsage {
 }
 
 /**
+ * Resource limits configuration
+ */
+export interface ResourceLimits {
+  memory?: string;
+  cpu?: string;
+  diskSpace?: string;
+  timeout?: number;
+}
+
+/**
+ * E2B service configuration
+ */
+export interface E2BConfiguration {
+  apiKey: string;
+  defaultEnvironment: string;
+  sessionTimeout: number;
+  maxConcurrentSessions: number;
+  resourceLimits: ResourceLimits;
+}
+
+/**
+ * E2B service statistics
+ */
+export interface E2BServiceStats {
+  isInitialized: boolean;
+  activeSessions: number;
+  maxConcurrentSessions: number;
+  totalSessionsCreated: number;
+  averageSessionAge: number;
+}
+
+/**
  * E2B Sandbox wrapper for session management
  */
 export interface E2BSandbox {
@@ -32,16 +64,6 @@ export interface E2BSandbox {
   createdAt: Date;
   lastUsed: Date;
   resourceLimits: ResourceLimits;
-}
-
-/**
- * Resource limits configuration
- */
-export interface ResourceLimits {
-  memory?: string;
-  cpu?: string;
-  diskSpace?: string;
-  timeout?: number;
 }
 
 /**
@@ -126,19 +148,23 @@ export class E2BService {
   /**
    * Create a new sandbox for a session
    */
-  async createSandbox(sessionId: string, environment?: string): Promise<E2BSandbox> {
+  public async createSandbox(sessionId: string, _environment?: string): Promise<E2BSandbox> {
     if (!this.isInitialized) {
       throw new Error('E2B service not initialized');
     }
 
     if (this.sandboxPool.has(sessionId)) {
       logger.warn(`Sandbox already exists for session ${sessionId}, returning existing`);
-      return this.sandboxPool.get(sessionId)!;
+      const existingSandbox = this.sandboxPool.get(sessionId);
+      if (!existingSandbox) {
+        throw new Error(`Sandbox for session ${sessionId} was unexpectedly null`);
+      }
+      return existingSandbox;
     }
 
     if (this.sandboxPool.size >= this.config.maxConcurrentSessions) {
       // Clean up old sessions to make room
-      await this.cleanupOldestSession();
+      this.cleanupOldestSession();
     }
 
     try {
@@ -174,7 +200,7 @@ export class E2BService {
   /**
    * Get existing sandbox for a session
    */
-  async getSandbox(sessionId: string): Promise<E2BSandbox | null> {
+  public getSandbox(sessionId: string): E2BSandbox | null {
     const sandbox = this.sandboxPool.get(sessionId);
 
     if (sandbox) {
@@ -189,19 +215,19 @@ export class E2BService {
   /**
    * Get or create sandbox for a session
    */
-  async getOrCreateSandbox(sessionId: string): Promise<E2BSandbox> {
-    const existing = await this.getSandbox(sessionId);
+  public async getOrCreateSandbox(sessionId: string): Promise<E2BSandbox> {
+    const existing = this.getSandbox(sessionId);
     if (existing) {
       return existing;
     }
 
-    return await this.createSandbox(sessionId);
+    return this.createSandbox(sessionId);
   }
 
   /**
    * Execute code in a sandbox
    */
-  async executeCode(
+  public async executeCode(
     sessionId: string,
     code: string,
     language: string = 'python'
@@ -225,7 +251,7 @@ export class E2BService {
         output: result.text || (result.logs ? result.logs.stdout.join('\n') : ''),
         error: result.error?.name || (result.logs ? result.logs.stderr.join('\n') : undefined),
         executionTime,
-        files: result.results?.map((r: any) => r.filename).filter(Boolean),
+        files: result.results?.map((r) => r.filename).filter((filename): filename is string => Boolean(filename)),
       };
 
       logger.info(
@@ -252,18 +278,39 @@ export class E2BService {
   /**
    * Execute code based on language type
    */
-  private async executeByLanguage(sandbox: Sandbox, code: string, language: string): Promise<any> {
+  private async executeByLanguage(sandbox: Sandbox, code: string, language: string): Promise<{
+    text?: string;
+    error?: { name: string };
+    logs?: { stdout: string[]; stderr: string[] };
+    results?: Array<{ filename?: string }>;
+  }> {
     switch (language.toLowerCase()) {
       case 'python':
-      case 'py':
-        return await sandbox.runCode(code);
+      case 'py': {
+        const execution = await sandbox.runCode(code);
+        return {
+          text: execution.text,
+          error: execution.error,
+          logs: execution.logs,
+          results: execution.results?.map(result => ({ 
+            filename: this.extractFilename(result)
+          })),
+        };
+      }
 
       case 'javascript':
       case 'js': {
         // Convert to Python execution of JavaScript-like logic where possible
-        // Note: E2B primarily supports Python, so we convert simple JS to Python
         const pythonCode = this.convertJSToPython(code);
-        return await sandbox.runCode(pythonCode);
+        const execution = await sandbox.runCode(pythonCode);
+        return {
+          text: execution.text,
+          error: execution.error,
+          logs: execution.logs,
+          results: execution.results?.map(result => ({ 
+            filename: this.extractFilename(result)
+          })),
+        };
       }
 
       case 'bash':
@@ -283,16 +330,32 @@ try:
 except subprocess.TimeoutExpired:
     print("Command timed out", file=sys.stderr)
     sys.exit(1)
-except Exception as e:
-    print(f"Execution error: {e}", file=sys.stderr)
-    sys.exit(1)
 `;
-        return await sandbox.runCode(bashCode);
+        const execution = await sandbox.runCode(bashCode);
+        return {
+          text: execution.text,
+          error: execution.error,
+          logs: execution.logs,
+          results: execution.results?.map(result => ({ 
+            filename: this.extractFilename(result)
+          })),
+        };
       }
 
       default:
         throw new Error(`Unsupported language: ${language}`);
     }
+  }
+
+  /**
+   * Safely extract filename from execution result
+   */
+  private extractFilename(result: unknown): string | undefined {
+    if (result && typeof result === 'object' && 'filename' in result) {
+      const { filename } = result as { filename: unknown };
+      return typeof filename === 'string' ? filename : undefined;
+    }
+    return undefined;
   }
 
   /**
@@ -339,9 +402,9 @@ print(f"File written to {${JSON.stringify(filePath)}}")
   /**
    * Download file from sandbox
    */
-  async downloadFile(sessionId: string, filePath: string): Promise<string> {
+  public async downloadFile(sessionId: string, filePath: string): Promise<string> {
     try {
-      const e2bSandbox = await this.getSandbox(sessionId);
+      const e2bSandbox = this.getSandbox(sessionId);
       if (!e2bSandbox) {
         throw new Error(`No sandbox found for session ${sessionId}`);
       }
@@ -365,7 +428,7 @@ except Exception as e:
       }
 
       logger.info(`📥 File downloaded from sandbox ${sessionId}: ${filePath}`);
-      return result.text || '';
+      return result.text ?? '';
     } catch (error) {
       logger.error(`❌ Failed to download file from session ${sessionId}:`, error);
       throw error;
@@ -375,7 +438,7 @@ except Exception as e:
   /**
    * Destroy a sandbox and clean up resources
    */
-  async destroySandbox(sessionId: string): Promise<void> {
+  public destroySandbox(sessionId: string): void {
     try {
       const e2bSandbox = this.sandboxPool.get(sessionId);
 
@@ -394,7 +457,7 @@ except Exception as e:
   /**
    * Clean up the oldest session to make room for new ones
    */
-  private async cleanupOldestSession(): Promise<void> {
+  private cleanupOldestSession(): void {
     if (this.sandboxPool.size === 0) return;
 
     let oldestSession: string | null = null;
@@ -409,7 +472,7 @@ except Exception as e:
 
     if (oldestSession) {
       logger.info(`🧹 Cleaning up oldest session: ${oldestSession}`);
-      await this.destroySandbox(oldestSession);
+      this.destroySandbox(oldestSession);
     }
   }
 
@@ -417,26 +480,21 @@ except Exception as e:
    * Start cleanup timer for expired sessions
    */
   private startCleanupTimer(): void {
-    this.cleanupTimer = setInterval(async () => {
-      await this.cleanupExpiredSessions();
+    this.cleanupTimer = setInterval(() => {
+      this.cleanupExpiredSessions();
     }, 300000); // Clean up every 5 minutes
   }
-
-  /**
-   * Stop cleanup timer and cleanup all resources
-   */
-  async shutdown(): Promise<void> {
+  shutdown(): void {
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;
     }
 
     // Destroy all active sandboxes
-    const destroyPromises = Array.from(this.sandboxPool.keys()).map(async sessionId =>
-      this.destroySandbox(sessionId)
-    );
+    Array.from(this.sandboxPool.keys()).forEach(sessionId => {
+      this.destroySandbox(sessionId);
+    });
 
-    await Promise.allSettled(destroyPromises);
     this.sandboxPool.clear();
     this.isInitialized = false;
 
@@ -444,9 +502,10 @@ except Exception as e:
   }
 
   /**
+  /**
    * Clean up expired sessions
    */
-  async cleanupExpiredSessions(): Promise<void> {
+  cleanupExpiredSessions(): void {
     const now = Date.now();
     const expiredSessions: string[] = [];
 
@@ -461,11 +520,10 @@ except Exception as e:
       logger.info(`🧹 Cleaning up ${expiredSessions.length} expired sessions`);
 
       for (const sessionId of expiredSessions) {
-        await this.destroySandbox(sessionId);
+        this.destroySandbox(sessionId);
       }
     }
   }
-
   /**
    * Install package in a sandbox
    */
@@ -550,51 +608,20 @@ except Exception as e:
   /**
    * Get service statistics
    */
-  getStats(): E2BServiceStats {
+  public getStats(): E2BServiceStats {
+    const totalSessionsCreated = this.sandboxPool.size;
+    const now = Date.now();
+    const averageSessionAge = this.sandboxPool.size > 0 
+      ? Array.from(this.sandboxPool.values())
+          .reduce((sum, sandbox) => sum + (now - sandbox.createdAt.getTime()), 0) / this.sandboxPool.size
+      : 0;
+
     return {
       isInitialized: this.isInitialized,
       activeSessions: this.sandboxPool.size,
       maxConcurrentSessions: this.config.maxConcurrentSessions,
-      totalSessionsCreated: this.sandboxPool.size, // This could be tracked more accurately
-      averageSessionAge: this.calculateAverageSessionAge(),
+      totalSessionsCreated,
+      averageSessionAge,
     };
   }
-
-  /**
-   * Calculate average session age
-   */
-  private calculateAverageSessionAge(): number {
-    if (this.sandboxPool.size === 0) return 0;
-
-    const now = Date.now();
-    let totalAge = 0;
-
-    for (const sandbox of this.sandboxPool.values()) {
-      totalAge += now - sandbox.createdAt.getTime();
-    }
-
-    return totalAge / this.sandboxPool.size;
-  }
-}
-
-/**
- * E2B service configuration
- */
-export interface E2BConfiguration {
-  apiKey: string;
-  defaultEnvironment: string;
-  sessionTimeout: number;
-  maxConcurrentSessions: number;
-  resourceLimits: ResourceLimits;
-}
-
-/**
- * E2B service statistics
- */
-export interface E2BServiceStats {
-  isInitialized: boolean;
-  activeSessions: number;
-  maxConcurrentSessions: number;
-  totalSessionsCreated: number;
-  averageSessionAge: number;
 }

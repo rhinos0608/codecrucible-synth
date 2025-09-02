@@ -10,7 +10,7 @@ import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 import { MetricsCollector } from '../monitoring/metrics-collector.js';
 import { AdaptivePerformanceTuner, PerformanceMetrics } from './adaptive-performance-tuner.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 export interface ProfileOperation {
   id: string;

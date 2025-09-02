@@ -797,7 +797,7 @@ export function createUnifiedOrchestrationServiceWithContext(
 ): UnifiedOrchestrationService {
   return new UnifiedOrchestrationService(
     configManager,
-    runtimeContext.getEventBus(),
+    runtimeContext.eventBus,
     userInteraction,
     runtimeContext
   );

@@ -62,7 +62,6 @@ export class CLICoordinator {
       this.formatter.print(`Intent: ${parsed.intent}`);
     }
     interaction.close();
-    this.sessions.endSession(session.id);
   }
 
   private shouldExit(line: string): boolean {

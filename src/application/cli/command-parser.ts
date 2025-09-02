@@ -29,7 +29,7 @@ export class CommandParser {
     const slash = CLIParser.parseSlashCommand(input);
     if (slash.command !== 'none') {
       return {
-        intent: slash.command as any,
+        intent: slash.command as ParsedCommand['intent'],
         confidence: 1,
         target: slash.role,
         originalInput: input,

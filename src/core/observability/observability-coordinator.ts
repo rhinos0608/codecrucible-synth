@@ -25,9 +25,15 @@ export interface ObservabilityConfig {
   health: HealthConfig;
   alerting: AlertConfig;
   telemetry?: TelemetryExporterConfig;
+
+  tracing?: unknown;
+  logging?: unknown;
+  storage?: unknown;
+
   tracing?: Record<string, unknown>;
   logging?: Record<string, unknown>;
   storage?: Record<string, unknown>;
+
 }
 
 export class ObservabilityCoordinator extends EventEmitter {

@@ -1,6 +1,13 @@
 use serde::{Deserialize, Serialize};
+
+use std::{collections::HashMap, time::Instant};
+use tracing::{info, warn};
+use tree_sitter::{Node, Parser, Query, QueryCursor};
+use tree_sitter_rust::language as rust_language;
+
 use std::collections::HashMap;
 use tracing::{info, warn};
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeAnalysisResult {
@@ -11,7 +18,7 @@ pub struct CodeAnalysisResult {
     pub maintainability_score: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CodeMetrics {
     pub total_lines: usize,
     pub code_lines: usize,
@@ -132,8 +139,119 @@ impl AnalysisTool {
     }
 
     fn calculate_metrics(&self, code: &str) -> CodeMetrics {
+        // Benchmark tree-sitter approach
+        let start_ts = Instant::now();
+        let ts_metrics = self
+            .calculate_metrics_tree_sitter(code)
+            .unwrap_or_else(|| self.calculate_metrics_regex(code));
+        let ts_time = start_ts.elapsed();
+
+        // Benchmark legacy regex approach
+        let start_regex = Instant::now();
+        let regex_metrics = self.calculate_metrics_regex(code);
+        let regex_time = start_regex.elapsed();
+
+        info!(
+            "metric collection times - tree-sitter: {:?}, regex: {:?}",
+            ts_time, regex_time
+        );
+
+        if ts_metrics != regex_metrics {
+            warn!(
+                "metric discrepancy detected: tree-sitter {:?} vs regex {:?}",
+                ts_metrics, regex_metrics
+            );
+        }
+
+        ts_metrics
+    }
+
+    fn calculate_metrics_tree_sitter(&self, code: &str) -> Option<CodeMetrics> {
+        let mut parser = Parser::new();
+        parser.set_language(rust_language()).ok()?;
+        let tree = parser.parse(code, None)?;
+
         let lines: Vec<&str> = code.lines().collect();
         let total_lines = lines.len();
+
+
+        let mut code_lines = 0;
+        let mut comment_lines = 0;
+        let mut blank_lines = 0;
+        for line in &lines {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                blank_lines += 1;
+            } else if trimmed.starts_with("//")
+                || trimmed.starts_with("/*")
+                || trimmed.starts_with("*")
+            {
+                comment_lines += 1;
+            } else {
+                code_lines += 1;
+            }
+        }
+
+        let lang = rust_language();
+
+        // Count functions
+        let query_fn = Query::new(lang, "(function_item) @fn").ok()?;
+        let mut cursor = QueryCursor::new();
+        let functions = cursor
+            .matches(&query_fn, tree.root_node(), code.as_bytes())
+            .count();
+
+        // Count structs/enums
+        let query_struct = Query::new(lang, "(struct_item) @s\n(enum_item) @e").ok()?;
+        let mut cursor = QueryCursor::new();
+        let classes_or_structs = cursor
+            .matches(&query_struct, tree.root_node(), code.as_bytes())
+            .count();
+
+        // Cyclomatic complexity via control flow nodes
+        let query_complex = Query::new(
+            lang,
+            "(if_expression) @c\n(match_expression) @c\n(for_expression) @c\n(while_expression) @c\n(loop_expression) @c",
+        )
+        .ok()?;
+        let mut cursor = QueryCursor::new();
+        let cyclomatic_complexity = 1 + cursor
+            .matches(&query_complex, tree.root_node(), code.as_bytes())
+            .count();
+
+        // Nesting depth by traversing block nodes
+        fn max_depth(node: Node, depth: usize) -> usize {
+            let mut max_d = depth;
+            let mut child_cursor = node.walk();
+            for child in node.children(&mut child_cursor) {
+                let child_depth = if child.kind() == "block" {
+                    max_depth(child, depth + 1)
+                } else {
+                    max_depth(child, depth)
+                };
+                max_d = max_d.max(child_depth);
+            }
+            max_d
+        }
+        let nesting_depth = max_depth(tree.root_node(), 0);
+
+        Some(CodeMetrics {
+            total_lines,
+            code_lines,
+            comment_lines,
+            blank_lines,
+            functions,
+            classes_or_structs,
+            cyclomatic_complexity,
+            nesting_depth,
+        })
+    }
+
+    fn calculate_metrics_regex(&self, code: &str) -> CodeMetrics {
+        let lines: Vec<&str> = code.lines().collect();
+        let total_lines = lines.len();
+
+
 
         let mut code_lines = 0;
         let mut comment_lines = 0;
@@ -154,7 +272,10 @@ impl AnalysisTool {
             } else {
                 code_lines += 1;
 
+
+
                 // Calculate nesting depth
+
                 let open_braces = trimmed.matches('{').count();
                 let close_braces = trimmed.matches('}').count();
                 current_nesting += open_braces;
@@ -163,9 +284,15 @@ impl AnalysisTool {
             }
         }
 
+
+        let functions = self.count_functions_regex(code);
+        let classes_or_structs = self.count_classes_structs_regex(code);
+        let cyclomatic_complexity = self.calculate_cyclomatic_complexity_regex(code);
+
         let functions = self.count_functions(code);
         let classes_or_structs = self.count_classes_structs(code);
         let cyclomatic_complexity = self.calculate_cyclomatic_complexity(code);
+
 
         CodeMetrics {
             total_lines,
@@ -179,7 +306,11 @@ impl AnalysisTool {
         }
     }
 
+
+    fn count_functions_regex(&self, code: &str) -> usize {
+
     fn count_functions(&self, code: &str) -> usize {
+
         let function_patterns = [
             r"fn\s+\w+",
             r"function\s+\w+",
@@ -197,7 +328,11 @@ impl AnalysisTool {
         count
     }
 
+
+    fn count_classes_structs_regex(&self, code: &str) -> usize {
+
     fn count_classes_structs(&self, code: &str) -> usize {
+
         let class_patterns = [
             r"class\s+\w+",
             r"struct\s+\w+",
@@ -215,7 +350,11 @@ impl AnalysisTool {
         count
     }
 
+
+    fn calculate_cyclomatic_complexity_regex(&self, code: &str) -> usize {
+
     fn calculate_cyclomatic_complexity(&self, code: &str) -> usize {
+
         let complexity_patterns = [
             r"\bif\b",
             r"\belse\b",
@@ -326,8 +465,12 @@ impl AnalysisTool {
             suggestions.push("Reduce nesting depth for better readability".to_string());
         }
 
+
+            && metrics.comment_lines as f64 / metrics.code_lines as f64 < 0.1
+
         if metrics.code_lines > 0
             && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
+
         {
             suggestions.push("Add more comments to improve code documentation".to_string());
         }

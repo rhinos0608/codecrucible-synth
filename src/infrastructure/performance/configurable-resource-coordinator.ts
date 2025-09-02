@@ -1,19 +1,19 @@
 /**
  * Resource Coordinator Factory - Non-Singleton Approach
- * 
+ *
  * Creates UnifiedResourceCoordinator instances that can be dependency-injected
  * rather than using the singleton pattern.
  */
 
 import { EventEmitter } from 'events';
 import { logger } from '../logging/unified-logger.js';
-import { 
-  ResourceLimits, 
-  ResourceUsage, 
-  ResourceAllocation, 
-  ResourceRestriction, 
+import {
+  ResourceLimits,
+  ResourceUsage,
+  ResourceAllocation,
+  ResourceRestriction,
   ResourceAlert,
-  ResourceCoordinationStats
+  ResourceCoordinationStats,
 } from './unified-resource-coordinator.js';
 
 /**
@@ -65,7 +65,7 @@ export interface ResourceCoordinatorConfig {
 
 /**
  * Dependency-Injectable Resource Coordinator
- * 
+ *
  * This replaces the singleton pattern with a factory approach
  */
 export class ConfigurableResourceCoordinator extends EventEmitter {
@@ -99,7 +99,8 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
   constructor(config: ResourceCoordinatorConfig = {}) {
     super();
 
-    this.coordinatorId = config.coordinatorId ?? `coord_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.coordinatorId =
+      config.coordinatorId ?? `coord_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     this.resourceLimits = { ...this.getDefaultResourceLimits(), ...config.resourceLimits };
     this.currentUsage = this.initializeResourceUsage();
 
@@ -163,7 +164,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
     this.monitoringIntervalId = undefined;
 
     logger.info('🛑 Resource coordination stopped', {
-      coordinatorId: this.coordinatorId
+      coordinatorId: this.coordinatorId,
     });
   }
 
@@ -190,7 +191,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
     });
 
     logger.info(`📋 Registered system for resource coordination: ${name} (priority: ${priority})`, {
-      coordinatorId: this.coordinatorId
+      coordinatorId: this.coordinatorId,
     });
     this.emit('system-registered', { name, priority });
   }
@@ -209,7 +210,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
     }
 
     const operationId = `op_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-    
+
     const operation: QueuedOperation = {
       id: operationId,
       systemName,
@@ -217,7 +218,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
       amount,
       priority,
       requestTime: Date.now(),
-      status: 'queued'
+      status: 'queued',
     };
 
     this.operationQueue.push(operation);
@@ -269,7 +270,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
     this.removeAllListeners();
 
     logger.info('🧹 Configurable Resource Coordinator disposed', {
-      coordinatorId: this.coordinatorId
+      coordinatorId: this.coordinatorId,
     });
   }
 
@@ -318,7 +319,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
     if (this.disposed) return;
 
     const memUsage = process.memoryUsage();
-    
+
     this.currentUsage = {
       timestamp: Date.now(),
       memory: {
@@ -356,20 +357,23 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
   private async checkResourceViolations(): Promise<void> {
     if (this.disposed) return;
 
-    const memoryViolation = this.currentUsage.memory.utilizationPercent > this.resourceLimits.memory.warningThreshold;
-    const concurrencyViolation = this.currentUsage.concurrency.activeOperations > this.resourceLimits.concurrency.maxConcurrentOperations;
+    const memoryViolation =
+      this.currentUsage.memory.utilizationPercent > this.resourceLimits.memory.warningThreshold;
+    const concurrencyViolation =
+      this.currentUsage.concurrency.activeOperations >
+      this.resourceLimits.concurrency.maxConcurrentOperations;
 
     if (memoryViolation || concurrencyViolation) {
       const alert: ResourceAlert = {
         level: 'warning',
         resourceType: memoryViolation ? 'memory' : 'concurrency',
-        current: memoryViolation 
+        current: memoryViolation
           ? this.currentUsage.memory.utilizationPercent
           : this.currentUsage.concurrency.activeOperations,
-        limit: memoryViolation 
+        limit: memoryViolation
           ? this.resourceLimits.memory.warningThreshold
           : this.resourceLimits.concurrency.maxConcurrentOperations,
-        message: memoryViolation 
+        message: memoryViolation
           ? `Memory usage ${this.currentUsage.memory.utilizationPercent.toFixed(1)}% exceeds warning threshold ${this.resourceLimits.memory.warningThreshold}%`
           : `Active operations ${this.currentUsage.concurrency.activeOperations} exceeds limit ${this.resourceLimits.concurrency.maxConcurrentOperations}`,
         timestamp: Date.now(),
@@ -400,20 +404,20 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
           resourceType: operation.resourceType,
           status: 'active',
           startTime: Date.now(),
-          amount: operation.amount
+          amount: operation.amount,
         });
 
         operation.status = 'allocated';
-        this.emit('resource-allocated', { 
-          operationId: operation.id, 
-          coordinatorId: this.coordinatorId 
+        this.emit('resource-allocated', {
+          operationId: operation.id,
+          coordinatorId: this.coordinatorId,
         });
       } catch (error) {
         operation.status = 'failed';
-        this.emit('resource-allocation-failed', { 
-          operationId: operation.id, 
-          coordinatorId: this.coordinatorId, 
-          error 
+        this.emit('resource-allocation-failed', {
+          operationId: operation.id,
+          coordinatorId: this.coordinatorId,
+          error,
         });
       }
     }
@@ -541,7 +545,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
 
   private calculateFairnessScore(): number {
     if (this.registeredSystems.size === 0) return 1.0;
-    
+
     // Simple fairness calculation based on equal distribution
     const expectedAllocation = 1.0 / this.registeredSystems.size;
     let totalDeviation = 0;
@@ -551,7 +555,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
       totalDeviation += Math.abs(actualAllocation - expectedAllocation);
     }
 
-    return Math.max(0, 1.0 - (totalDeviation / this.registeredSystems.size));
+    return Math.max(0, 1.0 - totalDeviation / this.registeredSystems.size);
   }
 }
 
@@ -562,16 +566,16 @@ export class ResourceCoordinatorFactory {
   private static defaultConfig: ResourceCoordinatorConfig = {
     monitoringInterval: 10000,
     maxAlerts: 100,
-    autoStart: true
+    autoStart: true,
   };
 
   /**
    * Set default configuration for all coordinators created by this factory
    */
   static setDefaults(config: Partial<ResourceCoordinatorConfig>): void {
-    ResourceCoordinatorFactory.defaultConfig = { 
-      ...ResourceCoordinatorFactory.defaultConfig, 
-      ...config 
+    ResourceCoordinatorFactory.defaultConfig = {
+      ...ResourceCoordinatorFactory.defaultConfig,
+      ...config,
     };
   }
 
@@ -586,25 +590,27 @@ export class ResourceCoordinatorFactory {
   /**
    * Create a test coordinator with minimal configuration
    */
-  static createForTesting(config: Partial<ResourceCoordinatorConfig> = {}): ConfigurableResourceCoordinator {
+  static createForTesting(
+    config: Partial<ResourceCoordinatorConfig> = {}
+  ): ConfigurableResourceCoordinator {
     const testConfig: ResourceCoordinatorConfig = {
       monitoringInterval: 100, // Fast for testing
       autoStart: false, // Don't auto-start in tests
       coordinatorId: `test_${Date.now()}`,
       resourceLimits: {
-        memory: { 
+        memory: {
           maxHeapSize: 50 * 1024 * 1024, // 50MB for testing
           warningThreshold: 50,
           criticalThreshold: 70,
-          gcForceThreshold: 80
+          gcForceThreshold: 80,
         },
-        concurrency: { 
+        concurrency: {
           maxConcurrentOperations: 5,
           maxQueueSize: 20,
-          operationTimeout: 30000
-        }
+          operationTimeout: 30000,
+        },
       },
-      ...config
+      ...config,
     };
 
     return new ConfigurableResourceCoordinator(testConfig);
@@ -618,18 +624,18 @@ export class ResourceCoordinatorFactory {
       coordinatorId: 'high_perf_coordinator',
       monitoringInterval: 5000, // More frequent monitoring
       resourceLimits: {
-        memory: { 
+        memory: {
           maxHeapSize: 1024 * 1024 * 1024, // 1GB
           warningThreshold: 75,
           criticalThreshold: 90,
-          gcForceThreshold: 95
+          gcForceThreshold: 95,
         },
-        concurrency: { 
+        concurrency: {
           maxConcurrentOperations: 50,
           maxQueueSize: 200,
-          operationTimeout: 300000
-        }
-      }
+          operationTimeout: 300000,
+        },
+      },
     });
   }
 }

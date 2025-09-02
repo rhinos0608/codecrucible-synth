@@ -19,7 +19,7 @@ import {
 import { IUnifiedSecurityValidator } from '../services/unified-security-validator.js';
 import { IEventBus } from '../interfaces/event-bus.js';
 import { ILogger } from '../interfaces/logger.js';
-import { RustExecutionBackend } from '../../core/execution/rust-executor/rust-execution-backend.js';
+import { RustExecutionBackend } from '../../infrastructure/execution/rust-executor/rust-execution-backend.js';
 
 // ============================================================================
 // CORE TOOL FRAMEWORK - Base classes and interfaces

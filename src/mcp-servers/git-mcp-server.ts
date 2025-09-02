@@ -24,8 +24,12 @@ class BaseMCPServer {
     public description: string
   ) {}
 }
-import { ApprovalManager, Operation, OperationContext } from '../core/approval/approval-manager.js';
-import { logger } from '../core/logger.js';
+import {
+  ApprovalManager,
+  Operation,
+  OperationContext,
+} from '../domain/approval/approval-manager.js';
+import { logger } from '../infrastructure/logging/logger.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -524,7 +528,9 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Branch operations
    */
-  async handleGitBranch(args: BranchArgs): Promise<ToolResponse<{ currentBranch: string; action?: string; branch?: string }>> {
+  async handleGitBranch(
+    args: BranchArgs
+  ): Promise<ToolResponse<{ currentBranch: string; action?: string; branch?: string }>> {
     try {
       const { name, checkout = false, delete: deleteBranch = false, remote } = args;
 
@@ -691,7 +697,9 @@ export class GitMCPServer extends BaseMCPServer {
    */
   async handleGitMerge(
     args: MergeArgs
-  ): Promise<ToolResponse<{ branch: string; strategy: string; noFastForward?: boolean; output?: string }>> {
+  ): Promise<
+    ToolResponse<{ branch: string; strategy: string; noFastForward?: boolean; output?: string }>
+  > {
     try {
       const { branch, strategy = 'merge', noFastForward = false } = args;
 
@@ -819,7 +827,9 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git tags
    */
-  async handleGitTag(args: TagArgs): Promise<ToolResponse<{ name: string; message?: string; action?: string; tag?: string }>> {
+  async handleGitTag(
+    args: TagArgs
+  ): Promise<ToolResponse<{ name: string; message?: string; action?: string; tag?: string }>> {
     try {
       const { name, message, delete: deleteTag = false, push = false } = args;
 

@@ -6,7 +6,8 @@ use crate::security::{IsolationError, ProcessIsolation, SecurityContext, Securit
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 use thiserror::Error;
@@ -56,8 +57,8 @@ pub struct CommandResult {
     pub working_directory: Option<PathBuf>,
 }
 
-/// Command whitelist for security - only these commands are allowed
-const ALLOWED_COMMANDS: &[&str] = &[
+/// Default command whitelist for security - can be overridden via configuration
+const DEFAULT_ALLOWED_COMMANDS: &[&str] = &[
     // Basic file operations
     "ls", "dir", "cat", "head", "tail", "find", "grep", "wc", "sort", "uniq",
     // Development tools
@@ -103,6 +104,11 @@ const BLOCKED_PATTERNS: &[&str] = &[
     "usermod",
 ];
 
+// List of forbidden shell metacharacters to prevent command injection
+const SHELL_METACHARS: &[char] = &[
+    ';', '&', '|', '$', '>', '<', '`', '!', '*', '?', '~', '(', ')', '{', '}', '[', ']', '\'', '"',
+];
+
 /// Secure command executor with comprehensive sandboxing and validation
 pub struct CommandExecutor {
     security_context: SecurityContext,
@@ -121,20 +127,80 @@ impl CommandExecutor {
         let isolation = ProcessIsolation::new(security_context.clone());
 
         // Copy blocked patterns for simple string matching
-        let blocked_patterns = BLOCKED_PATTERNS
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let blocked_patterns = BLOCKED_PATTERNS.iter().map(|s| s.to_string()).collect();
+
+        let command_whitelist = Self::load_command_whitelist(&security_context);
 
         Self {
             security_context,
             isolation,
-            command_whitelist: ALLOWED_COMMANDS.iter().map(|s| s.to_string()).collect(),
+            command_whitelist,
             blocked_patterns,
             max_execution_time: Duration::from_secs(120), // 2 minutes default
             max_output_size: 1024 * 1024,                 // 1MB default
             max_memory_bytes: 512 * 1024 * 1024,          // 512MB memory limit
         }
+    }
+
+    fn load_command_whitelist(security_context: &SecurityContext) -> Vec<String> {
+        let mut commands: Vec<String> = if !security_context.command_allowlist.is_empty() {
+            security_context.command_allowlist.iter().cloned().collect()
+        } else if let Ok(path) = std::env::var("COMMAND_ALLOWLIST_FILE") {
+            match Self::load_whitelist_from_file(Path::new(&path)) {
+                Ok(list) => list,
+                Err(e) => {
+                    eprintln!("Failed to load command allowlist from {}: {}", path, e);
+                    Vec::new()
+                }
+            }
+        } else {
+            DEFAULT_ALLOWED_COMMANDS
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
+        };
+
+        commands
+            .into_iter()
+            .filter(|cmd| {
+                if let Err(e) = Self::validate_command_name_static(cmd) {
+                    eprintln!("Ignoring invalid command in allowlist: {}", e);
+                    false
+                } else {
+                    true
+                }
+            })
+            .collect()
+    }
+
+    fn load_whitelist_from_file(path: &Path) -> Result<Vec<String>, std::io::Error> {
+        let content = fs::read_to_string(path)?;
+        let list: Vec<String> = serde_json::from_str(&content)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        Ok(list)
+    }
+
+    fn validate_command_name_static(command: &str) -> Result<(), CommandExecutionError> {
+        if command.trim().is_empty()
+            || command.contains(' ')
+            || command.contains('/')
+            || command.contains('\\')
+            || command.chars().any(|c| SHELL_METACHARS.contains(&c))
+        {
+            return Err(CommandExecutionError::InvalidArguments {
+                message: format!("Invalid command name: {}", command),
+            });
+        }
+
+        for pattern in BLOCKED_PATTERNS {
+            if command.contains(pattern) {
+                return Err(CommandExecutionError::CommandNotAllowed {
+                    command: command.to_string(),
+                });
+            }
+        }
+
+        Ok(())
     }
 
     /// Execute a command with full security validation and sandboxing
@@ -577,15 +643,60 @@ impl CommandExecutor {
     }
 
     /// Add a command to the whitelist (for extensibility)
-    pub fn add_allowed_command(&mut self, command: String) {
+    pub fn add_allowed_command(&mut self, command: String) -> Result<(), CommandExecutionError> {
+        self.validate_command_name(&command)?;
         if !self.command_whitelist.contains(&command) {
             self.command_whitelist.push(command);
         }
+        Ok(())
     }
 
     /// Remove a command from the whitelist
     pub fn remove_allowed_command(&mut self, command: &str) {
         self.command_whitelist.retain(|c| c != command);
+    }
+
+    /// Replace the whitelist with a new set of commands
+    pub fn set_command_whitelist(
+        &mut self,
+        commands: Vec<String>,
+    ) -> Result<(), CommandExecutionError> {
+        for cmd in &commands {
+            self.validate_command_name(cmd)?;
+        }
+        self.command_whitelist = commands;
+        Ok(())
+    }
+
+    fn validate_command_name(&self, command: &str) -> Result<(), CommandExecutionError> {
+
+        Self::validate_command_name_static(command)
+
+        // List of forbidden shell metacharacters
+        const SHELL_METACHARS: &[char] = &[
+            ';', '&', '|', '$', '>', '<', '`', '!', '*', '?', '~', '(', ')', '{', '}', '[', ']', '\'', '"'
+        ];
+        if command.trim().is_empty()
+            || command.contains(' ')
+            || command.contains('/')
+            || command.contains('\\')
+            || command.chars().any(|c| SHELL_METACHARS.contains(&c))
+        {
+            return Err(CommandExecutionError::InvalidArguments {
+                message: format!("Invalid command name: {}", command),
+            });
+        }
+
+        for pattern in &self.blocked_patterns {
+            if command.contains(pattern) {
+                return Err(CommandExecutionError::CommandNotAllowed {
+                    command: command.to_string(),
+                });
+            }
+        }
+
+        Ok(())
+
     }
 }
 
@@ -613,8 +724,12 @@ mod tests {
     };
     use serde_json::json;
     use std::collections::HashMap;
+    use std::fs;
     use std::path::PathBuf;
+    use std::sync::Mutex;
     use tempfile::TempDir;
+
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     fn create_test_executor() -> (CommandExecutor, TempDir) {
         let temp_dir = TempDir::new().unwrap();
@@ -823,11 +938,43 @@ mod tests {
         let initial_count = executor.get_supported_commands().len();
 
         // Add a new command
-        executor.add_allowed_command("test_command".to_string());
+        executor
+            .add_allowed_command("test_command".to_string())
+            .unwrap();
         assert_eq!(executor.get_supported_commands().len(), initial_count + 1);
 
         // Remove a command
         executor.remove_allowed_command("test_command");
         assert_eq!(executor.get_supported_commands().len(), initial_count);
+    }
+
+    #[test]
+    fn test_allowlist_from_security_context() {
+        let mut context = SecurityContext::for_command_execution();
+        context.set_command_allowlist(vec!["custom".to_string()]);
+        let executor = CommandExecutor::new(context);
+        assert_eq!(
+            executor.get_supported_commands(),
+            vec!["custom".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_allowlist_from_config_file() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("allow.json");
+        fs::write(&file_path, serde_json::to_string(&vec!["foo"]).unwrap()).unwrap();
+        std::env::set_var("COMMAND_ALLOWLIST_FILE", &file_path);
+        let context = SecurityContext::for_command_execution();
+        let executor = CommandExecutor::new(context);
+        std::env::remove_var("COMMAND_ALLOWLIST_FILE");
+        assert_eq!(executor.get_supported_commands(), vec!["foo".to_string()]);
+    }
+
+    #[test]
+    fn test_invalid_command_rejected() {
+        let (mut executor, _temp_dir) = create_test_executor();
+        assert!(executor.add_allowed_command("bad cmd".to_string()).is_err());
     }
 }

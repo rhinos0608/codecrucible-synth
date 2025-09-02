@@ -11,7 +11,7 @@
 
 import { LMStudioClient as SDK } from '@lmstudio/sdk';
 import { EventEmitter } from 'events';
-import { logger } from '../../core/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 
 export interface LMStudioConnectionConfig {
   baseUrl?: string;

@@ -1,8 +1,17 @@
 use serde::{Deserialize, Serialize};
+
 use std::{collections::HashMap, sync::Mutex, time::Instant};
+
+
+use std::{collections::HashMap, time::Instant};
+
 use tracing::{info, warn};
 use tree_sitter::{Node, Parser, Query, QueryCursor};
 use tree_sitter_rust::language as rust_language;
+
+use std::collections::HashMap;
+use tracing::{info, warn};
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeAnalysisResult {
@@ -222,6 +231,7 @@ impl AnalysisTool {
         let lines: Vec<&str> = code.lines().collect();
         let total_lines = lines.len();
 
+
         let mut code_lines = 0;
         let mut comment_lines = 0;
         let mut blank_lines = 0;
@@ -289,6 +299,8 @@ impl AnalysisTool {
         let lines: Vec<&str> = code.lines().collect();
         let total_lines = lines.len();
 
+
+
         let mut code_lines = 0;
         let mut comment_lines = 0;
         let mut blank_lines = 0;
@@ -308,6 +320,10 @@ impl AnalysisTool {
             } else {
                 code_lines += 1;
 
+
+
+                // Calculate nesting depth
+
                 let open_braces = trimmed.matches('{').count();
                 let close_braces = trimmed.matches('}').count();
                 current_nesting += open_braces;
@@ -316,9 +332,15 @@ impl AnalysisTool {
             }
         }
 
+
         let functions = self.count_functions_regex(code);
         let classes_or_structs = self.count_classes_structs_regex(code);
         let cyclomatic_complexity = self.calculate_cyclomatic_complexity_regex(code);
+
+        let functions = self.count_functions(code);
+        let classes_or_structs = self.count_classes_structs(code);
+        let cyclomatic_complexity = self.calculate_cyclomatic_complexity(code);
+
 
         CodeMetrics {
             total_lines,
@@ -332,7 +354,11 @@ impl AnalysisTool {
         }
     }
 
+
     fn count_functions_regex(&self, code: &str) -> usize {
+
+    fn count_functions(&self, code: &str) -> usize {
+
         let function_patterns = [
             r"fn\s+\w+",
             r"function\s+\w+",
@@ -350,7 +376,11 @@ impl AnalysisTool {
         count
     }
 
+
     fn count_classes_structs_regex(&self, code: &str) -> usize {
+
+    fn count_classes_structs(&self, code: &str) -> usize {
+
         let class_patterns = [
             r"class\s+\w+",
             r"struct\s+\w+",
@@ -368,7 +398,11 @@ impl AnalysisTool {
         count
     }
 
+
     fn calculate_cyclomatic_complexity_regex(&self, code: &str) -> usize {
+
+    fn calculate_cyclomatic_complexity(&self, code: &str) -> usize {
+
         let complexity_patterns = [
             r"\bif\b",
             r"\belse\b",
@@ -479,8 +513,17 @@ impl AnalysisTool {
             suggestions.push("Reduce nesting depth for better readability".to_string());
         }
 
+
         if metrics.code_lines > 0
             && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
+
+
+            && metrics.comment_lines as f64 / metrics.code_lines as f64 < 0.1
+
+        if metrics.code_lines > 0
+            && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
+
+
         {
             suggestions.push("Add more comments to improve code documentation".to_string());
         }

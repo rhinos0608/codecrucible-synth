@@ -31,7 +31,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
   ) {
     this.logger = logger ?? createLogger('VoiceSystem');
     this.council = new CouncilOrchestrator(
-      new CouncilDecisionEngine(this as any, modelClient as any)
+      new CouncilDecisionEngine(this as VoiceArchetypeSystemInterface, modelClient)
     );
   }
 

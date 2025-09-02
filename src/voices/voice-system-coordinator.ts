@@ -7,7 +7,7 @@ import { createArchetypeDefinitions, VoiceDefinition } from './archetype-definit
 import { selectVoices } from './voice-selector.js';
 import { CouncilOrchestrator, CouncilMode } from './council-orchestrator.js';
 import { synthesizePerspectives, VoiceOutput } from './perspective-synthesizer.js';
-import { CouncilDecisionEngine } from '../core/collaboration/council-decision-engine.js';
+import { CouncilDecisionEngine } from './collaboration/council-decision-engine.js';
 
 export interface SynthesisResult {
   finalDecision: string;
@@ -30,9 +30,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     logger?: ILogger
   ) {
     this.logger = logger ?? createLogger('VoiceSystem');
-    this.council = new CouncilOrchestrator(
-      new CouncilDecisionEngine(this, modelClient)
-    );
+    this.council = new CouncilOrchestrator(new CouncilDecisionEngine(this, modelClient));
     // NOTE: Call initialize() explicitly after construction.
   }
 
@@ -111,15 +109,21 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     };
   }
 
-  async generateMultiVoiceSolutions(voices: string[], prompt: string, options?: any): Promise<any[]> {
+  async generateMultiVoiceSolutions(
+    voices: string[],
+    prompt: string,
+    options?: any
+  ): Promise<any[]> {
     const result = await this.processPrompt(prompt, { requiredVoices: voices });
     // Convert single result to array format expected by callers
-    return [{
-      voice: result.voicesUsed?.[0] || 'synthesized',
-      content: result.finalDecision,
-      confidence: result.consensus || 0.8,
-      files: options?.files || []
-    }];
+    return [
+      {
+        voice: result.voicesUsed?.[0] || 'synthesized',
+        content: result.finalDecision,
+        confidence: result.consensus || 0.8,
+        files: options?.files || [],
+      },
+    ];
   }
 
   async getVoicePerspective(voiceId: string, prompt: string): Promise<any> {
@@ -141,9 +145,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
 
   setLivingSpiralCoordinator(coordinator: any): void {
     // Update the council with the spiral coordinator if needed
-    this.council = new CouncilOrchestrator(
-      new CouncilDecisionEngine(this, this.modelClient)
-    );
+    this.council = new CouncilOrchestrator(new CouncilDecisionEngine(this, this.modelClient));
   }
 
   async synthesizeMultipleVoices(request: string, context: any = {}): Promise<any> {

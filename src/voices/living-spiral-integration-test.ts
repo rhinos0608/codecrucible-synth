@@ -6,7 +6,7 @@
  */
 
 import { VoiceSystemIntegration2025 } from './voice-system-integration-2025.js';
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/logger.js';
 
 interface LivingSpiralPhase {
   name: string;
@@ -39,7 +39,7 @@ export class LivingSpiralIntegrationTest {
       useOptimizedSystem: true,
       maxConcurrentVoices: 5,
       enablePerformanceMonitoring: true,
-      voiceSelectionStrategy: 'adaptive'
+      voiceSelectionStrategy: 'adaptive',
     });
   }
 
@@ -403,4 +403,3 @@ export async function runLivingSpiralIntegrationTest(): Promise<any> {
     };
   }
 }
-

@@ -1,4 +1,4 @@
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/logger.js';
 import axios from 'axios';
 
 export interface ExaSearchConfig {

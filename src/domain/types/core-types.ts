@@ -38,7 +38,7 @@ export type {
   ModelRequest,
   ModelResponse,
   ProjectContext,
-  ExecutionResult
+  ExecutionResult,
 } from './unified-types.js';
 
 // Additional types for backward compatibility

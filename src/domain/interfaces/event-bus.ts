@@ -52,8 +52,18 @@ export interface SystemEvents {
 
   // Performance Events
   'performance:operation_start': { operationId: string; operationType: string; metadata?: any };
-  'performance:operation_end': { operationId: string; duration: number; status: 'success' | 'error'; error?: Error };
-  'performance:slow_operation': { operationId: string; operationType: string; duration: number; threshold: number };
+  'performance:operation_end': {
+    operationId: string;
+    duration: number;
+    status: 'success' | 'error';
+    error?: Error;
+  };
+  'performance:slow_operation': {
+    operationId: string;
+    operationType: string;
+    duration: number;
+    threshold: number;
+  };
   'performance:session_start': { sessionId: string; sessionType: string };
   'performance:session_end': { sessionId: string; summary: any };
 }
@@ -64,7 +74,9 @@ let globalEventBus: IEventBus | null = null;
 
 export function getGlobalEventBus(): IEventBus {
   if (!globalEventBus) {
-    throw new Error('Global event bus not initialized. Call setGlobalEventBus(...) during bootstrap.');
+    throw new Error(
+      'Global event bus not initialized. Call setGlobalEventBus(...) during bootstrap.'
+    );
   }
   return globalEventBus;
 }
@@ -72,4 +84,3 @@ export function getGlobalEventBus(): IEventBus {
 export function setGlobalEventBus(eventBus: IEventBus): void {
   globalEventBus = eventBus;
 }
-

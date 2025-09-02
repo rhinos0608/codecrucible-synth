@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/logger.js';
 import {
   SecurityAuditLogger,
   AuditEventType,
@@ -303,8 +303,8 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
         action: 'deployment_start',
         details: {
           plan,
-          message: `Starting deployment of version ${plan.version} to ${plan.environment}`
-        }
+          message: `Starting deployment of version ${plan.version} to ${plan.environment}`,
+        },
       });
     }
 

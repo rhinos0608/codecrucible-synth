@@ -12,7 +12,7 @@ import {
 } from '@azure/arm-compute';
 import { WebSiteManagementClient, Site } from '@azure/arm-appservice';
 import { DefaultAzureCredential } from '@azure/identity';
-import { logger } from '../../core/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 
 export interface AzureDeploymentConfig {
   subscriptionId: string;

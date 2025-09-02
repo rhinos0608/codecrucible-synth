@@ -10,8 +10,8 @@ export class ConfigWatcher {
 
   start(): void {
     if (this.watcher) return;
-    
-    this.watcher = watch(this.filePath, async (eventType) => {
+
+    this.watcher = watch(this.filePath, async eventType => {
       if (eventType === 'change') {
         try {
           await this.onChange();

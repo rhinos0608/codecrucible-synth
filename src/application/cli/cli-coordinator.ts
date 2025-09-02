@@ -9,8 +9,8 @@ import { OutputFormatter } from './output-formatter.js';
  * dedicated helpers to keep this file lightweight and maintainable.
  */
 export class CLICoordinator {
+  private interaction: InteractionManager | null = null;
   constructor(
-    private interaction = new InteractionManager(),
     private sessions = new SessionManager(),
     private formatter = new OutputFormatter()
   ) {}
@@ -23,6 +23,7 @@ export class CLICoordinator {
     const session = this.sessions.createSession();
 
     if (!command) {
+      this.interaction = new InteractionManager();
       await this.repl(session);
       return;
     }
@@ -39,15 +40,19 @@ export class CLICoordinator {
     }
 
     this.sessions.endSession(session.id);
+    this.interaction?.close();
+    this.interaction = null;
   }
 
   /**
    * Start interactive REPL-style session.
    */
   private async repl(session: CLISession): Promise<void> {
+    const interaction = this.interaction!;
+    // this.interaction is guaranteed to be set before repl() is called
     let shouldContinue = true;
     while (shouldContinue) {
-      const line = await this.interaction.ask('> ');
+      const line = await interaction.ask('> ');
       if (this.shouldExit(line)) {
         shouldContinue = false;
         continue;
@@ -56,7 +61,7 @@ export class CLICoordinator {
       this.sessions.record(session.id, line);
       this.formatter.print(`Intent: ${parsed.intent}`);
     }
-    this.interaction.close();
+    interaction.close();
   }
 
   private shouldExit(line: string): boolean {

@@ -8,11 +8,6 @@ import { VoiceArchetypeSystemInterface } from '../../domain/interfaces/voice-sys
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 import { EventEmitter } from 'events';
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
-import {
-  subAgentIsolationSystem,
-  IsolationLevel,
-} from '../../domain/agents/sub-agent-isolation-system.js';
-import { EnterpriseSecurityFramework } from '../../infrastructure/security/enterprise-security-framework.js';
 
 export interface VoicePerspective {
   voiceId: string;
@@ -61,26 +56,23 @@ export interface CouncilConfig {
 }
 
 export class CouncilDecisionEngine extends EventEmitter {
-  private voiceSystem: VoiceArchetypeSystemInterface;
-  private modelClient: any;
-  private securityFramework: EnterpriseSecurityFramework;
-  private performanceMetrics: Map<string, PerformanceMetric[]> = new Map();
+  private readonly voiceSystem: VoiceArchetypeSystemInterface;
   private readonly logger = createLogger('CouncilDecision');
 
-  constructor(voiceSystem: VoiceArchetypeSystem, modelClient: any) {
+  public constructor(
+    voiceSystem: Readonly<VoiceArchetypeSystem>
+  ) {
     super();
     this.voiceSystem = voiceSystem;
-    this.modelClient = modelClient;
-    this.securityFramework = new EnterpriseSecurityFramework();
   }
 
   /**
    * Conduct a council session with multiple voices
    */
-  async conductCouncilSession(
+  public async conductCouncilSession(
     prompt: string,
-    voices: string[],
-    config: CouncilConfig
+    voices: readonly string[],
+    _config: Readonly<CouncilConfig>
   ): Promise<CouncilDecision> {
     const sessionId = this.generateSessionId();
     this.logger.info(`Starting council session ${sessionId} with ${voices.length} voices`);
@@ -90,7 +82,7 @@ export class CouncilDecisionEngine extends EventEmitter {
     // Collect perspectives from each voice
     for (const voiceId of voices) {
       try {
-        const perspective = await this.voiceSystem.getVoicePerspective(voiceId, prompt);
+        const perspective = await this.voiceSystem.getVoicePerspective(voiceId, prompt) as VoicePerspective;
         perspectives.push(perspective);
       } catch (error) {
         this.logger.warn(`Failed to get perspective from voice ${voiceId}:`, error);
@@ -100,7 +92,7 @@ export class CouncilDecisionEngine extends EventEmitter {
     return {
       finalDecision: this.synthesizeDecision(perspectives),
       consensusLevel: this.calculateConsensus(perspectives),
-      participatingVoices: voices,
+      participatingVoices: Array.from(voices),
       perspectives,
       conflictsResolved: [],
       decisionRationale: 'Multi-voice synthesis decision',
@@ -126,7 +118,7 @@ export class CouncilDecisionEngine extends EventEmitter {
 }
 
 // Supporting interfaces for enhanced functionality
-interface PerformanceMetric {
+interface _PerformanceMetric {
   operation: string;
   duration: number;
   success: boolean;

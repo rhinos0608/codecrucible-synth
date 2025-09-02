@@ -1,12 +1,12 @@
 import { accessSync } from 'fs';
 import { execSync } from 'child_process';
 import { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system.js';
-import { createLogger, ILogger } from '../infrastructure/logging/logger-adapter.js';
+import { ILogger, createLogger } from '../infrastructure/logging/logger-adapter.js';
 import { RuntimeContext } from './enterprise-voice-prompts.js';
-import { createArchetypeDefinitions, VoiceDefinition } from './archetype-definitions.js';
+import { VoiceDefinition, createArchetypeDefinitions } from './archetype-definitions.js';
 import { selectVoices } from './voice-selector.js';
-import { CouncilOrchestrator, CouncilMode } from './council-orchestrator.js';
-import { synthesizePerspectives, VoiceOutput } from './perspective-synthesizer.js';
+import { CouncilMode, CouncilOrchestrator } from './council-orchestrator.js';
+import { VoiceOutput, synthesizePerspectives } from './perspective-synthesizer.js';
 import { CouncilDecisionEngine } from './collaboration/council-decision-engine.js';
 
 export interface SynthesisResult {
@@ -25,8 +25,8 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
   private logger: ILogger;
   private council: CouncilOrchestrator;
 
-  constructor(
-    private modelClient?: any,
+  public constructor(
+    private readonly modelClient?: unknown,
     logger?: ILogger
   ) {
     this.logger = logger ?? createLogger('VoiceSystem');
@@ -34,7 +34,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     // NOTE: Call initialize() explicitly after construction.
   }
 
-  initialize(): void {
+  public initialize(): void {
     const context = this.buildContext();
     this.voices = createArchetypeDefinitions(context);
   }
@@ -109,11 +109,16 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     };
   }
 
-  async generateMultiVoiceSolutions(
+  public async generateMultiVoiceSolutions(
     voices: string[],
     prompt: string,
-    options?: any
-  ): Promise<any[]> {
+    options?: { files?: string[] }
+  ): Promise<Array<{
+    voice: string;
+    content: string;
+    confidence: number;
+    files: string[];
+  }>> {
     const result = await this.processPrompt(prompt, { requiredVoices: voices });
     // Convert single result to array format expected by callers
     return [
@@ -121,14 +126,22 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
         voice: result.voicesUsed?.[0] || 'synthesized',
         content: result.finalDecision,
         confidence: result.consensus || 0.8,
-        files: options?.files || [],
+        files: options && Array.isArray(options.files) ? options.files : [],
       },
     ];
   }
 
-  async getVoicePerspective(voiceId: string, prompt: string): Promise<any> {
+  public getVoicePerspective(voiceId: string, prompt: string): Promise<{
+    voiceId: string;
+    position: string;
+    confidence: number;
+    reasoning: string;
+    supportingEvidence: unknown[];
+    concerns: unknown[];
+    alternatives: unknown[];
+  }> {
     const voice = this.voices.get(voiceId);
-    return {
+    return Promise.resolve({
       voiceId,
       position: `${voice?.name ?? voiceId} perspective on: ${prompt}`,
       confidence: 0.5,
@@ -136,21 +149,36 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
       supportingEvidence: [],
       concerns: [],
       alternatives: [],
-    };
+    });
   }
 
-  getLivingSpiralCoordinator(): any {
+  public getLivingSpiralCoordinator(): CouncilOrchestrator {
     return this.council;
   }
 
-  setLivingSpiralCoordinator(coordinator: any): void {
+  public setLivingSpiralCoordinator(_coordinator: unknown): void {
     // Update the council with the spiral coordinator if needed
     this.council = new CouncilOrchestrator(new CouncilDecisionEngine(this, this.modelClient));
   }
 
-  async synthesizeMultipleVoices(request: string, context: any = {}): Promise<any> {
-    // Use the existing processPrompt method which handles multiple voices
-    return this.processPrompt(request, context);
+  public async synthesizeMultipleVoices(
+    request: string,
+    context: { requiredVoices?: string[]; councilMode?: CouncilMode } = {}
+  ): Promise<SynthesisResult> {
+    // Map context to the expected type for processPrompt
+    const options: { requiredVoices?: string[]; councilMode?: CouncilMode } = {};
+    if (context && typeof context === 'object') {
+      if (Array.isArray(context.requiredVoices)) {
+        options.requiredVoices = context.requiredVoices;
+      }
+      if (
+        typeof context.councilMode === 'string' ||
+        typeof context.councilMode === 'number'
+      ) {
+        options.councilMode = context.councilMode;
+      }
+    }
+    return this.processPrompt(request, options);
   }
 }
 

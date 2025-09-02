@@ -147,10 +147,11 @@ export class LivingSpiralIntegrationTest {
         singleVoiceResult = await this.voiceSystem.generateSingleVoiceResponse(
           finalVoices[0],
           testPrompt
-        );
+        ) as { confidence?: number; tokens_used?: number };
+
       } else {
         // Test multi-voice coordination
-        const multiVoiceResults = await this.voiceSystem.generateMultiVoiceSolutions(
+        await this.voiceSystem.generateMultiVoiceSolutions(
           finalVoices,
           testPrompt,
           {
@@ -161,16 +162,24 @@ export class LivingSpiralIntegrationTest {
         );
 
         // Use synthesis for final result
-        singleVoiceResult = await this.voiceSystem.synthesize(testPrompt, finalVoices, 'consensus');
+        singleVoiceResult = await this.voiceSystem.synthesize(
+          testPrompt,
+          finalVoices,
+          'consensus'
+        ) as { confidence?: number; tokens_used?: number };
       }
 
       const duration = Date.now() - startTime;
-      const quality = singleVoiceResult.confidence || 0;
+      const quality: number = typeof singleVoiceResult?.confidence === 'number'
+        ? singleVoiceResult.confidence
+        : 0;
       const success = duration <= phase.expectedDuration * 1.5 && quality >= phase.qualityThreshold;
 
       // Calculate cost savings (comparison with baseline)
       const baselineCost = finalVoices.length * 0.08; // Baseline cost per voice
-      const actualCost = (singleVoiceResult.tokens_used || 1000) * 0.00001;
+      const actualCost = (typeof singleVoiceResult?.tokens_used === 'number'
+        ? singleVoiceResult.tokens_used
+        : 1000) * 0.00001;
       const costSavings = Math.max(0, baselineCost - actualCost);
 
       const result: SpiralTestResult = {
@@ -289,18 +298,48 @@ export class LivingSpiralIntegrationTest {
   /**
    * Generate comprehensive test report
    */
-  async generateTestReport(): Promise<any> {
-    const analytics = await this.voiceSystem.getSystemAnalytics();
+  public async generateTestReport(): Promise<{
+    testSummary: {
+      totalPhases: number;
+      successfulPhases: number;
+      successRate: number;
+      totalDuration: number;
+      averageQuality: number;
+      totalCostSavings: number;
+    };
+    phaseResults: ReadonlyArray<SpiralTestResult>;
+    systemAnalytics: {
+      systemOverview: {
+        optimizationsActive: boolean;
+        recommendationsGenerated: number;
+      };
+      [key: string]: unknown;
+    };
+    integrationStatus: {
+      spiralIntegration: boolean;
+      optimizationsActive: boolean;
+      performanceImprovement: number;
+      recommendationsGenerated: number;
+    };
+    conclusions: string[];
+  }> {
+    const analytics = await this.voiceSystem.getSystemAnalytics() as {
+      systemOverview: {
+        optimizationsActive: boolean;
+        recommendationsGenerated: number;
+      };
+      [key: string]: unknown;
+    };
 
     return {
       testSummary: {
         totalPhases: this.testResults.length,
-        successfulPhases: this.testResults.filter(r => r.success).length,
-        successRate: this.testResults.filter(r => r.success).length / this.testResults.length,
-        totalDuration: this.testResults.reduce((sum, r) => sum + r.duration, 0),
+        successfulPhases: this.testResults.filter((r: Readonly<SpiralTestResult>) => r.success).length,
+        successRate: this.testResults.filter((r: Readonly<SpiralTestResult>) => r.success).length / this.testResults.length,
+        totalDuration: this.testResults.reduce((sum: number, r: Readonly<SpiralTestResult>) => sum + r.duration, 0),
         averageQuality:
-          this.testResults.reduce((sum, r) => sum + r.quality, 0) / this.testResults.length,
-        totalCostSavings: this.testResults.reduce((sum, r) => sum + r.costSavings, 0),
+          this.testResults.reduce((sum: number, r: Readonly<SpiralTestResult>) => sum + r.quality, 0) / this.testResults.length,
+        totalCostSavings: this.testResults.reduce((sum: number, r: Readonly<SpiralTestResult>) => sum + r.costSavings, 0),
       },
       phaseResults: this.testResults,
       systemAnalytics: analytics,
@@ -374,7 +413,18 @@ export class LivingSpiralIntegrationTest {
 /**
  * Run Living Spiral integration test
  */
-export async function runLivingSpiralIntegrationTest(): Promise<any> {
+export async function runLivingSpiralIntegrationTest(): Promise<{
+  success: boolean;
+  results?: {
+    overallSuccess: boolean;
+    phaseResults: SpiralTestResult[];
+    totalCostSavings: number;
+    qualityImprovement: number;
+    recommendations: string[];
+  };
+  report?: Awaited<ReturnType<LivingSpiralIntegrationTest['generateTestReport']>>;
+  error?: string;
+}> {
   const test = new LivingSpiralIntegrationTest();
 
   try {

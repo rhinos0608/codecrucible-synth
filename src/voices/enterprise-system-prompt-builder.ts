@@ -38,17 +38,20 @@ export class EnterpriseSystemPromptBuilder {
   /**
    * Main entry point - builds complete system prompt following Claude Code patterns
    */
-  static buildSystemPrompt(
-    context: RuntimeContext,
-    options: {
+  public static buildSystemPrompt(
+    context: Readonly<RuntimeContext>,
+    options: Readonly<{
       voiceId?: string;
       conciseness?: 'ultra' | 'standard';
       securityLevel?: 'standard' | 'enterprise';
-    } = {}
+    }> = {}
   ): string {
     const cacheKey = this.getCacheKey(context, options);
     if (this.CACHE.has(cacheKey)) {
-      return this.CACHE.get(cacheKey)!;
+      const cached = this.CACHE.get(cacheKey);
+      if (cached !== undefined) {
+        return cached;
+      }
     }
 
     const components = this.assembleComponents(context, options);
@@ -61,7 +64,14 @@ export class EnterpriseSystemPromptBuilder {
   /**
    * Assembles components in Claude Code's prescribed order
    */
-  private static assembleComponents(context: RuntimeContext, options: any): SystemPromptComponents {
+  private static assembleComponents(
+    context: Readonly<RuntimeContext>,
+    options: Readonly<{
+      voiceId?: string;
+      conciseness?: 'ultra' | 'standard';
+      securityLevel?: 'standard' | 'enterprise';
+    }>
+  ): SystemPromptComponents {
     return {
       identity: this.getIdentitySection(options.voiceId),
       security: this.getSecuritySection(options.securityLevel),
@@ -560,21 +570,28 @@ You are Guardian Voice, a specialized enterprise CLI agent focused on quality ga
   /**
    * Cache key generation
    */
-  private static getCacheKey(context: RuntimeContext, options: any): string {
-    return `${context.workingDirectory}:${context.currentBranch}:${options.voiceId || 'default'}:${options.conciseness || 'ultra'}:${options.securityLevel || 'enterprise'}:${context.isCodingOperation || false}`;
+  private static getCacheKey(
+    context: Readonly<RuntimeContext>,
+    options: Readonly<{
+      voiceId?: string;
+      conciseness?: 'ultra' | 'standard';
+      securityLevel?: 'standard' | 'enterprise';
+    }>
+  ): string {
+    return `${context.workingDirectory}:${context.currentBranch}:${options.voiceId ?? 'default'}:${options.conciseness ?? 'ultra'}:${options.securityLevel ?? 'enterprise'}:${context.isCodingOperation ?? false}`;
   }
 
   /**
    * Clear cache (for testing or updates)
    */
-  static clearCache(): void {
+  public static clearCache(): void {
     this.CACHE.clear();
   }
 
   /**
    * Get available voice IDs
    */
-  static getAvailableVoices(): string[] {
+  public static getAvailableVoices(): string[] {
     return [
       'explorer',
       'maintainer',
@@ -591,8 +608,11 @@ You are Guardian Voice, a specialized enterprise CLI agent focused on quality ga
 
   /**
    * Coding Grimoire section - Living Spiral methodology for coding operations
+   * @internal
+   * This method is currently unused.
    */
-  private static getCodingGrimoireSection(context: RuntimeContext): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static getCodingGrimoireSection(_context: Readonly<RuntimeContext>): string {
     return `# CODING GRIMOIRE - LIVING SPIRAL METHODOLOGY
 
 ## Prime Directives for Code Creation

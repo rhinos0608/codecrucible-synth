@@ -15,7 +15,10 @@ export function synthesizePerspectives(outputs: VoiceOutput[]): string {
     if (!contentMap.has(o.content)) {
       contentMap.set(o.content, []);
     }
-    contentMap.get(o.content)!.push(o.voiceId);
+    const voices = contentMap.get(o.content);
+    if (voices) {
+      voices.push(o.voiceId);
+    }
   }
 
   const consensus: {content: string, voices: string[]}[] = [];

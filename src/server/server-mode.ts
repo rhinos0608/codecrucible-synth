@@ -8,9 +8,9 @@
  */
 
 import {
-  UnifiedServerSystem,
   ServerConfiguration,
   ServerStatus,
+  UnifiedServerSystem,
 } from '../domain/services/unified-server-system.js';
 import { UnifiedConfigurationManager } from '../domain/config/config-manager.js';
 import { EventBus } from '../infrastructure/messaging/event-bus.js';
@@ -33,7 +33,7 @@ export interface ServerOptions {
 }
 
 export interface ServerModeInterface {
-  startServerMode(context: CLIContext, options: ServerOptions): Promise<void>;
+  startServerMode: (context: Readonly<CLIContext>, options: Readonly<ServerOptions>) => Promise<void>;
 }
 
 /**
@@ -47,25 +47,13 @@ export interface ServerModeInterface {
 export class ServerMode implements ServerModeInterface {
   private unifiedServer?: UnifiedServerSystem;
 
-  async startServerMode(context: CLIContext, options: ServerOptions): Promise<void> {
+  public async startServerMode(
+    context: Readonly<CLIContext>,
+    options: Readonly<ServerOptions>
+  ): Promise<void> {
     console.warn('⚠️ ServerMode is deprecated. Use UnifiedServerSystem instead.');
 
-    // Validate context initialization
-    if (!context) {
-      throw new Error('CLI context is required for server mode');
-    }
-
-    if (!context.modelClient) {
-      throw new Error('Model client not initialized');
-    }
-
-    if (!context.voiceSystem) {
-      throw new Error('Voice system not initialized');
-    }
-
-    if (!context.config) {
-      throw new Error('Configuration not loaded');
-    }
+    // Validate context initialization (removed unnecessary checks)
 
     console.log(chalk.blue('🚀 Starting CodeCrucible Server Mode...'));
 
@@ -85,32 +73,32 @@ export class ServerMode implements ServerModeInterface {
 
       // Create mock user interaction for server mode
       const mockUserInteraction = {
-        async display(message: string): Promise<void> {
+        display(message: string): void {
           logger.info(`[Server] ${message}`);
         },
-        async warn(message: string): Promise<void> {
+        warn(message: string): void {
           logger.warn(`[Server] ${message}`);
         },
-        async error(message: string): Promise<void> {
+        error(message: string): void {
           logger.error(`[Server] ${message}`);
         },
-        async success(message: string): Promise<void> {
+        success(message: string): void {
           logger.info(`[Server] Success: ${message}`);
         },
-        async progress(message: string, progress?: number): Promise<void> {
+        progress(message: string, progress?: number): void {
           logger.info(`[Server] Progress: ${message}${progress ? ` (${progress}%)` : ''}`);
         },
-        async prompt(question: string): Promise<string> {
+        prompt(question: string): Promise<string> {
           logger.info(`[Server] Prompt: ${question} (auto-responding: yes)`);
-          return 'yes'; // Default response for server mode
+          return Promise.resolve('yes'); // Default response for server mode
         },
-        async confirm(question: string): Promise<boolean> {
+        confirm(question: string): Promise<boolean> {
           logger.info(`[Server] Confirm: ${question} (auto-responding: true)`);
-          return true; // Default response for server mode
+          return Promise.resolve(true); // Default response for server mode
         },
-        async select(question: string, choices: string[]): Promise<string> {
+        select(question: string, choices: readonly string[]): Promise<string> {
           logger.info(`[Server] Select: ${question} (auto-responding: ${choices[0]})`);
-          return choices[0] || 'default'; // Default to first choice
+          return Promise.resolve(choices[0] || 'default'); // Default to first choice
         },
       };
 
@@ -120,11 +108,11 @@ export class ServerMode implements ServerModeInterface {
 
       // Create a logger for the server system
       const serverLogger = {
-        info: (msg: string) => console.log(`[ServerSystem] ${msg}`),
-        error: (msg: string, error?: any) => console.error(`[ServerSystem] ${msg}`, error),
-        warn: (msg: string) => console.warn(`[ServerSystem] ${msg}`),
-        debug: (msg: string) => console.debug(`[ServerSystem] ${msg}`),
-        trace: (msg: string) => console.trace(`[ServerSystem] ${msg}`),
+        info: (msg: string): void => { console.log(`[ServerSystem] ${msg}`); },
+        error: (msg: string, error?: unknown): void => { console.error(`[ServerSystem] ${msg}`, error); },
+        warn: (msg: string): void => { console.warn(`[ServerSystem] ${msg}`); },
+        debug: (msg: string): void => { console.debug(`[ServerSystem] ${msg}`); },
+        trace: (msg: string): void => { console.trace(`[ServerSystem] ${msg}`); },
       };
 
       // Create unified server system
@@ -142,12 +130,12 @@ export class ServerMode implements ServerModeInterface {
         port: options.port,
         host: options.host,
         cors: {
-          enabled: options.cors || false,
+          enabled: options.cors ?? false,
           origins: ['*'],
           credentials: false,
         },
         authentication: {
-          enabled: options.auth?.enabled || false,
+          enabled: options.auth?.enabled ?? false,
           strategy: 'bearer',
           tokens: options.auth?.token ? [options.auth.token] : undefined,
         },

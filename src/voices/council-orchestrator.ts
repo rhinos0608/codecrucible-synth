@@ -1,8 +1,8 @@
 import {
-  CouncilDecisionEngine,
-  CouncilMode,
   CouncilConfig,
   CouncilDecision,
+  CouncilDecisionEngine,
+  CouncilMode,
 } from './collaboration/council-decision-engine.js';
 import { VoiceDefinition } from './archetype-definitions.js';
 
@@ -12,16 +12,12 @@ import { VoiceDefinition } from './archetype-definitions.js';
  * engine while providing a friendlier interface for the coordinator.
  */
 export class CouncilOrchestrator {
-  private engine: CouncilDecisionEngine;
+  public constructor(private readonly engine: CouncilDecisionEngine) {}
 
-  constructor(engine: CouncilDecisionEngine) {
-    this.engine = engine;
-  }
-
-  async convene(
+  public async convene(
     prompt: string,
-    voices: VoiceDefinition[],
-    config: Partial<CouncilConfig> = {}
+    voices: ReadonlyArray<VoiceDefinition>,
+    config: Readonly<Partial<CouncilConfig>> = {}
   ): Promise<CouncilDecision> {
     const voiceIds = voices.map(v => v.id);
     const base: CouncilConfig = {

@@ -22,7 +22,7 @@ export interface ModelRequest {
     tool_calls?: any[];
     tool_call_id?: string;
   }>;
-  // Ollama-specific parameters  
+  // Ollama-specific parameters
   num_ctx?: number;
   options?: Record<string, any>;
 }
@@ -82,6 +82,8 @@ export interface RequestContext {
 export interface StreamToken {
   content: string;
   isComplete: boolean;
+  index: number;
+  timestamp: number;
   metadata?: Record<string, any>;
 }
 

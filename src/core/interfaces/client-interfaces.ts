@@ -19,8 +19,8 @@ export type { ProjectContext, ModelRequest, ModelResponse };
 export interface StreamToken {
   content: string;
   isComplete: boolean;
-  index?: number;
-  timestamp?: number;
+  index: number;
+  timestamp: number;
   metadata?: Record<string, unknown>;
 }
 

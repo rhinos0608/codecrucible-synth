@@ -79,10 +79,17 @@ export class LMStudioAdapter implements ProviderAdapter {
     const streamFn = (this.provider as any).stream;
     if (!streamFn) return;
     const iterator = await streamFn.call(this.provider, req);
+    let index = 0;
     for await (const token of iterator as any) {
-      yield { content: (token as any).content ?? String(token), isComplete: false };
+      yield {
+        content: (token as any).content ?? String(token),
+        isComplete: false,
+        index,
+        timestamp: Date.now(),
+      };
+      index++;
     }
-    yield { content: '', isComplete: true };
+    yield { content: '', isComplete: true, index, timestamp: Date.now() };
   }
 
   async getModels(): Promise<string[]> {
@@ -106,7 +113,7 @@ export class ClaudeAdapter implements ProviderAdapter {
     const body = {
       model: req.model || 'claude-3-sonnet-20240229',
       max_tokens: req.maxTokens || 1024,
-      messages: req.messages ?? [{ role: 'user', content: req.prompt }],
+      messages: (req as any).messages ?? [{ role: 'user', content: req.prompt }],
       temperature: req.temperature ?? 0.7,
     };
     const response = await fetch(this.endpoint, {

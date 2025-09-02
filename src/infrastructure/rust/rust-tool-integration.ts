@@ -118,6 +118,74 @@ export abstract class RustTool implements ITool {
   }
 
   /**
+   * Validate arguments against the tool's parameter schema
+   */
+  validateArguments(args: Record<string, any>): { valid: boolean; errors?: string[] } {
+    const errors: string[] = [];
+    const { properties, required } = this.definition.parameters;
+
+    // Check required parameters
+    for (const requiredParam of required) {
+      if (!(requiredParam in args)) {
+        errors.push(`Missing required parameter: ${requiredParam}`);
+      }
+    }
+
+    // Validate parameter types and constraints
+    for (const [key, value] of Object.entries(args)) {
+      const paramDef = properties[key];
+      if (!paramDef) {
+        errors.push(`Unknown parameter: ${key}`);
+        continue;
+      }
+
+      // Type validation
+      const actualType = typeof value;
+      if (paramDef.type === 'array' && !Array.isArray(value)) {
+        errors.push(`Parameter ${key} must be an array`);
+      } else if (paramDef.type !== 'array' && actualType !== paramDef.type) {
+        errors.push(`Parameter ${key} must be of type ${paramDef.type}, got ${actualType}`);
+      }
+
+      // Enum validation
+      if (paramDef.enum && !paramDef.enum.includes(value)) {
+        errors.push(`Parameter ${key} must be one of: ${paramDef.enum.join(', ')}`);
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors: errors.length > 0 ? errors : undefined,
+    };
+  }
+
+  /**
+   * Check if the tool can be executed in the given context
+   */
+  canExecute(context: ToolExecutionContext): boolean {
+    // Check security level compatibility
+    if (this.definition.securityLevel === 'dangerous' && context.securityLevel === 'low') {
+      return false;
+    }
+
+    // Check required permissions
+    for (const requiredPermission of this.definition.permissions) {
+      const hasPermission = context.permissions.some(
+        p =>
+          p.type === requiredPermission.type &&
+          p.scope === requiredPermission.scope &&
+          (p.resource === requiredPermission.resource || p.resource === '*')
+      );
+
+      if (!hasPermission) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * Cleanup resources
    */
   async destroy(): Promise<void> {
@@ -145,7 +213,6 @@ export class RustFileAnalyzer extends RustTool {
       name: 'High-Performance File Analyzer',
       description: 'Analyzes files using native Rust for optimal performance',
       category: 'analysis',
-      version: '1.0.0',
       parameters: {
         type: 'object',
         properties: {

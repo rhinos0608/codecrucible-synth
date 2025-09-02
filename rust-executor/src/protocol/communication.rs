@@ -48,11 +48,11 @@ impl From<SecurityError> for CommunicationError {
 /// Registry of available executors and their capabilities
 pub struct ExecutorRegistry {
     filesystem_executor: Option<Arc<FileSystemExecutor>>,
-    command_executor: Option<Arc<dyn CommandExecutor>>, // TODO: Implement CommandExecutor
+    command_executor: Option<Arc<dyn CommandExecutor>>,
     security_contexts: HashMap<String, SecurityContext>,
 }
 
-/// Trait for command executors (placeholder for future implementation)
+/// Trait for command executors
 #[async_trait::async_trait]
 pub trait CommandExecutor: Send + Sync {
     async fn execute(&self, request: ExecutionRequest) -> ExecutionResponse;

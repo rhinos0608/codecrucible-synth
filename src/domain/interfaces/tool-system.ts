@@ -26,6 +26,8 @@ export interface ToolParameter {
   description: string;
   enum?: any[];
   default?: any;
+  minimum?: number;
+  maximum?: number;
   validation?: string; // regex pattern or validation rule
 }
 
@@ -38,12 +40,15 @@ export interface ToolPermission {
 export interface ToolExecutionContext {
   sessionId: string;
   userId?: string;
+  userAgent?: string;
+  ipAddress?: string;
   workingDirectory: string;
   rootDirectory?: string;
   securityLevel: 'low' | 'medium' | 'high';
   permissions: ToolPermission[];
   environment: Record<string, string>;
   timeoutMs?: number;
+  metadata?: Record<string, any>;
 }
 
 export interface ToolExecutionRequest {

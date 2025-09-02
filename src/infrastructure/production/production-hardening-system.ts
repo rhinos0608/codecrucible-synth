@@ -493,11 +493,7 @@ export class ProductionHardeningSystem extends EventEmitter {
         }
       );
 
-      const result = await circuitBreaker.execute();
-      if (!result.success) {
-        throw result.error;
-      }
-      return result.data!;
+      return await circuitBreaker!.execute(() => timeoutPromise);
     }
 
     return await timeoutPromise;

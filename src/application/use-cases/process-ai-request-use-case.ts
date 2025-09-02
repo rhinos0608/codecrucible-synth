@@ -65,7 +65,7 @@ export class ProcessAIRequestUseCase {
         // Generate response using UnifiedModelClient
         const modelRequest = {
           prompt: request.prompt,
-          model: selectedModel.primaryModel.name,
+          model: selectedModel.primaryModel.name.toString(),
           temperature: input.temperature,
           maxTokens: input.maxTokens,
         };

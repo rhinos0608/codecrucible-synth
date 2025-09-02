@@ -815,8 +815,219 @@ export class SearchCLICommands implements CLISearchIntegration {
     return { message: 'Class analysis not yet implemented' };
   }
 
-  private async analyzeTodos(options: unknown): Promise<unknown> {
-    return { message: 'TODO analysis not yet implemented' };
+  private async analyzeTodos(options: AnalyzeOptions): Promise<unknown> {
+    try {
+      this.logger.info('🔍 Analyzing TODOs, FIXMEs, and NOTEs in codebase...');
+      
+      // Search for various TODO patterns
+      const todoPatterns = [
+        'TODO',
+        'FIXME',
+        'HACK',
+        'NOTE',
+        'BUG', 
+        'REVIEW',
+        'OPTIMIZE',
+        'REFACTOR'
+      ];
+      
+      const allTodos: Array<{
+        type: string;
+        file: string;
+        line: number;
+        content: string;
+        priority: string;
+        category: string;
+      }> = [];
+      
+      // Search for each pattern
+      for (const pattern of todoPatterns) {
+        const searchPattern = `\\b${pattern}\\b.*`;
+        const searchOptions: SearchOptions = {
+          query: searchPattern,
+          regex: true,
+          caseSensitive: false,
+          contextLines: { context: 0 },
+          maxResults: 1000,
+          fileTypes: options.lang || ['typescript', 'javascript', 'python', 'rust', 'java', 'cpp'],
+        };
+        
+        const results = await this.commandSearch.searchInFiles(searchOptions);
+        
+        // Process and categorize results
+        results.forEach(result => {
+          const todo = this.parseTodoItem(result, pattern);
+          if (todo) {
+            allTodos.push(todo);
+          }
+        });
+      }
+      
+      // Analyze and categorize TODOs
+      const analysis = this.analyzeTodoData(allTodos);
+      
+      this.logger.info(`✅ Found ${allTodos.length} TODO items across ${analysis.totalFiles} files`);
+      
+      return analysis;
+      
+    } catch (error) {
+      this.logger.error('TODO analysis failed:', error);
+      return { 
+        error: `TODO analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        totalItems: 0 
+      };
+    }
+  }
+  
+  private parseTodoItem(result: SearchResult, pattern: string): any {
+    if (!result.match) return null;
+    
+    const content = result.match.trim();
+    const lowerContent = content.toLowerCase();
+    
+    // Determine priority based on keywords and pattern type
+    let priority = 'medium';
+    if (pattern === 'FIXME' || pattern === 'BUG' || lowerContent.includes('urgent') || lowerContent.includes('critical')) {
+      priority = 'high';
+    } else if (pattern === 'HACK' || lowerContent.includes('asap') || lowerContent.includes('important')) {
+      priority = 'high';
+    } else if (pattern === 'NOTE' || lowerContent.includes('low priority') || lowerContent.includes('nice to have')) {
+      priority = 'low';
+    }
+    
+    // Categorize by content
+    let category = 'general';
+    if (lowerContent.includes('security') || lowerContent.includes('auth') || lowerContent.includes('permission')) {
+      category = 'security';
+    } else if (lowerContent.includes('performance') || lowerContent.includes('slow') || lowerContent.includes('optimize')) {
+      category = 'performance';
+    } else if (lowerContent.includes('test') || lowerContent.includes('spec') || lowerContent.includes('coverage')) {
+      category = 'testing';
+    } else if (lowerContent.includes('refactor') || lowerContent.includes('cleanup') || lowerContent.includes('structure')) {
+      category = 'refactoring';
+    } else if (lowerContent.includes('feature') || lowerContent.includes('implement') || lowerContent.includes('add')) {
+      category = 'feature';
+    } else if (lowerContent.includes('bug') || lowerContent.includes('fix') || lowerContent.includes('error')) {
+      category = 'bugfix';
+    } else if (lowerContent.includes('doc') || lowerContent.includes('comment') || lowerContent.includes('explain')) {
+      category = 'documentation';
+    }
+    
+    return {
+      type: pattern,
+      file: result.file,
+      line: result.line || 0,
+      content: content.replace(/^.*?(TODO|FIXME|HACK|NOTE|BUG|REVIEW|OPTIMIZE|REFACTOR)[\s:]*/, '').trim(),
+      priority,
+      category,
+      fullText: content,
+    };
+  }
+  
+  private analyzeTodoData(todos: Array<any>): any {
+    const fileSet = new Set(todos.map(t => t.file));
+    const totalFiles = fileSet.size;
+    
+    // Group by type
+    const byType = todos.reduce((acc, todo) => {
+      acc[todo.type] = (acc[todo.type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    // Group by priority
+    const byPriority = todos.reduce((acc, todo) => {
+      acc[todo.priority] = (acc[todo.priority] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    // Group by category
+    const byCategory = todos.reduce((acc, todo) => {
+      acc[todo.category] = (acc[todo.category] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    // Files with most TODOs
+    const fileStats = todos.reduce((acc, todo) => {
+      const fileName = path.basename(todo.file);
+      acc[fileName] = (acc[fileName] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const topFiles = Object.entries(fileStats)
+      .sort(([, a], [, b]) => (b as number) - (a as number))
+      .slice(0, 10)
+      .map(([file, count]) => ({ file, count }));
+      
+    // Priority recommendations
+    const highPriorityItems = todos.filter(t => t.priority === 'high');
+    const securityItems = todos.filter(t => t.category === 'security');
+    const performanceItems = todos.filter(t => t.category === 'performance');
+    
+    return {
+      summary: {
+        totalItems: todos.length,
+        totalFiles,
+        avgItemsPerFile: (todos.length / Math.max(totalFiles, 1)).toFixed(1),
+      },
+      breakdown: {
+        byType: Object.entries(byType).sort(([, a], [, b]) => (b as number) - (a as number)),
+        byPriority: Object.entries(byPriority).sort(([, a], [, b]) => (b as number) - (a as number)),
+        byCategory: Object.entries(byCategory).sort(([, a], [, b]) => (b as number) - (a as number)),
+      },
+      insights: {
+        topFiles,
+        highPriorityCount: highPriorityItems.length,
+        securityRelated: securityItems.length,
+        performanceRelated: performanceItems.length,
+        techDebtIndicators: todos.filter(t => 
+          t.content.toLowerCase().includes('debt') || 
+          t.content.toLowerCase().includes('hack') || 
+          t.content.toLowerCase().includes('workaround')
+        ).length,
+      },
+      recommendations: this.generateTodoRecommendations(todos, highPriorityItems, securityItems, performanceItems),
+      items: todos.slice(0, 20), // Include sample items
+      timestamp: new Date().toISOString(),
+    };
+  }
+  
+  private generateTodoRecommendations(
+    allTodos: Array<any>, 
+    highPriority: Array<any>, 
+    security: Array<any>, 
+    performance: Array<any>
+  ): Array<string> {
+    const recommendations: string[] = [];
+    
+    if (highPriority.length > 0) {
+      recommendations.push(`🔥 Address ${highPriority.length} high-priority items first`);
+    }
+    
+    if (security.length > 0) {
+      recommendations.push(`🔒 Review ${security.length} security-related TODOs immediately`);
+    }
+    
+    if (performance.length > 0) {
+      recommendations.push(`⚡ Consider addressing ${performance.length} performance TODOs`);
+    }
+    
+    const todoCount = allTodos.filter(t => t.type === 'TODO').length;
+    const fixmeCount = allTodos.filter(t => t.type === 'FIXME').length;
+    
+    if (fixmeCount > todoCount * 0.3) {
+      recommendations.push('⚠️ High ratio of FIXMEs suggests code quality issues');
+    }
+    
+    if (allTodos.length > 100) {
+      recommendations.push('📋 Consider creating a technical debt cleanup sprint');
+    }
+    
+    const hackCount = allTodos.filter(t => t.type === 'HACK').length;
+    if (hackCount > 5) {
+      recommendations.push(`🔧 ${hackCount} HACKs detected - schedule refactoring time`);
+    }
+    
+    return recommendations;
   }
 
   private async analyzeComplexity(options: unknown): Promise<unknown> {

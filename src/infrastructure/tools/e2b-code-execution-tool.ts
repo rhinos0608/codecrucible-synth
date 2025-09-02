@@ -1,5 +1,5 @@
 import { BaseTool } from './base-tool.js';
-import { E2BService, ExecutionResult } from '../e2b/e2b-service.js';
+import { E2BService, ExecutionResult } from '../../core/e2b/e2b-service.js';
 import { logger } from '../logging/logger.js';
 import { SecurityError } from '../security/security-types.js';
 import { z } from 'zod';

@@ -21,7 +21,7 @@
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "node node_modules/jest/bin/jest.js --config jest.config.unit.cjs",
     "test:integration": "node node_modules/jest/bin/jest.js --config jest.config.integration.cjs",
-    "test:smoke": "node node_modules/jest/bin/jest.js tests/smoke.test.ts",
+    "test:smoke": "node node_modules/jest/bin/jest.js --config jest.smoke.config.cjs",
     "test:fast": "node node_modules/jest/bin/jest.js --config jest.config.unit.cjs --maxWorkers=75%",
     "test:unit:watch": "node node_modules/jest/bin/jest.js --config jest.config.unit.cjs --watch",
     "test:perf": "node node_modules/jest/bin/jest.js --verbose --logHeapUsage --detectOpenHandles",

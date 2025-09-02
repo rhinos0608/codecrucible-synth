@@ -207,6 +207,10 @@ export class SecurityDecorator implements ToolDecorator {
       if (typeof value === 'string') {
         const validation = await this.securityValidator.validateInput(value, {
           sessionId: context.sessionId,
+          requestId: context.sessionId + '_' + Date.now(),
+          userAgent: context.userAgent || 'CodeCrucible/1.0',
+          ipAddress: context.ipAddress || '127.0.0.1',
+          timestamp: new Date(),
           operationType: 'input',
           environment: 'sandbox',
           permissions: context.permissions.map(p => p.type),
@@ -325,10 +329,8 @@ export class CacheHitException extends Error {
 export class LoggingDecorator implements ToolDecorator {
   name = 'logging';
 
-  constructor(private eventBus?: IEventBus) {}
-
   constructor(
-    private logger: ILogger,
+    private logger?: ILogger,
     private eventBus?: IEventBus
   ) {}
 
@@ -336,12 +338,14 @@ export class LoggingDecorator implements ToolDecorator {
     args: Record<string, any>,
     context: ToolExecutionContext
   ): Promise<Record<string, any>> {
-    this.logger.debug('Tool execution started', {
-      sessionId: context.sessionId,
-      userId: context.userId,
-      workingDirectory: context.workingDirectory,
-      args: this.sanitizeArgsForLogging(args),
-    });
+    if (this.logger) {
+      this.logger.debug('Tool execution started', {
+        sessionId: context.sessionId,
+        userId: context.userId,
+        workingDirectory: context.workingDirectory,
+        args: this.sanitizeArgsForLogging(args),
+      });
+    }
 
     if (this.eventBus) {
       this.eventBus.emit('tool:execution-started', {
@@ -359,21 +363,23 @@ export class LoggingDecorator implements ToolDecorator {
     args: Record<string, any>,
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
-    const logLevel = result.success ? 'info' : 'error';
-    if (logLevel === 'info') {
-      this.logger.info('Tool execution completed', {
-        sessionId: context.sessionId,
-        success: result.success,
-        executionTime: result.executionTimeMs,
-        error: result.error?.message,
-      });
-    } else {
-      this.logger.error('Tool execution completed', {
-        sessionId: context.sessionId,
-        success: result.success,
-        executionTime: result.executionTimeMs,
-        error: result.error?.message,
-      });
+    if (this.logger) {
+      const logLevel = result.success ? 'info' : 'error';
+      if (logLevel === 'info') {
+        this.logger.info('Tool execution completed', {
+          sessionId: context.sessionId,
+          success: result.success,
+          executionTime: result.executionTimeMs,
+          error: result.error?.message,
+        });
+      } else {
+        this.logger.error('Tool execution completed', {
+          sessionId: context.sessionId,
+          success: result.success,
+          executionTime: result.executionTimeMs,
+          error: result.error?.message,
+        });
+      }
     }
 
     if (this.eventBus) {
@@ -772,7 +778,7 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
     const decorators: ToolDecorator[] = [];
 
     // Always apply logging
-    decorators.push(new LoggingDecorator(this.eventBus));
+    decorators.push(new LoggingDecorator(undefined, this.eventBus));
 
     // Apply security if validator is available
     if (this.securityValidator) {

@@ -478,7 +478,7 @@ export class ProductionIntegrationManager extends EventEmitter {
               activeOperations: this.activeOperations.size,
               systemUptime: Date.now() - this.systemStartTime,
             },
-          })
+          }).then(() => {})
         );
       }
 
@@ -515,7 +515,10 @@ export class ProductionIntegrationManager extends EventEmitter {
     if (this.config.components.securityAuditLogger) {
       securityReport = await this.securityAuditLogger.generateComplianceReport(
         framework,
-        dateRange
+        {
+          start: new Date(dateRange.start),
+          end: new Date(dateRange.end)
+        }
       );
     }
 
@@ -688,8 +691,9 @@ export class ProductionIntegrationManager extends EventEmitter {
       case 'observabilitySystem':
         // Create observability config
         const observabilityConfig = {
-          metrics: { enabled: true, retentionDays: 7, exportInterval: 60000, exporters: [] },
-          tracing: { enabled: true, samplingRate: 0.1, maxSpansPerTrace: 100, exporters: [] },
+          telemetry: { enabled: true, endpoint: 'http://localhost:4318', exporters: [] as any[] },
+          metrics: { enabled: true, retentionDays: 7, exportInterval: 60000, exporters: [] as any[] },
+          tracing: { enabled: true, samplingRate: 0.1, maxSpansPerTrace: 100, exporters: [] as any[] },
           logging: {
             level: 'info',
             outputs: [{ type: 'console', format: 'structured', configuration: {} }],
@@ -697,7 +701,7 @@ export class ProductionIntegrationManager extends EventEmitter {
             includeStackTrace: false,
           },
           health: { checkInterval: 30000, timeoutMs: 5000, retryAttempts: 3 },
-          alerting: { enabled: true, rules: [], defaultCooldown: 300000 },
+          alerting: { enabled: true, rules: [] as any[], defaultCooldown: 300000 },
           storage: {
             dataPath: './production-observability-data',
             maxFileSize: 100 * 1024 * 1024,
@@ -1062,7 +1066,7 @@ export class ProductionIntegrationManager extends EventEmitter {
           return {
             status: 'healthy', // Would implement actual health check
             lastChecked: now,
-            uptime: systemStats.systemInfo.uptime,
+            uptime: systemStats.uptime || process.uptime(),
             metrics: systemStats,
             issues: [],
           };
@@ -1092,7 +1096,7 @@ export class ProductionIntegrationManager extends EventEmitter {
   }
 
   private getHealthScore(status: string): number {
-    const scores = {
+    const scores: { [key: string]: number } = {
       healthy: 1.0,
       degraded: 0.6,
       critical: 0.2,
@@ -1174,7 +1178,7 @@ export class ProductionIntegrationManager extends EventEmitter {
   }
 
   private mapPriorityToNumber(priority: string): number {
-    const mapping = { low: 25, medium: 50, high: 75, critical: 100 };
+    const mapping: { [key: string]: number } = { low: 25, medium: 50, high: 75, critical: 100 };
     return mapping[priority] || 50;
   }
 

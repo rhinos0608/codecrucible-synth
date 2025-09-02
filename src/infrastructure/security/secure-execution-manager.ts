@@ -294,7 +294,11 @@ export class SecureExecutionManager {
       }
 
       // Use the advanced security validator
-      const validationResult = await this.securityValidator.validateCommand(request.command);
+      const validationResult = await this.securityValidator.validateCode({
+        code: request.command,
+        language: request.language || 'javascript',
+        environment: typeof request.environment === 'string' ? request.environment : 'node18-safe'
+      });
 
       if (!validationResult.isValid) {
         return {

@@ -34,6 +34,7 @@ import {
 } from './coordinators/simplified-living-spiral-coordinator.js';
 import { VoiceOrchestrationService } from '../domain/services/voice-orchestration-service.js';
 import { ModelSelectionService } from '../domain/services/model-selection-service.js';
+import { UnifiedModelClient } from './services/model-client.js';
 
 /**
  * Application Service Facade
@@ -49,12 +50,15 @@ export class ApplicationServiceFacade {
 
   constructor(
     voiceOrchestrationService: VoiceOrchestrationService,
-    modelSelectionService: ModelSelectionService
+    modelSelectionService: ModelSelectionService,
+    modelClient?: UnifiedModelClient
   ) {
     // Initialize use cases with domain services (no infrastructure dependencies)
+    // TODO: Properly inject UnifiedModelClient when DI system is complete
     this.processAIRequestUseCase = new ProcessAIRequestUseCase(
       modelSelectionService,
-      voiceOrchestrationService
+      voiceOrchestrationService,
+      modelClient || {} as UnifiedModelClient
     );
 
     this.multiVoiceSynthesisUseCase = new MultiVoiceSynthesisUseCase(

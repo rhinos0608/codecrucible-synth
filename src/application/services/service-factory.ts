@@ -80,11 +80,11 @@ export class ServiceFactory {
       const logger = this.runtimeContext.getLogger();
       const eventBus = this.runtimeContext.getEventBus();
 
-      this.configManager = await createUnifiedConfigurationManager(
+      this.configManager = await createUnifiedConfigurationManager({
         logger,
-        this.config.configFilePath,
+        configFilePath: this.config.configFilePath,
         eventBus
-      );
+      });
     }
     return this.configManager;
   }

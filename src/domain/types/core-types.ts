@@ -32,3 +32,26 @@ export interface ExecutionContext {
   userId?: string;
   sessionId: string;
 }
+
+// Re-export types from unified-types for backward compatibility
+export type {
+  ModelRequest,
+  ModelResponse,
+  ProjectContext,
+  ExecutionResult
+} from './unified-types.js';
+
+// Additional types for backward compatibility
+export type ExecutionMode = 'sync' | 'async' | 'streaming' | 'batch';
+
+export interface SynthesisResponse {
+  success: boolean;
+  result?: any;
+  error?: string;
+  metadata: {
+    timestamp: string;
+    duration: number;
+    voicesInvolved: string[];
+    phase: string;
+  };
+}

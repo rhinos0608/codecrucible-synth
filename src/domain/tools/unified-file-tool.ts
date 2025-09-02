@@ -43,7 +43,7 @@ export interface FileOperationStrategy {
 export class BasicFileStrategy implements FileOperationStrategy {
   name = 'basic';
 
-  supports(operation: string): boolean {
+  supports(operation: string, args?: any): boolean {
     return ['read', 'write', 'exists', 'stat'].includes(operation);
   }
 
@@ -76,7 +76,7 @@ export class BasicFileStrategy implements FileOperationStrategy {
       }
 
       const content = await fs.readFile(path, args.encoding || 'utf-8');
-      return content;
+      return content.toString();
     } catch (error) {
       throw new Error(
         `Failed to read file ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -95,8 +95,8 @@ export class BasicFileStrategy implements FileOperationStrategy {
       if (args.mode) options.mode = args.mode;
 
       await fs.writeFile(path, args.content, options);
-
-      return `File written successfully: ${path}`;
+      
+      // Success - no return value needed for void method
     } catch (error) {
       throw new Error(
         `Failed to write file ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -157,7 +157,7 @@ export class BatchFileStrategy extends BasicFileStrategy {
 
   supports(operation: string, args: any): boolean {
     return (
-      super.supports(operation) &&
+      super.supports(operation, args) &&
       (Array.isArray(args.paths) || (typeof args.path === 'string' && args.path.includes('*')))
     );
   }
@@ -241,7 +241,7 @@ export class SmartFileStrategy extends BatchFileStrategy {
   name = 'smart';
 
   supports(operation: string, args: any): boolean {
-    return super.supports(operation) && args.includeMetadata !== false;
+    return super.supports(operation, args) && args.includeMetadata !== false;
   }
 
   async execute(operation: string, args: any, context: ToolExecutionContext): Promise<any> {
@@ -625,6 +625,7 @@ export class UnifiedFileTool extends BaseTool {
     args: Record<string, any>,
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
+    const startTime = Date.now();
     try {
       // Select appropriate strategy
       const strategy = this.selectStrategy(args);
@@ -640,6 +641,7 @@ export class UnifiedFileTool extends BaseTool {
           operation: args.operation || 'read',
           timestamp: new Date().toISOString(),
         },
+        executionTimeMs: Date.now() - startTime,
       };
     } catch (error) {
       return {
@@ -649,6 +651,7 @@ export class UnifiedFileTool extends BaseTool {
           message: error instanceof Error ? error.message : 'Unknown error',
           details: error instanceof Error ? { stack: error.stack } : undefined,
         },
+        executionTimeMs: Date.now() - startTime,
       };
     }
   }

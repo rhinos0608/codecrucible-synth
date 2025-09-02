@@ -513,4 +513,27 @@ export class MCPServerManager {
       default: return 'stopped';
     }
   }
+
+  async healthCheck(): Promise<{ status: string; servers: any[] }> {
+    const serverIds = await this.listServers();
+    const serverStatuses = await Promise.all(
+      serverIds.map(async (serverId) => {
+        const serverInfo = mcpServerRegistry.getServerInfo(serverId);
+        const status = await this.getServerStatus(serverId);
+        return {
+          id: serverId,
+          name: serverInfo?.name || serverId,
+          status: status,
+          health: status === 'running' ? 'healthy' : 'unhealthy'
+        };
+      })
+    );
+    
+    const allHealthy = serverStatuses.every(server => server.status === 'running');
+    
+    return {
+      status: allHealthy ? 'healthy' : 'degraded',
+      servers: serverStatuses
+    };
+  }
 }

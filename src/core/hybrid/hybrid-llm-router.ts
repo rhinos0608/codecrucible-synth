@@ -59,6 +59,13 @@ export class HybridLLMRouter extends EventEmitter {
   private performanceMetrics: Map<string, number[]> = new Map();
   private readonly CACHE_TTL = 300000; // 5 minutes
   private readonly MAX_CACHE_SIZE = 1000;
+  
+  // Hit rate tracking for cache performance analysis
+  private cacheStats = {
+    hits: 0,
+    misses: 0,
+    totalRequests: 0,
+  };
 
   constructor(config: HybridConfig) {
     super();
@@ -114,7 +121,7 @@ export class HybridLLMRouter extends EventEmitter {
   }
 
   /**
-   * Analyze task complexity to inform routing decisions
+   * Enhanced task complexity analysis with sophisticated pattern recognition
    */
   private analyzeTaskComplexity(
     taskType: string,
@@ -123,43 +130,181 @@ export class HybridLLMRouter extends EventEmitter {
   ): number {
     let complexityScore = 0;
 
-    // Base complexity by task type
+    // Enhanced base complexity by task type with more granular scoring
     const taskTypeComplexity: Record<string, number> = {
-      template: 0.2, // LM Studio territory
-      format: 0.1, // LM Studio territory
-      edit: 0.3, // Could go either way
-      boilerplate: 0.2, // LM Studio territory
-      analysis: 0.8, // Ollama territory
-      security: 0.9, // Ollama territory
-      architecture: 0.9, // Ollama territory
-      'multi-file': 0.7, // Ollama territory
-      debugging: 0.6, // Moderate complexity
-      documentation: 0.4, // Moderate complexity
+      template: 0.15, // Simple template generation
+      format: 0.1,   // Basic formatting tasks
+      edit: 0.25,     // Simple edits
+      boilerplate: 0.2, // Standard boilerplate
+      analysis: 0.75,   // Code analysis
+      security: 0.9,    // Security analysis
+      architecture: 0.85, // System design
+      'multi-file': 0.7,  // Cross-file operations
+      debugging: 0.65,    // Bug investigation
+      documentation: 0.35, // Documentation tasks
+      refactoring: 0.7,   // Code restructuring
+      optimization: 0.8,  // Performance tuning
+      testing: 0.6,      // Test creation
+      integration: 0.75,  // System integration
+      migration: 0.8,    // Data/code migration
     };
 
     complexityScore += taskTypeComplexity[taskType] || 0.5;
 
-    // Analyze prompt characteristics
-    if (prompt.length > 1000) complexityScore += 0.2;
-    if (prompt.includes('analyze') || prompt.includes('review')) complexityScore += 0.3;
-    if (prompt.includes('secure') || prompt.includes('vulnerability')) complexityScore += 0.4;
-    if (prompt.includes('architecture') || prompt.includes('design')) complexityScore += 0.3;
-    if (prompt.includes('multiple') || prompt.includes('several')) complexityScore += 0.2;
+    // Enhanced prompt pattern analysis with weighted scoring
+    const promptPatterns = this.analyzePromptPatterns(prompt);
+    complexityScore += promptPatterns.complexityBoost;
 
-    // Apply metrics if provided
+    // Apply enhanced metrics analysis
     if (metrics) {
-      if (metrics.hasMultipleFiles) complexityScore += 0.3;
-      if (metrics.requiresDeepAnalysis) complexityScore += 0.4;
-      if (metrics.hasSecurityImplications) complexityScore += 0.3;
-      if (metrics.fileCount && metrics.fileCount > 5) complexityScore += 0.2;
-      if (metrics.linesOfCode && metrics.linesOfCode > 500) complexityScore += 0.2;
+      complexityScore += this.analyzeTaskMetrics(metrics);
     }
 
-    return Math.min(complexityScore, 1.0);
+    // Context-aware adjustments based on historical patterns
+    complexityScore = this.applyContextualAdjustments(complexityScore, taskType, prompt);
+
+    return Math.min(Math.max(complexityScore, 0.05), 1.0); // Clamp between 0.05 and 1.0
   }
 
   /**
-   * Make routing decision based on complexity analysis
+   * Analyze prompt patterns for complexity indicators
+   */
+  private analyzePromptPatterns(prompt: string): { complexityBoost: number; patterns: string[] } {
+    let complexityBoost = 0;
+    const foundPatterns: string[] = [];
+
+    // High complexity patterns (significant cognitive load)
+    const highComplexityPatterns = [
+      { pattern: /\b(analyze|review|evaluate|assess|investigate)\b/gi, weight: 0.3, name: 'deep-analysis' },
+      { pattern: /\b(secure|security|vulnerability|exploit|attack)\b/gi, weight: 0.35, name: 'security' },
+      { pattern: /\b(architecture|design|structure|framework|pattern)\b/gi, weight: 0.3, name: 'architectural' },
+      { pattern: /\b(optimize|performance|efficiency|scalable?|benchmark)\b/gi, weight: 0.25, name: 'optimization' },
+      { pattern: /\b(complex|complicated|intricate|sophisticated)\b/gi, weight: 0.2, name: 'complexity-indicator' },
+      { pattern: /\b(algorithm|data structure|computational)\b/gi, weight: 0.3, name: 'algorithmic' },
+    ];
+
+    // Medium complexity patterns
+    const mediumComplexityPatterns = [
+      { pattern: /\b(multiple|several|various|different)\b/gi, weight: 0.15, name: 'multi-entity' },
+      { pattern: /\b(integrate|combine|merge|connect)\b/gi, weight: 0.2, name: 'integration' },
+      { pattern: /\b(refactor|restructure|reorganize)\b/gi, weight: 0.25, name: 'refactoring' },
+      { pattern: /\b(test|testing|validation|verification)\b/gi, weight: 0.15, name: 'testing' },
+      { pattern: /\b(debug|troubleshoot|diagnose|fix)\b/gi, weight: 0.2, name: 'debugging' },
+    ];
+
+    // Low complexity reducers (simple tasks)
+    const lowComplexityPatterns = [
+      { pattern: /\b(simple|basic|quick|easy)\b/gi, weight: -0.1, name: 'simplicity' },
+      { pattern: /\b(format|formatting|style|prettify)\b/gi, weight: -0.05, name: 'formatting' },
+      { pattern: /\b(template|boilerplate|skeleton)\b/gi, weight: -0.1, name: 'template' },
+    ];
+
+    // Apply all pattern checks
+    [...highComplexityPatterns, ...mediumComplexityPatterns, ...lowComplexityPatterns].forEach(({ pattern, weight, name }) => {
+      const matches = prompt.match(pattern);
+      if (matches) {
+        complexityBoost += weight * Math.min(matches.length / 10, 1); // Diminishing returns
+        foundPatterns.push(`${name}(${matches.length})`);
+      }
+    });
+
+    // Length-based complexity (more sophisticated than simple threshold)
+    if (prompt.length > 500) {
+      const lengthMultiplier = Math.min((prompt.length - 500) / 2000, 0.3); // Max 0.3 boost
+      complexityBoost += lengthMultiplier;
+      foundPatterns.push(`length-boost(${lengthMultiplier.toFixed(2)})`);
+    }
+
+    // Technical depth indicators
+    const technicalTerms = prompt.match(/\b(database|API|protocol|algorithm|encryption|authentication|authorization)\b/gi);
+    if (technicalTerms) {
+      complexityBoost += Math.min(technicalTerms.length * 0.1, 0.25);
+      foundPatterns.push(`technical-depth(${technicalTerms.length})`);
+    }
+
+    return { complexityBoost, patterns: foundPatterns };
+  }
+
+  /**
+   * Enhanced metrics analysis with more sophisticated scoring
+   */
+  private analyzeTaskMetrics(metrics: TaskComplexityMetrics): number {
+    let metricScore = 0;
+
+    // File-based complexity with exponential scaling
+    if (metrics.fileCount) {
+      if (metrics.fileCount > 10) {
+        metricScore += 0.4; // Many files = high complexity
+      } else if (metrics.fileCount > 3) {
+        metricScore += 0.2; // Multiple files = medium complexity
+      }
+    }
+
+    // Code volume with logarithmic scaling
+    if (metrics.linesOfCode) {
+      const logScale = Math.log(metrics.linesOfCode + 1) / Math.log(10); // log10
+      metricScore += Math.min(logScale * 0.1, 0.3);
+    }
+
+    // Binary flags with adjusted weights
+    if (metrics.hasMultipleFiles) metricScore += 0.25;
+    if (metrics.requiresDeepAnalysis) metricScore += 0.35;
+    if (metrics.hasSecurityImplications) metricScore += 0.4;
+    if (metrics.isTemplateGeneration) metricScore -= 0.1; // Templates are usually simpler
+
+    // Processing time estimates
+    if (metrics.estimatedProcessingTime) {
+      const timeComplexity = Math.min(metrics.estimatedProcessingTime / 60000, 1); // Minutes to 0-1 scale
+      metricScore += timeComplexity * 0.2;
+    }
+
+    return metricScore;
+  }
+
+  /**
+   * Apply contextual adjustments based on historical patterns and system state
+   */
+  private applyContextualAdjustments(baseScore: number, taskType: string, prompt: string): number {
+    let adjustedScore = baseScore;
+
+    // Time-of-day adjustments (complex tasks might be better suited for specific times)
+    const hour = new Date().getHours();
+    if (hour >= 9 && hour <= 17) {
+      // Business hours - slightly favor faster responses
+      adjustedScore *= 0.95;
+    } else if (hour >= 22 || hour <= 6) {
+      // Off hours - can afford slower, higher quality responses
+      adjustedScore *= 1.05;
+    }
+
+    // Historical performance adjustment
+    const historicalData = this.getHistoricalPerformance(taskType, 'lm-studio');
+    if (historicalData.sampleSize > 5) {
+      if (historicalData.successRate < 0.7) {
+        // LM Studio has been struggling with this task type
+        adjustedScore += 0.15;
+      } else if (historicalData.successRate > 0.9) {
+        // LM Studio handles this well
+        adjustedScore -= 0.1;
+      }
+    }
+
+    // System load consideration
+    const totalLoad = this.currentLoads.lmStudio + this.currentLoads.ollama;
+    if (totalLoad > 5) {
+      // High system load - favor the less loaded provider
+      if (this.currentLoads.lmStudio < this.currentLoads.ollama) {
+        adjustedScore -= 0.05; // Favor LM Studio
+      } else {
+        adjustedScore += 0.05; // Favor Ollama
+      }
+    }
+
+    return adjustedScore;
+  }
+
+  /**
+   * Enhanced routing decision with dynamic thresholds and intelligent reasoning
    */
   private makeRoutingDecision(taskType: string, complexity: number): RoutingDecision {
     const { routing } = this.config;
@@ -178,37 +323,102 @@ export class HybridLLMRouter extends EventEmitter {
       };
     }
 
-    // Hybrid routing logic
-    if (complexity < 0.3) {
-      // Simple tasks → LM Studio
+    // Calculate dynamic thresholds based on system performance
+    const thresholds = this.calculateDynamicThresholds();
+    const providerPerformance = this.getProviderPerformanceMetrics();
+
+    // Enhanced routing logic with dynamic thresholds
+    if (complexity < thresholds.lowComplexity) {
+      // Simple tasks → LM Studio (unless it's consistently failing)
+      const confidence = providerPerformance.lmStudio.successRate > 0.8 ? 0.95 : 0.7;
       return {
         selectedLLM: 'lm-studio',
-        confidence: 0.9,
-        reasoning: 'Low complexity task suited for fast generation',
+        confidence,
+        reasoning: `Low complexity (${complexity.toFixed(2)}) - LM Studio optimal for speed (success rate: ${(providerPerformance.lmStudio.successRate * 100).toFixed(1)}%)`,
         fallbackStrategy: 'ollama',
         estimatedResponseTime: this.estimateResponseTime('lm-studio', complexity),
         escalationThreshold: routing.escalationThreshold,
       };
-    } else if (complexity > 0.7) {
+    } else if (complexity > thresholds.highComplexity) {
       // Complex tasks → Ollama
+      const confidence = providerPerformance.ollama.successRate > 0.8 ? 0.95 : 0.8;
       return {
         selectedLLM: 'ollama',
-        confidence: 0.9,
-        reasoning: 'High complexity task requiring deep reasoning',
+        confidence,
+        reasoning: `High complexity (${complexity.toFixed(2)}) - Ollama required for deep reasoning (success rate: ${(providerPerformance.ollama.successRate * 100).toFixed(1)}%)`,
         fallbackStrategy: 'lm-studio',
         estimatedResponseTime: this.estimateResponseTime('ollama', complexity),
       };
     } else {
-      // Medium complexity → Start with LM Studio, escalate if needed
-      return {
-        selectedLLM: 'hybrid',
-        confidence: 0.7,
-        reasoning: 'Medium complexity task - start fast, escalate if needed',
-        fallbackStrategy: 'ollama',
-        estimatedResponseTime: this.estimateResponseTime('lm-studio', complexity),
-        escalationThreshold: routing.escalationThreshold,
-      };
+      // Medium complexity → Intelligent selection based on current conditions
+      const lmStudioLoad = this.currentLoads.lmStudio / this.config.lmStudio.maxConcurrent;
+      const ollamaLoad = this.currentLoads.ollama / this.config.ollama.maxConcurrent;
+      
+      // Prefer less loaded provider for medium complexity tasks
+      if (lmStudioLoad < ollamaLoad && providerPerformance.lmStudio.successRate > 0.75) {
+        return {
+          selectedLLM: 'lm-studio',
+          confidence: 0.8,
+          reasoning: `Medium complexity (${complexity.toFixed(2)}) - LM Studio chosen (load: ${(lmStudioLoad * 100).toFixed(0)}% vs Ollama: ${(ollamaLoad * 100).toFixed(0)}%)`,
+          fallbackStrategy: 'ollama',
+          estimatedResponseTime: this.estimateResponseTime('lm-studio', complexity),
+          escalationThreshold: routing.escalationThreshold,
+        };
+      } else {
+        // Use hybrid approach - start with LM Studio, escalate to Ollama if needed
+        return {
+          selectedLLM: 'hybrid',
+          confidence: 0.75,
+          reasoning: `Medium complexity (${complexity.toFixed(2)}) - hybrid approach with escalation (LM Studio load: ${(lmStudioLoad * 100).toFixed(0)}%)`,
+          fallbackStrategy: 'ollama',
+          estimatedResponseTime: this.estimateResponseTime('lm-studio', complexity),
+          escalationThreshold: Math.max(0.5, routing.escalationThreshold),
+        };
+      }
     }
+  }
+
+  /**
+   * Calculate dynamic thresholds based on historical performance
+   */
+  private calculateDynamicThresholds(): { lowComplexity: number; highComplexity: number } {
+    const lmStudioPerf = this.getPerformanceStats('lm-studio');
+    const ollamaPerf = this.getPerformanceStats('ollama');
+
+    let lowThreshold = 0.3;  // Default
+    let highThreshold = 0.7; // Default
+
+    // Adjust thresholds based on relative performance
+    if (lmStudioPerf.successRate > 0.9 && lmStudioPerf.avgResponseTime < 5000) {
+      // LM Studio is performing very well - expand its range
+      lowThreshold = 0.35;
+    } else if (lmStudioPerf.successRate < 0.7) {
+      // LM Studio struggling - restrict its range
+      lowThreshold = 0.25;
+    }
+
+    if (ollamaPerf.successRate > 0.95) {
+      // Ollama very reliable - can handle medium complexity
+      highThreshold = 0.6;
+    } else if (ollamaPerf.successRate < 0.8) {
+      // Ollama having issues - increase threshold
+      highThreshold = 0.75;
+    }
+
+    return { lowComplexity: lowThreshold, highComplexity: highThreshold };
+  }
+
+  /**
+   * Get current provider performance metrics
+   */
+  private getProviderPerformanceMetrics(): {
+    lmStudio: { successRate: number; avgResponseTime: number };
+    ollama: { successRate: number; avgResponseTime: number };
+  } {
+    return {
+      lmStudio: this.getPerformanceStats('lm-studio'),
+      ollama: this.getPerformanceStats('ollama'),
+    };
   }
 
   /**
@@ -435,13 +645,19 @@ export class HybridLLMRouter extends EventEmitter {
   }
 
   /**
-   * PERFORMANCE FIX: Get cached routing decision
+   * PERFORMANCE FIX: Get cached routing decision with hit rate tracking
    */
   private getFromCache(key: string): RoutingDecision | null {
+    this.cacheStats.totalRequests++;
+    
     const cached = this.routingDecisionCache.get(key);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      this.cacheStats.hits++;
       return cached.decision;
     }
+    
+    this.cacheStats.misses++;
+    
     // Remove expired entry
     if (cached) {
       this.routingDecisionCache.delete(key);
@@ -506,22 +722,28 @@ export class HybridLLMRouter extends EventEmitter {
   }
 
   /**
-   * Clear performance cache (for memory management)
+   * Clear performance cache and reset statistics (for memory management)
    */
   clearCache(): void {
     this.routingDecisionCache.clear();
     this.performanceMetrics.clear();
-    logger.info('Hybrid router cache cleared');
+    this.cacheStats = { hits: 0, misses: 0, totalRequests: 0 };
+    logger.info('Hybrid router cache and statistics cleared');
   }
 
   /**
-   * Get current cache status
+   * Get current cache status with accurate hit rate
    */
-  getCacheStatus(): { size: number; maxSize: number; hitRate: number } {
+  getCacheStatus(): { size: number; maxSize: number; hitRate: number; stats: typeof this.cacheStats } {
+    const hitRate = this.cacheStats.totalRequests > 0 
+      ? this.cacheStats.hits / this.cacheStats.totalRequests 
+      : 0;
+      
     return {
       size: this.routingDecisionCache.size,
       maxSize: this.MAX_CACHE_SIZE,
-      hitRate: 0.0, // TODO: Implement hit rate tracking
+      hitRate: Number(hitRate.toFixed(3)),
+      stats: { ...this.cacheStats },
     };
   }
 

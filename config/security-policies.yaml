@@ -282,9 +282,20 @@ environments:
         
   production:
     authentication:
+      cli:
+        requireAuth: true  # ✅ SECURITY FIX: Always require auth in production
       api:
         requireHttps: true
         allowCors: false
+      e2b:
+        requireAuthentication: true
+        requireMFA: true  # Enable MFA in production
+    executionSecurity:
+      mcp:
+        requireAuthentication: true
+        validateConnections: true
+      tools:
+        allowDangerousTools: false
     rateLimiting:
       authentication:
         maxAttempts: 3  # Stricter in production

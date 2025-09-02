@@ -512,8 +512,6 @@ export class HealthMonitor extends EventEmitter {
           agentId: 'health-check',
           payload: { path: './test.txt' },
           timestamp: new Date(),
-        },
-        {
           sessionId: 'health-check',
           permissions: ['file_access'],
           environment: 'development',
@@ -546,7 +544,7 @@ export class HealthMonitor extends EventEmitter {
   private async getCacheHitRate(): Promise<number> {
     try {
       // Try to get real cache hit rate from cache manager
-      const cacheManager = await import('../../core/cache/cache-manager.js');
+      const cacheManager = await import('../cache/cache-manager.js');
       const stats = await cacheManager.CacheManager.prototype.getStats?.();
       if (stats && typeof stats.hitRate === 'number') {
         return stats.hitRate;

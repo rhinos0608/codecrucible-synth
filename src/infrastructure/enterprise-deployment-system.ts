@@ -10,7 +10,7 @@ import {
   AuditEventType,
   AuditSeverity,
   AuditOutcome,
-} from '../core/security/security-audit-logger.js';
+} from './security/security-audit-logger.js';
 import { PerformanceMonitor } from '../utils/performance.js';
 import { AWSProvider } from './cloud-providers/aws-provider.js';
 import { AzureProvider } from './cloud-providers/azure-provider.js';
@@ -294,17 +294,18 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
 
     // Audit log
     if (this.auditLogger) {
-      this.auditLogger.logEvent(
-        AuditEventType.SYSTEM_EVENT,
-        AuditSeverity.MEDIUM,
-        AuditOutcome.SUCCESS,
-        'enterprise-deployment-system',
-        'deployment_start',
-        plan.version,
-        `Starting deployment of version ${plan.version} to ${plan.environment}`,
-        {},
-        { plan }
-      );
+      this.auditLogger.logAuditEvent({
+        eventType: AuditEventType.SYSTEM_EVENT,
+        severity: AuditSeverity.MEDIUM,
+        outcome: AuditOutcome.SUCCESS,
+        userId: 'enterprise-deployment-system',
+        resource: plan.version,
+        action: 'deployment_start',
+        details: {
+          plan,
+          message: `Starting deployment of version ${plan.version} to ${plan.environment}`
+        }
+      });
     }
 
     try {

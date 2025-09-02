@@ -254,6 +254,7 @@ dependencies = [
  "napi-build",
  "napi-derive",
  "nix",
+ "regex",
  "serde",
  "serde_json",
  "sysinfo",

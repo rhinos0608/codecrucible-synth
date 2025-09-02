@@ -18,7 +18,10 @@ export interface ModelClient {
 
 // Response Validator (placeholder)
 export const ResponseValidator = {
-  validate: (response: Record<string, unknown>) => ({ isValid: true, errors: [] }),
+  validate: (response: Record<string, unknown>): { isValid: boolean; errors: string[] } => ({ 
+    isValid: true, 
+    errors: [] 
+  }),
 };
 
 // Re-export types from domain layer

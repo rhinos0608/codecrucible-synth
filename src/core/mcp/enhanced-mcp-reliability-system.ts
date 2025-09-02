@@ -486,6 +486,101 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
     logger.info(`Connection monitoring removed: ${connectionId}`);
     this.emit('connection-monitoring-removed', connectionId);
   }
+
+  /**
+   * Execute operation with reliability features
+   */
+  async executeWithReliability<T>(
+    connectionId: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    const circuitBreaker = this.getSmartCircuitBreaker(connectionId);
+    const adaptiveTimeout = this.getOrCreateAdaptiveTimeout(connectionId);
+    
+    // Check circuit breaker state
+    if (circuitBreaker.getState() === 'open') {
+      throw new Error(`Circuit breaker is open for connection: ${connectionId}`);
+    }
+
+    const startTime = Date.now();
+    
+    try {
+      // Execute with timeout
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Operation timed out')), adaptiveTimeout.currentTimeout || 30000)
+      );
+      
+      const result = await Promise.race([operation(), timeoutPromise]);
+      
+      // Record success
+      const responseTime = Date.now() - startTime;
+      this.recordConnectionHealth(connectionId, true, responseTime);
+      circuitBreaker.recordResult(true, responseTime);
+      
+      return result;
+    } catch (error) {
+      // Record failure
+      const responseTime = Date.now() - startTime;
+      this.recordConnectionHealth(connectionId, false, responseTime);
+      circuitBreaker.recordResult(false, responseTime, error instanceof Error ? error : new Error(String(error)));
+      
+      throw error;
+    }
+  }
+
+  private getOrCreateAdaptiveTimeout(connectionId: string): AdaptiveTimeout {
+    if (!this.adaptiveTimeouts.has(connectionId)) {
+      this.adaptiveTimeouts.set(connectionId, {
+        baseTimeout: 30000,
+        currentTimeout: 30000,
+        minTimeout: 5000,
+        maxTimeout: 60000,
+        adaptationFactor: 0.1,
+        successHistory: [],
+        timeoutHistory: []
+      });
+    }
+    return this.adaptiveTimeouts.get(connectionId)!;
+  }
+
+  private recordConnectionHealth(connectionId: string, success: boolean, responseTime: number): void {
+    if (!this.healthMetrics.has(connectionId)) {
+      this.healthMetrics.set(connectionId, {
+        connectionId,
+        serverName: connectionId,
+        uptime: Date.now(),
+        totalRequests: 1,
+        successfulRequests: success ? 1 : 0,
+        failedRequests: success ? 0 : 1,
+        avgResponseTime: responseTime,
+        lastResponseTime: responseTime,
+        consecutiveSuccesses: success ? 1 : 0,
+        consecutiveFailures: success ? 0 : 1,
+        errorRate: success ? 0 : 1,
+        availability: success ? 1 : 0,
+        lastHealthCheck: new Date(),
+        performanceTrend: 'stable' as const,
+        predictedReliability: success ? 100 : 0
+      });
+    } else {
+      const metrics = this.healthMetrics.get(connectionId)!;
+      metrics.totalRequests++;
+      if (success) {
+        metrics.successfulRequests++;
+        metrics.consecutiveSuccesses++;
+        metrics.consecutiveFailures = 0;
+      } else {
+        metrics.failedRequests++;
+        metrics.consecutiveFailures++;
+        metrics.consecutiveSuccesses = 0;
+      }
+      metrics.avgResponseTime = (metrics.avgResponseTime + responseTime) / 2;
+      metrics.lastResponseTime = responseTime;
+      metrics.errorRate = metrics.failedRequests / metrics.totalRequests;
+      metrics.availability = metrics.successfulRequests / metrics.totalRequests;
+      metrics.lastHealthCheck = new Date();
+    }
+  }
 }
 
 /**

@@ -11,13 +11,13 @@
     // Strict Type Checking - 2025 Enterprise Standards (gradual enablement)
     "strict": false,
     "noImplicitAny": true,
-    "strictNullChecks": false,
-    "strictFunctionTypes": false,
-    "strictBindCallApply": false,
-    "strictPropertyInitialization": false,
-    "noImplicitReturns": false,
-    "noImplicitThis": false,
-    "noImplicitOverride": false,
+    "strictNullChecks": false, // TODO: Enable after null check fixes
+    "strictFunctionTypes": false, // TODO: Enable after function type fixes
+    "strictBindCallApply": false, // TODO: Enable after call/bind/apply fixes
+    "strictPropertyInitialization": false, // TODO: Enable after property init fixes
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": false, // TODO: Enable after fixing optional properties
     "noUncheckedIndexedAccess": false,   // TODO: Enable after fixing array access
@@ -85,10 +85,6 @@
     "archive",
     "**/*.test.ts",
     "**/*.spec.ts",
-    "src/testing/**/*",
-    "src/infrastructure/**/*",
-    "src/voices/**/*",
-    "src/domain/**/*",
-    "src/application/**/*"
+    "src/testing/**/*"
   ]
 }

@@ -180,35 +180,36 @@ export class GitMCPServer {
     // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+      const typedArgs = args as Record<string, any>;
 
       try {
         switch (name) {
           case 'git_status':
-            return await this.gitStatus(args.short);
+            return await this.gitStatus(typedArgs.short as boolean);
 
           case 'git_log':
-            return await this.gitLog(args.limit, args.oneline);
+            return await this.gitLog(typedArgs.limit as number, typedArgs.oneline as boolean);
 
           case 'git_diff':
-            return await this.gitDiff(args.staged, args.commit);
+            return await this.gitDiff(typedArgs.staged as boolean, typedArgs.commit as string);
 
           case 'git_branch':
-            return await this.gitBranch(args);
+            return await this.gitBranch(typedArgs);
 
           case 'git_add':
-            return await this.gitAdd(args.files, args.all);
+            return await this.gitAdd(typedArgs.files as string[], typedArgs.all as boolean);
 
           case 'git_commit':
-            return await this.gitCommit(args.message, args.amend);
+            return await this.gitCommit(typedArgs.message as string, typedArgs.amend as boolean);
 
           case 'git_push':
-            return await this.gitPush(args.remote, args.branch, args.setUpstream);
+            return await this.gitPush(typedArgs.remote as string, typedArgs.branch as string, typedArgs.setUpstream as boolean);
 
           case 'git_pull':
-            return await this.gitPull(args.remote, args.branch, args.rebase);
+            return await this.gitPull(typedArgs.remote as string, typedArgs.branch as string, typedArgs.rebase as boolean);
 
           case 'git_checkout':
-            return await this.gitCheckout(args.branch, args.createNew, args.files);
+            return await this.gitCheckout(typedArgs.branch as string, typedArgs.createNew as boolean, typedArgs.files as string[]);
 
           default:
             return {

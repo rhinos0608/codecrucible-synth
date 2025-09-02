@@ -29,6 +29,11 @@ const EnvSchema = z
         ? z.string().url({ message: 'REDIS_URL must be a valid URL in production' })
         : z.string().url().optional(),
     LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
+    // Authentication configuration - required in production
+    REQUIRE_AUTHENTICATION: z
+      .string()
+      .transform((val) => val === 'true')
+      .default(NODE_ENV === 'production' ? 'true' : 'false'),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'test') {
@@ -46,6 +51,15 @@ const EnvSchema = z
           path: ['REDIS_URL'],
         });
       }
+    }
+    
+    // Enforce authentication in production
+    if (env.NODE_ENV === 'production' && !env.REQUIRE_AUTHENTICATION) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Authentication must be enabled in production environment',
+        path: ['REQUIRE_AUTHENTICATION'],
+      });
     }
   });
 

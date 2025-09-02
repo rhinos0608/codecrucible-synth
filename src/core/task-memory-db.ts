@@ -277,13 +277,179 @@ export class TaskMemoryDB {
       }
     }
 
+    // Calculate estimated remaining time
+    const estimated_remaining = this.calculateEstimatedRemainingTime(task, progress_percentage, current_phase_progress);
+
     return {
       task,
       progress_percentage,
       current_phase_progress,
-      estimated_remaining: 'Calculating...', // TODO: Implement time estimation
+      estimated_remaining,
       next_steps: next_steps.slice(0, 5), // Show next 5 steps
     };
+  }
+
+  /**
+   * Calculate estimated remaining time for a task based on progress and historical data
+   */
+  private calculateEstimatedRemainingTime(
+    task: TaskState, 
+    progress_percentage: number, 
+    current_phase_progress: number
+  ): string {
+    try {
+      const now = new Date();
+      const createdAt = new Date(task.created_at);
+      const elapsedMs = now.getTime() - createdAt.getTime();
+      const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+
+      // If we have an estimated duration, use it as baseline
+      if (task.estimated_duration) {
+        const estimatedTotalMinutes = this.parseDurationToMinutes(task.estimated_duration);
+        if (estimatedTotalMinutes > 0) {
+          const remainingMinutes = Math.max(0, estimatedTotalMinutes - elapsedMinutes);
+          
+          // Adjust based on actual progress vs expected progress
+          const expectedProgress = Math.min(100, (elapsedMinutes / estimatedTotalMinutes) * 100);
+          const progressDelta = progress_percentage - expectedProgress;
+          
+          // If we're ahead of schedule, reduce estimate; if behind, increase it
+          const adjustmentFactor = progressDelta > 0 ? 0.9 : (progressDelta < -10 ? 1.2 : 1.0);
+          const adjustedRemaining = Math.floor(remainingMinutes * adjustmentFactor);
+          
+          return this.formatDuration(adjustedRemaining);
+        }
+      }
+
+      // Fallback: Calculate based on progress rate
+      if (progress_percentage > 5 && elapsedMinutes > 0) {
+        // Calculate rate: progress per minute
+        const progressRate = progress_percentage / elapsedMinutes;
+        const remainingProgress = 100 - progress_percentage;
+        let estimatedRemainingMinutes = Math.floor(remainingProgress / progressRate);
+
+        // Apply complexity adjustments based on task characteristics
+        estimatedRemainingMinutes = this.applyComplexityAdjustments(task, estimatedRemainingMinutes);
+
+        return this.formatDuration(estimatedRemainingMinutes);
+      }
+
+      // If no progress yet, use phase-based estimation
+      if (task.total_phases > 0) {
+        const remainingPhases = task.total_phases - task.current_phase + 1;
+        const averagePhaseTime = elapsedMinutes / Math.max(1, task.current_phase - 1);
+        const estimatedRemainingMinutes = Math.floor(remainingPhases * averagePhaseTime * 0.8); // Slightly optimistic
+        
+        return this.formatDuration(Math.max(estimatedRemainingMinutes, 5)); // Minimum 5 minutes
+      }
+
+      // Default fallback for new tasks
+      return this.getDefaultEstimate(task, elapsedMinutes);
+      
+    } catch (error) {
+      logger.error('Error calculating estimated remaining time:', error);
+      return 'Unable to estimate';
+    }
+  }
+
+  /**
+   * Parse duration strings like "2h 30m", "45m", "1.5h" to minutes
+   */
+  private parseDurationToMinutes(duration: string): number {
+    try {
+      const timeRegex = /(?:(\d+(?:\.\d+)?)\s*h(?:our?s?)?)?(?:\s*(\d+)\s*m(?:in(?:ute)?s?)?)?/i;
+      const match = duration.match(timeRegex);
+      
+      if (match) {
+        const hours = parseFloat(match[1] || '0');
+        const minutes = parseInt(match[2] || '0', 10);
+        return Math.floor(hours * 60 + minutes);
+      }
+
+      // Try pure number (assume minutes)
+      const numMatch = duration.match(/^\d+$/);
+      if (numMatch) {
+        return parseInt(duration, 10);
+      }
+
+      return 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Apply adjustments based on task complexity indicators
+   */
+  private applyComplexityAdjustments(task: TaskState, baseEstimate: number): number {
+    let adjustmentFactor = 1.0;
+
+    // More failed attempts = more complexity
+    if (task.failed_attempts.length > 0) {
+      adjustmentFactor += Math.min(0.5, task.failed_attempts.length * 0.1);
+    }
+
+    // High priority tasks often take longer due to thoroughness requirements
+    if (task.priority === 'critical' || task.priority === 'high') {
+      adjustmentFactor += 0.15;
+    }
+
+    // Multiple agents can slow things down due to coordination overhead
+    if (task.agent_assignments.length > 2) {
+      adjustmentFactor += 0.1;
+    }
+
+    // Tasks with many phases tend to have hidden complexity
+    if (task.total_phases > 5) {
+      adjustmentFactor += 0.2;
+    }
+
+    // Rich context data suggests complexity
+    const contextKeys = Object.keys(task.context_data || {}).length;
+    if (contextKeys > 10) {
+      adjustmentFactor += 0.1;
+    }
+
+    return Math.floor(baseEstimate * adjustmentFactor);
+  }
+
+  /**
+   * Format duration in minutes to human-readable string
+   */
+  private formatDuration(minutes: number): string {
+    if (minutes < 1) return 'Less than 1 minute';
+    if (minutes === 1) return '1 minute';
+    if (minutes < 60) return `${minutes} minutes`;
+    
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
+    if (hours === 1 && remainingMinutes === 0) return '1 hour';
+    if (hours === 1) return `1 hour ${remainingMinutes} minutes`;
+    if (remainingMinutes === 0) return `${hours} hours`;
+    
+    return `${hours} hours ${remainingMinutes} minutes`;
+  }
+
+  /**
+   * Provide default estimates for new tasks
+   */
+  private getDefaultEstimate(task: TaskState, elapsedMinutes: number): string {
+    // For very new tasks (< 5 minutes), give optimistic estimates
+    if (elapsedMinutes < 5) {
+      const baseEstimate = task.total_phases * 15; // 15 minutes per phase
+      
+      switch (task.priority) {
+        case 'critical': return this.formatDuration(Math.floor(baseEstimate * 1.5));
+        case 'high': return this.formatDuration(Math.floor(baseEstimate * 1.2));
+        case 'medium': return this.formatDuration(baseEstimate);
+        case 'low': return this.formatDuration(Math.floor(baseEstimate * 0.8));
+        default: return this.formatDuration(baseEstimate);
+      }
+    }
+
+    // For tasks with some elapsed time but no progress, be more conservative
+    return this.formatDuration(Math.max(30, elapsedMinutes * 2));
   }
 
   private async persist(): Promise<void> {

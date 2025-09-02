@@ -75,6 +75,7 @@ export class UnifiedGitTool extends BaseTool {
     args: Record<string, any>,
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
+    const startTime = Date.now();
     try {
       const operation = args.operation || 'status';
       const gitArgs = this.buildGitArgs(operation, args);
@@ -88,6 +89,7 @@ export class UnifiedGitTool extends BaseTool {
           workingDirectory: context.workingDirectory,
           timestamp: new Date().toISOString(),
         },
+        executionTimeMs: Date.now() - startTime,
       };
     } catch (error) {
       return {
@@ -96,6 +98,7 @@ export class UnifiedGitTool extends BaseTool {
           code: 'git_operation_failed',
           message: error instanceof Error ? error.message : 'Unknown git error',
         },
+        executionTimeMs: Date.now() - startTime,
       };
     }
   }

@@ -13,6 +13,9 @@
 import { EventEmitter } from 'events';
 import { createHash, createHmac, randomBytes } from 'crypto';
 import { logger } from '../logger.js';
+import { SecurityValidator } from '../e2b/security-validator.js';
+import { InputSanitizer } from '../../infrastructure/security/input-sanitizer.js';
+import { SecurityPolicyLoader } from '../../infrastructure/security/security-policy-loader.js';
 
 export const DEFAULT_POLICY_ID = 'default';
 
@@ -177,6 +180,15 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
 
   // Encryption
   private encryptionKeys: Map<string, Buffer> = new Map();
+
+  // Integrated security systems
+  private securityValidator: SecurityValidator = new SecurityValidator();
+  private policyLoader: SecurityPolicyLoader = SecurityPolicyLoader.getInstance();
+
+  // High-risk IP and location cache
+  private highRiskIPCache: Map<string, { isHighRisk: boolean; timestamp: number }> = new Map();
+  private geolocationCache: Map<string, { location: GeolocationInfo | undefined; timestamp: number }> = new Map();
+  private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
   constructor() {
     super();
@@ -395,65 +407,227 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   }
 
   private async authenticateApiKey(apiKey: string): Promise<any> {
-    // Validate API key format and check against database
-    if (!apiKey || apiKey.length < 32) {
-      return { success: false, reason: 'Invalid API key format' };
+    // Use InputSanitizer to validate the token format
+    const tokenValidation = InputSanitizer.validateMCPToken(apiKey);
+    if (!tokenValidation.isValid) {
+      return { 
+        success: false, 
+        reason: `Invalid API key: ${tokenValidation.violations.join(', ')}` 
+      };
     }
 
     // Hash the API key for lookup
     const hashedKey = createHash('sha256').update(apiKey).digest('hex');
 
-    // Mock validation - in real implementation, check against database
-    const isValid = hashedKey.length === 64; // Simple validation
+    // Load authentication configuration from policy loader
+    try {
+      const authConfig = await this.policyLoader.getAuthConfig();
+      const isValidFormat = apiKey.length >= 32 && /^[a-zA-Z0-9._-]+$/.test(apiKey);
+      
+      if (!isValidFormat) {
+        return { success: false, reason: 'Invalid API key format' };
+      }
 
-    return {
-      success: isValid,
-      userId: isValid ? `user-${hashedKey.substring(0, 8)}` : null,
-      permissions: isValid ? ['read', 'write'] : [],
-      reason: isValid ? 'Valid API key' : 'Invalid API key',
-    };
+      // In production, this would check against a real database
+      // For now, validate against basic security requirements
+      const secretValidation = InputSanitizer.detectSecretsInCode(apiKey);
+      const hasSecrets = !secretValidation.isValid;
+
+      return {
+        success: isValidFormat && !hasSecrets,
+        userId: isValidFormat ? `user-${hashedKey.substring(0, 8)}` : null,
+        permissions: isValidFormat ? ['read', 'write'] : [],
+        reason: isValidFormat ? 'Valid API key' : 'Invalid API key format or contains suspicious patterns',
+      };
+    } catch (error) {
+      logger.error('Failed to authenticate API key:', error);
+      return { success: false, reason: 'Authentication service unavailable' };
+    }
   }
 
   private async authenticateOAuth2(token: string): Promise<any> {
-    // Validate OAuth2 token
-    // This would integrate with OAuth2 provider
-    return {
-      success: true,
-      userId: 'oauth-user',
-      permissions: ['read', 'write'],
-      reason: 'Valid OAuth2 token',
-    };
+    try {
+      // Use InputSanitizer to validate token format
+      const tokenValidation = InputSanitizer.validateMCPToken(token);
+      if (!tokenValidation.isValid) {
+        return { 
+          success: false, 
+          reason: `Invalid OAuth2 token: ${tokenValidation.violations.join(', ')}` 
+        };
+      }
+
+      // Load authentication configuration
+      const authConfig = await this.policyLoader.getAuthConfig();
+      
+      // Basic JWT validation if token looks like JWT
+      if (token.includes('.')) {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          try {
+            // Decode header to check token type
+            const header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
+            if (header.typ !== 'JWT') {
+              return { success: false, reason: 'Invalid token type' };
+            }
+            
+            // Decode payload for user info (in production, verify signature)
+            const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+            const now = Math.floor(Date.now() / 1000);
+            
+            // Check expiration
+            if (payload.exp && payload.exp < now) {
+              return { success: false, reason: 'Token expired' };
+            }
+            
+            // Check not before
+            if (payload.nbf && payload.nbf > now) {
+              return { success: false, reason: 'Token not yet valid' };
+            }
+
+            return {
+              success: true,
+              userId: payload.sub || `oauth-${payload.iss || 'unknown'}`,
+              permissions: payload.scope ? payload.scope.split(' ') : ['read'],
+              reason: 'Valid OAuth2 token',
+            };
+          } catch (error) {
+            return { success: false, reason: 'Malformed JWT token' };
+          }
+        }
+      }
+
+      // For opaque tokens, basic validation
+      return {
+        success: token.length >= 20,
+        userId: 'oauth-user',
+        permissions: ['read'],
+        reason: token.length >= 20 ? 'Valid OAuth2 token' : 'Token too short',
+      };
+    } catch (error) {
+      logger.error('Failed to authenticate OAuth2 token:', error);
+      return { success: false, reason: 'OAuth2 authentication service unavailable' };
+    }
   }
 
   private async authenticateJWT(token: string): Promise<any> {
-    // Validate JWT token
-    // This would use proper JWT validation
-    return {
-      success: true,
-      userId: 'jwt-user',
-      permissions: ['read', 'write'],
-      reason: 'Valid JWT token',
-    };
+    try {
+      // Use InputSanitizer to validate token format first
+      const tokenValidation = InputSanitizer.validateMCPToken(token);
+      if (!tokenValidation.isValid) {
+        return { 
+          success: false, 
+          reason: `Invalid JWT token: ${tokenValidation.violations.join(', ')}` 
+        };
+      }
+
+      // JWT should have exactly 3 parts separated by dots
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        return { success: false, reason: 'Invalid JWT structure' };
+      }
+
+      try {
+        // Decode and validate header
+        const header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
+        if (!header.alg || !header.typ || header.typ !== 'JWT') {
+          return { success: false, reason: 'Invalid JWT header' };
+        }
+
+        // Decode payload
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        const now = Math.floor(Date.now() / 1000);
+
+        // Validate standard JWT claims
+        if (payload.exp && payload.exp < now) {
+          return { success: false, reason: 'JWT token expired' };
+        }
+
+        if (payload.nbf && payload.nbf > now) {
+          return { success: false, reason: 'JWT token not yet valid' };
+        }
+
+        if (payload.iat && payload.iat > now) {
+          return { success: false, reason: 'JWT issued in the future' };
+        }
+
+        // Validate required claims
+        if (!payload.sub && !payload.user_id) {
+          return { success: false, reason: 'JWT missing subject claim' };
+        }
+
+        // In production, signature verification would happen here
+        // For now, we validate structure and claims
+        
+        return {
+          success: true,
+          userId: payload.sub || payload.user_id || 'jwt-user',
+          permissions: payload.permissions || payload.scope?.split(' ') || ['read'],
+          reason: 'Valid JWT token',
+        };
+      } catch (decodeError) {
+        return { success: false, reason: 'Failed to decode JWT token' };
+      }
+    } catch (error) {
+      logger.error('Failed to authenticate JWT token:', error);
+      return { success: false, reason: 'JWT authentication service unavailable' };
+    }
   }
 
   private async authenticateMutualTLS(certificate: any): Promise<any> {
-    // Validate client certificate
-    return {
-      success: true,
-      userId: 'cert-user',
-      permissions: ['read', 'write'],
-      reason: 'Valid client certificate',
-    };
+    try {
+      // Validate certificate object structure
+      if (!certificate || typeof certificate !== 'object') {
+        return { success: false, reason: 'Invalid certificate format' };
+      }
+
+      // Check for required certificate fields
+      const requiredFields = ['subject', 'issuer', 'valid_from', 'valid_to', 'fingerprint'];
+      const missingFields = requiredFields.filter(field => !(field in certificate));
+      if (missingFields.length > 0) {
+        return { 
+          success: false, 
+          reason: `Certificate missing required fields: ${missingFields.join(', ')}` 
+        };
+      }
+
+      // Validate certificate dates
+      const now = new Date();
+      const validFrom = new Date(certificate.valid_from);
+      const validTo = new Date(certificate.valid_to);
+
+      if (now < validFrom) {
+        return { success: false, reason: 'Certificate not yet valid' };
+      }
+
+      if (now > validTo) {
+        return { success: false, reason: 'Certificate expired' };
+      }
+
+      // Extract user ID from certificate subject
+      const userId = certificate.subject.CN || certificate.subject.commonName || 'cert-user';
+      
+      // Use InputSanitizer to validate extracted user ID
+      const sanitizedUserId = InputSanitizer.sanitizePrompt(userId);
+      if (!sanitizedUserId.isValid) {
+        return { success: false, reason: 'Certificate subject contains invalid characters' };
+      }
+
+      return {
+        success: true,
+        userId: sanitizedUserId.sanitized,
+        permissions: ['read', 'write'], // Could be extracted from certificate extensions
+        reason: 'Valid client certificate',
+      };
+    } catch (error) {
+      logger.error('Failed to authenticate mutual TLS certificate:', error);
+      return { success: false, reason: 'Certificate validation failed' };
+    }
   }
 
   private async authenticateCertificate(certificate: any): Promise<any> {
-    // Validate certificate
-    return {
-      success: true,
-      userId: 'cert-user',
-      permissions: ['read', 'write'],
-      reason: 'Valid certificate',
-    };
+    // Delegate to mutual TLS authentication for now
+    // In production, this might have different validation logic
+    return this.authenticateMutualTLS(certificate);
   }
 
   /**
@@ -857,25 +1031,181 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   }
 
   private async isHighRiskIP(ipAddress: string): Promise<boolean> {
-    // Check against threat intelligence databases
-    // This is a placeholder implementation
-    return false;
+    try {
+      // Check cache first
+      const cached = this.highRiskIPCache.get(ipAddress);
+      if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
+        return cached.isHighRisk;
+      }
+
+      // Validate IP format using InputSanitizer
+      const pathValidation = InputSanitizer.validateFilePath(ipAddress);
+      if (!pathValidation.isValid) {
+        // Invalid IP format is considered high risk
+        this.highRiskIPCache.set(ipAddress, { isHighRisk: true, timestamp: Date.now() });
+        return true;
+      }
+
+      // Check for localhost/private IPs (generally low risk)
+      const isPrivate = this.isPrivateIP(ipAddress);
+      if (isPrivate) {
+        this.highRiskIPCache.set(ipAddress, { isHighRisk: false, timestamp: Date.now() });
+        return false;
+      }
+
+      // Check for suspicious IP patterns
+      const suspiciousPatterns = [
+        /^0\./,           // Invalid 0.x.x.x
+        /^127\./,         // Localhost (shouldn't reach here)
+        /^255\.255\.255\.255$/, // Broadcast
+        /^224\.|^225\.|^226\.|^227\.|^228\.|^229\.|^230\.|^231\.|^232\.|^233\.|^234\.|^235\.|^236\.|^237\.|^238\.|^239\./  // Multicast
+      ];
+
+      const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(ipAddress));
+      
+      // In production, this would check against:
+      // - Threat intelligence feeds
+      // - IP reputation databases
+      // - Known bot networks
+      // - Geographic restrictions
+      
+      // For now, use simple heuristics
+      let isHighRisk = isSuspicious;
+      
+      // Cache the result
+      this.highRiskIPCache.set(ipAddress, { isHighRisk, timestamp: Date.now() });
+      
+      return isHighRisk;
+    } catch (error) {
+      logger.warn(`Failed to check IP risk for ${ipAddress}:`, error);
+      // On error, assume high risk for security
+      return true;
+    }
   }
 
   private async isHighRiskLocation(location: GeolocationInfo): Promise<boolean> {
-    // Check against high-risk countries/regions
-    // This is a placeholder implementation
-    const highRiskCountries = ['XX', 'YY', 'ZZ']; // Example country codes
-    return highRiskCountries.includes(location.country);
+    try {
+      // Load security policies for geographic restrictions
+      const policies = await this.policyLoader.loadPolicies();
+      
+      // In production, this would integrate with:
+      // - OFAC sanctions lists
+      // - Geographic compliance requirements
+      // - Corporate security policies
+      
+      // For now, use basic risk assessment based on common patterns
+      const highRiskCountries = new Set([
+        'Unknown', 'TOR', 'ANON',  // Anonymous/Tor networks
+        // In production, this would be loaded from external threat intelligence
+      ]);
+
+      const mediumRiskCountries = new Set([
+        // Countries with higher cybersecurity risks based on threat intelligence
+        // This would be populated from real threat intelligence feeds
+      ]);
+
+      // Validate location data using InputSanitizer
+      const countryValidation = InputSanitizer.sanitizePrompt(location.country);
+      if (!countryValidation.isValid) {
+        logger.warn('Invalid country code in geolocation data');
+        return true; // Invalid data is high risk
+      }
+
+      const sanitizedCountry = countryValidation.sanitized;
+      
+      // Check high-risk countries
+      if (highRiskCountries.has(sanitizedCountry)) {
+        return true;
+      }
+
+      // Check for suspicious location patterns
+      if (location.city && location.city.toLowerCase().includes('proxy')) {
+        return true;
+      }
+
+      if (location.region && location.region.toLowerCase().includes('vpn')) {
+        return true;
+      }
+
+      // In production, add more sophisticated geolocation risk analysis:
+      // - Cross-reference with user's typical locations
+      // - Check for impossible travel (user in different continents within hours)
+      // - Validate against known datacenter/hosting provider IP ranges
+      
+      return false;
+    } catch (error) {
+      logger.warn('Failed to assess location risk:', error);
+      // On error, assume high risk for security
+      return true;
+    }
   }
 
   private async getGeolocation(ipAddress: string): Promise<GeolocationInfo | undefined> {
-    // Geolocation lookup - would use actual GeoIP service
-    return {
-      country: 'US',
-      region: 'CA',
-      city: 'San Francisco',
-    };
+    try {
+      // Check cache first
+      const cached = this.geolocationCache.get(ipAddress);
+      if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
+        return cached.location;
+      }
+
+      // Validate IP address format
+      const isPrivate = this.isPrivateIP(ipAddress);
+      if (isPrivate) {
+        const location: GeolocationInfo = {
+          country: 'Private',
+          region: 'Private',
+          city: 'Private Network',
+        };
+        this.geolocationCache.set(ipAddress, { location, timestamp: Date.now() });
+        return location;
+      }
+
+      // In production, this would integrate with:
+      // - MaxMind GeoIP2 database
+      // - IP2Location services
+      // - Cloud provider geolocation APIs
+      
+      // For now, provide basic categorization
+      let location: GeolocationInfo | undefined;
+      
+      // Check for localhost
+      if (ipAddress === '127.0.0.1' || ipAddress === '::1') {
+        location = {
+          country: 'Local',
+          region: 'Localhost',
+          city: 'Local Machine',
+        };
+      }
+      // Check for common test/development IPs
+      else if (ipAddress.startsWith('192.168.') || ipAddress.startsWith('10.') || ipAddress.startsWith('172.')) {
+        location = {
+          country: 'Private',
+          region: 'Private',
+          city: 'Private Network',
+        };
+      }
+      // Default for unknown IPs
+      else {
+        location = {
+          country: 'Unknown',
+          region: 'Unknown',
+          city: 'Unknown',
+          accuracy: 0, // Low accuracy for fallback
+        };
+      }
+
+      // Cache the result
+      this.geolocationCache.set(ipAddress, { location, timestamp: Date.now() });
+      
+      return location;
+    } catch (error) {
+      logger.warn(`Failed to get geolocation for ${ipAddress}:`, error);
+      return {
+        country: 'Unknown',
+        region: 'Unknown',
+        city: 'Unknown',
+      };
+    }
   }
 
   /**

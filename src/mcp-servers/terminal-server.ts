@@ -154,37 +154,38 @@ export class TerminalMCPServer {
     // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+      const typedArgs = args as Record<string, any>;
 
       try {
         switch (name) {
           case 'run_command':
             return await this.runCommand(
-              args.command,
-              args.args,
-              args.workingDirectory,
-              args.timeout,
-              args.captureOutput !== false
+              typedArgs.command as string,
+              typedArgs.args as string[],
+              typedArgs.workingDirectory as string,
+              typedArgs.timeout as number,
+              typedArgs.captureOutput !== false
             );
 
           case 'run_script':
             return await this.runScript(
-              args.script,
-              args.interpreter,
-              args.workingDirectory,
-              args.timeout
+              typedArgs.script as string,
+              typedArgs.interpreter as string,
+              typedArgs.workingDirectory as string,
+              typedArgs.timeout as number
             );
 
           case 'get_environment':
-            return await this.getEnvironment(args.variable);
+            return await this.getEnvironment(typedArgs.variable as string);
 
           case 'set_working_directory':
-            return await this.setWorkingDirectory(args.path);
+            return await this.setWorkingDirectory(typedArgs.path as string);
 
           case 'list_processes':
             return await this.listProcesses();
 
           case 'kill_process':
-            return await this.killProcess(args.processId);
+            return await this.killProcess(typedArgs.processId as string);
 
           default:
             return {

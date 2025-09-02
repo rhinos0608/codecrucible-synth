@@ -37,13 +37,9 @@ export class LivingSpiralIntegrationTest {
     // Initialize with Living Spiral optimized configuration
     this.voiceSystem = new VoiceSystemIntegration2025(null, {
       useOptimizedSystem: true,
-      enableLivingSpiralIntegration: true,
-      enableDynamicSelection: true,
-      enableModeOptimization: true,
-      enableAdvancedCoordination: true,
-      enablePerformanceAnalytics: true,
-      qualityThreshold: 0.8,
-      maxConcurrentVoices: 3,
+      maxConcurrentVoices: 5,
+      enablePerformanceMonitoring: true,
+      voiceSelectionStrategy: 'adaptive'
     });
   }
 
@@ -408,5 +404,3 @@ export async function runLivingSpiralIntegrationTest(): Promise<any> {
   }
 }
 
-// Export for direct testing
-export { LivingSpiralIntegrationTest };

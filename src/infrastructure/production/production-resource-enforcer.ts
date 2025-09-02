@@ -170,6 +170,8 @@ export class ProductionResourceEnforcer extends EventEmitter {
   private limits: ResourceLimits;
   private isEnforcing: boolean = false;
   private monitoringInterval?: NodeJS.Timeout;
+  private memoryMonitoringInterval?: NodeJS.Timeout;
+  private cpuMonitoringInterval?: NodeJS.Timeout;
 
   // Resource Tracking
   private resourceHistory: ResourceSnapshot[] = [];
@@ -743,6 +745,16 @@ export class ProductionResourceEnforcer extends EventEmitter {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = undefined;
     }
+    
+    if (this.memoryMonitoringInterval) {
+      clearInterval(this.memoryMonitoringInterval);
+      this.memoryMonitoringInterval = undefined;
+    }
+    
+    if (this.cpuMonitoringInterval) {
+      clearInterval(this.cpuMonitoringInterval);
+      this.cpuMonitoringInterval = undefined;
+    }
   }
 
   private async performResourceCheck(): Promise<void> {
@@ -924,7 +936,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
 
   private setupResourceMonitoring(): void {
     // Monitor memory peaks
-    setInterval(() => {
+    this.memoryMonitoringInterval = setInterval(() => {
       const memUsage = process.memoryUsage().heapUsed;
       this.memoryPeaks.push(memUsage);
 
@@ -935,7 +947,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
     }, 10000); // Every 10 seconds
 
     // Monitor CPU usage
-    setInterval(() => {
+    this.cpuMonitoringInterval = setInterval(() => {
       const cpuUsage = this.getCurrentCPUUsage();
       this.cpuUsageHistory.push(cpuUsage);
 

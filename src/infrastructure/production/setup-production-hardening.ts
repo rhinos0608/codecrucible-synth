@@ -736,5 +736,4 @@ export async function setupEnterpriseHardening(): Promise<ProductionReadinessRep
   return await setup.generateReadinessReport();
 }
 
-// Export the main setup class
-export { ProductionHardeningSetup };
+// The main setup class is already exported above

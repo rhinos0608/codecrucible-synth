@@ -13,7 +13,7 @@ import {
   AuditSeverity,
   AuditOutcome,
 } from '../security/security-audit-logger.js';
-import { EnterpriseConfigManager } from '../config/enterprise-config-manager.js';
+import { EnterpriseConfigManager } from '../../core/config/enterprise-config-manager.js';
 import { AdvancedInputValidator } from '../security/input-validation-system.js';
 import {
   ErrorHandler as AdvancedErrorHandler,
@@ -298,22 +298,19 @@ export class EnterpriseErrorHandler {
     const auditSeverity = this.mapToAuditSeverity(error.severity);
     const auditType = this.mapToAuditEventType(error.category);
 
-    await this.auditLogger.logEvent(
-      auditType,
-      auditSeverity,
-      AuditOutcome.ERROR,
-      'enterprise-error-handler',
-      'error_occurred',
-      context.resource || 'system',
-      `Error: ${error.message}`,
-      {
-        userId: context.userId,
-        sessionId: context.sessionId,
+    this.auditLogger.logAuditEvent({
+      eventType: auditType,
+      severity: auditSeverity,
+      outcome: AuditOutcome.ERROR,
+      userId: context.userId,
+      sessionId: context.sessionId,
+      resource: context.resource || 'system',
+      action: 'error_occurred',
+      errorMessage: `Error: ${error.message}`,
+      details: {
         requestId: context.requestId,
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
-      },
-      {
         errorId: error.id,
         errorCategory: error.category,
         errorSeverity: error.severity,
@@ -323,7 +320,7 @@ export class EnterpriseErrorHandler {
         retryable: error.retryable,
         recoverable: error.recoverable,
       }
-    );
+    });
   }
 
   /**
@@ -337,16 +334,12 @@ export class EnterpriseErrorHandler {
     ];
 
     if (securityCategories.includes(error.category) && this.auditLogger) {
-      await this.auditLogger.logSecurityViolation(
-        this.mapToAuditSeverity(error.severity),
-        'enterprise-error-handler',
+      this.auditLogger.logSecurityViolation(
+        context.userId || 'unknown',
         `Security-related error: ${error.message}`,
         {
-          userId: context.userId,
           sessionId: context.sessionId,
           ipAddress: context.ipAddress,
-        },
-        {
           errorId: error.id,
           errorCategory: error.category,
           operation: context.operation,

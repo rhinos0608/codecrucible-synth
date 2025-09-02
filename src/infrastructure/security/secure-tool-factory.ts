@@ -11,6 +11,10 @@ import {
   AuditSeverity,
   AuditOutcome,
 } from './security-audit-logger.js';
+import {
+  ProductionAuditEventType,
+  ProductionAuditSeverity,
+} from './production-security-audit-logger.js';
 import { RBACSystem, AuthorizationContext } from './production-rbac-system.js';
 import { z } from 'zod';
 import { logger } from '../logging/logger.js';
@@ -196,28 +200,37 @@ class RestrictedCodeExecutionTool implements BaseTool {
       logger.warn('🚨 Code execution requested but E2B sandboxing unavailable');
 
       // Log security violation
-      await this.auditLogger.logSecurityViolation(
-        AuditSeverity.HIGH,
-        'restricted-code-tool',
+      this.auditLogger.logSecurityViolation(
+        'system',
         'Code execution attempted without proper sandboxing',
-        { executionId },
-        { code: `${args.code?.substring(0, 200)}...`, language: args.language }
+        {
+          executionId,
+          code: `${args.code?.substring(0, 200)}...`,
+          language: args.language,
+          toolId: 'restricted-code-tool'
+        }
       );
 
       // Perform strict validation
-      const validation = this.securityValidator.validateCode(args.code, args.language);
+      const validation = await this.securityValidator.validateCode({
+        code: args.code,
+        language: args.language || 'javascript',
+        environment: args.environment || 'node18-safe'
+      });
       if (!validation.isValid) {
-        await this.auditLogger.logEvent(
-          AuditEventType.SECURITY_VIOLATION,
-          AuditSeverity.CRITICAL,
-          AuditOutcome.FAILURE,
-          'code-validation',
-          'validate',
-          'code-execution',
-          `Code execution blocked: ${validation.reason}`,
-          { executionId },
-          { code: `${args.code?.substring(0, 200)}...`, reason: validation.reason }
-        );
+        this.auditLogger.logEvent({
+          timestamp: new Date().toISOString(),
+          eventType: AuditEventType.SECURITY_VIOLATION,
+          severity: AuditSeverity.CRITICAL,
+          outcome: AuditOutcome.BLOCKED,
+          details: {
+            validationErrors: validation.errors,
+            riskLevel: validation.riskLevel,
+            executionId,
+            code: `${args.code?.substring(0, 200)}...`,
+            reason: validation.reason
+          }
+        });
 
         return {
           success: false,
@@ -284,7 +297,11 @@ class RestrictedTerminalTool implements BaseTool {
     }
 
     // Even for safe commands, perform validation
-    const validation = this.securityValidator.validateCommand(args.command);
+    const validation = await this.securityValidator.validateCode({
+      code: args.command,
+      language: 'shell',
+      environment: 'bash-safe'
+    });
     if (!validation.isValid) {
       return {
         success: false,
@@ -340,27 +357,28 @@ class SecureE2BCodeExecutionTool implements BaseTool {
       });
 
       if (!inputValidation.success) {
-        await this.auditLogger.logEvent(
-          AuditEventType.SECURITY_VIOLATION,
-          AuditSeverity.HIGH,
-          AuditOutcome.FAILURE,
-          'secure-code-tool',
-          'validate_input',
-          'code-execution',
-          'Code execution blocked by input validation',
-          {
-            userId: this.agentContext.userId,
-            sessionId: this.agentContext.sessionId,
+        this.auditLogger.logEvent({
+          timestamp: new Date().toISOString(),
+          eventType: AuditEventType.SECURITY_VIOLATION,
+          severity: AuditSeverity.HIGH,
+          outcome: AuditOutcome.FAILURE,
+          userId: this.agentContext?.userId || 'unknown',
+          sessionId: this.agentContext?.sessionId || 'unknown',
+          resource: 'secure-code-tool',
+          action: 'validate_input',
+          details: {
+            type: 'code-execution',
+            message: 'Code execution blocked by input validation',
             executionId,
-          },
-          { reason: (inputValidation as any).error.message }
-        );
+            reason: (inputValidation as any).error?.message || 'Input validation failed'
+          }
+        });
 
         return {
           success: false,
           error: 'Code validation failed',
-          details: (inputValidation as any).error.message,
-          executionId,
+          details: (inputValidation as any).error?.message || 'Input validation failed',
+          executionId
         };
       }
 
@@ -378,17 +396,11 @@ class SecureE2BCodeExecutionTool implements BaseTool {
       });
 
       if (!authResult.granted) {
-        await this.auditLogger.logAuthorization(
+        this.auditLogger.logAuthorizationEvent(
           AuditOutcome.FAILURE,
           this.agentContext.userId,
           'code-execution',
-          'execute',
-          {
-            userId: this.agentContext.userId,
-            sessionId: this.agentContext.sessionId,
-            executionId,
-          },
-          { reason: authResult.reason }
+          'execute'
         );
 
         return {
@@ -400,18 +412,21 @@ class SecureE2BCodeExecutionTool implements BaseTool {
       }
 
       // Security validation
-      const securityValidation = this.securityValidator.validateCode(args.code, args.language);
+      const securityValidation = await this.securityValidator.validateCode({
+        code: args.code,
+        language: args.language || 'javascript',
+        environment: args.environment || 'node18-safe'
+      });
       if (!securityValidation.isValid) {
-        await this.auditLogger.logSecurityViolation(
-          AuditSeverity.HIGH,
-          'secure-code-tool',
+        this.auditLogger.logSecurityViolation(
+          this.agentContext?.userId || 'unknown',
           `Malicious code detected: ${securityValidation.reason}`,
           {
-            userId: this.agentContext.userId,
             sessionId: this.agentContext.sessionId,
             executionId,
-          },
-          { code: `${args.code.substring(0, 200)}...`, language: args.language }
+            code: `${args.code.substring(0, 200)}...`,
+            language: args.language
+          }
         );
 
         return {
@@ -432,25 +447,24 @@ class SecureE2BCodeExecutionTool implements BaseTool {
       );
 
       // Log successful execution
-      await this.auditLogger.logEvent(
-        AuditEventType.DATA_ACCESS,
-        AuditSeverity.LOW,
-        AuditOutcome.SUCCESS,
-        'secure-code-tool',
-        'execute',
-        'code-execution',
-        'Code executed successfully in sandbox',
-        {
-          userId: this.agentContext.userId,
-          sessionId: this.agentContext.sessionId,
+      this.auditLogger.logEvent({
+        timestamp: new Date().toISOString(),
+        eventType: AuditEventType.DATA_ACCESS,
+        severity: AuditSeverity.LOW,
+        outcome: AuditOutcome.SUCCESS,
+        userId: this.agentContext?.userId || 'unknown',
+        sessionId: this.agentContext?.sessionId || 'unknown',
+        resource: 'secure-code-tool',
+        action: 'execute',
+        details: {
+          type: 'code-execution',
+          message: 'Code executed successfully in sandbox',
           executionId,
-        },
-        {
           language: args.language,
           executionTime: Date.now() - startTime,
-          outputLength: result.output?.length || 0,
+          outputLength: result.output?.length || 0
         }
-      );
+      });
 
       return {
         success: true,
@@ -552,7 +566,7 @@ class SecureE2BTerminalTool implements BaseTool {
       });
 
       if (!authResult.granted) {
-        await this.auditLogger.logAuthorization(
+        await this.auditLogger.logAuthorizationEvent(
           AuditOutcome.FAILURE,
           this.agentContext.userId,
           'terminal-execution',
@@ -574,7 +588,11 @@ class SecureE2BTerminalTool implements BaseTool {
       }
 
       // Security validation
-      const securityValidation = this.securityValidator.validateCommand(args.command);
+      const securityValidation = await this.securityValidator.validateCode({
+        code: args.command,
+        language: 'shell',
+        environment: 'bash-safe'
+      });
       if (!securityValidation.isValid) {
         await this.auditLogger.logSecurityViolation(
           AuditSeverity.CRITICAL,

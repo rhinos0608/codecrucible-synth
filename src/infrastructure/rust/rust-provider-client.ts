@@ -29,7 +29,7 @@ export interface RustProviderStats {
 /**
  * Client for interacting with Rust-based provider services
  */
-export class RustProviderClient implements ProviderClient {
+export class RustProviderClient {
   private config: RustProviderConfig;
   private bridgeManager: RustBridgeManager;
   private stats: RustProviderStats;

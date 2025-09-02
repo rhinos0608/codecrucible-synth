@@ -413,7 +413,7 @@ export class PackageManagerTool extends BaseTool {
         fs
           .readFile(packageJsonPath, 'utf-8')
           .then(JSON.parse)
-          .catch(() => null),
+          .catch((): null => null),
         fs
           .access(lockfilePath)
           .then(() => true)

@@ -83,7 +83,16 @@ export class MCPVoiceCoordinator extends EventEmitter {
       this.logger.debug('Selected connection', { decision });
 
       // Placeholder: security and reliability checks
-      enhancedMCPSecuritySystem.validateRequest(mcpContext);
+      try {
+        const validationResult = enhancedMCPSecuritySystem.validateRequest(mcpContext);
+        if (validationResult === false) {
+          throw new Error('Security validation failed: validateRequest returned false for the provided context.');
+        }
+      } catch (err) {
+        throw new Error(
+          `Security validation failed for requestId=${request.requestId}, voiceId=${request.voiceId}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
       const safeContext = await enhancedMCPReliabilitySystem.executeWithRetries(
         async () => mcpContext
       );

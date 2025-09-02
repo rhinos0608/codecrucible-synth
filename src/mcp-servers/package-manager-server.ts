@@ -104,8 +104,8 @@ export class PackageManagerMCPServer {
       switch (name) {
         case 'install_package': {
           const installArgs = args as InstallPackageArgs | undefined;
-          if (!installArgs) {
-            throw new Error("Missing arguments for 'install_package'");
+          if (!installArgs?.name) {
+            throw new Error("Missing required 'name' argument for 'install_package'");
           }
           const result = await this.installPackage(installArgs.name, installArgs.manager);
           return {

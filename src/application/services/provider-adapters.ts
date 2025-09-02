@@ -28,10 +28,22 @@ export class OllamaAdapter implements ProviderAdapter {
     const streamFn = (this.provider as any).stream;
     if (!streamFn) return;
     const iterator = await streamFn.call(this.provider, req);
+    let index = 0;
     for await (const token of iterator as any) {
-      yield { content: (token as any).content ?? String(token), isComplete: false };
+      yield {
+        content: (token as any).content ?? String(token),
+        isComplete: false,
+        index,
+        timestamp: Date.now(),
+      };
+      index++;
     }
-    yield { content: '', isComplete: true };
+    yield {
+      content: '',
+      isComplete: true,
+      index,
+      timestamp: Date.now(),
+    };
   }
 
   async getModels(): Promise<string[]> {

@@ -23,8 +23,7 @@ interface ListenerRemover {
   removeAllListeners: () => void;
 }
 
-function isDisposable(value: unknown): value is Disposable {
-  return typeof (value as Disposable)?.dispose === 'function';
+  return value != null && typeof (value as Disposable)?.dispose === 'function';
 }
 
 function hasRemoveAllListeners(value: unknown): value is ListenerRemover {

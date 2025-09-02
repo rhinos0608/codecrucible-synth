@@ -152,7 +152,7 @@ import {
   createUnifiedOrchestrationService,
   UnifiedOrchestrationService,
 } from '../../application/services/unified-orchestration-service.js';
-import { getUnifiedConfigurationManager } from '../../domain/services/unified-configuration-manager.js';
+import { getUnifiedConfigurationManager } from '../../domain/config/config-manager.js';
 
 let _unifiedOrchestrationServiceInstance: UnifiedOrchestrationService | null = null;
 

@@ -18,7 +18,7 @@ import {
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { IModelClient, ModelRequest, ModelTool } from '../../domain/interfaces/model-client.js';
-import { UnifiedConfigurationManager } from '../../domain/services/unified-configuration-manager.js';
+import { UnifiedConfigurationManager } from '../../domain/config/config-manager.js';
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 import { RuntimeContext } from '../runtime/runtime-context.js';
@@ -78,8 +78,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       if (dependencies.runtimeContext) {
         this.runtimeContext = dependencies.runtimeContext;
         this.eventBus = dependencies.runtimeContext.eventBus;
-        this.securityValidator = dependencies.runtimeContext.securityValidator ?? dependencies.securityValidator;
-        this.configManager = dependencies.runtimeContext.configManager ?? dependencies.configManager;
+        this.securityValidator =
+          dependencies.runtimeContext.securityValidator ?? dependencies.securityValidator;
+        this.configManager =
+          dependencies.runtimeContext.configManager ?? dependencies.configManager;
       } else {
         this.eventBus = dependencies.eventBus;
         this.securityValidator = dependencies.securityValidator;
@@ -480,9 +482,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       }
       this.toolSelectionCache.set(cacheKey, selectedTools);
 
-      logger.info(`🎯 Dynamic tool selection: ${selectedTools.length} tools for "${userQuery.substring(0, 50)}..." (from ${registry.size} available)`);
+      logger.info(
+        `🎯 Dynamic tool selection: ${selectedTools.length} tools for "${userQuery.substring(0, 50)}..." (from ${registry.size} available)`
+      );
       return selectedTools;
-
     } catch (error) {
       logger.warn('Failed to get MCP tools for model:', error);
       // Return essential tools as fallback
@@ -505,23 +508,29 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     // Query intent patterns
     const patterns = [
       // Filesystem operations
-      { pattern: /\b(write|create|save|edit|modify|update)\b.*\bfile/i, tools: ['filesystem_write'] },
+      {
+        pattern: /\b(write|create|save|edit|modify|update)\b.*\bfile/i,
+        tools: ['filesystem_write'],
+      },
       { pattern: /\b(stat|size|info|details|properties)\b/i, tools: ['filesystem_stats'] },
       { pattern: /\b(show|display|cat|view|open)\b.*\bfile/i, tools: ['filesystem_read'] },
-      
+
       // Git operations
       { pattern: /\bgit\s+(status|st)\b/i, tools: ['git_status'] },
       { pattern: /\bgit\s+(add|stage)\b/i, tools: ['git_add'] },
       { pattern: /\bgit\s+(commit|ci)\b/i, tools: ['git_commit'] },
       { pattern: /\b(commit|stage|git)\b/i, tools: ['git_status', 'git_add', 'git_commit'] },
-      
+
       // Terminal operations
       { pattern: /\b(run|execute|command|terminal|shell|bash)\b/i, tools: ['execute_command'] },
       { pattern: /\b(npm|yarn|node|build|test|start)\b/i, tools: ['execute_command', 'npm_run'] },
       { pattern: /\binstall\b.*\bpackage/i, tools: ['npm_install'] },
-      
+
       // Smithery/MCP operations
-      { pattern: /\b(smithery|mcp|registry|server)\b/i, tools: ['smithery_status', 'smithery_refresh'] },
+      {
+        pattern: /\b(smithery|mcp|registry|server)\b/i,
+        tools: ['smithery_status', 'smithery_refresh'],
+      },
     ];
 
     // Apply patterns
@@ -555,7 +564,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       .replace(/[^\w\s]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    
+
     // Use first 100 chars for cache key to balance specificity and reuse
     return normalized.substring(0, 100);
   }
@@ -590,17 +599,17 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
         // Execute all tool calls and collect results
         const toolResults: Array<{ id: string; result: any; error?: string }> = [];
 
-      if (!this.mcpManager) {
-        throw new Error('MCP manager not available');
-      }
+        if (!this.mcpManager) {
+          throw new Error('MCP manager not available');
+        }
 
-      for (const toolCall of response.toolCalls) {
-        try {
-          const toolResult = await this.mcpManager.executeTool(
-            toolCall.function.name,
-            JSON.parse(toolCall.function.arguments),
-            request.context
-          );
+        for (const toolCall of response.toolCalls) {
+          try {
+            const toolResult = await this.mcpManager.executeTool(
+              toolCall.function.name,
+              JSON.parse(toolCall.function.arguments),
+              request.context
+            );
             logger.info(`✅ Tool call ${toolCall.function.name} executed successfully`);
 
             toolResults.push({
@@ -627,18 +636,18 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
           const structuredMessages = [
             {
               role: 'user' as const,
-              content: payload.input || payload.prompt
+              content: payload.input || payload.prompt,
             },
             {
               role: 'assistant' as const,
               content: response.content || 'I need to use tools to help with this request.',
-              tool_calls: response.toolCalls
+              tool_calls: response.toolCalls,
             },
             {
               role: 'tool' as const,
               content: JSON.stringify(toolResults, null, 2),
-              tool_call_id: 'batch_results'
-            }
+              tool_call_id: 'batch_results',
+            },
           ];
 
           // Create structured follow-up request
@@ -781,18 +790,18 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
         const structuredMessages = [
           {
             role: 'user' as const,
-            content: analysisPrompt
+            content: analysisPrompt,
           },
           {
             role: 'assistant' as const,
             content: result.content || 'I need to use tools to analyze this.',
-            tool_calls: result.toolCalls
+            tool_calls: result.toolCalls,
           },
           {
             role: 'tool' as const,
             content: JSON.stringify(toolResults, null, 2),
-            tool_call_id: 'analysis_batch_results'
-          }
+            tool_call_id: 'analysis_batch_results',
+          },
         ];
 
         // Create structured follow-up analysis request

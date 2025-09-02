@@ -10,7 +10,7 @@ import { join, dirname } from 'path';
 import { existsSync } from 'fs';
 import YAML from 'yaml';
 import { UnifiedConfiguration } from '../interfaces/configuration.js';
-import { UnifiedConfigurationManager } from './unified-configuration-manager.js';
+import { UnifiedConfigurationManager } from '../config/config-manager.js';
 import { ILogger } from '../interfaces/logger.js';
 
 export interface MigrationAnalysis {

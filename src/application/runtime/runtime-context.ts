@@ -8,9 +8,12 @@
  * injecting this object over importing singletons or using global setters.
  */
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
-import { unifiedResourceCoordinator, UnifiedResourceCoordinator } from '../../infrastructure/performance/unified-resource-coordinator.js';
+import {
+  unifiedResourceCoordinator,
+  UnifiedResourceCoordinator,
+} from '../../infrastructure/performance/unified-resource-coordinator.js';
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
-import { UnifiedConfigurationManager } from '../../domain/services/unified-configuration-manager.js';
+import { UnifiedConfigurationManager } from '../../domain/config/config-manager.js';
 
 export interface RuntimeContext {
   eventBus: IEventBus;

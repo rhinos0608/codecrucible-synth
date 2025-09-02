@@ -4,7 +4,7 @@
  * Command-line interface for configuration management and migration.
  */
 
-import { UnifiedConfigurationManager } from '../../domain/services/unified-configuration-manager.js';
+import { UnifiedConfigurationManager } from '../../domain/config/config-manager.js';
 import { ConfigurationMigrator } from '../../domain/services/configuration-migrator.js';
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 import { join } from 'path';

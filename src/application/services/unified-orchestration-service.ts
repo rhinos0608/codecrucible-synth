@@ -10,7 +10,7 @@ import { EventEmitter } from 'events';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { UnifiedConfiguration } from '../../domain/interfaces/configuration.js';
-import { UnifiedConfigurationManager } from '../../domain/services/unified-configuration-manager.js';
+import { UnifiedConfigurationManager } from '../../domain/config/config-manager.js';
 import { UnifiedAgentSystem } from '../../domain/services/unified-agent-system.js';
 import { UnifiedServerSystem } from '../../domain/services/unified-server-system.js';
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
@@ -242,7 +242,10 @@ export class UnifiedOrchestrationService extends EventEmitter {
         case 'debug':
         case 'optimize':
           if (!this.commandBus) throw new Error('Command bus not initialized');
-          result = await this.commandBus.execute({ type: `agent:${request.type}`, payload: { request } });
+          result = await this.commandBus.execute({
+            type: `agent:${request.type}`,
+            payload: { request },
+          });
           componentsUsed.push('AgentSystem');
           break;
 
@@ -750,8 +753,12 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
   // === Plugin Command Registry Bridge ===
 
-  listPluginCommands(): Array<{ name: string; description?: string; plugin?: string; version?: string }>
-  {
+  listPluginCommands(): Array<{
+    name: string;
+    description?: string;
+    plugin?: string;
+    version?: string;
+  }> {
     if (!this.commandRegistry) return [];
     try {
       return this.commandRegistry.list().map(c => ({

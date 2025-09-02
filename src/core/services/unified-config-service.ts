@@ -10,7 +10,7 @@
  */
 
 // Re-export the properly layered domain implementation
-export * from '../../domain/services/unified-configuration-manager.js';
+export * from '../../domain/config/config-manager.js';
 export * from '../../domain/interfaces/configuration.js';
 
 // For backward compatibility, provide type aliases for old naming conventions
@@ -65,10 +65,10 @@ export interface ConfigOptions {
 }
 
 // Export the class as a value, not just a type
-export { UnifiedConfigurationManager as UnifiedConfigService } from '../../domain/services/unified-configuration-manager.js';
+export { UnifiedConfigurationManager as UnifiedConfigService } from '../../domain/config/config-manager.js';
 
 // Create a singleton instance for backward compatibility
-import { UnifiedConfigurationManager } from '../../domain/services/unified-configuration-manager.js';
+import { UnifiedConfigurationManager } from '../../domain/config/config-manager.js';
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 
 const logger = createLogger('UnifiedConfigService');

@@ -7,7 +7,7 @@
  * @deprecated Use UnifiedConfigurationManager from domain/services instead
  */
 
-import { UnifiedConfigurationManager } from '../domain/services/unified-configuration-manager.js';
+import { UnifiedConfigurationManager } from '../domain/config/config-manager.js';
 import { UnifiedConfiguration } from '../domain/types/index.js';
 import { createLogger } from '../infrastructure/logging/logger-adapter.js';
 
@@ -71,11 +71,15 @@ export class ConfigManager {
   private convertToLegacyFormat(unified: UnifiedConfiguration): AppConfig {
     return {
       model: {
-        endpoint: unified.model.providers[0]?.endpoint || process.env.OLLAMA_ENDPOINT || 'http://localhost:11434',
+        endpoint:
+          unified.model.providers[0]?.endpoint ||
+          process.env.OLLAMA_ENDPOINT ||
+          'http://localhost:11434',
         name: unified.model.defaultModel || process.env.MODEL_DEFAULT_NAME,
         timeout: unified.model.timeout || parseInt(process.env.REQUEST_TIMEOUT || '30000'),
         maxTokens: unified.model.maxTokens || parseInt(process.env.MODEL_MAX_TOKENS || '131072'),
-        temperature: unified.model.temperature || parseFloat(process.env.MODEL_TEMPERATURE || '0.7'),
+        temperature:
+          unified.model.temperature || parseFloat(process.env.MODEL_TEMPERATURE || '0.7'),
       },
       llmProviders: {
         default: unified.model.defaultProvider || 'ollama',
@@ -137,7 +141,10 @@ export class ConfigManager {
             provider: 'ollama',
             endpoint: 'http://localhost:11434',
             enabled: true,
-            models: [process.env.MODEL_DEFAULT_NAME || 'qwen2.5-coder:7b', 'deepseek-coder:8b'].filter(Boolean),
+            models: [
+              process.env.MODEL_DEFAULT_NAME || 'qwen2.5-coder:7b',
+              'deepseek-coder:8b',
+            ].filter(Boolean),
           },
         },
       },

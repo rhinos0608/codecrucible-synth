@@ -32,7 +32,7 @@ export { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 
 // Export domain services
 export { UnifiedAgentSystem } from './domain/services/unified-agent-system.js';
-export { UnifiedConfigurationManager } from './domain/services/unified-configuration-manager.js';
+export { UnifiedConfigurationManager } from './domain/config/config-manager.js';
 export { UnifiedSecurityValidator } from './domain/services/unified-security-validator.js';
 export { UnifiedPerformanceSystem } from './domain/services/unified-performance-system.js';
 export { UnifiedServerSystem } from './domain/services/unified-server-system.js';

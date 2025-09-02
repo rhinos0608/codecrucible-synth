@@ -1,0 +1,194 @@
+import { homedir } from 'os';
+import { join } from 'path';
+import type { UnifiedConfiguration } from '../interfaces/configuration.js';
+import { loadConfigFile } from './config-loader.js';
+
+export function getDefaultConfig(): UnifiedConfiguration {
+  return {
+    system: {
+      app: {
+        name: 'CodeCrucible Synth',
+        version: '0.0.0',
+        environment: 'development',
+        logLevel: 'info',
+        features: [],
+      },
+      models: {} as any,
+      voices: {} as any,
+      tools: {} as any,
+      security: {} as any,
+      performance: {} as any,
+      infrastructure: {} as any,
+    },
+    application: {
+      name: 'CodeCrucible Synth',
+      version: '0.0.0',
+      environment: 'development',
+      logLevel: 'info',
+      features: [],
+    },
+    model: {
+      defaultProvider: 'ollama',
+      defaultModel: process.env.MODEL_DEFAULT_NAME || '',
+      providers: [],
+      routing: {
+        strategy: 'round_robin',
+        healthCheckInterval: 30000,
+        failoverThreshold: 3,
+      },
+      fallback: { enabled: true, chain: [], maxRetries: 3, backoffMs: 1000 },
+      timeout: 30000,
+      maxTokens: 4096,
+      temperature: 0.7,
+    },
+    voice: {
+      enabled: true,
+      defaultVoices: ['explorer'],
+      maxConcurrentVoices: 1,
+      consensusThreshold: 1,
+      voices: {},
+    },
+    tools: {
+      enabled: true,
+      discoveryPaths: [],
+      maxConcurrentExecutions: 1,
+      timeoutMs: 30000,
+      sandbox: {
+        enabled: true,
+        type: 'process',
+        resourceLimits: {
+          maxMemoryMB: 512,
+          maxCpuPercent: 80,
+          maxDiskMB: 1024,
+          maxExecutionTimeMs: 60000,
+          maxFileDescriptors: 256,
+        },
+        networkIsolation: true,
+        fileSystemIsolation: true,
+      },
+    },
+    security: {
+      enabled: true,
+      level: 'medium',
+      policies: [],
+      auditing: {
+        enabled: true,
+        logLevel: 'standard',
+        retention: { days: 30, maxSizeMB: 100, compressionEnabled: true },
+        destinations: [],
+      },
+      encryption: {
+        enabled: false,
+        algorithm: 'AES-256',
+        keyRotationIntervalDays: 90,
+        encryptAtRest: false,
+        encryptInTransit: true,
+      },
+      enableSandbox: true,
+      securityLevel: 'medium',
+    },
+    performance: {
+      caching: {
+        enabled: true,
+        type: 'memory',
+        maxSizeMB: 64,
+        ttlSeconds: 60,
+        evictionPolicy: 'lru',
+      },
+      pooling: {
+        connections: {
+          maxConnections: 10,
+          minConnections: 1,
+          acquireTimeoutMs: 3000,
+          idleTimeoutMs: 30000,
+        },
+        threads: { coreSize: 1, maxSize: 4, queueSize: 100, keepAliveMs: 60000 },
+      },
+      optimization: { enabled: false, strategies: [], adaptiveTuning: false },
+      monitoring: { enabled: true, metrics: [], alerts: [], dashboards: [] },
+      maxConcurrentRequests: 3,
+      enableCaching: true,
+      defaultTimeout: 30000,
+    },
+    monitoring: { enabled: true, metrics: [], alerts: [], dashboards: [] },
+    infrastructure: {
+      database: {
+        type: 'sqlite',
+        poolSize: 1,
+        migrations: true,
+        backup: {
+          enabled: false,
+          schedule: '0 0 * * *',
+          retention: 7,
+          compression: false,
+          destination: join(homedir(), '.codecrucible', 'backups'),
+        },
+        path: './data.db',
+        inMemory: false,
+      },
+      storage: {
+        type: 'local',
+        basePath: './',
+        encryption: false,
+        compression: false,
+        configuration: {},
+      },
+      messaging: { enabled: false, type: 'memory', configuration: {} },
+      networking: {
+        timeoutMs: 30000,
+        retries: 3,
+        tls: { enabled: false, version: 'TLS1.3', verifyPeer: true },
+      },
+    },
+  } as UnifiedConfiguration;
+}
+
+export function mergeConfigurations<T extends object>(base: T, override: Partial<T>): T {
+  for (const [key, value] of Object.entries(override)) {
+    if (Array.isArray(value)) {
+      (base as any)[key] = value;
+    } else if (value && typeof value === 'object') {
+      (base as any)[key] = mergeConfigurations((base as any)[key] || {}, value);
+    } else if (value !== undefined) {
+      (base as any)[key] = value;
+    }
+  }
+  return base;
+}
+
+function loadEnvConfig(): Partial<UnifiedConfiguration> {
+  const env: Partial<UnifiedConfiguration> = {};
+  if (process.env.NODE_ENV) {
+    env.application = env.application || ({} as any);
+    env.application.environment = process.env.NODE_ENV as any;
+  }
+  if (process.env.LOG_LEVEL) {
+    env.application = env.application || ({} as any);
+    env.application.logLevel = process.env.LOG_LEVEL as any;
+  }
+  if (process.env.MODEL_DEFAULT_NAME) {
+    env.model = env.model || ({} as any);
+    env.model.defaultModel = process.env.MODEL_DEFAULT_NAME;
+  }
+  return env;
+}
+
+function loadCliConfig(): Partial<UnifiedConfiguration> {
+  const cli: Partial<UnifiedConfiguration> = {};
+  for (const arg of process.argv.slice(2)) {
+    if (arg.startsWith('--log-level=')) {
+      cli.application = cli.application || ({} as any);
+      cli.application.logLevel = arg.split('=')[1] as any;
+    }
+  }
+  return cli;
+}
+
+export async function resolveConfig(filePath: string): Promise<UnifiedConfiguration> {
+  let config = getDefaultConfig();
+  const fileConfig = await loadConfigFile(filePath);
+  config = mergeConfigurations(config, fileConfig);
+  config = mergeConfigurations(config, loadEnvConfig());
+  config = mergeConfigurations(config, loadCliConfig());
+  return config;
+}

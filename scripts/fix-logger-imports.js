@@ -141,7 +141,7 @@ async function main() {
     'src/core/unified-response-coordinator.ts',
     'src/domain/services/configuration-migrator.ts',
     'src/domain/services/living-spiral-coordinator.ts',
-    'src/domain/services/unified-configuration-manager.ts',
+    'src/domain/config/config-manager.ts',
     'src/domain/services/unified-performance-system.ts',
     'src/domain/services/unified-security-validator.ts',
     'src/domain/services/unified-server-system.ts',

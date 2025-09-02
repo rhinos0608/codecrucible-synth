@@ -5,7 +5,7 @@
 
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { ModernInputSanitizer } from './modern-input-sanitizer.js';
-import { logger } from '../../core/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 import type { ILogger } from '../../domain/interfaces/logger.js';
 
 export interface SecurityValidationOptions {

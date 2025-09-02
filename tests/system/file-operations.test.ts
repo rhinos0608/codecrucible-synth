@@ -1,6 +1,6 @@
 /**
  * Comprehensive File Operations System Test
- * 
+ *
  * Tests the system's ability to handle various file operations including:
  * - Reading various file types (.ts, .js, .json, .md, .txt)
  * - Writing files with different content types
@@ -23,11 +23,19 @@ import { EventEmitter } from 'events';
 const generateId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
 // Import system components
-import { EnhancedReadFileTool, EnhancedWriteFileTool, FileSearchTool, FileOperationsTool } from '../../src/core/tools/enhanced-file-tools.js';
+import {
+  EnhancedReadFileTool,
+  EnhancedWriteFileTool,
+  FileSearchTool,
+  FileOperationsTool,
+} from '../../src/core/tools/enhanced-file-tools.js';
 import { FilesystemTools } from '../../src/core/tools/filesystem-tools.js';
-import IntelligentFileWatcher, { FileChangeType, FileChangeEvent } from '../../src/core/file-watching/intelligent-file-watcher.js';
+import IntelligentFileWatcher, {
+  FileChangeType,
+  FileChangeEvent,
+} from '../../src/core/file-watching/intelligent-file-watcher.js';
 import { MCPServerManager } from '../../src/mcp-servers/mcp-server-manager.js';
-import { Logger } from '../../src/core/logger.js';
+import { Logger } from '../../src/infrastructure/logging/logger.js';
 
 // Test configuration
 const TEST_DIR_PREFIX = 'codecrucible-file-ops-test';
@@ -83,15 +91,15 @@ class FileOperationsTestSuite {
     // Create unique test directory
     this.testDir = join(tmpdir(), `${TEST_DIR_PREFIX}-${generateId()}`);
     this.agentContext = { workingDirectory: this.testDir };
-    
+
     this.logger = new Logger('FileOperationsTest');
-    
+
     // Initialize tools
     this.readTool = new EnhancedReadFileTool(this.agentContext);
     this.writeTool = new EnhancedWriteFileTool(this.agentContext);
     this.searchTool = new FileSearchTool(this.agentContext);
     this.operationsTool = new FileOperationsTool(this.agentContext);
-    
+
     // Mock MCP Manager for filesystem tools
     this.mcpManager = {
       readFileSecure: async (path: string) => fs.readFile(path, 'utf8'),
@@ -118,7 +126,7 @@ class FileOperationsTestSuite {
         }
       },
     } as any;
-    
+
     this.filesystemTools = new FilesystemTools(this.mcpManager);
 
     // Initialize report
@@ -147,7 +155,7 @@ class FileOperationsTestSuite {
   async setup(): Promise<void> {
     // Create test directory structure
     await fs.mkdir(this.testDir, { recursive: true });
-    
+
     // Create subdirectories
     const subdirs = ['src', 'tests', 'config', 'docs', 'temp', 'large-files'];
     for (const subdir of subdirs) {
@@ -162,11 +170,11 @@ class FileOperationsTestSuite {
       if (this.fileWatcher) {
         await this.fileWatcher.stopWatching();
       }
-      
+
       if (existsSync(this.testDir)) {
         await fs.rm(this.testDir, { recursive: true, force: true });
       }
-      
+
       this.logger.info('Test environment cleaned up');
     } catch (error) {
       this.logger.warn('Cleanup failed:', error);
@@ -190,7 +198,7 @@ class FileOperationsTestSuite {
     }
 
     const executionTime = performance.now() - startTime;
-    
+
     const testResult: TestResult = {
       testName,
       passed,
@@ -204,7 +212,9 @@ class FileOperationsTestSuite {
     if (passed) this.report.passedTests++;
     else this.report.failedTests++;
 
-    this.logger.info(`Test ${testName}: ${passed ? 'PASSED' : 'FAILED'} (${executionTime.toFixed(2)}ms)`);
+    this.logger.info(
+      `Test ${testName}: ${passed ? 'PASSED' : 'FAILED'} (${executionTime.toFixed(2)}ms)`
+    );
     if (error) {
       this.logger.error(`Test ${testName} error:`, error);
     }
@@ -213,7 +223,11 @@ class FileOperationsTestSuite {
   // Test 1: Reading Various File Types
   async testReadVariousFileTypes(): Promise<any> {
     const files = [
-      { name: 'test.ts', content: 'export class TestClass {\n  constructor() {}\n}', type: 'typescript' },
+      {
+        name: 'test.ts',
+        content: 'export class TestClass {\n  constructor() {}\n}',
+        type: 'typescript',
+      },
       { name: 'test.js', content: 'function test() {\n  return "hello";\n}', type: 'javascript' },
       { name: 'config.json', content: '{"name": "test", "version": "1.0.0"}', type: 'json' },
       { name: 'README.md', content: '# Test Project\n\nThis is a test.', type: 'markdown' },
@@ -243,7 +257,7 @@ class FileOperationsTestSuite {
       expect(result.files.length).toBe(1);
       expect(result.files[0].content).toBe(file.content);
       expect(result.files[0].metadata?.type).toBe(extname(file.name));
-      
+
       results.push({
         file: file.name,
         type: file.type,
@@ -263,11 +277,24 @@ class FileOperationsTestSuite {
   // Test 2: Writing Files with Different Content Types
   async testWriteVariousContentTypes(): Promise<any> {
     const writeOperations = [
-      { path: 'output.ts', content: 'interface TestInterface {\n  id: number;\n  name: string;\n}', mode: 'write' as const },
+      {
+        path: 'output.ts',
+        content: 'interface TestInterface {\n  id: number;\n  name: string;\n}',
+        mode: 'write' as const,
+      },
       { path: 'logs.txt', content: 'Log entry 1\n', mode: 'write' as const },
       { path: 'logs.txt', content: 'Log entry 2\n', mode: 'append' as const },
-      { path: 'config.yaml', content: 'version: 2\nservices:\n  web:\n    image: nginx', mode: 'write' as const },
-      { path: 'temp/nested.json', content: '{"nested": {"structure": true}}', mode: 'write' as const, createDirs: true },
+      {
+        path: 'config.yaml',
+        content: 'version: 2\nservices:\n  web:\n    image: nginx',
+        mode: 'write' as const,
+      },
+      {
+        path: 'temp/nested.json',
+        content: '{"nested": {"structure": true}}',
+        mode: 'write' as const,
+        createDirs: true,
+      },
     ];
 
     const writeTimes: number[] = [];
@@ -276,12 +303,14 @@ class FileOperationsTestSuite {
     for (const op of writeOperations) {
       const startTime = performance.now();
       const result = await this.writeTool.execute({
-        operations: [{
-          path: op.path,
-          content: op.content,
-          mode: op.mode,
-          createDirs: op.createDirs || false,
-        }],
+        operations: [
+          {
+            path: op.path,
+            content: op.content,
+            mode: op.mode,
+            createDirs: op.createDirs || false,
+          },
+        ],
         backup: false,
       });
       const writeTime = performance.now() - startTime;
@@ -293,7 +322,7 @@ class FileOperationsTestSuite {
       // Verify file was written correctly
       const filePath = join(this.testDir, op.path);
       expect(existsSync(filePath)).toBe(true);
-      
+
       const written = await fs.readFile(filePath, 'utf8');
       if (op.mode === 'write') {
         expect(written).toBe(op.content);
@@ -321,7 +350,8 @@ class FileOperationsTestSuite {
     const structure = {
       'src/components/Button.tsx': 'export const Button = () => <button>Click</button>;',
       'src/components/Input.tsx': 'export const Input = () => <input />;',
-      'src/utils/helpers.ts': 'export const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);',
+      'src/utils/helpers.ts':
+        'export const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);',
       'src/utils/api.ts': 'export const fetchData = async (url: string) => fetch(url);',
       'tests/Button.test.ts': 'describe("Button", () => { test("renders", () => {}); });',
       'tests/utils.test.ts': 'describe("Utils", () => { test("capitalize", () => {}); });',
@@ -351,7 +381,7 @@ class FileOperationsTestSuite {
 
     // Verify all expected files were read correctly (there might be additional files from previous tests)
     const readFiles = new Set(result.files.map((f: any) => f.path));
-    const expectedFilesFound = Object.keys(structure).filter(expectedFile => 
+    const expectedFilesFound = Object.keys(structure).filter(expectedFile =>
       result.files.some((f: any) => f.path.includes(expectedFile))
     ).length;
     expect(expectedFilesFound).toBe(Object.keys(structure).length);
@@ -384,7 +414,7 @@ class FileOperationsTestSuite {
           const readOnlyPath = join(this.testDir, 'readonly.txt');
           await fs.writeFile(readOnlyPath, 'test', 'utf8');
           await fs.chmod(readOnlyPath, 0o444); // read-only
-          
+
           return this.writeTool.execute({
             operations: [{ path: 'readonly.txt', content: 'new content', mode: 'write' }],
           });
@@ -393,10 +423,11 @@ class FileOperationsTestSuite {
       },
       {
         name: 'large-file-limit',
-        test: () => this.readTool.execute({ 
-          paths: 'large-test-file.txt',
-          maxSize: 10, // Very small limit
-        }),
+        test: () =>
+          this.readTool.execute({
+            paths: 'large-test-file.txt',
+            maxSize: 10, // Very small limit
+          }),
         expectError: false, // Should return size error, not throw
       },
     ];
@@ -409,11 +440,11 @@ class FileOperationsTestSuite {
     for (const errorCase of errorCases) {
       try {
         const result = await errorCase.test();
-        
+
         if (errorCase.expectError) {
           expect(result.error || result.errors?.length > 0).toBe(true);
         }
-        
+
         results.push({
           case: errorCase.name,
           handled: true,
@@ -441,7 +472,7 @@ class FileOperationsTestSuite {
   async testLargeFileHandling(): Promise<any> {
     const largeContent = 'A'.repeat(LARGE_FILE_SIZE);
     const largeFilePath = join(this.testDir, 'large-files', 'large-file.txt');
-    
+
     // Test writing large file
     const writeStartTime = performance.now();
     await fs.writeFile(largeFilePath, largeContent, 'utf8');
@@ -463,12 +494,14 @@ class FileOperationsTestSuite {
     // Test memory efficiency
     const memoryBefore = process.memoryUsage();
     const multipleReads = await Promise.all(
-      Array(5).fill(0).map(() => 
-        this.readTool.execute({ 
-          paths: 'large-files/large-file.txt',
-          maxSize: LARGE_FILE_SIZE + 1000,
-        })
-      )
+      Array(5)
+        .fill(0)
+        .map(() =>
+          this.readTool.execute({
+            paths: 'large-files/large-file.txt',
+            maxSize: LARGE_FILE_SIZE + 1000,
+          })
+        )
     );
     const memoryAfter = process.memoryUsage();
     const memoryIncrease = memoryAfter.heapUsed - memoryBefore.heapUsed;
@@ -487,22 +520,21 @@ class FileOperationsTestSuite {
   async testConcurrentOperations(): Promise<any> {
     const concurrentOps = Array.from({ length: CONCURRENT_OPERATIONS }, (_, i) => ({
       read: () => this.readTool.execute({ paths: `concurrent-${i}.txt` }),
-      write: () => this.writeTool.execute({
-        operations: [{
-          path: `concurrent-${i}.txt`,
-          content: `Content for file ${i}\nGenerated at ${Date.now()}`,
-          mode: 'write' as const,
-        }],
-      }),
+      write: () =>
+        this.writeTool.execute({
+          operations: [
+            {
+              path: `concurrent-${i}.txt`,
+              content: `Content for file ${i}\nGenerated at ${Date.now()}`,
+              mode: 'write' as const,
+            },
+          ],
+        }),
     }));
 
     // Create all files first
     for (let i = 0; i < CONCURRENT_OPERATIONS; i++) {
-      await fs.writeFile(
-        join(this.testDir, `concurrent-${i}.txt`),
-        `Initial content ${i}`,
-        'utf8'
-      );
+      await fs.writeFile(join(this.testDir, `concurrent-${i}.txt`), `Initial content ${i}`, 'utf8');
     }
 
     // Test concurrent reads
@@ -537,7 +569,8 @@ class FileOperationsTestSuite {
   async testFileSearch(): Promise<any> {
     // Create files with searchable content
     const searchFiles = {
-      'src/user.ts': 'export class User { private id: number; getName(): string { return this.name; } }',
+      'src/user.ts':
+        'export class User { private id: number; getName(): string { return this.name; } }',
       'src/admin.ts': 'export class Admin extends User { private role: string; }',
       'tests/user.test.ts': 'describe("User", () => { test("getName", () => {}); });',
       'config/database.json': '{"host": "localhost", "user": "admin", "password": "secret"}',
@@ -570,8 +603,9 @@ class FileOperationsTestSuite {
       });
       const searchTime = performance.now() - startTime;
 
-      const totalMatches = result.results?.reduce((sum: number, file: any) => sum + file.matches.length, 0) || 0;
-      
+      const totalMatches =
+        result.results?.reduce((sum: number, file: any) => sum + file.matches.length, 0) || 0;
+
       results.push({
         pattern: searchTest.pattern,
         description: searchTest.description,
@@ -628,17 +662,17 @@ class FileOperationsTestSuite {
     ];
 
     const operationTimes: number[] = [];
-    
+
     for (const operation of testOperations) {
       const filePath = join(this.testDir, operation.path);
       const startTime = performance.now();
-      
+
       await fs.writeFile(filePath, operation.content, 'utf8');
-      
+
       // Wait for file change detection
       const maxWaitTime = 1000; // 1 second max wait
       const startWaitTime = Date.now();
-      
+
       while (Date.now() - startWaitTime < maxWaitTime) {
         const relevantEvents = events.filter(e => e.filename === operation.path);
         if (relevantEvents.length > 0) {
@@ -646,7 +680,7 @@ class FileOperationsTestSuite {
         }
         await new Promise(resolve => setTimeout(resolve, 10));
       }
-      
+
       const operationTime = performance.now() - startTime;
       operationTimes.push(operationTime);
     }
@@ -663,7 +697,8 @@ class FileOperationsTestSuite {
       watcherStarted: watcherReady,
       eventsDetected: events.length,
       operationsPerformed: testOperations.length,
-      averageDetectionTime: operationTimes.reduce((sum, time) => sum + time, 0) / operationTimes.length,
+      averageDetectionTime:
+        operationTimes.reduce((sum, time) => sum + time, 0) / operationTimes.length,
       watcherStatus: status,
       detectedFileTypes: [...new Set(events.map(e => e.extension))],
     };
@@ -677,36 +712,40 @@ class FileOperationsTestSuite {
 
     // Test each filesystem tool
     const toolResults = [];
-    
+
     for (const tool of fsTools) {
       try {
         let result;
         const startTime = performance.now();
-        
+
         switch (tool.id) {
           case 'filesystem_read_file':
             // Create a test file first
-            await fs.writeFile(join(this.testDir, 'integration-test.txt'), 'Integration test content', 'utf8');
+            await fs.writeFile(
+              join(this.testDir, 'integration-test.txt'),
+              'Integration test content',
+              'utf8'
+            );
             result = await tool.execute(
               { filePath: 'integration-test.txt' },
               { workingDirectory: this.testDir, userId: 'test' }
             );
             break;
-            
+
           case 'filesystem_write_file':
             result = await tool.execute(
               { filePath: 'integration-write-test.txt', content: 'Written by integration test' },
               { workingDirectory: this.testDir, userId: 'test' }
             );
             break;
-            
+
           case 'filesystem_list_directory':
             result = await tool.execute(
               { dirPath: '.' },
               { workingDirectory: this.testDir, userId: 'test' }
             );
             break;
-            
+
           case 'filesystem_file_stats':
             await fs.writeFile(join(this.testDir, 'stats-test.txt'), 'Stats test', 'utf8');
             result = await tool.execute(
@@ -714,20 +753,20 @@ class FileOperationsTestSuite {
               { workingDirectory: this.testDir, userId: 'test' }
             );
             break;
-            
+
           case 'filesystem_find_files':
             result = await tool.execute(
               { pattern: '*.txt', directory: '.' },
               { workingDirectory: this.testDir, userId: 'test' }
             );
             break;
-            
+
           default:
             continue;
         }
-        
+
         const executionTime = performance.now() - startTime;
-        
+
         toolResults.push({
           toolId: tool.id,
           toolName: tool.name,
@@ -736,7 +775,6 @@ class FileOperationsTestSuite {
           error: result.error,
           outputSize: JSON.stringify(result.output || {}).length,
         });
-        
       } catch (error) {
         toolResults.push({
           toolId: tool.id,
@@ -750,7 +788,7 @@ class FileOperationsTestSuite {
     }
 
     const successfulTools = toolResults.filter(r => r.success).length;
-    
+
     return {
       toolsTested: fsTools.length,
       successfulTools,
@@ -763,52 +801,60 @@ class FileOperationsTestSuite {
   private generateRecommendations(): string[] {
     const recommendations: string[] = [];
     const metrics = this.report.systemMetrics.performanceMetrics;
-    
+
     // Performance recommendations
     if (metrics.averageReadTime > 100) {
-      recommendations.push('Consider implementing file content caching for frequently accessed files');
+      recommendations.push(
+        'Consider implementing file content caching for frequently accessed files'
+      );
     }
-    
+
     if (metrics.averageWriteTime > 200) {
       recommendations.push('Implement batch write operations for multiple small files');
     }
-    
+
     if (metrics.concurrentOperationTime > 1000) {
-      recommendations.push('Consider implementing connection pooling for concurrent file operations');
+      recommendations.push(
+        'Consider implementing connection pooling for concurrent file operations'
+      );
     }
-    
+
     if (metrics.memoryEfficiency < 0.5) {
-      recommendations.push('Implement streaming file operations for large files to reduce memory usage');
+      recommendations.push(
+        'Implement streaming file operations for large files to reduce memory usage'
+      );
     }
-    
+
     // Error handling recommendations
     const errorTests = this.testResults.find(t => t.testName === 'testErrorHandling');
     if (errorTests && !errorTests.passed) {
       recommendations.push('Improve error handling for edge cases in file operations');
     }
-    
+
     // File watching recommendations
     if (metrics.fileWatcherLatency > 500) {
       recommendations.push('Optimize file watcher debounce settings for better responsiveness');
     }
-    
+
     // General recommendations
     recommendations.push('Implement comprehensive logging for all file operations');
     recommendations.push('Add file operation metrics collection for monitoring');
     recommendations.push('Consider implementing file operation quotas for security');
-    
+
     return recommendations;
   }
 
   async runAllTests(): Promise<TestReport> {
     this.logger.info('Starting comprehensive file operations test suite');
-    
+
     await this.setup();
-    
+
     try {
       // Run all tests and record results
       await this.recordTest('testReadVariousFileTypes', () => this.testReadVariousFileTypes());
-      await this.recordTest('testWriteVariousContentTypes', () => this.testWriteVariousContentTypes());
+      await this.recordTest('testWriteVariousContentTypes', () =>
+        this.testWriteVariousContentTypes()
+      );
       await this.recordTest('testFileIteration', () => this.testFileIteration());
       await this.recordTest('testErrorHandling', () => this.testErrorHandling());
       await this.recordTest('testLargeFileHandling', () => this.testLargeFileHandling());
@@ -816,37 +862,38 @@ class FileOperationsTestSuite {
       await this.recordTest('testFileSearch', () => this.testFileSearch());
       await this.recordTest('testFileWatching', () => this.testFileWatching());
       await this.recordTest('testRealSystemIntegration', () => this.testRealSystemIntegration());
-      
+
       // Calculate performance metrics
       const readTests = this.testResults.filter(t => t.testName.includes('Read'));
       const writeTests = this.testResults.filter(t => t.testName.includes('Write'));
       const concurrentTest = this.testResults.find(t => t.testName === 'testConcurrentOperations');
       const watchingTest = this.testResults.find(t => t.testName === 'testFileWatching');
       const largeFileTest = this.testResults.find(t => t.testName === 'testLargeFileHandling');
-      
+
       this.report.systemMetrics.performanceMetrics = {
-        averageReadTime: readTests.reduce((sum, t) => sum + t.executionTime, 0) / Math.max(readTests.length, 1),
-        averageWriteTime: writeTests.reduce((sum, t) => sum + t.executionTime, 0) / Math.max(writeTests.length, 1),
+        averageReadTime:
+          readTests.reduce((sum, t) => sum + t.executionTime, 0) / Math.max(readTests.length, 1),
+        averageWriteTime:
+          writeTests.reduce((sum, t) => sum + t.executionTime, 0) / Math.max(writeTests.length, 1),
         concurrentOperationTime: concurrentTest?.executionTime || 0,
         memoryEfficiency: largeFileTest?.metrics?.memoryEfficient ? 1 : 0,
         fileWatcherLatency: watchingTest?.metrics?.averageDetectionTime || 0,
       };
-      
+
       // Final system metrics
       this.report.systemMetrics.memoryUsage = process.memoryUsage();
       this.report.endTime = performance.now();
       this.report.results = this.testResults;
       this.report.recommendations = this.generateRecommendations();
-      
+
       this.logger.info('File operations test suite completed', {
         totalTests: this.report.totalTests,
         passed: this.report.passedTests,
         failed: this.report.failedTests,
         duration: this.report.endTime - this.report.startTime,
       });
-      
+
       return this.report;
-      
     } finally {
       await this.cleanup();
     }
@@ -911,7 +958,9 @@ describe('File Operations System Test', () => {
   });
 
   test('should integrate with real system components', () => {
-    const integrationTest = finalReport.results.find(t => t.testName === 'testRealSystemIntegration');
+    const integrationTest = finalReport.results.find(
+      t => t.testName === 'testRealSystemIntegration'
+    );
     expect(integrationTest?.passed).toBe(true);
     expect(integrationTest?.metrics?.integrationSuccessRate).toBeGreaterThanOrEqual(0.8);
   });
@@ -938,8 +987,10 @@ describe('File Operations System Test', () => {
     console.log(`Total Tests: ${finalReport.totalTests}`);
     console.log(`Passed: ${finalReport.passedTests}`);
     console.log(`Failed: ${finalReport.failedTests}`);
-    console.log(`Success Rate: ${((finalReport.passedTests / finalReport.totalTests) * 100).toFixed(1)}%`);
-    
+    console.log(
+      `Success Rate: ${((finalReport.passedTests / finalReport.totalTests) * 100).toFixed(1)}%`
+    );
+
     console.log('\n' + '-'.repeat(50));
     console.log('PERFORMANCE METRICS');
     console.log('-'.repeat(50));
@@ -948,8 +999,10 @@ describe('File Operations System Test', () => {
     console.log(`Average Write Time: ${metrics.averageWriteTime.toFixed(2)}ms`);
     console.log(`Concurrent Operation Time: ${metrics.concurrentOperationTime.toFixed(2)}ms`);
     console.log(`File Watcher Latency: ${metrics.fileWatcherLatency.toFixed(2)}ms`);
-    console.log(`Memory Efficiency: ${metrics.memoryEfficiency > 0 ? 'GOOD' : 'NEEDS IMPROVEMENT'}`);
-    
+    console.log(
+      `Memory Efficiency: ${metrics.memoryEfficiency > 0 ? 'GOOD' : 'NEEDS IMPROVEMENT'}`
+    );
+
     console.log('\n' + '-'.repeat(50));
     console.log('DETAILED TEST RESULTS');
     console.log('-'.repeat(50));
@@ -963,14 +1016,14 @@ describe('File Operations System Test', () => {
         console.log(`    Metrics: ${JSON.stringify(result.metrics, null, 2).slice(0, 200)}...`);
       }
     });
-    
+
     console.log('\n' + '-'.repeat(50));
     console.log('RECOMMENDATIONS');
     console.log('-'.repeat(50));
     finalReport.recommendations.forEach((rec, index) => {
       console.log(`${index + 1}. ${rec}`);
     });
-    
+
     console.log('\n' + '-'.repeat(50));
     console.log('MEMORY USAGE');
     console.log('-'.repeat(50));
@@ -979,7 +1032,7 @@ describe('File Operations System Test', () => {
     console.log(`Heap Used: ${(mem.heapUsed / 1024 / 1024).toFixed(2)}MB`);
     console.log(`Heap Total: ${(mem.heapTotal / 1024 / 1024).toFixed(2)}MB`);
     console.log(`External: ${(mem.external / 1024 / 1024).toFixed(2)}MB`);
-    
+
     console.log('\n' + '='.repeat(80));
   });
 });

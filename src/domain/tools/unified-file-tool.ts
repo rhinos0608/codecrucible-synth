@@ -95,7 +95,7 @@ export class BasicFileStrategy implements FileOperationStrategy {
       if (args.mode) options.mode = args.mode;
 
       await fs.writeFile(path, args.content, options);
-      
+
       // Success - no return value needed for void method
     } catch (error) {
       throw new Error(

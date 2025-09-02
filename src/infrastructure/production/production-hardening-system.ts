@@ -25,8 +25,8 @@ import {
   TimeoutStrategy,
 } from '../error-handling/timeout-manager.js';
 import { CircuitBreakerManager } from '../error-handling/circuit-breaker-system.js';
-import { ObservabilitySystem } from '../../core/observability/observability-system.js';
-import { globalRateLimitManager } from '../../core/networking/rate-limiting-system.js';
+import { ObservabilitySystem } from '../observability/observability-system.js';
+import { globalRateLimitManager } from '../networking/rate-limiting-system.js';
 
 // Production Hardening Configuration
 export interface ProductionHardeningConfig {

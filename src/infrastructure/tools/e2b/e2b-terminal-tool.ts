@@ -5,8 +5,8 @@
 
 import { TerminalMCPServer } from '../../../mcp-servers/terminal-server.js';
 import { AdvancedProcessTool } from '../process-management-tools.js';
-import { logger } from '../../logging/logger.js';
-import { SecurityValidator } from '../../../core/e2b/security-validator.js';
+import { createLogger } from '../../logging/logger-adapter.js';
+import { SecurityValidator } from './security-validator.js';
 
 export interface TerminalCommand {
   command: string;
@@ -38,6 +38,7 @@ export interface TerminalSession {
 export class E2BTerminalTool {
   private sessions: Map<string, TerminalSession> = new Map();
   private sessionCounter = 0;
+  private readonly logger = createLogger('E2BTerminal');
   private terminalServer: TerminalMCPServer;
   private processManager: AdvancedProcessTool;
   private securityValidator: SecurityValidator;
@@ -47,22 +48,22 @@ export class E2BTerminalTool {
       workingDirectory,
       timeout: 30000,
       maxOutputSize: 1000000,
-      environment: process.env as Record<string, string>
+      environment: process.env as Record<string, string>,
     });
-    
+
     this.processManager = new AdvancedProcessTool({ workingDirectory });
     this.securityValidator = new SecurityValidator();
-    
-    logger.info('E2BTerminalTool initialized with real backend integrations');
+
+    this.logger.info('E2BTerminalTool initialized with real backend integrations');
   }
 
   async initialize(): Promise<void> {
     try {
       // Initialize the underlying systems if not already initialized
       await this.securityValidator.initialize();
-      logger.info('E2BTerminalTool initialization complete');
+      this.logger.info('E2BTerminalTool initialization complete');
     } catch (error) {
-      logger.error('Failed to initialize E2BTerminalTool:', error);
+      this.logger.error('Failed to initialize E2BTerminalTool:', error);
       throw error;
     }
   }
@@ -70,15 +71,15 @@ export class E2BTerminalTool {
   async createSession(workingDirectory?: string): Promise<TerminalSession> {
     const sessionId = `e2b_session_${++this.sessionCounter}`;
     const effectiveWorkingDir = workingDirectory || process.cwd();
-    
+
     try {
       // Validate the working directory
       const validationResult = await this.securityValidator.validateInput({
         type: 'filesystem_path',
         content: effectiveWorkingDir,
-        context: { operation: 'create_session' }
+        context: { operation: 'create_session' },
       });
-      
+
       if (!validationResult.isValid) {
         throw new Error(`Invalid working directory: ${validationResult.reason}`);
       }
@@ -86,21 +87,21 @@ export class E2BTerminalTool {
       const session: TerminalSession = {
         id: sessionId,
         workingDirectory: effectiveWorkingDir,
-        environment: { 
+        environment: {
           ...process.env,
           PWD: effectiveWorkingDir,
-          E2B_SESSION_ID: sessionId
+          E2B_SESSION_ID: sessionId,
         } as Record<string, string>,
         isActive: true,
-        lastActivity: Date.now()
+        lastActivity: Date.now(),
       };
 
       this.sessions.set(sessionId, session);
-      logger.info(`Created E2B terminal session: ${sessionId}`);
-      
+      this.logger.info(`Created E2B terminal session: ${sessionId}`);
+
       return session;
     } catch (error) {
-      logger.error(`Failed to create terminal session: ${error}`);
+      this.logger.error(`Failed to create terminal session: ${error}`);
       throw error;
     }
   }
@@ -115,32 +116,32 @@ export class E2BTerminalTool {
         stdout: '',
         stderr: 'Invalid or inactive session',
         exitCode: 1,
-        executionTime: Date.now() - startTime
+        executionTime: Date.now() - startTime,
       };
     }
 
     try {
       // Security validation of the command
-      const fullCommand = command.args 
+      const fullCommand = command.args
         ? `${command.command} ${command.args.join(' ')}`
         : command.command;
-        
+
       const validationResult = await this.securityValidator.validateInput({
         type: 'shell_command',
         content: fullCommand,
-        context: { 
+        context: {
           sessionId,
-          workingDirectory: command.workingDirectory || session.workingDirectory
-        }
+          workingDirectory: command.workingDirectory || session.workingDirectory,
+        },
       });
-      
+
       if (!validationResult.isValid) {
         return {
           success: false,
           stdout: '',
           stderr: `Security validation failed: ${validationResult.reason}`,
           exitCode: 1,
-          executionTime: Date.now() - startTime
+          executionTime: Date.now() - startTime,
         };
       }
 
@@ -152,39 +153,38 @@ export class E2BTerminalTool {
           interactive: true,
           workingDirectory: command.workingDirectory || session.workingDirectory,
           environment: { ...session.environment, ...command.environment },
-          timeout: command.timeout || 30000
+          timeout: command.timeout || 30000,
         });
-        
+
         // Store process session ID for later interaction
         if (processResult.success && processResult.sessionId) {
           session.processSessionId = processResult.sessionId;
         }
-        
+
         return {
           success: processResult.success,
           stdout: processResult.output || '',
           stderr: processResult.error || '',
           exitCode: processResult.exitCode || 0,
           executionTime: Date.now() - startTime,
-          sessionId: processResult.sessionId
+          sessionId: processResult.sessionId,
         };
       }
 
       // For non-interactive commands, use the terminal server directly
       const result = await this.executeViaTerminalServer(sessionId, command);
-      
+
       // Update session activity
       session.lastActivity = Date.now();
-      
+
       return {
         success: result.exitCode === 0,
         stdout: result.stdout,
         stderr: result.stderr,
         exitCode: result.exitCode,
         executionTime: result.duration,
-        sessionId
+        sessionId,
       };
-      
     } catch (error) {
       logger.error(`Command execution failed in session ${sessionId}:`, error);
       return {
@@ -192,19 +192,22 @@ export class E2BTerminalTool {
         stdout: '',
         stderr: error instanceof Error ? error.message : 'Unknown execution error',
         exitCode: 1,
-        executionTime: Date.now() - startTime
+        executionTime: Date.now() - startTime,
       };
     }
   }
 
-  private async executeViaTerminalServer(sessionId: string, command: TerminalCommand): Promise<{
+  private async executeViaTerminalServer(
+    sessionId: string,
+    command: TerminalCommand
+  ): Promise<{
     stdout: string;
     stderr: string;
     exitCode: number;
     duration: number;
   }> {
     const session = this.sessions.get(sessionId)!;
-    const fullCommand = command.args 
+    const fullCommand = command.args
       ? `${command.command} ${command.args.join(' ')}`
       : command.command;
 
@@ -214,7 +217,7 @@ export class E2BTerminalTool {
       workingDirectory: command.workingDirectory || session.workingDirectory,
       timeout: command.timeout || 30000,
       captureOutput: true,
-      environment: { ...session.environment, ...command.environment }
+      environment: { ...session.environment, ...command.environment },
     });
 
     if (toolResult.isError) {
@@ -226,7 +229,7 @@ export class E2BTerminalTool {
       stdout: result.stdout || '',
       stderr: result.stderr || '',
       exitCode: result.exitCode || 0,
-      duration: result.duration || 0
+      duration: result.duration || 0,
     };
   }
 
@@ -241,11 +244,13 @@ export class E2BTerminalTool {
       const validationResult = await this.securityValidator.validateInput({
         type: 'filesystem_path',
         content: directory,
-        context: { operation: 'change_directory', sessionId }
+        context: { operation: 'change_directory', sessionId },
       });
-      
+
       if (!validationResult.isValid) {
-        logger.warn(`Directory change rejected for session ${sessionId}: ${validationResult.reason}`);
+        this.logger.warn(
+          `Directory change rejected for session ${sessionId}: ${validationResult.reason}`
+        );
         return false;
       }
 
@@ -253,21 +258,21 @@ export class E2BTerminalTool {
       const result = await this.executeCommand(sessionId, {
         command: 'cd',
         args: [directory, '&&', 'pwd'],
-        timeout: 5000
+        timeout: 5000,
       });
 
       if (result.success) {
         session.workingDirectory = directory;
         session.environment.PWD = directory;
         session.lastActivity = Date.now();
-        logger.info(`Changed directory for session ${sessionId} to: ${directory}`);
+        this.logger.info(`Changed directory for session ${sessionId} to: ${directory}`);
         return true;
       } else {
-        logger.warn(`Failed to change directory for session ${sessionId}: ${result.stderr}`);
+        this.logger.warn(`Failed to change directory for session ${sessionId}: ${result.stderr}`);
         return false;
       }
     } catch (error) {
-      logger.error(`Error changing directory for session ${sessionId}:`, error);
+      this.logger.error(`Error changing directory for session ${sessionId}:`, error);
       return false;
     }
   }
@@ -283,26 +288,28 @@ export class E2BTerminalTool {
       const keyValidation = await this.securityValidator.validateInput({
         type: 'environment_variable',
         content: key,
-        context: { operation: 'set_env', sessionId }
+        context: { operation: 'set_env', sessionId },
       });
-      
+
       const valueValidation = await this.securityValidator.validateInput({
         type: 'environment_variable',
         content: value,
-        context: { operation: 'set_env', sessionId }
+        context: { operation: 'set_env', sessionId },
       });
 
       if (!keyValidation.isValid || !valueValidation.isValid) {
-        logger.warn(`Environment variable rejected for session ${sessionId}: ${keyValidation.reason || valueValidation.reason}`);
+        this.logger.warn(
+          `Environment variable rejected for session ${sessionId}: ${keyValidation.reason || valueValidation.reason}`
+        );
         return false;
       }
 
       session.environment[key] = value;
       session.lastActivity = Date.now();
-      logger.info(`Set environment variable ${key} for session ${sessionId}`);
+      this.logger.info(`Set environment variable ${key} for session ${sessionId}`);
       return true;
     } catch (error) {
-      logger.error(`Error setting environment variable for session ${sessionId}:`, error);
+      this.logger.error(`Error setting environment variable for session ${sessionId}:`, error);
       return false;
     }
   }
@@ -317,7 +324,7 @@ export class E2BTerminalTool {
         stdout: '',
         stderr: 'No interactive process available in session',
         exitCode: 1,
-        executionTime: Date.now() - startTime
+        executionTime: Date.now() - startTime,
       };
     }
 
@@ -326,16 +333,16 @@ export class E2BTerminalTool {
       const validationResult = await this.securityValidator.validateInput({
         type: 'process_input',
         content: input,
-        context: { sessionId, processSessionId: session.processSessionId }
+        context: { sessionId, processSessionId: session.processSessionId },
       });
-      
+
       if (!validationResult.isValid) {
         return {
           success: false,
           stdout: '',
           stderr: `Input validation failed: ${validationResult.reason}`,
           exitCode: 1,
-          executionTime: Date.now() - startTime
+          executionTime: Date.now() - startTime,
         };
       }
 
@@ -344,7 +351,7 @@ export class E2BTerminalTool {
         action: 'interact',
         sessionId: session.processSessionId,
         input,
-        timeout: 30000
+        timeout: 30000,
       });
 
       session.lastActivity = Date.now();
@@ -355,16 +362,16 @@ export class E2BTerminalTool {
         stderr: result.error || '',
         exitCode: result.exitCode || 0,
         executionTime: Date.now() - startTime,
-        sessionId
+        sessionId,
       };
     } catch (error) {
-      logger.error(`Process interaction failed for session ${sessionId}:`, error);
+      this.logger.error(`Process interaction failed for session ${sessionId}:`, error);
       return {
         success: false,
         stdout: '',
         stderr: error instanceof Error ? error.message : 'Process interaction failed',
         exitCode: 1,
-        executionTime: Date.now() - startTime
+        executionTime: Date.now() - startTime,
       };
     }
   }
@@ -380,15 +387,15 @@ export class E2BTerminalTool {
       if (session.processSessionId) {
         await this.processManager.execute({
           action: 'kill',
-          sessionId: session.processSessionId
+          sessionId: session.processSessionId,
         });
       }
 
       session.isActive = false;
       this.sessions.delete(sessionId);
-      logger.info(`Closed terminal session: ${sessionId}`);
+      this.logger.info(`Closed terminal session: ${sessionId}`);
     } catch (error) {
-      logger.error(`Error closing session ${sessionId}:`, error);
+      this.logger.error(`Error closing session ${sessionId}:`, error);
     }
   }
 
@@ -406,16 +413,16 @@ export class E2BTerminalTool {
       try {
         processStatus = await this.processManager.execute({
           action: 'status',
-          sessionId: session.processSessionId
+          sessionId: session.processSessionId,
         });
       } catch (error) {
-        logger.warn(`Failed to get process status for session ${sessionId}:`, error);
+        this.logger.warn(`Failed to get process status for session ${sessionId}:`, error);
       }
     }
 
     return {
       session,
-      processStatus
+      processStatus,
     };
   }
 
@@ -424,17 +431,15 @@ export class E2BTerminalTool {
   }
 
   async cleanup(): Promise<void> {
-    logger.info('Cleaning up E2B terminal sessions...');
-    
+    this.logger.info('Cleaning up E2B terminal sessions...');
+
     const activeSessions = this.getActiveSessions();
-    const cleanupPromises = activeSessions.map(session => 
-      this.closeSession(session.id)
-    );
-    
+    const cleanupPromises = activeSessions.map(session => this.closeSession(session.id));
+
     await Promise.allSettled(cleanupPromises);
-    
+
     this.sessions.clear();
-    logger.info('E2B terminal cleanup complete');
+    this.logger.info('E2B terminal cleanup complete');
   }
 
   // Health check method for monitoring
@@ -446,18 +451,16 @@ export class E2BTerminalTool {
     const activeSessions = this.getActiveSessions();
     const now = Date.now();
     const staleThreshold = 30 * 60 * 1000; // 30 minutes
-    
+
     // Check for stale sessions
     const staleSessions = activeSessions.filter(
       session => now - session.lastActivity > staleThreshold
     );
-    
+
     // Clean up stale sessions
     if (staleSessions.length > 0) {
-      logger.info(`Cleaning up ${staleSessions.length} stale sessions`);
-      await Promise.allSettled(
-        staleSessions.map(session => this.closeSession(session.id))
-      );
+      this.logger.info(`Cleaning up ${staleSessions.length} stale sessions`);
+      await Promise.allSettled(staleSessions.map(session => this.closeSession(session.id)));
     }
 
     return {
@@ -466,8 +469,8 @@ export class E2BTerminalTool {
       details: {
         totalSessions: this.sessions.size,
         staleSessions: staleSessions.length,
-        lastCleanup: now
-      }
+        lastCleanup: now,
+      },
     };
   }
 }

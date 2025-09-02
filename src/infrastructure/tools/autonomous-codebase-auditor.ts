@@ -3,7 +3,7 @@
  * Infrastructure layer tool for comprehensive codebase analysis
  */
 
-import { CodebaseAnalyzer } from '../../core/analysis/codebase-analyzer.js';
+import { CodebaseAnalyzer } from '../../application/analysis/codebase-analyzer.js';
 
 export interface CodebaseAnalysis {
   summary: string;

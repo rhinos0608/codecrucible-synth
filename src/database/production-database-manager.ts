@@ -6,7 +6,7 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import knex, { Knex } from 'knex';
 import Redis from 'redis';
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/logger.js';
 import { performance } from 'perf_hooks';
 
 export interface ProductionDatabaseConfig {

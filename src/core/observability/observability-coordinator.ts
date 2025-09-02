@@ -1,7 +1,13 @@
 import { EventEmitter } from 'events';
 import { createLogger } from '../logger.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
-import { MetricsCollector, MetricPoint, MetricsConfig, MetricsStats, MetricsSummary } from './metrics-collector.js';
+import {
+  MetricsCollector,
+  MetricPoint,
+  MetricsConfig,
+  MetricsStats,
+  MetricsSummary,
+} from './metrics-collector.js';
 import { HealthMonitor, HealthConfig, SystemHealth, HealthStats } from './health-monitor.js';
 import { AlertManager, AlertConfig, Alert, AlertStats } from './alert-manager.js';
 import { TelemetryExporter, TelemetryExporterConfig } from './telemetry-exporter.js';
@@ -18,7 +24,10 @@ export interface ObservabilityConfig {
   metrics: MetricsConfig;
   health: HealthConfig;
   alerting: AlertConfig;
-  telemetry: TelemetryExporterConfig;
+  telemetry?: TelemetryExporterConfig;
+  tracing?: Record<string, unknown>;
+  logging?: Record<string, unknown>;
+  storage?: Record<string, unknown>;
 }
 
 export class ObservabilityCoordinator extends EventEmitter {
@@ -26,7 +35,7 @@ export class ObservabilityCoordinator extends EventEmitter {
   private metrics: MetricsCollector;
   private health: HealthMonitor;
   private alerts: AlertManager;
-  private telemetry: TelemetryExporter;
+  private telemetry?: TelemetryExporter;
   private healthInterval?: NodeJS.Timeout;
   private startTime = Date.now();
 
@@ -35,29 +44,52 @@ export class ObservabilityCoordinator extends EventEmitter {
     this.metrics = new MetricsCollector(config.metrics);
     this.health = new HealthMonitor(config.health);
     this.alerts = new AlertManager(config.alerting);
-    this.telemetry = new TelemetryExporter(config.telemetry);
+    if (config.telemetry) {
+      this.telemetry = new TelemetryExporter(config.telemetry);
+    }
   }
 
   async initialize(): Promise<void> {
     await this.metrics.initialize();
     await this.health.initialize();
     await this.alerts.initialize();
-    await this.telemetry.initialize();
+    if (this.telemetry) {
+      await this.telemetry.initialize();
+    }
     this.scheduleHealthChecks();
   }
 
-  recordMetric(name: string, value: number, tags: Record<string, string> = {}, unit = 'count'): void {
+  recordMetric(
+    name: string,
+    value: number,
+    tags: Record<string, string> = {},
+    unit = 'count'
+  ): void {
     const metric: MetricPoint = { name, value, timestamp: new Date(), tags, unit, type: 'gauge' };
     this.metrics.record(metric);
   }
 
   incrementCounter(name: string, tags: Record<string, string> = {}, value = 1): void {
-    const metric: MetricPoint = { name, value, timestamp: new Date(), tags, unit: 'count', type: 'counter' };
+    const metric: MetricPoint = {
+      name,
+      value,
+      timestamp: new Date(),
+      tags,
+      unit: 'count',
+      type: 'counter',
+    };
     this.metrics.record(metric);
   }
 
   recordTimer(name: string, duration: number, tags: Record<string, string> = {}): void {
-    const metric: MetricPoint = { name, value: duration, timestamp: new Date(), tags, unit: 'ms', type: 'timer' };
+    const metric: MetricPoint = {
+      name,
+      value: duration,
+      timestamp: new Date(),
+      tags,
+      unit: 'ms',
+      type: 'timer',
+    };
     this.metrics.record(metric);
   }
 
@@ -78,21 +110,29 @@ export class ObservabilityCoordinator extends EventEmitter {
     return this.health.performHealthCheck();
   }
 
+  checkHealth(): Promise<SystemHealth> {
+    return this.getSystemHealth();
+  }
+
   getActiveAlerts(): Alert[] {
     return this.alerts.getActiveAlerts();
   }
 
   getSystemStats(): {
-    metrics: MetricsStats;
-    health: HealthStats;
-    alerts: AlertStats;
-    uptime: number;
+    systemInfo: {
+      metrics: MetricsStats;
+      health: HealthStats;
+      alerts: AlertStats;
+      uptime: number;
+    };
   } {
     return {
-      metrics: this.metrics.getStats(),
-      health: this.health.getStats(),
-      alerts: this.alerts.getStats(),
-      uptime: Date.now() - this.startTime,
+      systemInfo: {
+        metrics: this.metrics.getStats(),
+        health: this.health.getStats(),
+        alerts: this.alerts.getStats(),
+        uptime: Date.now() - this.startTime,
+      },
     };
   }
 
@@ -101,15 +141,15 @@ export class ObservabilityCoordinator extends EventEmitter {
     await this.metrics.shutdown();
     await this.health.shutdown();
     await this.alerts.shutdown();
-    await this.telemetry.shutdown();
+    await this.telemetry?.shutdown();
   }
 
   private scheduleHealthChecks(): void {
     const run = async () => {
       const health = await this.health.performHealthCheck();
-      this.telemetry.exportHealth(health).catch(() => {});
+      this.telemetry?.exportHealth(health).catch(() => {});
       const metrics = this.metrics.exportData();
-      this.telemetry.exportMetrics(metrics).catch(() => {});
+      this.telemetry?.exportMetrics(metrics).catch(() => {});
       let mcp;
       try {
         mcp = mcpServerMonitoring.getSystemMetrics();
@@ -117,7 +157,9 @@ export class ObservabilityCoordinator extends EventEmitter {
           this.recordMetric('system.cpu.usage', mcp.cpu.usage, {}, '%');
           this.recordMetric('system.memory.used', mcp.memory.used, {}, 'bytes');
         } else {
-          this.logger?.warn?.('MCP system metrics unavailable: getSystemMetrics() returned null or undefined');
+          this.logger?.warn?.(
+            'MCP system metrics unavailable: getSystemMetrics() returned null or undefined'
+          );
         }
       } catch (err) {
         this.logger?.error?.('Failed to collect MCP system metrics', err);
@@ -130,4 +172,3 @@ export class ObservabilityCoordinator extends EventEmitter {
 }
 
 export type { MetricPoint, SystemHealth, Alert, MetricsStats, HealthStats, AlertStats };
-

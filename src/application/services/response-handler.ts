@@ -18,7 +18,6 @@ export class BasicResponseHandler implements ResponseHandler {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-throw-literal
   handleError(error: unknown): never {
     if (error instanceof Error) {
       throw error;

@@ -2,6 +2,10 @@ import { Readable } from 'stream';
 import { EventEmitter } from 'events';
 import { outputConfig } from '../../utils/output-config.js';
 
+function hasCode(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error && typeof (err as { code?: unknown }).code === 'string';
+}
+
 /**
  * StreamProcessor handles true streaming of data sources using Node streams.
  * It emits chunks as they arrive without buffering the entire content.
@@ -18,8 +22,8 @@ class StreamProcessor extends EventEmitter {
       for await (const chunk of readable) {
         handler(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
       }
-    } catch (err: any) {
-      if (err?.code !== 'ERR_STREAM_DESTROYED') {
+    } catch (err: unknown) {
+      if (!hasCode(err) || err.code !== 'ERR_STREAM_DESTROYED') {
         throw err;
       }
     }

@@ -1,5 +1,7 @@
 import { outputConfig } from '../../utils/output-config.js';
 
+const TRUNCATION_MESSAGE = '\n[...output truncated...]\n';
+
 /**
  * TruncationManager enforces memory-safe limits on streamed content.
  * It tracks cumulative size and truncates with a clear marker when limits are exceeded.
@@ -31,7 +33,8 @@ class TruncationManager {
       return { text: chunk, done: false };
     }
 
-    this.size = remaining + truncationMessage.length;
+    const text = chunk.slice(0, remaining) + TRUNCATION_MESSAGE;
+    this.size = remaining + TRUNCATION_MESSAGE.length;
     this.truncated = true;
     return { text, done: true };
   }

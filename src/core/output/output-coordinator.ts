@@ -37,13 +37,14 @@ class OutputCoordinator {
     }
 
     // Attempt to parse JSON for structured formats
+    let data: unknown = raw;
     try {
-      const parsed = JSON.parse(raw);
-      return this.formatter.to(options.format, parsed);
+      data = JSON.parse(raw);
     } catch (err) {
       console.error('Failed to parse JSON in OutputCoordinator.process:', err);
-      return this.formatter.to(options.format, raw);
     }
+
+    return this.formatter.to(options.format, data);
   }
 }
 

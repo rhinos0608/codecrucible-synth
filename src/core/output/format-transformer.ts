@@ -1,4 +1,5 @@
-import yaml from 'yaml';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
 /**
  * FormatTransformer converts structured data into common output formats.
@@ -9,8 +10,16 @@ class FormatTransformer {
    */
   to(format: 'json' | 'yaml' | 'markdown', data: unknown): string {
     switch (format) {
-      case 'yaml':
-        return yaml.stringify(data);
+      case 'yaml': {
+        try {
+          const yaml = require('yaml');
+          return yaml.stringify(data);
+        } catch {
+          throw new Error(
+            "The 'yaml' package is required for YAML output. Install it with `npm install yaml`."
+          );
+        }
+      }
       case 'markdown':
         if (typeof data === 'string') {
           return data;

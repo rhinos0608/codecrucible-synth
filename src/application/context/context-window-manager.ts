@@ -774,8 +774,7 @@ export class ContextWindowManager {
 
   private extractDependencies(content: string): string[] {
     const deps: string[] = [];
-    const importRegex =
-      /(?:import(?:[^'"`]*from)?\s*['"`]([^'"`]+)['"`]|require\(['"`]([^'"`]+)['"`]\))/g;
+      /(?:import\s+(?:[\w*\s{},]*\s+from\s+)?['"`]([^'"`]+)['"`]|require\(['"`]([^'"`]+)['"`]\))/g;
     let match: RegExpExecArray | null;
     while ((match = importRegex.exec(content)) !== null) {
       const dep = match[1] || match[2];

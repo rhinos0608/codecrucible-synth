@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/logger.js';
 
 // DATABASE_URL and REDIS_URL are required except in 'test' environment.
 // First, parse NODE_ENV to determine environment
@@ -32,7 +32,7 @@ const EnvSchema = z
     // Authentication configuration - required in production
     REQUIRE_AUTHENTICATION: z
       .string()
-      .transform((val) => val === 'true')
+      .transform(val => val === 'true')
       .default(NODE_ENV === 'production' ? 'true' : 'false'),
   })
   .superRefine((env, ctx) => {
@@ -52,7 +52,7 @@ const EnvSchema = z
         });
       }
     }
-    
+
     // Enforce authentication in production
     if (env.NODE_ENV === 'production' && !env.REQUIRE_AUTHENTICATION) {
       ctx.addIssue({

@@ -1,13 +1,17 @@
 /**
  * Rust Tool Integration - Phase 4 Implementation
- * 
+ *
  * Integrates Rust-backed tools with the existing tool system,
  * providing seamless registration, execution, and lifecycle management.
  */
 
-import { logger } from '../../core/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 import { RustProviderClient } from './rust-provider-client.js';
-import type { ITool, ToolDefinition, ToolExecutionContext } from '../../domain/interfaces/tool-system.js';
+import type {
+  ITool,
+  ToolDefinition,
+  ToolExecutionContext,
+} from '../../domain/interfaces/tool-system.js';
 
 export interface RustToolDefinition extends ToolDefinition {
   rustImplementation: string;
@@ -199,8 +203,14 @@ export abstract class RustTool implements ITool {
 
   // Abstract methods to be implemented by concrete tools
 
-  protected abstract executeRust(args: any, context?: ToolExecutionContext): Promise<RustToolExecutionResult>;
-  protected abstract executeTypescript(args: any, context?: ToolExecutionContext): Promise<RustToolExecutionResult>;
+  protected abstract executeRust(
+    args: any,
+    context?: ToolExecutionContext
+  ): Promise<RustToolExecutionResult>;
+  protected abstract executeTypescript(
+    args: any,
+    context?: ToolExecutionContext
+  ): Promise<RustToolExecutionResult>;
 }
 
 /**
@@ -244,7 +254,10 @@ export class RustFileAnalyzer extends RustTool {
     });
   }
 
-  protected async executeRust(args: any, context?: ToolExecutionContext): Promise<RustToolExecutionResult> {
+  protected async executeRust(
+    args: any,
+    context?: ToolExecutionContext
+  ): Promise<RustToolExecutionResult> {
     const request = {
       type: 'code-analysis',
       operation: 'analyze-file',
@@ -268,10 +281,13 @@ export class RustFileAnalyzer extends RustTool {
     };
   }
 
-  protected async executeTypescript(args: any, context?: ToolExecutionContext): Promise<RustToolExecutionResult> {
+  protected async executeTypescript(
+    args: any,
+    context?: ToolExecutionContext
+  ): Promise<RustToolExecutionResult> {
     // TypeScript fallback implementation
     const fs = await import('fs/promises');
-    
+
     try {
       const content = await fs.readFile(args.filePath, 'utf-8');
       const analysis = {
@@ -300,14 +316,14 @@ export class RustFileAnalyzer extends RustTool {
   private detectFileType(filePath: string): string {
     const extension = filePath.split('.').pop()?.toLowerCase();
     const typeMap: Record<string, string> = {
-      'ts': 'typescript',
-      'js': 'javascript',
-      'py': 'python',
-      'rs': 'rust',
-      'go': 'go',
-      'java': 'java',
-      'cpp': 'cpp',
-      'c': 'c',
+      ts: 'typescript',
+      js: 'javascript',
+      py: 'python',
+      rs: 'rust',
+      go: 'go',
+      java: 'java',
+      cpp: 'cpp',
+      c: 'c',
     };
     return typeMap[extension || ''] || 'unknown';
   }
@@ -394,7 +410,7 @@ export class RustToolRegistry {
    * Cleanup all tools
    */
   async destroy(): Promise<void> {
-    const destroyPromises = Array.from(this.tools.values()).map(tool => 
+    const destroyPromises = Array.from(this.tools.values()).map(tool =>
       tool.destroy().catch(error => {
         logger.error(`Error destroying tool ${tool.definition.id}:`, error);
       })
@@ -403,7 +419,7 @@ export class RustToolRegistry {
     await Promise.all(destroyPromises);
     this.tools.clear();
     this.initialized = false;
-    
+
     logger.info('Rust tool registry cleaned up');
   }
 }

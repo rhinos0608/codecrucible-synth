@@ -1,5 +1,5 @@
-import { E2BService } from '../../core/e2b/e2b-service.js';
-import { SecurityValidator } from '../../core/e2b/security-validator.js';
+import { E2BService } from '../tools/e2b/e2b-service.js';
+import { SecurityValidator } from '../tools/e2b/security-validator.js';
 import { E2BCodeExecutionTool } from '../tools/e2b/e2b-code-execution-tool.js';
 import { E2BTerminalTool } from '../tools/e2b/e2b-terminal-tool.js';
 import { SecureTerminalExecuteTool } from '../tools/secure-terminal-tools.js';
@@ -207,7 +207,7 @@ class RestrictedCodeExecutionTool implements BaseTool {
           executionId,
           code: `${args.code?.substring(0, 200)}...`,
           language: args.language,
-          toolId: 'restricted-code-tool'
+          toolId: 'restricted-code-tool',
         }
       );
 
@@ -215,7 +215,7 @@ class RestrictedCodeExecutionTool implements BaseTool {
       const validation = await this.securityValidator.validateCode({
         code: args.code,
         language: args.language || 'javascript',
-        environment: args.environment || 'node18-safe'
+        environment: args.environment || 'node18-safe',
       });
       if (!validation.isValid) {
         this.auditLogger.logEvent({
@@ -228,8 +228,8 @@ class RestrictedCodeExecutionTool implements BaseTool {
             riskLevel: validation.riskLevel,
             executionId,
             code: `${args.code?.substring(0, 200)}...`,
-            reason: validation.reason
-          }
+            reason: validation.reason,
+          },
         });
 
         return {
@@ -300,7 +300,7 @@ class RestrictedTerminalTool implements BaseTool {
     const validation = await this.securityValidator.validateCode({
       code: args.command,
       language: 'shell',
-      environment: 'bash-safe'
+      environment: 'bash-safe',
     });
     if (!validation.isValid) {
       return {
@@ -370,15 +370,15 @@ class SecureE2BCodeExecutionTool implements BaseTool {
             type: 'code-execution',
             message: 'Code execution blocked by input validation',
             executionId,
-            reason: (inputValidation as any).error?.message || 'Input validation failed'
-          }
+            reason: (inputValidation as any).error?.message || 'Input validation failed',
+          },
         });
 
         return {
           success: false,
           error: 'Code validation failed',
           details: (inputValidation as any).error?.message || 'Input validation failed',
-          executionId
+          executionId,
         };
       }
 
@@ -415,7 +415,7 @@ class SecureE2BCodeExecutionTool implements BaseTool {
       const securityValidation = await this.securityValidator.validateCode({
         code: args.code,
         language: args.language || 'javascript',
-        environment: args.environment || 'node18-safe'
+        environment: args.environment || 'node18-safe',
       });
       if (!securityValidation.isValid) {
         this.auditLogger.logSecurityViolation(
@@ -425,7 +425,7 @@ class SecureE2BCodeExecutionTool implements BaseTool {
             sessionId: this.agentContext.sessionId,
             executionId,
             code: `${args.code.substring(0, 200)}...`,
-            language: args.language
+            language: args.language,
           }
         );
 
@@ -462,8 +462,8 @@ class SecureE2BCodeExecutionTool implements BaseTool {
           executionId,
           language: args.language,
           executionTime: Date.now() - startTime,
-          outputLength: result.output?.length || 0
-        }
+          outputLength: result.output?.length || 0,
+        },
       });
 
       return {
@@ -591,7 +591,7 @@ class SecureE2BTerminalTool implements BaseTool {
       const securityValidation = await this.securityValidator.validateCode({
         code: args.command,
         language: 'shell',
-        environment: 'bash-safe'
+        environment: 'bash-safe',
       });
       if (!securityValidation.isValid) {
         await this.auditLogger.logSecurityViolation(

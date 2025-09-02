@@ -9,7 +9,9 @@ function toFileUrl(p: string): string {
   return href;
 }
 
-export async function discoverPlugins(directories: string[]): Promise<Array<() => Promise<IPlugin>>> {
+export async function discoverPlugins(
+  directories: string[]
+): Promise<Array<() => Promise<IPlugin>>> {
   const factories: Array<() => Promise<IPlugin>> = [];
 
   for (const dir of directories) {
@@ -24,7 +26,10 @@ export async function discoverPlugins(directories: string[]): Promise<Array<() =
       const filePath = path.join(dir, entry.name);
       factories.push(async () => {
         const mod = await import(toFileUrl(filePath));
-        const plugin: IPlugin = typeof mod.default === 'function' ? await mod.default() : mod.plugin ?? mod.default ?? mod;
+        const plugin: IPlugin =
+          typeof mod.default === 'function'
+            ? await mod.default()
+            : (mod.plugin ?? mod.default ?? mod);
         return plugin;
       });
     }
@@ -32,4 +37,3 @@ export async function discoverPlugins(directories: string[]): Promise<Array<() =
 
   return factories;
 }
-

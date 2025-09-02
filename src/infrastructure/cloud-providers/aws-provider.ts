@@ -8,7 +8,7 @@ import * as ECS from '@aws-sdk/client-ecs';
 import * as EKS from '@aws-sdk/client-eks';
 import * as CloudFormation from '@aws-sdk/client-cloudformation';
 import * as AutoScaling from '@aws-sdk/client-auto-scaling';
-import { logger } from '../../core/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 
 export interface AWSDeploymentConfig {
   region: string;

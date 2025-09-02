@@ -5,7 +5,7 @@
 
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/logger.js';
 
 export interface TestResult {
   name: string;

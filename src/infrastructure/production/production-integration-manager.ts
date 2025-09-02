@@ -32,7 +32,7 @@ import {
   ResourceType,
   ResourceSnapshot,
 } from './production-resource-enforcer.js';
-import { ObservabilitySystem } from '../../core/observability/observability-system.js';
+import { ObservabilitySystem } from '../observability/observability-system.js';
 
 // Production Integration Configuration
 export interface ProductionIntegrationConfig {
@@ -463,22 +463,24 @@ export class ProductionIntegrationManager extends EventEmitter {
 
       if (this.config.components.securityAuditLogger) {
         emergencyPromises.push(
-          this.securityAuditLogger.logSecurityEvent({
-            eventType: SecurityEventType.EMERGENCY_MODE,
-            severity: SecuritySeverity.CRITICAL,
-            context: {
-              environment: (process.env.NODE_ENV as any) || 'development',
-              sessionId: this.generateSessionId(),
-              operationId: 'emergency-mode',
-            },
-            description: `Emergency mode activated: ${reason}`,
-            source: triggerSource,
-            details: {
-              triggerSource,
-              activeOperations: this.activeOperations.size,
-              systemUptime: Date.now() - this.systemStartTime,
-            },
-          }).then(() => {})
+          this.securityAuditLogger
+            .logSecurityEvent({
+              eventType: SecurityEventType.EMERGENCY_MODE,
+              severity: SecuritySeverity.CRITICAL,
+              context: {
+                environment: (process.env.NODE_ENV as any) || 'development',
+                sessionId: this.generateSessionId(),
+                operationId: 'emergency-mode',
+              },
+              description: `Emergency mode activated: ${reason}`,
+              source: triggerSource,
+              details: {
+                triggerSource,
+                activeOperations: this.activeOperations.size,
+                systemUptime: Date.now() - this.systemStartTime,
+              },
+            })
+            .then(() => {})
         );
       }
 
@@ -513,13 +515,10 @@ export class ProductionIntegrationManager extends EventEmitter {
     // Get security audit data
     let securityReport: any = {};
     if (this.config.components.securityAuditLogger) {
-      securityReport = await this.securityAuditLogger.generateComplianceReport(
-        framework,
-        {
-          start: new Date(dateRange.start),
-          end: new Date(dateRange.end)
-        }
-      );
+      securityReport = await this.securityAuditLogger.generateComplianceReport(framework, {
+        start: new Date(dateRange.start),
+        end: new Date(dateRange.end),
+      });
     }
 
     // Get system health data
@@ -692,8 +691,18 @@ export class ProductionIntegrationManager extends EventEmitter {
         // Create observability config
         const observabilityConfig = {
           telemetry: { enabled: true, endpoint: 'http://localhost:4318', exporters: [] as any[] },
-          metrics: { enabled: true, retentionDays: 7, exportInterval: 60000, exporters: [] as any[] },
-          tracing: { enabled: true, samplingRate: 0.1, maxSpansPerTrace: 100, exporters: [] as any[] },
+          metrics: {
+            enabled: true,
+            retentionDays: 7,
+            exportInterval: 60000,
+            exporters: [] as any[],
+          },
+          tracing: {
+            enabled: true,
+            samplingRate: 0.1,
+            maxSpansPerTrace: 100,
+            exporters: [] as any[],
+          },
           logging: {
             level: 'info',
             outputs: [{ type: 'console', format: 'structured', configuration: {} }],

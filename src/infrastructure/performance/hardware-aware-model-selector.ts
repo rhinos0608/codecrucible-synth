@@ -8,7 +8,7 @@ import {
   IntelligentModelDetector,
   ModelInfo,
   OptimalConfiguration,
-} from '../../core/model-management/intelligent-model-detector.js';
+} from './intelligent-model-detector.js';
 import { EventEmitter } from 'events';
 import * as os from 'os';
 import { resourceManager } from './resource-cleanup-manager.js';
@@ -579,10 +579,13 @@ export class HardwareAwareModelSelector extends EventEmitter {
   /**
    * Get optimal fallback model for a specific failure reason
    */
-  async getFallbackModel(currentModel: string, reason: ModelSwitchEvent['reason']): Promise<ModelInfo | null> {
+  async getFallbackModel(
+    currentModel: string,
+    reason: ModelSwitchEvent['reason']
+  ): Promise<ModelInfo | null> {
     // Set current model for context
     this.currentModel = currentModel;
-    
+
     // Create minimal performance metrics
     const metrics: PerformanceMetrics = {
       responseTime: 0,
@@ -593,7 +596,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
       consecutiveErrors: 1,
       lastSuccessTime: Date.now(),
     };
-    
+
     // Use the private method to select fallback
     return this.selectFallbackModel(reason, metrics);
   }

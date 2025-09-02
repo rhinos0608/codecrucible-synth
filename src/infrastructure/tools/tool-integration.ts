@@ -5,7 +5,7 @@
 
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { FilesystemTools } from './filesystem-tools.js';
-import { logger } from '../logging/logger.js';
+import { createLogger } from '../logging/logger-adapter.js';
 
 export interface LLMFunction {
   type: 'function';
@@ -34,6 +34,8 @@ export class ToolIntegration {
   private initializationPromise: Promise<void> | null = null;
   private isInitialized = false;
 
+  private readonly logger = createLogger('ToolIntegration');
+
   constructor(mcpManager: MCPServerManager) {
     this.mcpManager = mcpManager;
     // Don't initialize synchronously - use lazy initialization
@@ -59,7 +61,7 @@ export class ToolIntegration {
     try {
       // Initialize filesystem tools with proper backend delegation
       this.filesystemTools = new FilesystemTools();
-      
+
       // Set MCP manager as fallback
       if (this.mcpManager) {
         this.filesystemTools.setMCPManager(this.mcpManager);
@@ -67,18 +69,20 @@ export class ToolIntegration {
 
       // Try to initialize Rust backend
       try {
-        const { RustExecutionBackend } = await import('../../core/execution/rust-executor/rust-execution-backend.js');
+        const { RustExecutionBackend } = await import(
+          '../execution/rust-executor/rust-execution-backend.js'
+        );
         const rustBackend = new RustExecutionBackend();
         const initialized = await rustBackend.initialize();
-        
+
         if (initialized) {
           this.filesystemTools.setRustBackend(rustBackend);
-          logger.info('Rust execution backend initialized for filesystem tools');
+          this.logger.info('Rust execution backend initialized for filesystem tools');
         } else {
-          logger.warn('Rust execution backend failed to initialize, using MCP fallback');
+          this.logger.warn('Rust execution backend failed to initialize, using MCP fallback');
         }
       } catch (error) {
-        logger.warn('Failed to load Rust execution backend, using MCP fallback', error);
+        this.logger.warn('Failed to load Rust execution backend, using MCP fallback', error);
       }
 
       // Register filesystem tools
@@ -88,9 +92,11 @@ export class ToolIntegration {
       }
 
       this.isInitialized = true;
-      logger.info(`Initialized ${this.availableTools.size} tools for LLM integration with Rust-first architecture`);
+      this.logger.info(
+        `Initialized ${this.availableTools.size} tools for LLM integration with Rust-first architecture`
+      );
     } catch (error) {
-      logger.error('Failed to initialize tools:', error);
+      this.logger.error('Failed to initialize tools:', error);
       // Don't throw - allow system to continue without tools
       this.isInitialized = true; // Mark as initialized to prevent retry loops
     }
@@ -127,7 +133,7 @@ export class ToolIntegration {
    */
   getLLMFunctionsCached(): LLMFunction[] {
     if (!this.isInitialized) {
-      logger.warn('Tools not initialized yet, returning empty functions list');
+      this.logger.warn('Tools not initialized yet, returning empty functions list');
       return [];
     }
 
@@ -160,7 +166,7 @@ export class ToolIntegration {
       const functionName = toolCall.function.name;
       const args = JSON.parse(toolCall.function.arguments);
 
-      logger.info(`Executing tool: ${functionName} with args:`, args);
+      this.logger.info(`Executing tool: ${functionName} with args:`, args);
 
       const tool = this.availableTools.get(functionName);
       if (!tool) {
@@ -179,14 +185,14 @@ export class ToolIntegration {
 
       const result = await tool.execute(args, context);
 
-      logger.info(`Tool ${functionName} executed successfully:`, {
+      this.logger.info(`Tool ${functionName} executed successfully:`, {
         success: result.success,
         executionTime: result.metadata?.executionTime,
       });
 
       return result;
     } catch (error) {
-      logger.error(`Tool execution failed:`, error);
+      this.logger.error(`Tool execution failed:`, error);
       throw error;
     }
   }

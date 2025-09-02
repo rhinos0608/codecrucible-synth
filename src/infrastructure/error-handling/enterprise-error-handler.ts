@@ -13,7 +13,7 @@ import {
   AuditSeverity,
   AuditOutcome,
 } from '../security/security-audit-logger.js';
-import { EnterpriseConfigManager } from '../../core/config/enterprise-config-manager.js';
+import { EnterpriseConfigManager } from '../../application/config/enterprise-config-manager.js';
 import { AdvancedInputValidator } from '../security/input-validation-system.js';
 import {
   ErrorHandler as AdvancedErrorHandler,
@@ -319,7 +319,7 @@ export class EnterpriseErrorHandler {
         userMessage: error.userMessage,
         retryable: error.retryable,
         recoverable: error.recoverable,
-      }
+      },
     });
   }
 

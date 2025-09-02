@@ -1,7 +1,7 @@
 import { parentPort } from 'worker_threads';
 
 parentPort?.on('message', async (task: any) => {
-  if (task.crash) {
+  if (process.env.NODE_ENV === 'test' && task.crash) {
     // Simulate an unexpected failure for testing purposes
     process.exit(1);
   }

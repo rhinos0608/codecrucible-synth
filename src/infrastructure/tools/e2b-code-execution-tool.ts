@@ -1,6 +1,6 @@
 import { BaseTool } from './base-tool.js';
-import { E2BService, ExecutionResult } from '../../core/e2b/e2b-service.js';
-import { logger } from '../logging/logger.js';
+import { E2BService, ExecutionResult } from './e2b/e2b-service.js';
+import { createLogger } from '../logging/logger-adapter.js';
 import { SecurityError } from '../security/security-types.js';
 import { z } from 'zod';
 
@@ -12,6 +12,8 @@ import { z } from 'zod';
 export class E2BCodeExecutionTool extends BaseTool {
   private e2bService: E2BService;
   private sessionId: string;
+
+  private readonly logger = createLogger('E2BTool');
 
   constructor(agentContext: { workingDirectory: string }, e2bService?: E2BService) {
     super({
@@ -59,7 +61,9 @@ export class E2BCodeExecutionTool extends BaseTool {
       const authConfig = await policyLoader.getAuthConfig();
 
       if (authConfig.e2b.requireAuthentication && !args.user) {
-        logger.error('🚨 E2B code execution blocked: Authentication required by security policy');
+        this.logger.error(
+          '🚨 E2B code execution blocked: Authentication required by security policy'
+        );
         return {
           success: false,
           output: '',
@@ -73,7 +77,7 @@ export class E2BCodeExecutionTool extends BaseTool {
       const { code, language = 'python', sessionId, installPackages, files } = args;
       const actualSessionId = sessionId || this.sessionId;
 
-      logger.info(`🔒 Executing ${language} code in secure E2B sandbox: ${actualSessionId}`);
+      this.logger.info(`🔒 Executing ${language} code in secure E2B sandbox: ${actualSessionId}`);
 
       // Initialize E2B service if needed
       if (!this.e2bService.getStats().isInitialized) {
@@ -94,7 +98,7 @@ export class E2BCodeExecutionTool extends BaseTool {
       // Validate code for basic security
       const securityCheck = this.validateCodeSecurity(code, language);
       if (!securityCheck.safe) {
-        logger.warn(`🚨 Security check failed for code execution: ${securityCheck.reason}`);
+        this.logger.warn(`🚨 Security check failed for code execution: ${securityCheck.reason}`);
         return {
           success: false,
           output: '',
@@ -109,14 +113,14 @@ export class E2BCodeExecutionTool extends BaseTool {
       if (files && files.length > 0) {
         for (const file of files) {
           await this.e2bService.uploadFile(actualSessionId, file.path, file.content);
-          logger.info(`📁 Uploaded file to sandbox: ${file.path}`);
+          this.logger.info(`📁 Uploaded file to sandbox: ${file.path}`);
         }
       }
 
       // Install packages if specified
       if (installPackages && installPackages.length > 0) {
         for (const pkg of installPackages) {
-          logger.info(`📦 Installing package: ${pkg}`);
+          this.logger.info(`📦 Installing package: ${pkg}`);
           const installResult = await this.e2bService.installPackage(
             actualSessionId,
             pkg,
@@ -124,7 +128,7 @@ export class E2BCodeExecutionTool extends BaseTool {
           );
 
           if (!installResult.success) {
-            logger.warn(`⚠️ Package installation failed: ${pkg} - ${installResult.error}`);
+            this.logger.warn(`⚠️ Package installation failed: ${pkg} - ${installResult.error}`);
           }
         }
       }
@@ -140,17 +144,17 @@ export class E2BCodeExecutionTool extends BaseTool {
       };
 
       // Log execution for audit
-      logger.info(
+      this.logger.info(
         `🔍 Code execution completed - Success: ${result.success}, Time: ${result.executionTime}ms`
       );
       if (result.error) {
-        logger.warn(`⚠️ Execution error: ${result.error}`);
+        this.logger.warn(`⚠️ Execution error: ${result.error}`);
       }
 
       return enhancedResult;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ E2B code execution failed:', error);
+      this.logger.error('❌ E2B code execution failed:', error);
 
       return {
         success: false,
@@ -227,6 +231,6 @@ export class E2BCodeExecutionTool extends BaseTool {
   async cleanupSandbox(sessionId?: string): Promise<void> {
     const actualSessionId = sessionId || this.sessionId;
     await this.e2bService.destroySandbox(actualSessionId);
-    logger.info(`🧹 Cleaned up sandbox: ${actualSessionId}`);
+    this.logger.info(`🧹 Cleaned up sandbox: ${actualSessionId}`);
   }
 }

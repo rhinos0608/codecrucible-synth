@@ -3,9 +3,9 @@
  * Integrates with RustExecutionBackend and security validation for real code execution
  */
 
-import { RustExecutionBackend } from '../../../core/execution/rust-executor/rust-execution-backend.js';
-import { SecurityValidator } from '../../../core/e2b/security-validator.js';
-import { logger } from '../../logging/logger.js';
+import { RustExecutionBackend } from '../../execution/rust-executor/rust-execution-backend.js';
+import { SecurityValidator } from './security-validator.js';
+import { createLogger } from '../../logging/logger-adapter.js';
 import { TerminalMCPServer } from '../../../mcp-servers/terminal-server.js';
 
 export interface CodeExecutionRequest {
@@ -41,12 +41,26 @@ export interface ExecutionEnvironment {
   lastUsed: number;
 }
 
+const logger = createLogger('E2BTool');
+
 export class E2BCodeExecutionTool {
   private readonly supportedLanguages = [
-    'python', 'python3', 'javascript', 'typescript', 'node', 'bash', 'sh', 
-    'rust', 'go', 'java', 'c', 'cpp', 'ruby', 'php'
+    'python',
+    'python3',
+    'javascript',
+    'typescript',
+    'node',
+    'bash',
+    'sh',
+    'rust',
+    'go',
+    'java',
+    'c',
+    'cpp',
+    'ruby',
+    'php',
   ];
-  
+
   private rustBackend: RustExecutionBackend;
   private securityValidator: SecurityValidator;
   private terminalServer: TerminalMCPServer;
@@ -58,24 +72,24 @@ export class E2BCodeExecutionTool {
       enableProfiling: true,
       maxConcurrency: 4,
       timeoutMs: 60000,
-      logLevel: 'info'
+      logLevel: 'info',
     });
-    
+
     this.securityValidator = new SecurityValidator();
-    
+
     this.terminalServer = new TerminalMCPServer({
       workingDirectory,
       timeout: 60000,
       maxOutputSize: 10 * 1024 * 1024, // 10MB for code output
     });
-    
+
     logger.info('E2BCodeExecutionTool initialized with production backend');
   }
 
   async initialize(): Promise<void> {
     try {
       await this.securityValidator.initialize();
-      
+
       // Initialize Rust backend if available
       try {
         await this.rustBackend.initialize();
@@ -83,7 +97,7 @@ export class E2BCodeExecutionTool {
       } catch (error) {
         logger.warn('Rust backend not available, falling back to terminal execution:', error);
       }
-      
+
       logger.info('E2BCodeExecutionTool initialization complete');
     } catch (error) {
       logger.error('Failed to initialize E2BCodeExecutionTool:', error);
@@ -101,7 +115,7 @@ export class E2BCodeExecutionTool {
         return {
           success: false,
           error: `Unsupported language: ${request.language}. Supported: ${this.supportedLanguages.join(', ')}`,
-          executionTime: Date.now() - startTime
+          executionTime: Date.now() - startTime,
         };
       }
 
@@ -112,16 +126,16 @@ export class E2BCodeExecutionTool {
           success: false,
           error: `Security validation failed: ${securityReport.issues.join(', ')}`,
           executionTime: Date.now() - startTime,
-          securityReport
+          securityReport,
         };
       }
 
       // Prepare execution environment
       const environment = await this.prepareEnvironment(request);
-      
+
       // Execute code using the most appropriate method
       let result: CodeExecutionResult;
-      
+
       if (this.canUseRustBackend(language)) {
         result = await this.executeViaRustBackend(request, environment);
       } else {
@@ -131,12 +145,11 @@ export class E2BCodeExecutionTool {
       // Add security report to successful results
       result.securityReport = securityReport;
       result.sessionId = environment.id;
-      
+
       // Update environment usage
       environment.lastUsed = Date.now();
-      
+
       return result;
-      
     } catch (error) {
       logger.error('Code execution failed:', error);
       return {
@@ -145,8 +158,8 @@ export class E2BCodeExecutionTool {
         executionTime: Date.now() - startTime,
         securityReport: {
           validated: false,
-          issues: ['Execution error occurred']
-        }
+          issues: ['Execution error occurred'],
+        },
       };
     }
   }
@@ -161,7 +174,10 @@ export class E2BCodeExecutionTool {
     }
   }
 
-  private async performSecurityValidation(code: string, language: string): Promise<{
+  private async performSecurityValidation(
+    code: string,
+    language: string
+  ): Promise<{
     validated: boolean;
     issues: string[];
   }> {
@@ -169,16 +185,18 @@ export class E2BCodeExecutionTool {
     const validationResult = await this.securityValidator.validateInput({
       type: 'code',
       content: code,
-      context: { 
+      context: {
         language,
         operation: 'code_execution',
-        environment: 'e2b_sandbox'
-      }
+        environment: 'e2b_sandbox',
+      },
     });
 
     return {
       validated: validationResult.isValid,
-      issues: validationResult.isValid ? [] : [validationResult.reason || 'Security validation failed']
+      issues: validationResult.isValid
+        ? []
+        : [validationResult.reason || 'Security validation failed'],
     };
   }
 
@@ -198,7 +216,7 @@ export class E2BCodeExecutionTool {
       workingDirectory,
       dependencies: request.dependencies || [],
       isReady: false,
-      lastUsed: Date.now()
+      lastUsed: Date.now(),
     };
 
     // Install dependencies if specified
@@ -208,18 +226,20 @@ export class E2BCodeExecutionTool {
 
     environment.isReady = true;
     this.environments.set(environmentId, environment);
-    
+
     return environment;
   }
 
   private async installDependencies(environment: ExecutionEnvironment): Promise<void> {
     if (environment.dependencies.length === 0) return;
 
-    logger.info(`Installing dependencies for ${environment.language}: ${environment.dependencies.join(', ')}`);
+    logger.info(
+      `Installing dependencies for ${environment.language}: ${environment.dependencies.join(', ')}`
+    );
 
     try {
       let installCommand: string;
-      
+
       switch (environment.language.toLowerCase()) {
         case 'python':
         case 'python3':
@@ -243,7 +263,7 @@ export class E2BCodeExecutionTool {
         command: installCommand,
         workingDirectory: environment.workingDirectory,
         timeout: 300000, // 5 minutes for dependency installation
-        captureOutput: true
+        captureOutput: true,
       });
 
       if (result.isError) {
@@ -265,20 +285,16 @@ export class E2BCodeExecutionTool {
 
     try {
       logger.info(`Executing ${request.language} code via Rust backend`);
-      
+
       // Create a temporary file for the code
       const tempFile = await this.createTemporaryFile(request.code, request.language, environment);
-      
+
       // Execute via Rust backend
-      const result = await this.rustBackend.executeCode(
-        tempFile,
-        request.language,
-        {
-          workingDirectory: environment.workingDirectory,
-          timeout: request.timeout || 30000,
-          enableProfiling: true
-        }
-      );
+      const result = await this.rustBackend.executeCode(tempFile, request.language, {
+        workingDirectory: environment.workingDirectory,
+        timeout: request.timeout || 30000,
+        enableProfiling: true,
+      });
 
       // Clean up temporary file
       await this.cleanupTemporaryFile(tempFile);
@@ -289,7 +305,7 @@ export class E2BCodeExecutionTool {
         error: result.error,
         executionTime: Date.now() - startTime,
         memoryUsed: result.memoryUsage,
-        exitCode: result.exitCode
+        exitCode: result.exitCode,
       };
     } catch (error) {
       logger.error('Rust backend execution failed:', error);
@@ -305,10 +321,10 @@ export class E2BCodeExecutionTool {
 
     try {
       logger.info(`Executing ${request.language} code via terminal server`);
-      
+
       // Create execution command based on language
       const { command, tempFile } = await this.prepareExecutionCommand(request, environment);
-      
+
       // Execute via terminal server
       const result = await this.terminalServer.callTool('run_command', {
         command,
@@ -318,8 +334,8 @@ export class E2BCodeExecutionTool {
         environment: {
           ...process.env,
           PYTHONPATH: environment.workingDirectory,
-          NODE_PATH: environment.workingDirectory
-        }
+          NODE_PATH: environment.workingDirectory,
+        },
       });
 
       // Clean up temporary file if created
@@ -331,18 +347,18 @@ export class E2BCodeExecutionTool {
         return {
           success: false,
           error: result.content[0]?.text || 'Terminal execution failed',
-          executionTime: Date.now() - startTime
+          executionTime: Date.now() - startTime,
         };
       }
 
       const executionResult = JSON.parse(result.content[0]?.text || '{}');
-      
+
       return {
         success: executionResult.exitCode === 0,
         output: executionResult.stdout,
         error: executionResult.stderr,
         executionTime: Date.now() - startTime,
-        exitCode: executionResult.exitCode
+        exitCode: executionResult.exitCode,
       };
     } catch (error) {
       logger.error('Terminal server execution failed:', error);
@@ -383,9 +399,9 @@ export class E2BCodeExecutionTool {
       case 'rust':
         const rustFile = await this.createTemporaryFile(request.code, language, environment);
         const executableName = rustFile.replace('.rs', '');
-        return { 
+        return {
           command: `rustc "${rustFile}" -o "${executableName}" && "${executableName}"`,
-          tempFile: rustFile
+          tempFile: rustFile,
         };
 
       default:
@@ -407,7 +423,7 @@ export class E2BCodeExecutionTool {
       command: `cat > "${filepath}"`,
       workingDirectory: environment.workingDirectory,
       captureOutput: true,
-      stdin: code
+      stdin: code,
     });
 
     if (result.isError) {
@@ -421,7 +437,7 @@ export class E2BCodeExecutionTool {
     try {
       await this.terminalServer.callTool('run_command', {
         command: `rm -f "${filepath}"`,
-        captureOutput: true
+        captureOutput: true,
       });
     } catch (error) {
       logger.warn(`Failed to cleanup temporary file ${filepath}:`, error);
@@ -430,22 +446,22 @@ export class E2BCodeExecutionTool {
 
   private getFileExtension(language: string): string {
     const extensions: Record<string, string> = {
-      'python': 'py',
-      'python3': 'py',
-      'javascript': 'js',
-      'typescript': 'ts',
-      'node': 'js',
-      'bash': 'sh',
-      'sh': 'sh',
-      'rust': 'rs',
-      'go': 'go',
-      'java': 'java',
-      'c': 'c',
-      'cpp': 'cpp',
-      'ruby': 'rb',
-      'php': 'php'
+      python: 'py',
+      python3: 'py',
+      javascript: 'js',
+      typescript: 'ts',
+      node: 'js',
+      bash: 'sh',
+      sh: 'sh',
+      rust: 'rs',
+      go: 'go',
+      java: 'java',
+      c: 'c',
+      cpp: 'cpp',
+      ruby: 'rb',
+      php: 'php',
     };
-    
+
     return extensions[language.toLowerCase()] || 'txt';
   }
 
@@ -466,7 +482,7 @@ export class E2BCodeExecutionTool {
       await this.terminalServer.callTool('run_command', {
         command: `find "${environment.workingDirectory}" -name "temp_*" -type f -delete`,
         workingDirectory: environment.workingDirectory,
-        captureOutput: true
+        captureOutput: true,
       });
 
       this.environments.delete(environmentId);
@@ -478,12 +494,12 @@ export class E2BCodeExecutionTool {
 
   async cleanup(): Promise<void> {
     logger.info('Cleaning up E2B code execution environments...');
-    
+
     const environmentIds = Array.from(this.environments.keys());
     const cleanupPromises = environmentIds.map(id => this.cleanupEnvironment(id));
-    
+
     await Promise.allSettled(cleanupPromises);
-    
+
     // Cleanup the Rust backend
     if (this.rustBackend) {
       try {
@@ -492,7 +508,7 @@ export class E2BCodeExecutionTool {
         logger.warn('Failed to cleanup Rust backend:', error);
       }
     }
-    
+
     this.environments.clear();
     logger.info('E2B code execution cleanup complete');
   }
@@ -506,18 +522,16 @@ export class E2BCodeExecutionTool {
   }> {
     const now = Date.now();
     const staleThreshold = 60 * 60 * 1000; // 1 hour
-    
+
     // Check for stale environments
     const staleEnvironments = Array.from(this.environments.values()).filter(
       env => now - env.lastUsed > staleThreshold
     );
-    
+
     // Clean up stale environments
     if (staleEnvironments.length > 0) {
       logger.info(`Cleaning up ${staleEnvironments.length} stale execution environments`);
-      await Promise.allSettled(
-        staleEnvironments.map(env => this.cleanupEnvironment(env.id))
-      );
+      await Promise.allSettled(staleEnvironments.map(env => this.cleanupEnvironment(env.id)));
     }
 
     // Check Rust backend health
@@ -539,8 +553,8 @@ export class E2BCodeExecutionTool {
         totalEnvironments: this.environments.size,
         staleEnvironments: staleEnvironments.length,
         supportedLanguages: this.supportedLanguages,
-        lastCleanup: now
-      }
+        lastCleanup: now,
+      },
     };
   }
 }

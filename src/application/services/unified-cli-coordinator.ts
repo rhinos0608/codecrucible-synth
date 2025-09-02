@@ -27,39 +27,30 @@ import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { getDependencyContainer, UseCaseDependencies } from './dependency-container.js';
 import { AnalysisRequest, GenerationRequest } from '../use-cases/index.js';
-import { FileReferenceParser } from '../../core/cli/file-reference-parser.js';
+import { FileReferenceParser } from '../cli/file-reference-parser.js';
 import {
   projectConfigurationLoader,
   CombinedProjectConfig,
-} from '../../core/config/project-config-loader.js';
-import {
-  contextWindowManager,
-  CodebaseAnalysisResult,
-} from '../../core/context/context-window-manager.js';
-import {
-  naturalLanguageInterface,
-  ParsedCommand,
-} from '../../core/cli/natural-language-interface.js';
-import {
-  agenticWorkflowDisplay,
-  WorkflowPhase,
-} from '../../core/workflow/agentic-workflow-display.js';
-import { streamingWorkflowIntegration } from '../../core/workflow/streaming-workflow-integration.js';
+} from '../config/project-config-loader.js';
+import { contextWindowManager, CodebaseAnalysisResult } from '../context/context-window-manager.js';
+import { naturalLanguageInterface, ParsedCommand } from '../cli/natural-language-interface.js';
+import { agenticWorkflowDisplay, WorkflowPhase } from '../workflow/agentic-workflow-display.js';
+import { streamingWorkflowIntegration } from '../workflow/streaming-workflow-integration.js';
 import {
   EnterpriseSecurityFramework,
   SecurityContext,
   SecurityValidationResult,
-} from '../../core/security/enterprise-security-framework.js';
+} from '../../infrastructure/security/enterprise-security-framework.js';
 import {
   AdaptivePerformanceTuner,
   PerformanceMetrics,
   TuningConfiguration,
-} from '../../core/performance/adaptive-performance-tuner.js';
+} from '../../infrastructure/performance/adaptive-performance-tuner.js';
 import {
   ObservabilitySystem,
   MetricPoint,
   TraceSpan,
-} from '../../core/observability/observability-system.js';
+} from '../../infrastructure/observability/observability-system.js';
 
 // LEGACY IMPORTS REMOVED - replaced with simple interfaces
 // Define minimal types for backward compatibility
@@ -95,7 +86,7 @@ interface QuickContextInfo {
 //   OptimizedContextAwareCLI,
 //   OptimizedContextOptions,
 //   QuickContextInfo
-// } from '../../core/intelligence/optimized-context-cli.js';
+// } from '../intelligence/optimized-context-cli.js';
 
 // Keep only minimal types needed
 interface ContextualPromptEnhancement {
@@ -112,7 +103,7 @@ import {
   ResilientCLIWrapper,
   ResilientOptions,
   OperationResult,
-} from '../../core/resilience/resilient-cli-wrapper.js';
+} from '../../infrastructure/resilience/resilient-cli-wrapper.js';
 
 // Session and Performance Types
 export interface CLISession {

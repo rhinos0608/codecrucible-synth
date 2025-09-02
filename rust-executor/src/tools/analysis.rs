@@ -1,8 +1,20 @@
 use serde::{Deserialize, Serialize};
+
 use std::{collections::HashMap, sync::Mutex, time::Instant};
+
+use std::{collections::HashMap, sync::Mutex, time::Instant};
+
+
+use std::{collections::HashMap, time::Instant};
+
+
 use tracing::{info, warn};
 use tree_sitter::{Node, Parser, Query, QueryCursor};
 use tree_sitter_rust::language as rust_language;
+
+use std::collections::HashMap;
+use tracing::{info, warn};
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeAnalysisResult {
@@ -108,14 +120,24 @@ impl AnalysisTool {
             .set_language(rust_language())
             .expect("Error loading Rust grammar");
         let lang = rust_language();
+
         let query_fn = Query::new(lang, "(function_item) @fn").expect("Failed to compile fn query");
         let query_struct = Query::new(lang, "(struct_item) @s\n(enum_item) @e")
             .expect("Failed to compile struct query");
+
+        let query_fn = Query::new(lang, "(function_item) @fn").expect("Invalid function query");
+        let query_struct =
+            Query::new(lang, "(struct_item) @s\n(enum_item) @e").expect("Invalid struct query");
+
         let query_complex = Query::new(
             lang,
             "(if_expression) @c\n(match_expression) @c\n(for_expression) @c\n(while_expression) @c\n(loop_expression) @c",
         )
+
         .expect("Failed to compile complexity query");
+
+        .expect("Invalid complexity query");
+
 
         Self {
             patterns,
@@ -174,6 +196,7 @@ impl AnalysisTool {
         );
 
         match ts_metrics {
+
             Some(ts_metrics) => {
                 if ts_metrics != regex_metrics {
                     warn!(
@@ -188,6 +211,47 @@ impl AnalysisTool {
                 regex_metrics
             }
         }
+
+            Some(ts) => {
+                if Self::metrics_diverge(&ts, &regex_metrics) {
+                    warn!(
+                        "metric discrepancy detected: tree-sitter {:?} vs regex {:?}",
+                        ts, regex_metrics
+                    );
+                    regex_metrics
+                } else {
+                    ts
+                }
+            }
+            None => {
+                warn!("tree-sitter parsing failed; falling back to regex metrics");
+                regex_metrics
+            }
+        }
+    }
+
+    fn metrics_diverge(ts: &CodeMetrics, regex: &CodeMetrics) -> bool {
+        // Absolute divergence for code_lines and functions (likely parser failure)
+        if (regex.code_lines > 0 && ts.code_lines == 0)
+            || (regex.functions > 0 && ts.functions == 0)
+        {
+            return true;
+        }
+        // Relative threshold for cyclomatic complexity
+        let ts_cc = ts.cyclomatic_complexity as f64;
+        let regex_cc = regex.cyclomatic_complexity as f64;
+        let max_cc = ts_cc.max(regex_cc);
+        let min_cc = ts_cc.min(regex_cc);
+        // If both are zero, no divergence
+        if max_cc == 0.0 {
+            return false;
+        }
+        // If the difference is more than 20% of the larger value, consider it a divergence
+        if (max_cc - min_cc) / max_cc > 0.2 {
+            return true;
+        }
+        false
+
     }
 
     fn calculate_metrics_tree_sitter(&self, code: &str) -> Option<CodeMetrics> {
@@ -200,6 +264,7 @@ impl AnalysisTool {
 
         let lines: Vec<&str> = code.lines().collect();
         let total_lines = lines.len();
+
 
         let mut code_lines = 0;
         let mut comment_lines = 0;
@@ -268,6 +333,8 @@ impl AnalysisTool {
         let lines: Vec<&str> = code.lines().collect();
         let total_lines = lines.len();
 
+
+
         let mut code_lines = 0;
         let mut comment_lines = 0;
         let mut blank_lines = 0;
@@ -287,6 +354,10 @@ impl AnalysisTool {
             } else {
                 code_lines += 1;
 
+
+
+                // Calculate nesting depth
+
                 let open_braces = trimmed.matches('{').count();
                 let close_braces = trimmed.matches('}').count();
                 current_nesting += open_braces;
@@ -295,9 +366,15 @@ impl AnalysisTool {
             }
         }
 
+
         let functions = self.count_functions_regex(code);
         let classes_or_structs = self.count_classes_structs_regex(code);
         let cyclomatic_complexity = self.calculate_cyclomatic_complexity_regex(code);
+
+        let functions = self.count_functions(code);
+        let classes_or_structs = self.count_classes_structs(code);
+        let cyclomatic_complexity = self.calculate_cyclomatic_complexity(code);
+
 
         CodeMetrics {
             total_lines,
@@ -311,7 +388,11 @@ impl AnalysisTool {
         }
     }
 
+
     fn count_functions_regex(&self, code: &str) -> usize {
+
+    fn count_functions(&self, code: &str) -> usize {
+
         let function_patterns = [
             r"fn\s+\w+",
             r"function\s+\w+",
@@ -329,7 +410,11 @@ impl AnalysisTool {
         count
     }
 
+
     fn count_classes_structs_regex(&self, code: &str) -> usize {
+
+    fn count_classes_structs(&self, code: &str) -> usize {
+
         let class_patterns = [
             r"class\s+\w+",
             r"struct\s+\w+",
@@ -347,7 +432,11 @@ impl AnalysisTool {
         count
     }
 
+
     fn calculate_cyclomatic_complexity_regex(&self, code: &str) -> usize {
+
+    fn calculate_cyclomatic_complexity(&self, code: &str) -> usize {
+
         let complexity_patterns = [
             r"\bif\b",
             r"\belse\b",
@@ -458,8 +547,22 @@ impl AnalysisTool {
             suggestions.push("Reduce nesting depth for better readability".to_string());
         }
 
+
         if metrics.code_lines > 0
             && metrics.comment_lines as f64 / (metrics.code_lines as f64) < 0.1
+
+
+        if metrics.code_lines > 0
+            && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
+
+
+            && metrics.comment_lines as f64 / metrics.code_lines as f64 < 0.1
+
+        if metrics.code_lines > 0
+            && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
+
+
+
         {
             suggestions.push("Add more comments to improve code documentation".to_string());
         }

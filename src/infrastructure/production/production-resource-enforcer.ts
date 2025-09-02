@@ -745,12 +745,12 @@ export class ProductionResourceEnforcer extends EventEmitter {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = undefined;
     }
-    
+
     if (this.memoryMonitoringInterval) {
       clearInterval(this.memoryMonitoringInterval);
       this.memoryMonitoringInterval = undefined;
     }
-    
+
     if (this.cpuMonitoringInterval) {
       clearInterval(this.cpuMonitoringInterval);
       this.cpuMonitoringInterval = undefined;

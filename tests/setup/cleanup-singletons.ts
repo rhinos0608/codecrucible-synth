@@ -3,7 +3,7 @@
  * This file contains global setup and teardown hooks
  */
 
-import { subAgentIsolationSystem } from '../../src/core/agents/sub-agent-isolation-system.js';
+import { subAgentIsolationSystem } from '../../src/domain/agents/sub-agent-isolation-system.js';
 import { unifiedCache } from '../../src/infrastructure/cache/unified-cache-system.js';
 
 // Enhanced cleanup after each test to prevent timer and EventEmitter leaks

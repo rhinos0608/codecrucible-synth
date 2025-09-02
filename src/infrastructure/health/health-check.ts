@@ -7,7 +7,7 @@ import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 import * as os from 'os';
 import { promises as fs } from 'fs';
-import { HealthStatus, HealthCheck } from '../../core/types/global.types.js';
+import { HealthStatus, HealthCheck } from '../../domain/types/global.types.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { metrics, logging } from '../monitoring/observability.js';
 import config from '../config/production.config.js';
@@ -470,7 +470,7 @@ export class HealthMonitor extends EventEmitter {
     try {
       // Check if council engine can be instantiated
       const { CouncilDecisionEngine } = await import(
-        '../../core/collaboration/council-decision-engine.js'
+        '../../voices/collaboration/council-decision-engine.js'
       );
 
       const duration = performance.now() - startTime;
@@ -500,24 +500,21 @@ export class HealthMonitor extends EventEmitter {
     try {
       // Check if security framework can validate
       const { EnterpriseSecurityFramework } = await import(
-        '../../core/security/enterprise-security-framework.js'
+        '../../infrastructure/security/enterprise-security-framework.js'
       );
       const security = new EnterpriseSecurityFramework();
 
       // Test validation
-      const testResult = await security.validateAgentAction(
-        'health-check',
-        {
-          type: 'file_access',
-          agentId: 'health-check',
-          payload: { path: './test.txt' },
-          timestamp: new Date(),
-          sessionId: 'health-check',
-          permissions: ['file_access'],
-          environment: 'development',
-          riskProfile: 'low',
-        }
-      );
+      const testResult = await security.validateAgentAction('health-check', {
+        type: 'file_access',
+        agentId: 'health-check',
+        payload: { path: './test.txt' },
+        timestamp: new Date(),
+        sessionId: 'health-check',
+        permissions: ['file_access'],
+        environment: 'development',
+        riskProfile: 'low',
+      });
 
       const duration = performance.now() - startTime;
 

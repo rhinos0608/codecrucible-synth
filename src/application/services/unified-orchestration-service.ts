@@ -10,7 +10,10 @@ import { EventEmitter } from 'events';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { UnifiedConfiguration } from '../../domain/interfaces/configuration.js';
-import { UnifiedConfigurationManager, getUnifiedConfigurationManager } from '../../domain/config/config-manager.js';
+import {
+  UnifiedConfigurationManager,
+  getUnifiedConfigurationManager,
+} from '../../domain/config/config-manager.js';
 import { UnifiedAgentSystem } from '../../domain/services/unified-agent-system.js';
 import { UnifiedServerSystem } from '../../domain/services/unified-server-system.js';
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
@@ -22,7 +25,7 @@ import { AgentOperationHandler } from '../cqrs/handlers/agent-operation-handler.
 import { PluginDispatchHandler } from '../cqrs/handlers/plugin-dispatch-handler.js';
 import { discoverPlugins } from '../../infrastructure/plugins/plugin-loader.js';
 import { CommandRegistry } from './command-registry.js';
-import { RuntimeContext } from '../../core/runtime/runtime-context.js';
+import { RuntimeContext } from '../runtime/runtime-context.js';
 
 export interface OrchestrationRequest {
   id: string;
@@ -110,8 +113,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
     userInteraction?: IUserInteraction;
   }): Promise<UnifiedOrchestrationService> {
     // Create dependencies if not provided
-    const configManager =
-      options?.configManager || (await getUnifiedConfigurationManager());
+    const configManager = options?.configManager || (await getUnifiedConfigurationManager());
 
     // Import dependencies to avoid circular imports
     const { EventBus } = await import('../../infrastructure/messaging/event-bus.js');

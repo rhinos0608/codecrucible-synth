@@ -11,7 +11,7 @@ import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/logger.js';
 import { InputSanitizer } from '../infrastructure/security/input-sanitizer.js';
 
 const execAsync = promisify(exec);

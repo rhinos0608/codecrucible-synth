@@ -1,6 +1,6 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/logger.js';
 import { SmitheryRegistryIntegration, SmitheryConfig } from './smithery-registry-integration.js';
 
 export interface SmitheryMCPConfig {

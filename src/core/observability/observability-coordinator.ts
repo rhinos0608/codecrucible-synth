@@ -119,18 +119,32 @@ export class ObservabilityCoordinator extends EventEmitter {
   }
 
   getSystemStats(): {
+
+    metrics: MetricsStats;
+    health: HealthStats;
+    alerts: AlertStats;
+    systemInfo: {
+
     systemInfo: {
       metrics: MetricsStats;
       health: HealthStats;
       alerts: AlertStats;
+
       uptime: number;
     };
   } {
     return {
+
+      metrics: this.metrics.getStats(),
+      health: this.health.getStats(),
+      alerts: this.alerts.getStats(),
+      systemInfo: {
+
       systemInfo: {
         metrics: this.metrics.getStats(),
         health: this.health.getStats(),
         alerts: this.alerts.getStats(),
+
         uptime: Date.now() - this.startTime,
       },
     };

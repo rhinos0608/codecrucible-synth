@@ -110,10 +110,17 @@ export class ObservabilityCoordinator extends EventEmitter {
       this.telemetry.exportHealth(health).catch(() => {});
       const metrics = this.metrics.exportData();
       this.telemetry.exportMetrics(metrics).catch(() => {});
-      const mcp = mcpServerMonitoring.getSystemMetrics();
-      if (mcp) {
-        this.recordMetric('system.cpu.usage', mcp.cpu.usage, {}, '%');
-        this.recordMetric('system.memory.used', mcp.memory.used, {}, 'bytes');
+      let mcp;
+      try {
+        mcp = mcpServerMonitoring.getSystemMetrics();
+        if (mcp) {
+          this.recordMetric('system.cpu.usage', mcp.cpu.usage, {}, '%');
+          this.recordMetric('system.memory.used', mcp.memory.used, {}, 'bytes');
+        } else {
+          this.logger?.warn?.('MCP system metrics unavailable: getSystemMetrics() returned null or undefined');
+        }
+      } catch (err) {
+        this.logger?.error?.('Failed to collect MCP system metrics', err);
       }
       this.alerts.evaluateRules();
     };

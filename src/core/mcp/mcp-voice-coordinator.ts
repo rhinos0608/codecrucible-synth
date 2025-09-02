@@ -18,6 +18,9 @@ import { voiceToolMapper, VoiceToolMapper } from './voice-tool-mapper.js';
 import { contextTranslator, ContextTranslator } from './context-translator.js';
 import { responseSynthesizer, ResponseSynthesizer } from './response-synthesizer.js';
 import { integrationMonitor, IntegrationMonitor } from './integration-monitor.js';
+import { intelligentMCPLoadBalancer } from './intelligent-mcp-load-balancer.js';
+import { enhancedMCPSecuritySystem } from './enhanced-mcp-security-system.js';
+import { enhancedMCPReliabilitySystem } from './enhanced-mcp-reliability-system.js';
 
 export interface MCPVoiceRequest {
   requestId: string;
@@ -67,12 +70,29 @@ export class MCPVoiceCoordinator extends EventEmitter {
       // Translate voice context to MCP friendly structure
       const mcpContext = this.translator.toMCPContext(request.context);
 
-      // Placeholder: choose server via discovery/load balancer
-      const decision = await _intelligentMCPLoadBalancer.selectServer(server);
-      this.logger.debug('Selected server', { decision });
+      // Placeholder: choose connection via discovery/load balancer
+      const decision = await intelligentMCPLoadBalancer.getConnection(
+        'default',
+        [request.capability],
+        request.requestId,
+        mcpContext
+      );
+      if (!decision) {
+        throw new Error('No available MCP connection');
+      }
+      this.logger.debug('Selected connection', { decision });
 
       // Placeholder: security and reliability checks
-      enhancedMCPSecuritySystem.validateRequest(mcpContext);
+      try {
+        const validationResult = enhancedMCPSecuritySystem.validateRequest(mcpContext);
+        if (validationResult === false) {
+          throw new Error('Security validation failed: validateRequest returned false for the provided context.');
+        }
+      } catch (err) {
+        throw new Error(
+          `Security validation failed for requestId=${request.requestId}, voiceId=${request.voiceId}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
       const safeContext = await enhancedMCPReliabilitySystem.executeWithRetries(
         async () => mcpContext
       );

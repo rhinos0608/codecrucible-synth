@@ -72,17 +72,48 @@ export class LMStudioAdapter implements ProviderAdapter {
   async request(req: ModelRequest): Promise<ModelResponse> {
     logger.debug('LMStudioAdapter.request', { model: req.model });
     const cfg = (this.provider as any).config;
-    return this.provider.request({ ...req, model: req.model || cfg.defaultModel });
+    
+    // LMStudioProvider doesn't have request method, use generateCode instead
+    if ('request' in this.provider && typeof this.provider.request === 'function') {
+      return this.provider.request({ ...req, model: req.model || cfg.defaultModel });
+    } else {
+      // Fallback to generateCode method
+      const response = await this.provider.generateCode(req.prompt, { model: req.model || cfg.defaultModel });
+      return {
+        id: `${this.name}_${Date.now()}`,
+        content: response.content,
+        model: response.model || req.model || cfg.defaultModel,
+        provider: this.name,
+        usage: {
+          promptTokens: response.metadata?.promptTokens || 0,
+          completionTokens: response.metadata?.completionTokens || 0,
+          totalTokens: response.metadata?.tokens || 0
+        },
+        responseTime: response.responseTime,
+        finishReason: response.metadata?.finishReason || 'stop'
+      };
+    }
   }
 
   async *stream(req: ModelRequest): AsyncIterable<StreamToken> {
     const streamFn = (this.provider as any).stream;
     if (!streamFn) return;
     const iterator = await streamFn.call(this.provider, req);
+    let index = 0;
     for await (const token of iterator as any) {
-      yield { content: (token as any).content ?? String(token), isComplete: false };
+      yield { 
+        content: (token as any).content ?? String(token), 
+        isComplete: false,
+        index: index++,
+        timestamp: Date.now()
+      };
     }
-    yield { content: '', isComplete: true };
+    yield { 
+      content: '', 
+      isComplete: true,
+      index: index++,
+      timestamp: Date.now()
+    };
   }
 
   async getModels(): Promise<string[]> {

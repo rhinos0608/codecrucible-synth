@@ -37,7 +37,6 @@ const SECURITY_PATTERNS = {
     /eval\s*\(/i,
     /setTimeout\s*\(/i,
     /setInterval\s*\(/i,
-    // TODO: Store interval ID and call clearInterval in cleanup
     /Function\s*\(/i,
   ],
 

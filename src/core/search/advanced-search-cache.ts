@@ -466,7 +466,6 @@ export class AdvancedSearchCacheManager {
 
   private startCompactionTimer(): void {
     this.compactionTimer = setInterval(() => {
-      // TODO: Store interval ID and call clearInterval in cleanup
       this.performMaintenance().catch(error => this.logger.error('Maintenance error:', error));
     }, this.config.compactionInterval);
   }

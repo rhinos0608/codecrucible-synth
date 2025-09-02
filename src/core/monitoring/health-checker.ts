@@ -64,6 +64,7 @@ export class HealthChecker extends EventEmitter {
   private results = new Map<string, ComponentHealth>();
   private config: HealthConfig;
   private intervalHandles = new Map<string, NodeJS.Timeout>();
+  private mainCheckInterval?: NodeJS.Timeout;
   private startTime = Date.now();
 
   constructor(config: Partial<HealthConfig> = {}) {
@@ -368,7 +369,6 @@ export class HealthChecker extends EventEmitter {
     // Start interval if specified
     if (check.interval) {
       const intervalHandle = setInterval(async () => {
-        // TODO: Store interval ID and call clearInterval in cleanup
         await this.runSingleCheck(check.name);
       }, check.interval);
 
@@ -555,8 +555,7 @@ export class HealthChecker extends EventEmitter {
     setTimeout(async () => this.runAllChecks(), 1000);
 
     // Set up periodic checks
-    setInterval(async () => {
-      // TODO: Store interval ID and call clearInterval in cleanup
+    this.mainCheckInterval = setInterval(async () => {
       await this.runAllChecks();
     }, this.config.checkInterval);
   }
@@ -619,6 +618,13 @@ export class HealthChecker extends EventEmitter {
    * Stop all health checks
    */
   stop(): void {
+    // Clear main check interval
+    if (this.mainCheckInterval) {
+      clearInterval(this.mainCheckInterval);
+      this.mainCheckInterval = undefined;
+    }
+
+    // Clear individual check intervals
     for (const intervalHandle of this.intervalHandles.values()) {
       clearInterval(intervalHandle);
     }

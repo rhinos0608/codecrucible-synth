@@ -51,7 +51,9 @@ export class MCPServerSecurity {
   private config: SecurityConfig;
   private pathCache: Map<string, SecurityValidationResult> = new Map();
   private concurrentOperations = 0;
+  private blockedOperations = 0; // Track actual blocked operations
   private blockedPathPatterns: RegExp[] = [];
+  private riskLevelCounts = { low: 0, medium: 0, high: 0, critical: 0 }; // Track risk levels
 
   constructor(config: Partial<SecurityConfig> = {}) {
     this.config = {
@@ -83,6 +85,25 @@ export class MCPServerSecurity {
     this.blockedPathPatterns = this.config.blockedPaths.map(pattern => 
       new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
     );
+  }
+
+  /**
+   * Track security validation results and update counters
+   */
+  private trackSecurityResult(result: SecurityValidationResult): SecurityValidationResult {
+    // Track blocked operations
+    if (!result.allowed) {
+      this.blockedOperations++;
+      logger.debug(`🚫 Blocked operation: ${result.reason}`);
+    }
+
+    // Track risk level counts
+    const riskLevel = result.riskAssessment.level;
+    if (riskLevel in this.riskLevelCounts) {
+      (this.riskLevelCounts as any)[riskLevel]++;
+    }
+
+    return result;
   }
 
   /**
@@ -283,7 +304,7 @@ export class MCPServerSecurity {
       });
     }
 
-    return {
+    const result = {
       allowed,
       sanitizedPath,
       reason: allowed ? undefined : `Operation blocked due to ${riskLevel} risk level`,
@@ -294,6 +315,13 @@ export class MCPServerSecurity {
         score: riskScore
       }
     };
+
+    // Cache result for performance
+    const cacheKey = `${sanitizedPath}:${context.operation}`;
+    this.pathCache.set(cacheKey, result);
+    
+    // Track security statistics
+    return this.trackSecurityResult(result);
   }
 
   /**
@@ -404,7 +432,7 @@ export class MCPServerSecurity {
     const riskLevel = this.calculateRiskLevel(riskScore);
     const allowed = this.isOperationAllowed(riskLevel, context);
 
-    return {
+    const result = {
       allowed,
       reason: allowed ? undefined : 'Command execution blocked for security',
       warnings,
@@ -414,6 +442,9 @@ export class MCPServerSecurity {
         score: riskScore
       }
     };
+
+    // Track security statistics  
+    return this.trackSecurityResult(result);
   }
 
   /**
@@ -428,12 +459,12 @@ export class MCPServerSecurity {
     return {
       cacheSize: this.pathCache.size,
       concurrentOperations: this.concurrentOperations,
-      blockedOperations: 0, // TODO: Track this
+      blockedOperations: this.blockedOperations, // Real blocked operations tracking
       riskLevelCounts: {
-        low: 0,
-        medium: 0,
-        high: 0,
-        critical: 0
+        low: this.riskLevelCounts.low,
+        medium: this.riskLevelCounts.medium,
+        high: this.riskLevelCounts.high,
+        critical: this.riskLevelCounts.critical
       }
     };
   }

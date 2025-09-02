@@ -92,7 +92,10 @@ export class MCPVoiceCoordinator extends EventEmitter {
 
       this.monitor.recordSuccess();
       this.emit('request-completed', synthesized);
-      return synthesized;
+      return {
+        requestId: request.requestId,
+        ...synthesized
+      };
     } catch (error) {
       this.monitor.recordFailure(error as Error);
       this.emit('request-failed', error);

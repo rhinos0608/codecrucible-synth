@@ -181,8 +181,9 @@ class ConfigServiceFactory implements ServiceFactory<IConfigurationService> {
   async create(dependencies: Map<string, any>, config?: any): Promise<IConfigurationService> {
     logger.info('🏗️ Creating UnifiedConfigService');
 
-    // UnifiedConfigService is async to initialize
-    const service = await UnifiedConfigService.getInstance(config);
+    // Use the singleton config service or create a new one
+    const { getUnifiedConfigurationManager } = await import('../../domain/services/unified-configuration-manager.js');
+    const service = await getUnifiedConfigurationManager();
 
     if (!this.validateContract(service)) {
       throw new Error('UnifiedConfigService does not implement IConfigurationService contract');

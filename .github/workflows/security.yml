@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 jobs:
   dependency-audit:
@@ -106,8 +106,30 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust-executor/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-executor/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+        
       - name: Install dependencies
         run: npm ci
+        
+      - name: Build Rust native module
+        run: npm run build:rust
         
       - name: Build application
         run: npm run build

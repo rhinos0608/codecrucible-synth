@@ -1264,6 +1264,7 @@ export interface ConfigurationSource {
   type: 'file' | 'environment' | 'default' | 'override';
   name: string;
   priority: number;
+  path?: string;
   lastModified?: Date;
 }
 

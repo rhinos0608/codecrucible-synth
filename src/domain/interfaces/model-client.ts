@@ -47,6 +47,8 @@ export interface ModelResponse {
   response?: string;
   confidence?: number;
   error?: string;
+  responseTime?: number;
+  finishReason?: string;
 }
 
 export interface ModelTool {
@@ -82,6 +84,8 @@ export interface RequestContext {
 export interface StreamToken {
   content: string;
   isComplete: boolean;
+  index: number;
+  timestamp: number;
   metadata?: Record<string, any>;
 }
 

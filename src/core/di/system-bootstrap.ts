@@ -407,13 +407,18 @@ export class SystemBootstrap {
         const performanceMonitor = await container.resolveAsync(PERFORMANCE_MONITOR_TOKEN);
 
         // Create client with all dependencies injected using new DI constructor
-        const client = new UnifiedModelClient(config, {
-          providerRepository,
-          securityValidator,
-          streamingManager,
-          cacheCoordinator,
-          performanceMonitor,
-          hybridRouter,
+        const client = new UnifiedModelClient({
+          adapters: [],
+          defaultProvider: config.defaultProvider,
+          providers: config.providers,
+          fallbackStrategy: config.fallbackStrategy,
+          timeout: config.timeout,
+          retryAttempts: config.retryAttempts,
+          enableCaching: config.enableCaching,
+          enableMetrics: config.enableMetrics,
+          requestProcessor: await container.resolveAsync('RequestProcessor'),
+          responseHandler: await container.resolveAsync('ResponseHandler'),
+          streamingManager: streamingManager,
         });
 
         return client;

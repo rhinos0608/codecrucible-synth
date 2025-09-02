@@ -138,13 +138,17 @@ test-logs/
 private-keys/
 certificates/.env
 
-# Rust build artifacts
-target/debug/
-target/release/
+# Rust build artifacts - NEVER commit native binaries
+target/
+rust-executor/target/
+*.node
 **/*.pdb
 **/*.rlib
 **/*.rmeta
 *.dll.exp
+*.dll
+*.dylib
+*.so
 
 # Large temporary files
 full_output.txt

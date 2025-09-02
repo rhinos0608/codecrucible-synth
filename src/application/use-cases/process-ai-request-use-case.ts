@@ -10,6 +10,7 @@ import { ModelSelectionService } from '../../domain/services/model-selection-ser
 import { VoiceOrchestrationService } from '../../domain/services/voice-orchestration-service.js';
 import { ProcessingRequest } from '../../domain/entities/request.js';
 import { Model } from '../../domain/entities/model.js';
+import { UnifiedModelClient } from '../services/model-client.js';
 
 export interface AIRequestInput {
   prompt: string;
@@ -38,7 +39,8 @@ export interface AIRequestOutput {
 export class ProcessAIRequestUseCase {
   constructor(
     private modelSelectionService: ModelSelectionService,
-    private voiceOrchestrationService: VoiceOrchestrationService
+    private voiceOrchestrationService: VoiceOrchestrationService,
+    private modelClient: UnifiedModelClient
   ) {}
 
   async execute(input: AIRequestInput): Promise<AIRequestOutput> {
@@ -53,16 +55,44 @@ export class ProcessAIRequestUseCase {
     const primaryVoice = voiceSelection.primaryVoice;
 
     // Generate response through model (domain operation)
+    const startTime = Date.now();
     let response;
-    if (selectedModel.generateResponse) {
-      response = await selectedModel.generateResponse(request.prompt);
-    } else {
-      // Fallback: create a placeholder response
-      // TODO: Inject UnifiedModelClient or similar service for actual response generation
+    
+    try {
+      if (selectedModel.generateResponse) {
+        response = await selectedModel.generateResponse(request.prompt);
+      } else {
+        // Generate response using UnifiedModelClient
+        const modelRequest = {
+          prompt: request.prompt,
+          model: selectedModel.primaryModel.name,
+          temperature: input.temperature,
+          maxTokens: input.maxTokens,
+        };
+        
+        const modelResponse = await this.modelClient.request(modelRequest);
+        const processingTime = Date.now() - startTime;
+        
+        response = {
+          content: modelResponse.content,
+          model: selectedModel.primaryModel.name,
+          timestamp: new Date(),
+          tokensUsed: modelResponse.usage?.totalTokens || 0,
+          processingTime,
+          confidence: 0.9, // High confidence for successful model responses
+        };
+      }
+    } catch (error) {
+      // Fallback for model errors
+      const processingTime = Date.now() - startTime;
       response = {
-        content: 'Response generation not implemented yet',
+        content: `Error generating response: ${error instanceof Error ? error.message : 'Unknown error'}`,
         model: selectedModel.primaryModel.name,
         timestamp: new Date(),
+        tokensUsed: 0,
+        processingTime,
+        confidence: 0.1, // Low confidence for error responses
+        error: true,
       };
     }
 

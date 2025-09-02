@@ -5,25 +5,82 @@ node_modules/
 dist/
 build/
 coverage/
+target/
 
-# Logs
+# Logs and temporary files
 *.log
-
-# Generated files
-*.d.ts
-
-# Package files
-package-lock.json
-yarn.lock
-
-# Environment files
-.env*
-
-# Temporary files
+*.tmp
 tmp/
 temp/
-*.tmp
+full_output.txt
+temp_query.txt
 
-# Archives
+# Generated and compiled files
+*.d.ts
+*.js.map
+*.min.js
+*.min.css
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment and config files
+.env*
+.secrets/
+.claude/
+
+# Git merge/conflict files
+*.orig
+*.rej
+
+# Documentation that shouldn't be auto-formatted
+CHANGELOG*.md
+LICENSE*
+
+# Archives and media
 *.tar.gz
 *.zip
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.pdf
+
+# Native modules and Rust artifacts
+*.node
+*.dll
+*.so
+*.dylib
+*.pdb
+*.rlib
+*.rmeta
+Cargo.lock
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Test fixtures and mocks that are intentionally unformatted
+tests/fixtures/
+tests/__mocks__/**/unformatted-*
+
+# Legacy or archived code
+archive/
+legacy/
+
+# Auto-generated API documentation
+api-docs/
+docs/api/
+
+# Rust target directories
+rust-executor/target/

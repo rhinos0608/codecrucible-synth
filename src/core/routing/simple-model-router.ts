@@ -10,7 +10,7 @@ import {
   ModelRequest,
   ModelResponse,
 } from '../../domain/interfaces/model-client.js';
-import { UnifiedModelClientConfig } from '../../application/services/model-client.js';
+import { UnifiedModelClientConfig } from '../../application/services/client.js';
 
 export class SimpleModelRouter implements IModelRouter {
   private providers: Map<string, IModelProvider>;

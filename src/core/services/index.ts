@@ -164,7 +164,8 @@ export function createCacheService(config?: any): UnifiedCacheService {
  * Create a pre-configured config service instance
  */
 export async function createConfigService(options?: any): Promise<UnifiedConfigService> {
-  return UnifiedConfigService.getInstance(options);
+  const { getUnifiedConfigurationManager } = await import('../../domain/config/config-manager.js');
+  return await getUnifiedConfigurationManager();
 }
 
 /**

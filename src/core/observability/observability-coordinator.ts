@@ -21,17 +21,28 @@ export interface TraceSpan {
 }
 
 export interface TracingConfig {
+  enabled: boolean;
   provider?: string;
+  samplingRate?: number;
+  maxSpansPerTrace?: number;
+  exporters?: any[];
   options?: Record<string, unknown>;
 }
 
 export interface LoggingConfig {
   level?: string;
+  outputs?: any[];
+  structured?: boolean;
+  includeStackTrace?: boolean;
   transports?: Record<string, unknown>;
 }
 
 export interface StorageConfig {
   type?: string;
+  dataPath?: string;
+  maxFileSize?: number;
+  compressionEnabled?: boolean;
+  encryptionEnabled?: boolean;
   options?: Record<string, unknown>;
 }
 

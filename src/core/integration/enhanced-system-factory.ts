@@ -122,28 +122,8 @@ export class EnhancedSystemFactory {
       // Step 1: Create VoiceArchetypeSystem first (without spiral coordinator to break circular dependency)
       const voiceSystem = finalConfig.voice.enabled
         ? new VoiceArchetypeSystem(
-            logger,
-            undefined, // Will be injected later
             modelClient,
-            {
-              voices: {
-                default: ['explorer', 'maintainer'],
-                available: [
-                  'explorer',
-                  'maintainer',
-                  'analyzer',
-                  'developer',
-                  'implementor',
-                  'security',
-                  'architect',
-                  'designer',
-                  'optimizer',
-                  'guardian',
-                ],
-                parallel: finalConfig.voice.parallelVoices || false,
-                maxConcurrent: finalConfig.voice.maxVoices || 3,
-              },
-            }
+            logger
           )
         : undefined;
 

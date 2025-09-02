@@ -200,7 +200,7 @@ export class GitMCPServer extends BaseMCPServer {
       git_remote: this.handleGitRemote.bind(this),
       git_stash: this.handleGitStash.bind(this),
       git_clean: this.handleGitClean.bind(this),
-    } as Record<string, ToolHandler>;
+    } satisfies Record<string, ToolHandler>;
 
     logger.info('Git MCP server initialized', { workspaceRoot });
   }

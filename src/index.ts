@@ -222,6 +222,7 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     // Create model client configuration based on selected model
     const modelClientConfig = {
+      adapters: [] as any[], // Empty for now, adapters would be created from providers
       defaultProvider: selectedModelInfo.provider,
       providers: [
         {

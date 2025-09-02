@@ -4,6 +4,8 @@ import { MetricPoint } from './metrics-collector.js';
 import { SystemHealth } from './health-monitor.js';
 
 export interface TelemetryExporterConfig {
+  enabled: boolean;
+  interval?: number;
   exporters: Array<{
     type: 'prometheus' | 'statsd' | 'opentelemetry' | 'file';
     endpoint?: string;

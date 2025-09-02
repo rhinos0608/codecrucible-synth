@@ -8,6 +8,7 @@
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
+import { loadRustExecutorSafely, createFallbackRustExecutor } from '../../utils/rust-module-loader.js';
 import type { 
   StreamChunk, 
   StreamProcessor, 
@@ -16,14 +17,16 @@ import type {
   StreamEvent
 } from './stream-chunk-protocol.js';
 
-// Import the Rust executor
-let RustExecutor: any;
-try {
-  // Dynamic import to handle missing native module gracefully
-  RustExecutor = require('../../../rust-executor/codecrucible-rust-executor.win32-x64-msvc.node').RustExecutor;
-} catch (error) {
-  logger.warn('Rust executor not available, falling back to TypeScript streaming');
-  RustExecutor = null;
+// Load the Rust executor with cross-platform support
+const rustModuleResult = loadRustExecutorSafely();
+const RustExecutor = rustModuleResult.available 
+  ? rustModuleResult.module.RustExecutor 
+  : null;
+
+if (rustModuleResult.available) {
+  logger.info(`🦀 Rust executor loaded from: ${rustModuleResult.binaryPath}`);
+} else {
+  logger.warn(`⚠️ Rust executor not available: ${rustModuleResult.error}`);
 }
 
 /**

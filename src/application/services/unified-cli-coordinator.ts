@@ -220,6 +220,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
       logging: { level: 'info', outputs: [], structured: true, includeStackTrace: true },
       health: { checkInterval: 30000, timeoutMs: 5000, retryAttempts: 3 },
       alerting: { enabled: true, rules: [], defaultCooldown: 300000 },
+      telemetry: { enabled: true, interval: 60000, exporters: [] },
       storage: {
         dataPath: './data/observability',
         maxFileSize: 100 * 1024 * 1024,

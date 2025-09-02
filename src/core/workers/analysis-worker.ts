@@ -41,7 +41,7 @@ if (!isMainThread) {
         debug: () => {},
         trace: () => {},
       };
-      const voiceSystem = new VoiceArchetypeSystem(logger, undefined, client, config);
+      const voiceSystem = new VoiceArchetypeSystem(client, logger);
 
       // Perform analysis
       const result = await performAnalysis(task, client, voiceSystem);

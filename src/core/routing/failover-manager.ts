@@ -11,7 +11,7 @@ export class FailoverManager {
    * Return next provider from the fallback list when a request fails.
    */
   getFallback(decision: RoutingDecision): RoutingDecision {
-    const next = decision.fallbackProviders.shift();
+    const [next, ...remainingFallbacks] = decision.fallbackProviders;
     if (!next) {
       throw new Error('No fallback providers available');
     }
@@ -19,6 +19,7 @@ export class FailoverManager {
       ...decision,
       provider: next,
       model: next.models[0],
+      fallbackProviders: remainingFallbacks,
       reasoning: `${decision.reasoning} -> fallback to ${next.name}`,
     };
   }

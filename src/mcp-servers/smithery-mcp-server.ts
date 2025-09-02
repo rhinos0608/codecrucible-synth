@@ -222,4 +222,15 @@ export class SmitheryMCPServer {
     this.availableTools.clear();
     await this.discoverServers();
   }
+
+  async initialize(): Promise<void> {
+    await this.ensureInitialized();
+  }
+
+  async shutdown(): Promise<void> {
+    this.initialized = false;
+    this.initializationPromise = null;
+    this.availableServers.clear();
+    this.availableTools.clear();
+  }
 }

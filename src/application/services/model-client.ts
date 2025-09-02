@@ -15,6 +15,32 @@ import { logger as defaultLogger } from '../../infrastructure/logging/unified-lo
 
 export interface ModelClientOptions {
   adapters: ProviderAdapter[];
+  defaultProvider?: string;
+  providers?: any[];
+  fallbackStrategy?: string;
+  executionMode?: string;
+  fallbackChain?: string[];
+  timeout?: number;
+  retryAttempts?: number;
+  enableCaching?: boolean;
+  enableMetrics?: boolean;
+  performanceThresholds?: {
+    maxLatency?: number;
+    maxTokensPerSecond?: number;
+    maxMemoryUsage?: number;
+    fastModeMaxTokens?: number;
+    timeoutMs?: number;
+    maxConcurrentRequests?: number;
+  };
+  security?: {
+    enableSandbox?: boolean;
+    maxInputLength?: number;
+    allowedCommands?: string[];
+    enableRateLimit?: boolean;
+    maxRequestsPerMinute?: number;
+    enableCors?: boolean;
+    corsOrigins?: string[];
+  };
   requestProcessor?: RequestProcessor;
   responseHandler?: ResponseHandler;
   streamingManager?: StreamingManager;
@@ -90,7 +116,53 @@ export class ModelClient extends EventEmitter implements IModelClient {
   async shutdown(): Promise<void> {
     this.logger.info('ModelClient shutdown');
   }
+
+  async destroy(): Promise<void> {
+    await this.shutdown();
+  }
+
+  // Core interfaces compatibility methods
+  async processRequest(request: ModelRequest, context?: any): Promise<ModelResponse> {
+    return this.request(request);
+  }
+
+  async streamRequest(
+    request: ModelRequest, 
+    onToken: (token: StreamToken) => void, 
+    context?: any
+  ): Promise<ModelResponse> {
+    const tokens: StreamToken[] = [];
+    for await (const token of this.stream(request)) {
+      tokens.push(token);
+      onToken(token);
+    }
+    
+    // Reconstruct response from tokens
+    const content = tokens.map(t => t.content).join('');
+    return {
+      id: `stream_${Date.now()}`,
+      content,
+      model: request.model || 'unknown',
+      provider: 'stream'
+    };
+  }
+
+  async generateText(prompt: string, options?: Record<string, unknown>): Promise<string> {
+    return this.generate(prompt, options);
+  }
+
+  async synthesize(request: ModelRequest): Promise<ModelResponse> {
+    return this.request(request);
+  }
+
+  async healthCheck(): Promise<Record<string, boolean>> {
+    const isHealthy = await this.isHealthy();
+    return { healthy: isHealthy };
+  }
+
+  getProviders(): Map<string, unknown> {
+    return new Map(Array.from(this.adapters.entries()));
+  }
 }
 
 export { ModelClient as UnifiedModelClient };
-export type { ModelClientOptions };

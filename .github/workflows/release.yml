@@ -21,7 +21,7 @@ on:
         - alpha
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 jobs:
   validate-release:
@@ -108,14 +108,38 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+          
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust-executor/target/
+          key: ${{ runner.os }}-${{ matrix.platform }}-cargo-${{ hashFiles('rust-executor/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.platform }}-cargo-
+            ${{ runner.os }}-cargo-
+          
       - name: Install dependencies
         run: npm ci
+        
+      - name: Build Rust native module
+        run: npm run build:rust
         
       - name: Build application
         run: npm run build
         
-      - name: Build standalone package
-        run: npm run package:${{ matrix.platform }}
+      - name: Package application
+        run: npm run package:all
         
       - name: Build desktop package (non-Windows)
         if: matrix.os != 'windows-latest'
@@ -287,7 +311,7 @@ jobs:
           ## 🐛 Troubleshooting
           
           If you encounter issues:
-          1. Ensure Node.js 18+ is installed: `node --version`
+          1. Ensure Node.js 20+ is installed: `node --version`
           2. Check Ollama status: `ollama --version`
           3. View logs in `.codecrucible/` directory
           4. Report issues: [GitHub Issues](https://github.com/rhinos0608/codecrucibe-synth/issues)
@@ -331,30 +355,17 @@ jobs:
           ls -la release-assets/ || echo "No assets found"
           
       - name: Create GitHub Release
-        uses: actions/create-release@v1
-        id: create-release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ needs.validate-release.outputs.tag }}
-          release_name: CodeCrucible Synth v${{ needs.validate-release.outputs.version }}
+          name: CodeCrucible Synth v${{ needs.validate-release.outputs.version }}
           body_path: release-notes.md
           draft: false
           prerelease: false
-          
-      - name: Upload Release Assets
-        if: hashFiles('release-assets/*') != ''
-        run: |
-          for file in release-assets/*; do
-            if [ -f "$file" ]; then
-              echo "Uploading $file"
-              curl \
-                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                -H "Content-Type: application/octet-stream" \
-                --data-binary @"$file" \
-                "${{ steps.create-release.outputs.upload_url }}?name=$(basename $file)"
-            fi
-          done
+          files: release-assets/*
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   notify-release:
     name: Notify Release Complete

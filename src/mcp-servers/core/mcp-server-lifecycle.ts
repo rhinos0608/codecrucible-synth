@@ -259,7 +259,7 @@ export class MCPServerLifecycle extends EventEmitter {
     }
 
     // Calculate error rate (simplified)
-    const totalChecks = Math.max(1, Math.ceil((Date.now() - this.startupCompleted ? Date.now() - 300000 : 0) / this.config.healthCheckInterval));
+    const totalChecks = Math.max(1, Math.ceil((Date.now() - (this.startupCompleted ? (Date.now() - 300000) : 0)) / this.config.healthCheckInterval));
     healthStatus.errorRate = healthStatus.consecutiveFailures / Math.max(1, Math.min(totalChecks, 10));
 
     // Emit status change events

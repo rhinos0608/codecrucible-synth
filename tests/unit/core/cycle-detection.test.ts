@@ -288,16 +288,16 @@ describe('Cycle Detection in Orchestration Components', () => {
 
       expect(plan.tasks.length).toBeGreaterThan(0);
       expect(plan.executionOrder.length).toBeGreaterThan(0);
-    it('should prevent infinite loops with complex cycles', async () => {
-      const cycleEvents: any[] = [];
-      
-      expect(plan.tasks.length).toBeGreaterThan(0);
-      expect(plan.executionOrder.length).toBeGreaterThan(0);
       // Test should complete quickly (under reasonable time limit)
       expect(duration).toBeLessThan(5000);
     });
 
     it('should prevent infinite loops with complex cycles', async () => {
+      const cycleEvents: any[] = [];
+      
+      mcpOrchestrator.on('dependency-cycle-detected', (event) => {
+        cycleEvents.push(event);
+      });
 
       // Create a complex multi-cycle graph
       const steps: ToolExecutionStep[] = [

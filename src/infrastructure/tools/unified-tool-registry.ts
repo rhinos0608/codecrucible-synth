@@ -460,5 +460,4 @@ class ToolMetrics {
 // Export singleton instance
 export const unifiedToolRegistry = new UnifiedToolRegistry();
 
-// Export types
-export type { ToolDefinition, ToolExecutionContext, ToolExecutionResult };
+// Types already exported with their definitions above

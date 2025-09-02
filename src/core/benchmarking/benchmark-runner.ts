@@ -738,6 +738,7 @@ except Exception as e:
   private initializeClients(): void {
     try {
       this.hybridClient = new UnifiedModelClient({
+        adapters: [] as any[], // Empty adapters array
         defaultProvider: 'ollama',
         providers: [
           {
@@ -781,6 +782,7 @@ except Exception as e:
       });
 
       this.ollamaClient = new UnifiedModelClient({
+        adapters: [] as any[], // Empty adapters array
         defaultProvider: 'ollama-quality',
         providers: [
           {

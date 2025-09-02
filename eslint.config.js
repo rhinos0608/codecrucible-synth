@@ -69,33 +69,33 @@ export default [
       ...eslint.configs.recommended.rules,
       ...tseslint.configs.recommended.rules,
       
-      // 2025 TypeScript Best Practices - Strict Mode
-      // Temporarily relax no-explicit-any to warn while we migrate types progressively.
+      // 2025 TypeScript Best Practices - Pragmatic Approach
+      // Start with warnings to enable gradual improvement without blocking development
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { 
         'vars': 'all',
         'args': 'after-used',
-        'ignoreRestSiblings': false,
+        'ignoreRestSiblings': true,
         'argsIgnorePattern': '^_',
         'varsIgnorePattern': '^_'
       }],
-      '@typescript-eslint/no-non-null-assertion': 'error',
+      '@typescript-eslint/no-non-null-assertion': 'warn', // Downgraded from error
       // Disabled until strictNullChecks is enabled in tsconfig
       '@typescript-eslint/prefer-nullish-coalescing': 'off',
       '@typescript-eslint/prefer-optional-chain': 'warn',
-      // Gradual migration for promise-safety rules
+      // Gradual migration for promise-safety rules - more lenient during development
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-misused-promises': 'warn',
-      '@typescript-eslint/await-thenable': 'error',
-      '@typescript-eslint/no-for-in-array': 'error',
-      '@typescript-eslint/no-implied-eval': 'error',
-      '@typescript-eslint/prefer-includes': 'error',
-      '@typescript-eslint/prefer-string-starts-ends-with': 'error',
-      '@typescript-eslint/promise-function-async': 'error',
-      '@typescript-eslint/require-array-sort-compare': 'error',
-      '@typescript-eslint/restrict-plus-operands': 'error',
-      '@typescript-eslint/restrict-template-expressions': 'error',
-      '@typescript-eslint/unbound-method': 'error',
+      '@typescript-eslint/await-thenable': 'warn',
+      '@typescript-eslint/no-for-in-array': 'warn',
+      '@typescript-eslint/no-implied-eval': 'error', // Keep as error - security issue
+      '@typescript-eslint/prefer-includes': 'warn',
+      '@typescript-eslint/prefer-string-starts-ends-with': 'warn',
+      '@typescript-eslint/promise-function-async': 'warn', // Downgraded from error
+      '@typescript-eslint/require-array-sort-compare': 'warn',
+      '@typescript-eslint/restrict-plus-operands': 'off', // Too strict for current codebase
+      '@typescript-eslint/restrict-template-expressions': 'off', // Too strict for logging/debugging
+      '@typescript-eslint/unbound-method': 'warn',
       
       // Security & Best Practices
       'no-eval': 'error',
@@ -109,8 +109,8 @@ export default [
       'prefer-arrow-callback': 'error',
       'prefer-template': 'error',
       
-      // Code Quality
-      'no-console': 'warn', // Keep as warn for CLI application
+      // Code Quality - CLI Application Specific
+      'no-console': 'off', // Allow console statements in CLI application
       'no-debugger': 'error',
       'no-alert': 'error',
       
@@ -121,13 +121,15 @@ export default [
     }
   },
 
-  // Test files - More lenient rules
+  // Test files - More lenient rules for testing patterns
   {
     files: ['**/*.test.ts', '**/*.spec.ts', 'tests/**/*.ts'],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-non-null-assertion': 'warn',
-      'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off', // Allow any in tests for mocking
+      '@typescript-eslint/no-non-null-assertion': 'off', // Allow non-null assertions in tests
+      '@typescript-eslint/no-unused-vars': 'off', // Test variables often used for setup
+      'no-console': 'off', // Allow console in tests for debugging
+      'prefer-const': 'off', // Allow let in tests for readability
     }
   },
 

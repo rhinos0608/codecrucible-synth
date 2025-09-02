@@ -177,11 +177,12 @@ export class EnterpriseMCPOrchestrator extends EventEmitter {
     }
 
     logger.info('Discovering MCP server capabilities');
-    const servers = await this.mcpManager.listServers();
+    const serverIds = await this.mcpManager.listServers();
     const allCapabilities: ToolCapability[] = [];
 
-    for (const server of servers) {
+    for (const serverId of serverIds) {
       try {
+        const server = this.mcpManager.getServerStatus(serverId);
         const tools = server.capabilities?.tools || [];
         const resources = server.capabilities?.resources || [];
         const prompts = server.capabilities?.prompts || [];
@@ -192,27 +193,27 @@ export class EnterpriseMCPOrchestrator extends EventEmitter {
           inputSchema: Record<string, unknown>;
         }
         const serverCapabilities = tools.map((tool: MCPTool) => ({
-          serverId: server.id,
+          serverId: serverId,
           name: tool.name,
           description: tool.description,
           schema: tool.inputSchema,
-          reliability: this.getToolReliability(server.id, tool.name),
+          reliability: this.getToolReliability(serverId, tool.name),
           securityLevel: this.assessToolSecurity(tool) as 'safe' | 'restricted' | 'dangerous',
           dependencies: this.identifyToolDependencies(tool),
-          averageExecutionTime: this.getAverageExecutionTime(server.id, tool.name),
-          successRate: this.getSuccessRate(server.id, tool.name),
+          averageExecutionTime: this.getAverageExecutionTime(serverId, tool.name),
+          successRate: this.getSuccessRate(serverId, tool.name),
         }));
 
         allCapabilities.push(...serverCapabilities);
 
         logger.debug('Discovered capabilities for server', {
-          serverId: server.id,
+          serverId: serverId,
           toolCount: tools.length,
           resourceCount: resources.length,
           promptCount: prompts.length,
         });
       } catch (error) {
-        logger.warn(`Failed to discover capabilities for server ${server.id}:`, error);
+        logger.warn(`Failed to discover capabilities for server ${serverId}:`, error);
       }
     }
 

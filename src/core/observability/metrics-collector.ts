@@ -45,6 +45,7 @@ export interface MetricsStats {
 }
 
 export interface MetricsConfig {
+  enabled: boolean;
   retentionDays: number;
   exportInterval: number;
   exporters: MetricExporter[];

@@ -12,8 +12,10 @@
   "scripts": {
     "build": "npm run build:rust && tsc && npm run copy-assets",
     "build:all": "npm run build:rust && tsc && npm run copy-assets",
-    "build:rust": "cd rust-executor && napi build --platform --release",
-    "build:rust:dev": "cd rust-executor && napi build --platform",
+    "build:rust": "cd rust-executor && napi build --release",
+    "build:rust:dev": "cd rust-executor && napi build",
+    "build:cross-platform": "cd rust-executor && napi build --release --target x86_64-pc-windows-msvc && napi build --release --target x86_64-apple-darwin && napi build --release --target x86_64-unknown-linux-gnu",
+    "prepublishOnly": "npm run build && cd rust-executor && napi prepublish -t npm",
     "copy-assets": "node scripts/copy-assets.js",
     "dev": "tsx src/index.ts",
     "test": "npm run test:unit && npm run test:integration",
@@ -24,25 +26,40 @@
     "test:unit:watch": "node node_modules/jest/bin/jest.js --config jest.config.unit.cjs --watch",
     "test:perf": "node node_modules/jest/bin/jest.js --verbose --logHeapUsage --detectOpenHandles",
     "test:all": "node node_modules/jest/bin/jest.js --config jest.config.cjs",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix",
-    "format": "prettier --write \"src/**/*.{ts,js,json}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,js,json}\"",
+    "test:coverage": "npm test -- --coverage",
+    "test:coverage:open": "npm run test:coverage && npm run coverage:open",
+    "coverage:open": "open coverage/lcov-report/index.html || start coverage/lcov-report/index.html || xdg-open coverage/lcov-report/index.html",
+    "test:ci": "npm run test:coverage -- --ci --maxWorkers=2 --testTimeout=60000",
+    "lint": "eslint",
+    "lint:src": "eslint src/**/*.ts",
+    "lint:tests": "eslint tests/**/*.ts",
+    "lint:fix": "eslint --fix",
+    "lint:fix:src": "eslint src/**/*.ts --fix",
+    "format": "prettier --write \"**/*.{ts,js,json}\" --ignore-path .prettierignore",
+    "format:check": "prettier --check \"**/*.{ts,js,json}\" --ignore-path .prettierignore",
+    "format:src": "prettier --write \"src/**/*.{ts,js,json}\"",
     "typecheck": "npx tsc --noEmit",
-    "fix-code": "npm run lint:fix && npm run format && npm run typecheck",
+    "fix-code": "npm run format && npm run lint:fix && npm run typecheck",
+    "code-quality": "npm run lint && npm run format:check && npm run typecheck",
+    "dev-check": "npm run code-quality && npm run test:smoke",
+    "pre-commit": "npm run format && npm run lint:fix",
     "start": "node dist/index.js",
     "cli": "npm run build && node dist/index.js",
     "install-global": "npm run build && npm link",
     "test-install": "node scripts/install-and-test.js",
     "package:bundle": "ncc build dist/index.js -o build/bundled",
-    "package:win": "npm run package:bundle",
-    "package:mac": "npm run package:bundle",
-    "package:linux": "npm run package:bundle",
+    "package:win": "npm run package:bundle && npm run desktop:package:win",
+    "package:mac": "npm run package:bundle && npm run desktop:package:mac", 
+    "package:linux": "npm run package:bundle && npm run desktop:package:linux",
     "package:all": "npm run package:win && npm run package:mac && npm run package:linux",
+    "desktop:package": "electron-builder",
+    "desktop:package:win": "electron-builder --win",
+    "desktop:package:mac": "electron-builder --mac",
+    "desktop:package:linux": "electron-builder --linux",
     "version": "npm run build",
     "postversion": "echo 'Version updated. Run: git push && git push --tags' to deploy manually",
     "release": "npm run build && npm run package:all && npm version patch && npm publish",
-    "prepublishOnly": "npm run build"
+    "artifacts": "cd rust-executor && napi artifacts"
   },
   "publishConfig": {
     "access": "public"
@@ -238,14 +255,30 @@
     }
   },
   "napi": {
-    "name": "codecrucible-rust-executor",
-    "triples": {
-      "additional": [
-        "aarch64-apple-darwin",
-        "aarch64-unknown-linux-gnu",
-        "aarch64-pc-windows-msvc",
-        "x86_64-unknown-linux-musl"
-      ]
+    "binaryName": "codecrucible-rust-executor",
+    "targets": [
+      "x86_64-pc-windows-msvc",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-apple-darwin",
+      "aarch64-unknown-linux-gnu",
+      "aarch64-pc-windows-msvc",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-musl",
+      "x86_64-unknown-freebsd",
+      "armv7-unknown-linux-gnueabihf",
+      "i686-pc-windows-msvc"
+    ],
+    "package": {
+      "name": "@codecrucible/rust-executor"
     }
+  },
+  "optionalDependencies": {
+    "@codecrucible/rust-executor-win32-x64-msvc": "*",
+    "@codecrucible/rust-executor-darwin-x64": "*",
+    "@codecrucible/rust-executor-darwin-arm64": "*",
+    "@codecrucible/rust-executor-linux-x64-gnu": "*",
+    "@codecrucible/rust-executor-linux-arm64-gnu": "*",
+    "@codecrucible/rust-executor-linux-x64-musl": "*"
   }
 }

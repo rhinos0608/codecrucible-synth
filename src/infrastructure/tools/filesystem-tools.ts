@@ -101,7 +101,7 @@ export class FilesystemTools {
           context: { 
             sessionId: 'file-read',
             workingDirectory: process.cwd(),
-            permissions: ['filesystem:read'],
+            permissions: [{ type: 'read' as const, resource: path, scope: 'file' as const }],
             environment: {},
             securityLevel: 'medium' 
           }
@@ -139,7 +139,13 @@ export class FilesystemTools {
         const request: ToolExecutionRequest = {
           toolId: 'filesystem',
           arguments: { operation: 'write', path, content },
-          context: { securityLevel: 'medium' }
+          context: { 
+            sessionId: 'file-write',
+            workingDirectory: process.cwd(),
+            permissions: [{ type: 'write' as const, resource: path, scope: 'file' as const }],
+            environment: {},
+            securityLevel: 'medium' 
+          }
         };
         
         const result = await this.rustBackend.execute(request);
@@ -174,7 +180,13 @@ export class FilesystemTools {
         const request: ToolExecutionRequest = {
           toolId: 'filesystem',
           arguments: { operation: 'list', path: directory },
-          context: { securityLevel: 'medium' }
+          context: { 
+            sessionId: 'file-list',
+            workingDirectory: process.cwd(),
+            permissions: [{ type: 'read' as const, resource: directory, scope: 'directory' as const }],
+            environment: {},
+            securityLevel: 'medium' 
+          }
         };
         
         const result = await this.rustBackend.execute(request);
@@ -209,7 +221,13 @@ export class FilesystemTools {
         const request: ToolExecutionRequest = {
           toolId: 'filesystem',
           arguments: { operation: 'exists', path },
-          context: { securityLevel: 'medium' }
+          context: { 
+            sessionId: 'file-exists',
+            workingDirectory: process.cwd(),
+            permissions: [{ type: 'read' as const, resource: path, scope: 'file' as const }],
+            environment: {},
+            securityLevel: 'medium' 
+          }
         };
         
         const result = await this.rustBackend.execute(request);

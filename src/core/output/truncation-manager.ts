@@ -31,8 +31,10 @@ class TruncationManager {
       return { text: chunk, done: false };
     }
 
+    const truncationMessage = '\n[... content truncated due to size limits ...]';
     this.size = remaining + truncationMessage.length;
     this.truncated = true;
+    const text = chunk.slice(0, remaining) + truncationMessage;
     return { text, done: true };
   }
 

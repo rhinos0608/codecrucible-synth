@@ -1,8 +1,8 @@
-# CodeCrucible Synth v4.1.0 🚀
+# CodeCrucible Synth v4.2.4 🚀
 
 > **Enterprise CLI AI Platform** - Local AI assistance with industry-leading approval systems, ultra-concise communication, and comprehensive security inspired by OpenAI Codex and Claude Code
 
-[![Version](https://img.shields.io/badge/version-4.1.0-brightgreen.svg)](https://github.com/rhinos0608/codecrucible-synth)
+[![Version](https://img.shields.io/badge/version-4.2.4-brightgreen.svg)](https://github.com/rhinos0608/codecrucible-synth)
 [![NPM](https://img.shields.io/badge/npm-codecrucible--synth-red.svg)](https://www.npmjs.com/package/codecrucible-synth)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
@@ -11,7 +11,7 @@
 
 **CodeCrucible Synth** is an enterprise-grade CLI AI platform that combines industry-leading approval systems, ultra-concise communication patterns, and multi-voice AI synthesis. Based on comprehensive research of OpenAI Codex, Claude Code, and Gemini CLI architectures, it provides enterprise security with 6-tier approval modes, voice-collaborative workflows, and intelligent risk assessment.
 
-## ⚡ **v4.1.0 - Enterprise CLI AI Research Integration**
+## ⚡ **v4.2.4 - Enterprise CLI AI Research Integration**
 
 ### 🎯 Industry-Leading Approval System
 - **6 Approval Modes**: Auto, Read-Only, Full-Access, Interactive, Enterprise-Audit, Voice-Collaborative

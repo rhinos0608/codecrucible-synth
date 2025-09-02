@@ -81,6 +81,43 @@ export class UnifiedConfigurationManager
     return validateConfiguration(config);
   }
 
+  async set(path: string, value: any): Promise<void> {
+    // Set a specific configuration value at the given path
+    const pathParts = path.split('.');
+    const updates: any = {};
+    let current = updates;
+    
+    // Build nested object structure based on path
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      current[pathParts[i]] = {};
+      current = current[pathParts[i]];
+    }
+    current[pathParts[pathParts.length - 1]] = value;
+    
+    // Update configuration using existing method
+    await this.updateConfiguration(updates, { type: 'override', name: 'programmatic', priority: 999, path });
+  }
+
+  get(path: string): any {
+    // Get a specific configuration value at the given path
+    const pathParts = path.split('.');
+    let current: any = this.currentConfig;
+    
+    for (const part of pathParts) {
+      if (current && typeof current === 'object' && part in current) {
+        current = current[part];
+      } else {
+        return undefined;
+      }
+    }
+    
+    return current;
+  }
+
+  getAll(): UnifiedConfiguration {
+    return this.getConfiguration();
+  }
+
   async saveConfiguration(filePath?: string): Promise<void> {
     await saveConfigFile(filePath || this.configFilePath, this.currentConfig);
   }

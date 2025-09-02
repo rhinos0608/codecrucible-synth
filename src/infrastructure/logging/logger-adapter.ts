@@ -8,6 +8,9 @@
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { logger as concreteLogger } from './logger.js';
 
+// Re-export ILogger interface for convenience
+export type { ILogger };
+
 export class LoggerAdapter implements ILogger {
   constructor(private context?: string) {}
 

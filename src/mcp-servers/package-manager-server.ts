@@ -5,18 +5,38 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { logger } from '../infrastructure/logging/logger.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 interface PackageManagerConfig {
   workingDirectory?: string;
   allowedManagers?: string[];
   defaultManager?: string;
+}
+
+interface InstallPackageArgs {
+  name: string;
+  manager?: string;
+}
+
+interface InstallPackageResult {
+  stdout: string;
+  stderr: string;
+}
+
+interface ListInstalledResult {
+  dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
+}
+
+interface PackageJson {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
 }
 
 export class PackageManagerMCPServer {
@@ -79,13 +99,12 @@ export class PackageManagerMCPServer {
     // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
-      const typedArgs = args as Record<string, any>;
 
       switch (name) {
         case 'install_package': {
           const result = await this.installPackage(
-            typedArgs.name as string,
-            typedArgs.manager as string
+            (args as InstallPackageArgs).name,
+            (args as InstallPackageArgs).manager
           );
           return {
             content: [{ type: 'text', text: result.stdout || result.stderr || '' }],
@@ -125,9 +144,20 @@ export class PackageManagerMCPServer {
   /**
    * Call a tool directly (for internal use)
    */
-  async callTool(toolName: string, args: any): Promise<any> {
+  async callTool(
+    toolName: 'install_package',
+    args: InstallPackageArgs
+  ): Promise<InstallPackageResult>;
+  async callTool(toolName: 'list_installed'): Promise<ListInstalledResult>;
+  async callTool(
+    toolName: string,
+    args?: InstallPackageArgs
+  ): Promise<InstallPackageResult | ListInstalledResult> {
     switch (toolName) {
       case 'install_package':
+        if (!args) {
+          throw new Error("Missing arguments for 'install_package'");
+        }
         return this.installPackage(args.name, args.manager);
       case 'list_installed':
         return this.listInstalled();
@@ -136,40 +166,45 @@ export class PackageManagerMCPServer {
     }
   }
 
-  private async installPackage(name: string, manager?: string): Promise<any> {
+  private async installPackage(name: string, manager?: string): Promise<InstallPackageResult> {
     const pkgManager = manager || this.config.defaultManager!;
     if (!this.config.allowedManagers!.includes(pkgManager)) {
       throw new Error(`Package manager ${pkgManager} not allowed`);
     }
 
-    const command = `${pkgManager} install ${name}`;
-    const { stdout, stderr } = await execAsync(command, {
+    if (!/^[\w@./-]+$/.test(name)) {
+      throw new Error(`Invalid package name: ${name}`);
+    }
+
+    const { stdout, stderr } = await execFileAsync(pkgManager, ['install', name], {
       cwd: this.config.workingDirectory,
     });
 
     return { stdout, stderr };
   }
 
-  private async listInstalled(): Promise<any> {
+  private async listInstalled(): Promise<ListInstalledResult> {
     const pkgPath = path.join(this.config.workingDirectory!, 'package.json');
     let file: string;
-    let pkg: any;
+    let pkg: PackageJson;
     try {
       file = await fs.readFile(pkgPath, 'utf8');
-    } catch (err: any) {
-      if (err.code === 'ENOENT') {
+    } catch (err) {
+      const error = err as NodeJS.ErrnoException;
+      if (error.code === 'ENOENT') {
         logger.error(`package.json not found at ${pkgPath}`);
         throw new Error(`package.json not found at ${pkgPath}`);
       } else {
-        logger.error(`Error reading package.json at ${pkgPath}: ${err.message}`);
-        throw new Error(`Error reading package.json at ${pkgPath}: ${err.message}`);
+        logger.error(`Error reading package.json at ${pkgPath}: ${error.message}`);
+        throw new Error(`Error reading package.json at ${pkgPath}: ${error.message}`);
       }
     }
     try {
-      pkg = JSON.parse(file);
-    } catch (err: any) {
-      logger.error(`Invalid JSON in package.json at ${pkgPath}: ${err.message}`);
-      throw new Error(`Invalid JSON in package.json at ${pkgPath}: ${err.message}`);
+      pkg = JSON.parse(file) as PackageJson;
+    } catch (err) {
+      const error = err as Error;
+      logger.error(`Invalid JSON in package.json at ${pkgPath}: ${error.message}`);
+      throw new Error(`Invalid JSON in package.json at ${pkgPath}: ${error.message}`);
     }
     return {
       dependencies: pkg.dependencies || {},

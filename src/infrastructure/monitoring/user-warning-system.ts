@@ -29,8 +29,6 @@ export class UserWarningSystem {
 
   private longRunningInterval: NodeJS.Timeout | null = null;
 
-  private longRunningInterval?: NodeJS.Timeout;
-
   constructor(config?: Partial<WarningConfig>) {
     this.config = {
       memoryWarningThreshold: 0.85, // 85% memory usage
@@ -140,12 +138,6 @@ Used: ${usage.count} times in ${duration} minutes
     }, this.config.longRunningWarningInterval);
   }
 
-  shutdown(): void {
-    if (this.longRunningInterval) {
-      clearInterval(this.longRunningInterval);
-      this.longRunningInterval = null;
-    }
-  }
 
   /**
    * Warn user about long-running sessions (helpful, not alarming)
@@ -217,7 +209,7 @@ Most used tool: ${toolsUsed.length > 0 ? toolsUsed.reduce((max, tool) => (tool.c
   shutdown(): void {
     if (this.longRunningInterval) {
       clearInterval(this.longRunningInterval);
-      this.longRunningInterval = undefined;
+      this.longRunningInterval = null;
     }
   }
 }

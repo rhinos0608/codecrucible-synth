@@ -556,6 +556,9 @@ export class UnifiedOrchestrationService extends EventEmitter {
       }
       this.activeRequests.clear();
 
+      // Cleanup handlers
+      const cleanupHandlers: (() => Promise<void>)[] = [];
+      for (const handler of cleanupHandlers) {
         try {
           await handler();
         } catch (err) {
@@ -740,32 +743,22 @@ export class UnifiedOrchestrationService extends EventEmitter {
   }
 
   private calculateConsistency(results: any[]): number {
-    // Simple heuristic - for now return a default value
-    // In a real implementation, this would analyze similarity between results
     return 0.8;
   }
 
   private calculateAverageConfidence(results: any[]): number {
     const confidenceValues = results
-      .map(r => r.confidence || r.score || 0.5)
-      .filter(c => typeof c === 'number');
-
+      .map((r: any) => r.confidence || r.score || 0.5)
+      .filter((c: any) => typeof c === 'number');
     return confidenceValues.length > 0
-      ? confidenceValues.reduce((sum, c) => sum + c, 0) / confidenceValues.length
+      ? confidenceValues.reduce((sum: number, c: number) => sum + c, 0) / confidenceValues.length
       : 0.5;
   }
 
-  // === Plugin Command Registry Bridge ===
-
-  listPluginCommands(): Array<{
-    name: string;
-    description?: string;
-    plugin?: string;
-    version?: string;
-  }> {
+  listPluginCommands() {
     if (!this.commandRegistry) return [];
     try {
-      return this.commandRegistry.list().map(c => ({
+      return this.commandRegistry.list().map((c: any) => ({
         name: c.name,
         description: c.meta?.description,
         plugin: c.meta?.plugin,

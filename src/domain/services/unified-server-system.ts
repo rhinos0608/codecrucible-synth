@@ -11,7 +11,8 @@
  */
 
 import { EventEmitter } from 'events';
-import express, { Express, Request, Response, NextFunction } from 'express';
+import * as express from 'express';
+import { Express, Request, Response, NextFunction } from 'express';
 import { createServer, Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { IEventBus } from '../interfaces/event-bus.js';
@@ -159,7 +160,7 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
   ) {
     super();
 
-    this.app = express();
+    this.app = express.default();
     this.status = {
       running: false,
       type: 'http',

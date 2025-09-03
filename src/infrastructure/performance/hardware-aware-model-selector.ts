@@ -43,10 +43,10 @@ export interface ModelSwitchEvent {
 }
 
 export class HardwareAwareModelSelector extends EventEmitter {
-  private logger: Logger;
-  private modelDetector: IntelligentModelDetector;
-  private hardwareProfile: HardwareProfile;
-  private performanceMetrics: Map<string, PerformanceMetrics> = new Map();
+  private readonly logger: Logger;
+  private readonly modelDetector: IntelligentModelDetector;
+  private readonly hardwareProfile: HardwareProfile;
+  private readonly performanceMetrics: Map<string, PerformanceMetrics> = new Map();
   private currentModel: string | null = null;
   private fallbackModels: ModelInfo[] = [];
   private switchingInProgress = false;
@@ -63,7 +63,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
     memoryWarningThreshold: 0.75, // 75% memory usage warning
   };
 
-  constructor() {
+  public constructor() {
     super();
     this.logger = new Logger('HardwareAwareModelSelector');
     this.modelDetector = new IntelligentModelDetector();
@@ -115,7 +115,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
   /**
    * Get optimal model configuration based on hardware
    */
-  async getOptimalModelForHardware(): Promise<OptimalConfiguration> {
+  public async getOptimalModelForHardware(): Promise<OptimalConfiguration> {
     await this.modelDetector.scanAvailableModels();
     const availableModels = await this.modelDetector.scanAvailableModels();
 
@@ -133,7 +133,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
     }
 
     // Prioritize qwen2.5-coder if available
-    const qwenCoder = suitableModels.find(m => m.name.toLowerCase().includes('qwen2.5-coder'));
+    const qwenCoder = suitableModels.find((m: ModelInfo) => m.name.toLowerCase().includes('qwen2.5-coder'));
     let sortedModels = this.sortModelsByHardwareCompatibility(suitableModels);
 
     if (qwenCoder) {
@@ -148,8 +148,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
       .filter(m => this.estimateModelMemoryUsage(m) <= primaryModelSize)
       .slice(0, 3); // Keep top 3 smaller/equal fallbacks
 
-    const primaryModel = sortedModels[0];
-    const secondaryModel = sortedModels[1] || primaryModel;
+    const [primaryModel, secondaryModel = sortedModels[0]] = sortedModels;
 
     return {
       writer: {
@@ -381,23 +380,28 @@ export class HardwareAwareModelSelector extends EventEmitter {
     }
 
     if (switchReason) {
-      this.performAutomaticSwitch(switchReason, metrics);
+      void this.performAutomaticSwitch(switchReason, metrics);
     }
   }
 
   /**
    * Perform automatic model switch
    */
-  private async performAutomaticSwitch(
+  private performAutomaticSwitch(
     reason: ModelSwitchEvent['reason'],
     metrics: PerformanceMetrics
-  ): Promise<void> {
+  ): void {
     if (this.switchingInProgress || this.fallbackModels.length === 0) {
       return;
     }
 
     this.switchingInProgress = true;
-    const originalModel = this.currentModel!;
+    const originalModel = this.currentModel;
+    if (!originalModel) {
+      this.logger.error('No current model set for switching.');
+      this.switchingInProgress = false;
+      return;
+    }
 
     try {
       this.logger.warn(`Switching model due to ${reason}:`, {
@@ -445,7 +449,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
    */
   private selectFallbackModel(
     reason: ModelSwitchEvent['reason'],
-    metrics: PerformanceMetrics
+    _metrics: PerformanceMetrics
   ): ModelInfo | null {
     // Check if current model is already small/efficient
     if (this.currentModel) {

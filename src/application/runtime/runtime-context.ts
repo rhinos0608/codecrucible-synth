@@ -23,9 +23,11 @@ interface ListenerRemover {
   removeAllListeners: () => void;
 }
 
+function isDisposable(value: any): value is Disposable {
   return value != null && typeof (value as Disposable)?.dispose === 'function';
 }
 
+function hasListenerRemover(value: any): value is ListenerRemover {
   return value != null && typeof (value as ListenerRemover).removeAllListeners === 'function';
 }
 
@@ -78,13 +80,13 @@ export async function disposeRuntimeContext(context: RuntimeContext): Promise<vo
   if (coordinator !== unifiedResourceCoordinator) {
     if (isDisposable(coordinator)) {
       await coordinator.dispose();
-    } else if (hasRemoveAllListeners(coordinator)) {
+    } else if (hasListenerRemover(coordinator)) {
       coordinator.removeAllListeners();
     }
   }
 
   const { configManager } = context;
-  if (configManager && hasRemoveAllListeners(configManager)) {
+  if (configManager && hasListenerRemover(configManager)) {
     configManager.removeAllListeners();
   }
 }

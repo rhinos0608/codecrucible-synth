@@ -6,11 +6,11 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { readFile, stat } from 'fs/promises';
-import { join, extname, isAbsolute } from 'path';
+import { extname, isAbsolute, join } from 'path';
 import { glob } from 'glob';
 import { logger } from '../../infrastructure/logging/logger.js';
 
-import { CLIOptions, CLIContext } from './cli-types.js';
+import { CLIContext, CLIOptions } from './cli-types.js';
 // import { CLIDisplay } from './cli-display.js';
 // import { ProjectContext } from '../client.js';
 import { ServerModeInterface } from '../../server/server-mode.js';
@@ -27,7 +27,7 @@ export class CLICommands {
   private context: CLIContext;
   private workingDirectory: string;
 
-  constructor(context: CLIContext, workingDirectory: string = process.cwd()) {
+  public constructor(context: CLIContext, workingDirectory: string = process.cwd()) {
     this.context = context;
     this.workingDirectory = workingDirectory;
   }
@@ -35,7 +35,7 @@ export class CLICommands {
   /**
    * Show system status including model connections and health
    */
-  async showStatus(): Promise<void> {
+  public async showStatus(): Promise<void> {
     console.log(chalk.bold('\n📊 CodeCrucible Synth - System Status\n'));
 
     // Model Client Status
@@ -47,8 +47,13 @@ export class CLICommands {
         logger.debug('HealthCheck completed', { healthCheck });
         console.log(chalk.green(`  ✅ Status: ${healthCheck ? 'Connected' : 'Disconnected'}`));
 
-        if (typeof (this.context.modelClient as any).getCurrentModel === 'function') {
-          const currentModel = (this.context.modelClient as any).getCurrentModel();
+        // Type guard for getCurrentModel
+        interface ModelClientWithCurrentModel {
+          getCurrentModel: () => string | undefined;
+        }
+        const modelClient = this.context.modelClient as Partial<ModelClientWithCurrentModel>;
+        if (typeof modelClient.getCurrentModel === 'function') {
+          const currentModel = modelClient.getCurrentModel();
           console.log(chalk.cyan(`  🎯 Current Model: ${currentModel || 'Auto-detect'}`));
         }
       } else {
@@ -80,11 +85,17 @@ export class CLICommands {
     console.log(chalk.cyan('\n🔧 MCP Servers:'));
     try {
       if (this.context.mcpManager) {
-        const serverCount = (this.context.mcpManager as any).servers?.size || 0;
+        // Type guard for servers and isReady
+        interface MCPManagerWithServers {
+          servers?: Map<string, unknown>;
+          isReady?: () => boolean;
+        }
+        const mcpManager = this.context.mcpManager as Partial<MCPManagerWithServers>;
+        const serverCount = mcpManager.servers?.size || 0;
         console.log(chalk.green(`  ✅ Active Servers: ${serverCount}`));
 
-        if (typeof (this.context.mcpManager as any).isReady === 'function') {
-          const ready = (this.context.mcpManager as any).isReady();
+        if (typeof mcpManager.isReady === 'function') {
+          const ready = mcpManager.isReady();
           console.log(chalk.cyan(`  🚀 Ready: ${ready ? 'Yes' : 'No'}`));
         }
       } else {
@@ -125,7 +136,7 @@ export class CLICommands {
   /**
    * List available AI models
    */
-  async listModels(): Promise<void> {
+  public async listModels(): Promise<void> {
     console.log(chalk.bold('\n🧠 Available AI Models\n'));
 
     const spinner = ora('Fetching available models...').start();
@@ -145,10 +156,10 @@ export class CLICommands {
 
         if (models.length > 0) {
           console.log(chalk.cyan('📋 Available Models:'));
-          models.forEach((model: any, index: number) => {
+          models.forEach((model: { name?: string; id?: string; size?: string; modified_at?: string }, index: number) => {
             // TODO: Import AIModel from unified-types
             console.log(chalk.white(`  ${index + 1}. ${model.name || model.id || model}`));
-            if (model.size) {
+            if (model?.size) {
               console.log(chalk.gray(`     Size: ${model.size}`));
             }
             if (model.modified_at) {
@@ -175,7 +186,7 @@ export class CLICommands {
   /**
    * Handle code generation requests
    */
-  async handleGeneration(prompt: string, options: CLIOptions = {}): Promise<void> {
+  public async handleGeneration(prompt: string, options: CLIOptions = {}): Promise<void> {
     console.log(chalk.bold(`\n🎨 Generating Code\n`));
     console.log(chalk.cyan(`Prompt: ${prompt}`));
 
@@ -191,8 +202,16 @@ export class CLICommands {
       // Get voices for code generation
       const voices = options.voices || this.context.voiceSystem.getDefaultVoices() || ['developer'];
 
+      // Define the type for the result
+      interface MultiVoiceSolutionResult {
+        voice?: string;
+        content?: string;
+        confidence?: number;
+        [key: string]: unknown;
+      }
+
       // Generate multi-voice solutions
-      const results = await this.context.voiceSystem.generateMultiVoiceSolutions(
+      const results: MultiVoiceSolutionResult[] = await this.context.voiceSystem.generateMultiVoiceSolutions(
         Array.isArray(voices) ? voices : [voices],
         prompt,
         { files: [] }
@@ -203,11 +222,11 @@ export class CLICommands {
       if (results && results.length > 0) {
         console.log(chalk.green('\n✨ Generated Solutions:\n'));
 
-        results.forEach((result: any, index: number) => {
+        results.forEach((result: MultiVoiceSolutionResult, index: number) => {
           console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Solution:`));
           console.log(chalk.white(result.content || 'No content generated'));
 
-          if (result.confidence) {
+          if (typeof result.confidence === 'number') {
             console.log(chalk.gray(`   Confidence: ${Math.round(result.confidence * 100)}%`));
           }
         });
@@ -225,7 +244,7 @@ export class CLICommands {
   /**
    * Handle file and directory analysis
    */
-  async handleAnalyze(files: string[] = [], options: CLIOptions = {}): Promise<void> {
+  public async handleAnalyze(files: readonly string[] = [], options: Readonly<CLIOptions> = {}): Promise<void> {
     if (files.length === 0) {
       // Use our real codebase analysis for directory analysis
       console.log(chalk.cyan('🔍 Performing comprehensive codebase analysis...'));
@@ -270,12 +289,19 @@ export class CLICommands {
   /**
    * Start server mode
    */
-  async startServer(options: CLIOptions, serverMode: ServerModeInterface): Promise<void> {
+  public async startServer(options: CLIOptions, serverMode: ServerModeInterface): Promise<void> {
     const port = parseInt(options.port || '3002', 10);
 
     console.log(chalk.cyan(`\n🚀 Starting CodeCrucible Server on port ${port}...`));
 
-    const serverOptions: any = {
+    // Import or define the ServerOptions interface if not already imported
+    interface ServerOptions {
+      port: number;
+      host: string;
+      cors: boolean;
+    }
+
+    const serverOptions: ServerOptions = {
       port,
       host: 'localhost',
       cors: true,
@@ -294,6 +320,23 @@ export class CLICommands {
    * Analyze a directory structure with worker pool
    */
   private async analyzeDirectory(dirPath: string, options: CLIOptions): Promise<void> {
+    // Define a type for the expected result structure
+    interface AnalysisResult {
+      totalFiles: number;
+      chunks: Array<unknown>;
+      summary?: { successRate?: number };
+    }
+
+    // Use type guard to check if result.result matches AnalysisResult
+    function isAnalysisResult(obj: unknown): obj is AnalysisResult {
+      if (typeof obj !== 'object' || obj === null) return false;
+      const o = obj as { totalFiles?: unknown; chunks?: unknown };
+      return (
+        typeof o.totalFiles === 'number' &&
+        Array.isArray(o.chunks)
+      );
+    }
+
     console.log(chalk.bold(`\n📁 Analyzing Directory: ${dirPath}`));
 
     const spinner = ora('Scanning directory...').start();
@@ -338,47 +381,62 @@ export class CLICommands {
 
         // Execute analysis in worker thread
         try {
-          // TODO: Implement worker pool for analysis
-          // const result = await analysisWorkerPool.executeAnalysis(analysisTask, {
-          const result = await this.performDirectAnalysis(analysisTask, {
-            endpoint: this.context.config.model?.endpoint || 'http://localhost:11434',
-            providers: [{ type: 'ollama' as const }],
-            executionMode: 'auto' as const,
-            fallbackChain: ['ollama' as const],
-            performanceThresholds: {
-              fastModeMaxTokens: 2048,
-              timeoutMs: 300000, // 5 minutes for complex operations
-              maxConcurrentRequests: 2,
-            },
-            security: {
-              enableSandbox: true,
-              maxInputLength: 100000,
-              allowedCommands: ['node', 'npm', 'git'],
-            },
-          });
+            // Use worker pool for analysis
+            const result = await analysisWorkerPool.runTask({
+              ...analysisTask,
+              config: {
+                endpoint: this.context.config.model?.endpoint
+                  ? this.context.config.model.endpoint
+                  : 'http://localhost:11434',
+                providers: [{ type: 'ollama' as const }],
+                executionMode: 'auto' as const,
+                fallbackChain: ['ollama' as const],
+                performanceThresholds: {
+                  fastModeMaxTokens: 2048,
+                  timeoutMs: 300000, // 5 minutes for complex operations
+                  maxConcurrentRequests: 2,
+                },
+                security: {
+                  enableSandbox: true,
+                  maxInputLength: 100000,
+                  allowedCommands: ['node', 'npm', 'git'],
+                },
+              }
+            }) as {
+              success: boolean;
+              result?: unknown;
+              error?: unknown;
+              duration?: number;
+            };
 
-          spinner.succeed(`Analysis complete - processed ${result.result?.totalFiles || 0} files`);
+          if (result.success && isAnalysisResult(result.result)) {
+            spinner.succeed(`Analysis complete - processed ${result.result.totalFiles} files`);
 
-          // Display results
-          if (result.success && result.result) {
             console.log(chalk.green('\n✅ Analysis Results:'));
             console.log(chalk.cyan(`📊 Files processed: ${result.result.totalFiles}`));
             console.log(chalk.cyan(`⏱️ Duration: ${result.duration}ms`));
-            console.log(chalk.cyan(`📈 Success rate: ${result.result.summary?.successRate || 0}%`));
+            console.log(
+              chalk.cyan(
+                `📈 Success rate: ${result.result.summary?.successRate ?? 0}%`
+              )
+            );
 
             // Display chunk results
-            result.result.chunks.forEach((chunk: any, index: number) => {
+            result.result.chunks.forEach((chunk: unknown, index: number) => {
+              if (typeof chunk !== 'object' || chunk === null) return;
+              const c = chunk as { error?: unknown; analysis?: Array<{ content: string }>; files?: Array<unknown> };
               console.log(chalk.yellow(`\n📦 Chunk ${index + 1}:`));
-              if (chunk.error) {
-                console.log(chalk.red(`❌ Error: ${chunk.error}`));
-              } else if (chunk.analysis) {
-                console.log(chalk.green(`✅ Successfully analyzed ${chunk.files.length} files`));
-                if (chunk.analysis.length > 0) {
-                  console.log(chalk.white(`${chunk.analysis[0].content.substring(0, 200)}...`));
+              if (c.error) {
+                console.log(chalk.red(`❌ Error: ${c.error}`));
+              } else if (c.analysis && Array.isArray(c.analysis)) {
+                console.log(chalk.green(`✅ Successfully analyzed ${Array.isArray(c.files) ? c.files.length : 0} files`));
+                if (c.analysis.length > 0 && typeof c.analysis[0].content === 'string') {
+                  console.log(chalk.white(`${c.analysis[0].content.substring(0, 200)}...`));
                 }
               }
             });
           } else {
+            spinner.succeed(`Analysis complete - processed 0 files`);
             console.log(chalk.red(`❌ Analysis failed: ${result.error || 'Unknown error'}`));
           }
         } catch (analysisError) {
@@ -433,8 +491,13 @@ export class CLICommands {
 
         spinner.succeed('File analysis complete');
 
-        if (analysis && analysis.length > 0) {
-          analysis.forEach((result: any, index: number) => {
+        interface AnalysisResult {
+          voice?: string;
+          content?: string;
+        }
+
+        if (Array.isArray(analysis) && analysis.length > 0) {
+          analysis.forEach((result: AnalysisResult, index: number) => {
             console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Analysis:`));
             console.log(result.content || 'No analysis available');
           });
@@ -469,13 +532,31 @@ export class CLICommands {
   /**
    * Dispatch analysis task to worker pool
    */
-  private async performDirectAnalysis(task: AnalysisTask, _config: any): Promise<any> {
+  // (eslint rule '@typescript-eslint/no-unused-private-class-member' removed because it is not installed)
+  private async performDirectAnalysis(
+    task: Readonly<AnalysisTask>,
+    _config: Readonly<Record<string, unknown>>
+  ): Promise<{
+    success: boolean;
+    duration: number;
+    result: {
+      totalFiles: number;
+      chunks: unknown[];
+      summary: { successRate: number };
+    };
+  }> {
     const result = await analysisWorkerPool.runTask(task);
+
+    // Type guard for expected result structure
+    function isExpectedResult(obj: unknown): obj is { totalFiles: number } {
+      return typeof obj === 'object' && obj !== null && typeof (obj as { totalFiles?: unknown }).totalFiles === 'number';
+    }
+
     return {
       success: true,
       duration: 0,
       result: {
-        totalFiles: result.totalFiles,
+        totalFiles: isExpectedResult(result) ? result.totalFiles : 0,
         chunks: [],
         summary: {
           successRate: 100,

@@ -26,11 +26,45 @@ export interface AlertThreshold {
   unit: string;
 }
 
-export interface AlertAction {
-  type: 'log' | 'email' | 'webhook' | 'slack';
-  configuration: Record<string, any>;
+type AlertActionType = 'log' | 'email' | 'webhook' | 'slack';
+
+interface LogActionConfig {
+  level?: 'info' | 'warn' | 'error';
+  messageTemplate?: string;
+}
+
+interface EmailActionConfig {
+  to: string[];
+  subject: string;
+  templateId?: string;
+  cc?: string[];
+  bcc?: string[];
+}
+
+interface WebhookActionConfig {
+  url: string;
+  method?: 'POST' | 'PUT' | 'PATCH';
+  headers?: Record<string, string>;
+  timeoutMs?: number;
+}
+
+interface SlackActionConfig {
+  channel: string;
+  username?: string;
+  iconEmoji?: string;
+}
+
+interface AlertActionBase<TType extends AlertActionType, TConfig> {
+  type: TType;
+  configuration: TConfig;
   enabled: boolean;
 }
+
+export type AlertAction =
+  | AlertActionBase<'log', LogActionConfig>
+  | AlertActionBase<'email', EmailActionConfig>
+  | AlertActionBase<'webhook', WebhookActionConfig>
+  | AlertActionBase<'slack', SlackActionConfig>;
 
 export interface Alert {
   id: string;
@@ -40,7 +74,7 @@ export interface Alert {
   triggeredAt: Date;
   resolvedAt?: Date;
   message: string;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   acknowledgedBy?: string;
   acknowledgedAt?: Date;
 }
@@ -61,13 +95,13 @@ export interface AlertConfig {
 
 export class AlertManager {
   private rules: Map<string, AlertRule> = new Map();
-  private active: Map<string, Alert> = new Map();
+  private readonly active: Map<string, Alert> = new Map();
   private history: Alert[] = [];
   private logger: ILogger = new Logger('AlertManager');
 
   constructor(private config: AlertConfig) {}
 
-  async initialize(): Promise<void> {
+  public initialize(): void {
     for (const rule of this.config.rules || []) {
       this.addRule(rule);
     }

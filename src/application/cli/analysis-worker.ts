@@ -1,11 +1,19 @@
 import { parentPort } from 'worker_threads';
 
-parentPort?.on('message', async (task: any) => {
+interface AnalysisTask {
+  id: string | number;
+  delay?: number;
+  files?: unknown[];
+}
+
+parentPort?.on('message', async (rawTask: unknown) => {
+  const task = rawTask as AnalysisTask;
   try {
-    const delay = typeof task.delay === 'number' ? task.delay : 0;
-    await new Promise(resolve => setTimeout(resolve, delay));
+    const delay: number = typeof task.delay === 'number' ? task.delay : 0;
+    await new Promise<void>(resolve => setTimeout(resolve, delay));
+    const files = Array.isArray(task.files) ? task.files : [];
     const result = {
-      totalFiles: (task.files || []).length,
+      totalFiles: files.length,
     };
     parentPort?.postMessage({ id: task.id, result });
   } catch (error) {

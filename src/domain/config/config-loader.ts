@@ -5,7 +5,7 @@ import { validateConfiguration } from './config-validator.js';
 export async function loadConfigFile(filePath: string): Promise<Partial<UnifiedConfiguration>> {
   try {
     const { readFile, access } = await import('fs/promises');
-    const { default: YAML } = await import('yaml');
+    const YAML = await import('yaml');
     await access(filePath);
     const content = await readFile(filePath, 'utf-8');
     const parsed = YAML.parse(content) as Partial<UnifiedConfiguration>;
@@ -25,7 +25,7 @@ export async function saveConfigFile(
   config: UnifiedConfiguration
 ): Promise<void> {
   const { writeFile, mkdir } = await import('fs/promises');
-  const { default: YAML } = await import('yaml');
+  const YAML = await import('yaml');
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, YAML.stringify(config), 'utf-8');
 }

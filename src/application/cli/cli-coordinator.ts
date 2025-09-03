@@ -1,6 +1,6 @@
 import { CommandParser } from './command-parser.js';
 import { InteractionManager } from './interaction-manager.js';
-import { SessionManager, CLISession } from './session-manager.js';
+import { CLISession, SessionManager } from './session-manager.js';
 import { OutputFormatter } from './output-formatter.js';
 
 /**

@@ -61,10 +61,10 @@ export class MetricsCollector {
 
   constructor(private config: MetricsConfig) {}
 
-  async initialize(): Promise<void> {
+  public initialize(): void {
     if (this.config.exportInterval > 0) {
       setInterval(() => {
-        void this.exportMetrics();
+        this.exportMetrics().catch(err => { this.logger.error('Error exporting metrics:', err); });
       }, this.config.exportInterval);
     }
   }
@@ -75,21 +75,23 @@ export class MetricsCollector {
     this.cleanup();
   }
 
-  getSummary(timeRange?: { start: Date; end: Date }): MetricsSummary {
-    let metrics = this.metrics;
+  public getSummary(timeRange?: { start: Date; end: Date }): MetricsSummary {
+    const { metrics } = this;
+    let filteredMetrics = metrics;
     if (timeRange) {
-      metrics = metrics.filter(m => m.timestamp >= timeRange.start && m.timestamp <= timeRange.end);
+      const { start, end } = timeRange;
+      filteredMetrics = metrics.filter(m => m.timestamp >= start && m.timestamp <= end);
     }
 
     return {
-      totalMetrics: metrics.length,
-      uniqueMetrics: new Set(metrics.map(m => m.name)).size,
+      totalMetrics: filteredMetrics.length,
+      uniqueMetrics: new Set(filteredMetrics.map(m => m.name)).size,
       timeRange: timeRange || {
-        start: metrics[0]?.timestamp ?? new Date(),
-        end: metrics[metrics.length - 1]?.timestamp ?? new Date(),
+        start: filteredMetrics[0]?.timestamp ?? new Date(),
+        end: filteredMetrics[filteredMetrics.length - 1]?.timestamp ?? new Date(),
       },
-      topMetrics: this.getTopMetrics(metrics),
-      aggregations: this.getAggregations(metrics),
+      topMetrics: this.getTopMetrics(filteredMetrics),
+      aggregations: this.getAggregations(filteredMetrics),
     };
   }
 
@@ -126,7 +128,11 @@ export class MetricsCollector {
       });
     }
 
-    const agg = this.aggregated.get(key)!;
+    const agg = this.aggregated.get(key);
+    if (!agg) {
+      this.logger.error(`Aggregated metric not found for key: ${key}`);
+      return;
+    }
     agg.count++;
     agg.sum += metric.value;
     agg.min = Math.min(agg.min, metric.value);
@@ -152,6 +158,7 @@ export class MetricsCollector {
         this.logger.error(`Failed to export to ${exporter.type}:`, error);
       }
     }
+    return Promise.resolve();
   }
 
   private getTopMetrics(metrics: MetricPoint[]): Record<string, number> {

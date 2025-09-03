@@ -50,7 +50,7 @@ export class HealthMonitor {
 
   constructor(private config: HealthConfig) {}
 
-  async initialize(): Promise<void> {
+  public initialize(): void {
     this.registerDefaultComponents();
   }
 
@@ -121,7 +121,7 @@ export class HealthMonitor {
     }
   }
 
-  private checkEventLoop(component: ComponentHealth): Promise<ComponentHealth> {
+  private async checkEventLoop(component: ComponentHealth): Promise<ComponentHealth> {
     const start = Date.now();
     return new Promise(resolve => {
       setImmediate(() => {

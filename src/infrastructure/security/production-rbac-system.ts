@@ -108,8 +108,6 @@ export class ProductionRBACSystem extends EventEmitter {
 
   private cacheCleanupInterval: NodeJS.Timeout | null = null;
 
-  private cacheCleanupInterval?: NodeJS.Timeout;
-
 
   constructor(db: ProductionDatabaseManager, secretsManager: SecretsManager) {
     super();
@@ -898,10 +896,6 @@ export class ProductionRBACSystem extends EventEmitter {
     }
   }
 
-  shutdown(): void {
-    this.stopCacheCleanup();
-    this.removeAllListeners();
-  }
 
   /**
    * Check if user has specific permission
@@ -967,7 +961,7 @@ export class ProductionRBACSystem extends EventEmitter {
   shutdown(): void {
     if (this.cacheCleanupInterval) {
       clearInterval(this.cacheCleanupInterval);
-      this.cacheCleanupInterval = undefined;
+      this.cacheCleanupInterval = null;
     }
 
     this.removeAllListeners();

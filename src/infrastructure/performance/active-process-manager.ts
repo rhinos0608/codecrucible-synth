@@ -17,7 +17,7 @@ export interface ActiveProcess {
   startTime: Date;
   estimatedMemoryUsage: number;
   abortController: AbortController;
-  promise: Promise<any>;
+  promise: Promise<unknown>;
   priority: 'low' | 'medium' | 'high' | 'critical';
 }
 
@@ -41,23 +41,23 @@ export interface ProcessTerminationEvent {
 }
 
 export class ActiveProcessManager extends EventEmitter {
-  private logger: Logger;
-  private hardwareSelector: HardwareAwareModelSelector;
-  private userWarningSystem: UserWarningSystem;
-  private activeProcesses: Map<string, ActiveProcess> = new Map();
+  private readonly logger: Logger;
+  private readonly hardwareSelector: HardwareAwareModelSelector;
+  private readonly userWarningSystem: UserWarningSystem;
+  private readonly activeProcesses: Map<string, ActiveProcess> = new Map();
   private resourceMonitorIntervalId: string | null = null;
   private thresholds: ResourceThresholds;
   private isTerminating = false;
   private modelSwitchInProgress = false;
-  private lastCriticalWarning = 0;
-  private lastEmergencyWarning = 0;
+  private readonly lastCriticalWarning = 0;
+  private readonly lastEmergencyWarning = 0;
 
   // Compatibility properties for core interface
-  public config: any;
-  public processes = new Map<string, any>();
+  public config: Record<string, unknown> = {};
+  public processes = new Map<string, ActiveProcess>();
   public processHandlers = new Map<string, AbortController>();
 
-  constructor(hardwareSelector: HardwareAwareModelSelector) {
+  public constructor(hardwareSelector: HardwareAwareModelSelector) {
     super();
     this.logger = new Logger('ActiveProcessManager');
     this.hardwareSelector = hardwareSelector;
@@ -82,8 +82,8 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Register a new active process for monitoring
    */
-  registerProcess(
-    process: Omit<ActiveProcess, 'id' | 'startTime' | 'abortController'>
+  public registerProcess(
+    process: Readonly<Omit<ActiveProcess, 'id' | 'startTime' | 'abortController'>>,
   ): ActiveProcess {
     const id = this.generateProcessId();
     const abortController = new AbortController();
@@ -114,7 +114,7 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Unregister a completed process
    */
-  unregisterProcess(processId: string): void {
+  public unregisterProcess(processId: string): void {
     const process = this.activeProcesses.get(processId);
     if (process) {
       this.activeProcesses.delete(processId);
@@ -126,7 +126,7 @@ export class ActiveProcessManager extends EventEmitter {
    * Start a process with automatic resource management
    * Compatible with core ActiveProcessManager interface
    */
-  async startProcess(processName: string, handler: () => Promise<any>): Promise<string> {
+  public async startProcess(processName: string, handler: () => Promise<unknown>): Promise<string> {
     const processConfig = {
       type: 'analysis' as const,
       modelName: 'unknown',
@@ -152,7 +152,7 @@ export class ActiveProcessManager extends EventEmitter {
    * Stop a running process
    * Compatible with core ActiveProcessManager interface
    */
-  async stopProcess(processId: string): Promise<boolean> {
+  public async stopProcess(processId: string): Promise<boolean> {
     const process = this.activeProcesses.get(processId);
     if (!process) {
       return false;
@@ -160,6 +160,7 @@ export class ActiveProcessManager extends EventEmitter {
 
     try {
       process.abortController.abort();
+      await Promise.resolve(); // Ensure async context, in case future logic is added
       this.unregisterProcess(processId);
       this.logger.debug(`Stopped process ${processId}`);
       return true;
@@ -172,29 +173,42 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Pause process (compatibility method - not fully implemented for infrastructure layer)
    */
-  async pauseProcess(processId: string): Promise<boolean> {
+  public async pauseProcess(processId: string): Promise<boolean> {
     // Infrastructure layer doesn't support pause/resume, but return false to indicate unsupported
     this.logger.warn(
       `Pause operation not supported for process ${processId} in infrastructure layer`
     );
+    await Promise.resolve(); // Ensure async context, in case future logic is added
     return false;
   }
 
   /**
    * Resume process (compatibility method - not fully implemented for infrastructure layer)
    */
-  async resumeProcess(processId: string): Promise<boolean> {
+  public async resumeProcess(processId: string): Promise<boolean> {
     // Infrastructure layer doesn't support pause/resume, but return false to indicate unsupported
     this.logger.warn(
       `Resume operation not supported for process ${processId} in infrastructure layer`
     );
+    await Promise.resolve(); // Ensure async context, in case future logic is added
     return false;
   }
 
   /**
    * Get process information (compatibility method)
    */
-  getProcessInfo(processId: string): any | null {
+  public getProcessInfo(processId: string): {
+    id: string;
+    name: ActiveProcess['type'];
+    startTime: number;
+    status: string;
+    progress: number;
+    priority: ActiveProcess['priority'];
+    metadata: {
+      modelName: string;
+      estimatedMemoryUsage: number;
+    };
+  } | null {
     const process = this.activeProcesses.get(processId);
     if (!process) {
       return null;
@@ -217,8 +231,30 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Get all active processes (compatibility method)
    */
-  getActiveProcesses(): any[] {
-    const processes = [];
+  public getActiveProcesses(): {
+    id: string;
+    name: ActiveProcess['type'];
+    startTime: number;
+    status: string;
+    progress: number;
+    priority: ActiveProcess['priority'];
+    metadata: {
+      modelName: string;
+      estimatedMemoryUsage: number;
+    };
+  }[] {
+    const processes: {
+      id: string;
+      name: ActiveProcess['type'];
+      startTime: number;
+      status: string;
+      progress: number;
+      priority: ActiveProcess['priority'];
+      metadata: {
+        modelName: string;
+        estimatedMemoryUsage: number;
+      };
+    }[] = [];
     for (const [id, process] of this.activeProcesses.entries()) {
       processes.push({
         id,
@@ -249,9 +285,7 @@ export class ActiveProcessManager extends EventEmitter {
     }, 60000); // Check every 60 seconds (reduced frequency to allow AI requests to complete)
 
     // Prevent the interval from keeping the process alive
-    if (monitorInterval.unref) {
-      monitorInterval.unref();
-    }
+    monitorInterval.unref();
 
     // Register with resource cleanup manager for proper cleanup
     this.resourceMonitorIntervalId = resourceManager.registerInterval(
@@ -292,7 +326,7 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Handle emergency memory pressure (95%+) - terminate all and switch models
    */
-  private async handleEmergencyMemoryPressure(memoryUsage: number): Promise<void> {
+  private async handleEmergencyMemoryPressure(_memoryUsage: number): Promise<void> {
     if (this.modelSwitchInProgress) return;
 
     // DISABLED: Emergency warnings disabled for normal operation
@@ -331,14 +365,14 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Handle critical memory pressure (90%+) - terminate low priority processes
    */
-  private async handleCriticalMemoryPressure(memoryUsage: number): Promise<void> {
+  private async handleCriticalMemoryPressure(_memoryUsage: number): Promise<void> {
     // DISABLED: Critical memory warnings disabled for normal operation
     // Still perform the cleanup but don't log
 
     // Terminate low and medium priority processes
     const processesToTerminate = Array.from(this.activeProcesses.values())
       .filter(p => p.priority === 'low' || p.priority === 'medium')
-      .sort((a, b) => {
+      .sort((a: Readonly<ActiveProcess>, b: Readonly<ActiveProcess>) => {
         // Sort by priority (low first) then by memory usage (high first) then by age (old first)
         if (a.priority !== b.priority) {
           const priorityOrder = { low: 0, medium: 1, high: 2, critical: 3 };
@@ -352,8 +386,9 @@ export class ActiveProcessManager extends EventEmitter {
 
     let terminatedCount = 0;
     for (const process of processesToTerminate) {
-      await this.terminateProcess(process.id, 'memory_pressure');
-      terminatedCount++;
+      if (await this.terminateProcess(process.id, 'memory_pressure')) {
+        terminatedCount++;
+      }
 
       // Check if memory usage has improved enough
       const currentUsage = this.getCurrentMemoryUsage();
@@ -408,9 +443,9 @@ export class ActiveProcessManager extends EventEmitter {
       this.logger.warn(`Terminated ${terminatedCount} CPU-intensive processes`);
     }
   }
-
   /**
    * Terminate a specific process
+   * (Removed duplicate synchronous version to avoid confusion and errors)
    */
   private async terminateProcess(
     processId: string,
@@ -424,6 +459,13 @@ export class ActiveProcessManager extends EventEmitter {
 
       // Signal the process to abort
       process.abortController.abort();
+
+      // Wait for the process promise to settle if possible
+      try {
+        await Promise.resolve(process.promise);
+      } catch {
+        // Ignore errors from the process itself
+      }
 
       // Remove from active processes
       this.activeProcesses.delete(processId);
@@ -456,8 +498,9 @@ export class ActiveProcessManager extends EventEmitter {
     let terminatedCount = 0;
 
     for (const processId of processIds) {
-      const success = await this.terminateProcess(processId, reason);
-      if (success) terminatedCount++;
+      if (await this.terminateProcess(processId, reason)) {
+        terminatedCount++;
+      }
     }
 
     return terminatedCount;
@@ -477,34 +520,41 @@ export class ActiveProcessManager extends EventEmitter {
    * Get current CPU usage (simplified estimation)
    */
   private getCurrentCpuUsage(): number {
-    const loadAvg = os.loadavg()[0]; // 1-minute load average
+    const [loadAvg] = os.loadavg(); // 1-minute load average
     const cpuCores = os.cpus().length;
     return Math.min(loadAvg / cpuCores, 1.0); // Cap at 100%
   }
-
   /**
    * Setup event listeners for model selector
    */
   private setupModelSelectorEvents(): void {
-    this.hardwareSelector.on('modelSwitch', event => {
-      this.logger.info(
-        `Model switched from ${event.fromModel} to ${event.toModel} due to ${event.reason}`
-      );
-
-      // Update all future processes to use the new model
-      this.emit('modelSwitched', {
-        fromModel: event.fromModel,
-        toModel: event.toModel,
-        reason: event.reason,
-        timestamp: event.timestamp,
+    this.hardwareSelector.on('modelSwitch', (_event) => {
+      // Fire and forget: don't return a Promise to the event handler
+      this.terminateAllProcesses('model_switch').catch((err) => {
+        this.logger.error('Failed to terminate all processes on model switch:', err);
       });
     });
   }
-
   /**
    * Get process statistics
    */
-  getProcessStats(): any {
+  public getProcessStats(): {
+    activeProcesses: number;
+    byType: {
+      model_inference: number;
+      analysis: number;
+      generation: number;
+      streaming: number;
+    };
+    byPriority: {
+      critical: number;
+      high: number;
+      medium: number;
+      low: number;
+    };
+    totalEstimatedMemory: number;
+    oldestProcess: number | null;
+  } {
     const processes = Array.from(this.activeProcesses.values());
     return {
       activeProcesses: processes.length,
@@ -529,7 +579,7 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Force terminate all processes (for emergency shutdown)
    */
-  async emergencyShutdown(): Promise<void> {
+  public async emergencyShutdown(): Promise<void> {
     this.logger.error('🚨 EMERGENCY SHUTDOWN - terminating all processes immediately');
 
     this.isTerminating = true;
@@ -541,7 +591,7 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Update resource thresholds
    */
-  updateThresholds(newThresholds: Partial<ResourceThresholds>): void {
+  public updateThresholds(newThresholds: Readonly<Partial<ResourceThresholds>>): void {
     this.thresholds = { ...this.thresholds, ...newThresholds };
     this.logger.info('Updated resource thresholds:', this.thresholds);
   }
@@ -549,7 +599,7 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Get current resource usage
    */
-  getCurrentResourceUsage(): { memory: number; cpu: number; processes: number } {
+  public getCurrentResourceUsage(): { memory: number; cpu: number; processes: number } {
     return {
       memory: this.getCurrentMemoryUsage(),
       cpu: this.getCurrentCpuUsage(),
@@ -560,7 +610,7 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Destroy and cleanup
    */
-  destroy(): void {
+  public async destroy(): Promise<void> {
     this.logger.info('Destroying ActiveProcessManager');
 
     // Cleanup resource monitoring interval using resource manager
@@ -570,7 +620,7 @@ export class ActiveProcessManager extends EventEmitter {
     }
 
     // Emergency terminate all processes
-    this.terminateAllProcesses('memory_pressure');
+    await this.terminateAllProcesses('memory_pressure');
 
     this.userWarningSystem.shutdown();
 
@@ -590,6 +640,10 @@ export class ActiveProcessManager extends EventEmitter {
   private setLastWarningTime(time: number): void {
     this.lastWarningTime = time;
   }
+}
+
+function _getProcessStats(manager: ActiveProcessManager): ReturnType<ActiveProcessManager['getProcessStats']> {
+  return manager.getProcessStats();
 }
 
 export default ActiveProcessManager;

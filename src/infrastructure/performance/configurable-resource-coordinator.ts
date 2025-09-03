@@ -8,12 +8,12 @@
 import { EventEmitter } from 'events';
 import { logger } from '../logging/unified-logger.js';
 import {
-  ResourceLimits,
-  ResourceUsage,
-  ResourceAllocation,
-  ResourceRestriction,
   ResourceAlert,
+  ResourceAllocation,
   ResourceCoordinationStats,
+  ResourceLimits,
+  ResourceRestriction,
+  ResourceUsage,
 } from './unified-resource-coordinator.js';
 
 /**
@@ -70,402 +70,59 @@ export interface ResourceCoordinatorConfig {
  */
 export class ConfigurableResourceCoordinator extends EventEmitter {
   private readonly coordinatorId: string;
-  private resourceLimits: ResourceLimits;
+  private readonly resourceLimits: ResourceLimits;
   private currentUsage: ResourceUsage;
-  private allocations = new Map<string, ResourceAllocation>();
-  private restrictions = new Map<string, ResourceRestriction>();
+  private readonly allocations = new Map<string, ResourceAllocation>();
+  private readonly restrictions = new Map<string, ResourceRestriction>();
   private alerts: ResourceAlert[] = [];
 
   private monitoringIntervalId?: NodeJS.Timeout;
   private isMonitoring = false;
-  private startTime = Date.now();
 
   // System coordination
-  private registeredSystems = new Set<string>();
-  private systemPriorities = new Map<string, number>();
+  private readonly registeredSystems = new Set<string>();
+  private readonly systemPriorities = new Map<string, number>();
   private operationQueue: QueuedOperation[] = [];
-  private activeOperations = new Map<string, Operation>();
+  private readonly activeOperations = new Map<string, Operation>();
 
   // Resource pools
-  private connectionPools = new Map<string, ConnectionPool>();
-  private memoryPools = new Map<string, MemoryPool>();
+  private readonly connectionPools = new Map<string, ConnectionPool>();
+  private readonly memoryPools = new Map<string, MemoryPool>();
 
   // Metrics
-  private preventedContentionCount = 0;
-  private resourceSavings = 0;
+  private readonly preventedContentionCount = 0;
+  private readonly resourceSavings = 0;
   private coordinationOperations = 0;
   private disposed = false;
+  private readonly config: Readonly<ResourceCoordinatorConfig>;
 
-  constructor(config: ResourceCoordinatorConfig = {}) {
-    super();
+  // Add missing methods for coordination metrics
+  private calculateResourceSavings(): number {
+    // Placeholder implementation; replace with actual logic as needed
+    return this.resourceSavings;
+  }
 
-    this.coordinatorId =
-      config.coordinatorId ?? `coord_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    this.resourceLimits = { ...this.getDefaultResourceLimits(), ...config.resourceLimits };
-    this.currentUsage = this.initializeResourceUsage();
+  private calculateCoordinationOverhead(): number {
+    // Placeholder implementation; replace with actual logic as needed
+    return Math.min(this.coordinationOperations * 0.1, 10);
+  }
 
-    this.setupSystemPriorities();
-    this.setupResourcePools();
+  private calculateFairnessScore(): number {
+    if (this.registeredSystems.size === 0) return 1.0;
 
-    if (config.autoStart !== false) {
-      this.startCoordination(config.monitoringInterval);
+    // Simple fairness calculation based on equal distribution
+    const expectedAllocation = 1.0 / this.registeredSystems.size;
+    let totalDeviation = 0;
+
+    for (const allocation of this.allocations.values()) {
+      const actualAllocation = allocation.used / (allocation.allocated || 1);
+      totalDeviation += Math.abs(actualAllocation - expectedAllocation);
     }
 
-    logger.info('⚡ Configurable Resource Coordinator initialized', {
-      coordinatorId: this.coordinatorId,
-      memoryLimit: `${(this.resourceLimits.memory.maxHeapSize / 1024 / 1024).toFixed(0)}MB`,
-      concurrencyLimit: this.resourceLimits.concurrency.maxConcurrentOperations,
-    });
+    return Math.max(0, 1.0 - totalDeviation / this.registeredSystems.size);
   }
 
-  /**
-   * Get the coordinator ID for debugging and tracking
-   */
-  getCoordinatorId(): string {
-    return this.coordinatorId;
-  }
-
-  /**
-   * Start resource monitoring and coordination
-   */
-  startCoordination(intervalMs: number = 10000): void {
-    if (this.disposed) {
-      throw new Error('Cannot start coordination on disposed coordinator');
-    }
-
-    if (this.isMonitoring) {
-      logger.warn('Resource coordination already started');
-      return;
-    }
-
-    this.isMonitoring = true;
-    this.monitoringIntervalId = setInterval(() => {
-      void this.performResourceCoordination();
-    }, intervalMs);
-
-    logger.info('🚀 Resource coordination started', {
-      coordinatorId: this.coordinatorId,
-      interval: `${intervalMs}ms`,
-      systems: this.registeredSystems.size,
-    });
-
-    // Perform initial coordination
-    void this.performResourceCoordination();
-  }
-
-  /**
-   * Stop resource coordination
-   */
-  stopCoordination(): void {
-    if (!this.isMonitoring || !this.monitoringIntervalId) return;
-
-    clearInterval(this.monitoringIntervalId);
-    this.isMonitoring = false;
-    this.monitoringIntervalId = undefined;
-
-    logger.info('🛑 Resource coordination stopped', {
-      coordinatorId: this.coordinatorId,
-    });
-  }
-
-  /**
-   * Register a system for resource coordination
-   */
-  registerSystem(name: string, priority: number = 50): void {
-    if (this.disposed) {
-      throw new Error('Cannot register system on disposed coordinator');
-    }
-
-    this.registeredSystems.add(name);
-    this.systemPriorities.set(name, priority);
-
-    // Initialize resource allocations
-    this.allocations.set(name, {
-      systemName: name,
-      resourceType: 'memory',
-      allocated: 0,
-      used: 0,
-      priority,
-      lastAccessed: Date.now(),
-      restrictions: [],
-    });
-
-    logger.info(`📋 Registered system for resource coordination: ${name} (priority: ${priority})`, {
-      coordinatorId: this.coordinatorId,
-    });
-    this.emit('system-registered', { name, priority });
-  }
-
-  /**
-   * Request resource allocation
-   */
-  async requestResource(
-    systemName: string,
-    resourceType: 'memory' | 'cpu' | 'network' | 'filesystem' | 'concurrency',
-    amount: number,
-    priority: 'low' | 'medium' | 'high' | 'critical' = 'medium'
-  ): Promise<string> {
-    if (this.disposed) {
-      throw new Error('Cannot request resource on disposed coordinator');
-    }
-
-    const operationId = `op_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-    const operation: QueuedOperation = {
-      id: operationId,
-      systemName,
-      resourceType,
-      amount,
-      priority,
-      requestTime: Date.now(),
-      status: 'queued',
-    };
-
-    this.operationQueue.push(operation);
-    this.emit('resource-requested', { operationId, systemName, resourceType, amount });
-
-    // Process queue immediately if possible
-    void this.processQueuedOperations();
-
-    return operationId;
-  }
-
-  /**
-   * Get resource coordination statistics
-   */
-  getCoordinationStats(): ResourceCoordinationStats & { coordinatorId: string } {
-    return {
-      coordinatorId: this.coordinatorId,
-      totalSystems: this.registeredSystems.size,
-      resourceUsage: this.currentUsage,
-      allocations: Array.from(this.allocations.values()),
-      restrictions: Array.from(this.restrictions.values()),
-      alerts: this.alerts.slice(-20),
-      coordinationMetrics: {
-        preventedContention: this.preventedContentionCount,
-        resourceSavings: this.calculateResourceSavings(),
-        coordinationOverhead: this.calculateCoordinationOverhead(),
-        fairnessScore: this.calculateFairnessScore(),
-      },
-    };
-  }
-
-  /**
-   * Dispose of the coordinator and clean up resources
-   */
-  async dispose(): Promise<void> {
-    if (this.disposed) return;
-
-    this.disposed = true;
-    this.stopCoordination();
-
-    // Clean up all data structures
-    this.registeredSystems.clear();
-    this.allocations.clear();
-    this.restrictions.clear();
-    this.activeOperations.clear();
-    this.operationQueue = [];
-    this.connectionPools.clear();
-    this.memoryPools.clear();
-    this.removeAllListeners();
-
-    logger.info('🧹 Configurable Resource Coordinator disposed', {
-      coordinatorId: this.coordinatorId,
-    });
-  }
-
-  /**
-   * Check if the coordinator is disposed
-   */
-  isDisposed(): boolean {
-    return this.disposed;
-  }
-
-  // The rest of the methods are copied from the original UnifiedResourceCoordinator
-  // but with checks for disposal state
-
-  private async performResourceCoordination(): Promise<void> {
-    if (this.disposed) return;
-
-    try {
-      // Update resource usage
-      await this.updateResourceUsage();
-
-      // Check for resource violations
-      await this.checkResourceViolations();
-
-      // Process queued operations
-      await this.processQueuedOperations();
-
-      // Clean up expired resources and operations
-      await this.cleanupExpiredResources();
-
-      // Update coordination metrics
-      this.coordinationOperations++;
-
-      this.emit('coordination-cycle-complete', {
-        coordinatorId: this.coordinatorId,
-        usage: this.currentUsage,
-        activeOperations: this.activeOperations.size,
-        queueSize: this.operationQueue.length,
-      });
-    } catch (error) {
-      logger.error('Resource coordination cycle error:', error);
-      this.emit('coordination-error', { coordinatorId: this.coordinatorId, error });
-    }
-  }
-
-  private async updateResourceUsage(): Promise<void> {
-    if (this.disposed) return;
-
-    const memUsage = process.memoryUsage();
-
-    this.currentUsage = {
-      timestamp: Date.now(),
-      memory: {
-        heapUsed: memUsage.heapUsed,
-        heapTotal: memUsage.heapTotal,
-        external: memUsage.external,
-        rss: memUsage.rss,
-        utilizationPercent: (memUsage.heapUsed / memUsage.heapTotal) * 100,
-      },
-      cpu: {
-        usagePercent: 0, // Would need process monitoring to calculate
-        loadAverage: [],
-        processTime: process.uptime() * 1000,
-      },
-      network: {
-        activeConnections: 0,
-        pendingRequests: 0,
-        bytesTransferred: 0,
-        errors: 0,
-      },
-      filesystem: {
-        openFiles: 0,
-        diskUsage: 0,
-        ioOperations: 0,
-      },
-      concurrency: {
-        activeOperations: this.activeOperations.size,
-        queuedOperations: this.operationQueue.length,
-        completedOperations: 0,
-        failedOperations: 0,
-      },
-    };
-  }
-
-  private async checkResourceViolations(): Promise<void> {
-    if (this.disposed) return;
-
-    const memoryViolation =
-      this.currentUsage.memory.utilizationPercent > this.resourceLimits.memory.warningThreshold;
-    const concurrencyViolation =
-      this.currentUsage.concurrency.activeOperations >
-      this.resourceLimits.concurrency.maxConcurrentOperations;
-
-    if (memoryViolation || concurrencyViolation) {
-      const alert: ResourceAlert = {
-        level: 'warning',
-        resourceType: memoryViolation ? 'memory' : 'concurrency',
-        current: memoryViolation
-          ? this.currentUsage.memory.utilizationPercent
-          : this.currentUsage.concurrency.activeOperations,
-        limit: memoryViolation
-          ? this.resourceLimits.memory.warningThreshold
-          : this.resourceLimits.concurrency.maxConcurrentOperations,
-        message: memoryViolation
-          ? `Memory usage ${this.currentUsage.memory.utilizationPercent.toFixed(1)}% exceeds warning threshold ${this.resourceLimits.memory.warningThreshold}%`
-          : `Active operations ${this.currentUsage.concurrency.activeOperations} exceeds limit ${this.resourceLimits.concurrency.maxConcurrentOperations}`,
-        timestamp: Date.now(),
-      };
-
-      this.alerts.push(alert);
-      this.emit('resource-violation', alert);
-
-      // Keep only recent alerts
-      if (this.alerts.length > 100) {
-        this.alerts = this.alerts.slice(-50);
-      }
-    }
-  }
-
-  private async processQueuedOperations(): Promise<void> {
-    if (this.disposed || this.operationQueue.length === 0) return;
-
-    // Process up to 3 operations per cycle
-    const toProcess = this.operationQueue.splice(0, 3);
-
-    for (const operation of toProcess) {
-      try {
-        // Simple allocation logic - in production this would be more sophisticated
-        this.activeOperations.set(operation.id, {
-          id: operation.id,
-          systemName: operation.systemName,
-          resourceType: operation.resourceType,
-          status: 'active',
-          startTime: Date.now(),
-          amount: operation.amount,
-        });
-
-        operation.status = 'allocated';
-        this.emit('resource-allocated', {
-          operationId: operation.id,
-          coordinatorId: this.coordinatorId,
-        });
-      } catch (error) {
-        operation.status = 'failed';
-        this.emit('resource-allocation-failed', {
-          operationId: operation.id,
-          coordinatorId: this.coordinatorId,
-          error,
-        });
-      }
-    }
-  }
-
-  private async cleanupExpiredResources(): Promise<void> {
-    if (this.disposed) return;
-
-    const now = Date.now();
-    for (const [id, operation] of this.activeOperations.entries()) {
-      if (operation.status === 'completed') {
-        this.activeOperations.delete(id);
-      } else if (now - operation.startTime > 300000) {
-        // 5 minutes timeout
-        operation.status = 'failed';
-        operation.endTime = now;
-        operation.error = new Error('Operation timeout');
-        this.activeOperations.delete(id);
-      }
-    }
-  }
-
-  private setupSystemPriorities(): void {
-    // Set up default system priorities (higher = more important)
-    this.systemPriorities.set('unified-cache', 100);
-    this.systemPriorities.set('routing-system', 90);
-    this.systemPriorities.set('voice-system', 80);
-    this.systemPriorities.set('mcp-system', 70);
-    this.systemPriorities.set('orchestration-system', 85);
-    this.systemPriorities.set('search-system', 60);
-  }
-
-  private setupResourcePools(): void {
-    // Initialize connection pools for different services
-    this.connectionPools.set('default', {
-      maxConnections: 50,
-      activeConnections: 0,
-      queue: [],
-    });
-
-    // Initialize memory pools for different types of data
-    this.memoryPools.set('cache', {
-      maxSize: 50 * 1024 * 1024, // 50MB
-      currentSize: 0,
-      allocations: new Map(),
-    });
-  }
-
+  // Move these methods above the constructor so they are available
   private getDefaultResourceLimits(): ResourceLimits {
     return {
       memory: {
@@ -535,28 +192,395 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
     };
   }
 
-  private calculateResourceSavings(): number {
-    return this.resourceSavings; // Simplified
+  private setupSystemPriorities(): void {
+    // Set up default system priorities (higher = more important)
+    this.systemPriorities.set('unified-cache', 100);
+    this.systemPriorities.set('routing-system', 90);
+    this.systemPriorities.set('voice-system', 80);
+    this.systemPriorities.set('mcp-system', 70);
+    this.systemPriorities.set('orchestration-system', 85);
+    this.systemPriorities.set('search-system', 60);
   }
 
-  private calculateCoordinationOverhead(): number {
-    return Math.min(this.coordinationOperations * 0.1, 10); // Simplified
+  private setupResourcePools(): void {
+    // Initialize connection pools for different services
+    this.connectionPools.set('default', {
+      maxConnections: 50,
+      activeConnections: 0,
+      queue: [],
+    });
+
+    // Initialize memory pools for different types of data
+    this.memoryPools.set('cache', {
+      maxSize: 50 * 1024 * 1024, // 50MB
+      currentSize: 0,
+      allocations: new Map(),
+    });
   }
 
-  private calculateFairnessScore(): number {
-    if (this.registeredSystems.size === 0) return 1.0;
+  public constructor(config: Readonly<ResourceCoordinatorConfig> = {} as Readonly<ResourceCoordinatorConfig>) {
+    super();
+    this.config = Object.freeze({ ...config }) as Readonly<ResourceCoordinatorConfig>;
 
-    // Simple fairness calculation based on equal distribution
-    const expectedAllocation = 1.0 / this.registeredSystems.size;
-    let totalDeviation = 0;
+    this.coordinatorId =
+      config.coordinatorId ?? `coord_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    this.resourceLimits = { ...this.getDefaultResourceLimits(), ...config.resourceLimits };
+    this.currentUsage = this.initializeResourceUsage();
 
-    for (const allocation of this.allocations.values()) {
-      const actualAllocation = allocation.used / (allocation.allocated || 1);
-      totalDeviation += Math.abs(actualAllocation - expectedAllocation);
+    this.setupSystemPriorities();
+    this.setupResourcePools();
+
+    if (config.autoStart !== false) {
+      // Cannot await in constructor; fire and forget
+      try {
+        this.startCoordination(config.monitoringInterval);
+      } catch (err) {
+        logger.error('Failed to start resource coordination:', err);
+      }
     }
 
-    return Math.max(0, 1.0 - totalDeviation / this.registeredSystems.size);
+    logger.info('⚡ Configurable Resource Coordinator initialized', {
+      coordinatorId: this.coordinatorId,
+      memoryLimit: `${(this.resourceLimits.memory.maxHeapSize / 1024 / 1024).toFixed(0)}MB`,
+      concurrencyLimit: this.resourceLimits.concurrency.maxConcurrentOperations,
+    });
   }
+
+  /**
+   * Get the coordinator ID for debugging and tracking
+   */
+  public getCoordinatorId(): string {
+    return this.coordinatorId;
+  }
+
+  /**
+   * Start resource monitoring and coordination
+   */
+  public startCoordination(intervalMs: number = 10000): void {
+    if (this.disposed) {
+      throw new Error('Cannot start coordination on disposed coordinator');
+    }
+
+    if (this.isMonitoring) {
+      logger.warn('Resource coordination already started');
+      return;
+    }
+
+    this.isMonitoring = true;
+    this.monitoringIntervalId = setInterval(() => {
+      try {
+        this.performResourceCoordination();
+      } catch (error) {
+        logger.error('Error during scheduled resource coordination:', error);
+      }
+    }, intervalMs);
+
+    logger.info('🚀 Resource coordination started', {
+      coordinatorId: this.coordinatorId,
+      interval: `${intervalMs}ms`,
+      systems: this.registeredSystems.size,
+    });
+
+    // Perform initial coordination
+    this.performResourceCoordination();
+  }
+
+  /**
+   * Stop resource coordination
+   */
+  public stopCoordination(): void {
+    if (!this.isMonitoring || !this.monitoringIntervalId) return;
+
+    clearInterval(this.monitoringIntervalId);
+    this.isMonitoring = false;
+    this.monitoringIntervalId = undefined;
+
+    logger.info('🛑 Resource coordination stopped', {
+      coordinatorId: this.coordinatorId,
+    });
+  }
+
+  /**
+   * Register a system for resource coordination
+   */
+  public registerSystem(name: string, priority: number = 50): void {
+    if (this.disposed) {
+      throw new Error('Cannot register system on disposed coordinator');
+    }
+
+    this.registeredSystems.add(name);
+    this.systemPriorities.set(name, priority);
+
+    // Initialize resource allocations
+    this.allocations.set(name, {
+      systemName: name,
+      resourceType: 'memory',
+      allocated: 0,
+      used: 0,
+      priority,
+      lastAccessed: Date.now(),
+      restrictions: [],
+    });
+
+    logger.info(`📋 Registered system for resource coordination: ${name} (priority: ${priority})`, {
+      coordinatorId: this.coordinatorId,
+    });
+    this.emit('system-registered', { name, priority });
+  }
+
+  /**
+   * Request resource allocation
+   */
+  public requestResource(
+    systemName: string,
+    resourceType: 'memory' | 'cpu' | 'network' | 'filesystem' | 'concurrency',
+    amount: number,
+    priority: 'low' | 'medium' | 'high' | 'critical' = 'medium'
+  ): string {
+    if (this.disposed) {
+      throw new Error('Cannot request resource on disposed coordinator');
+    }
+
+    const operationId = `op_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+    const operation: QueuedOperation = {
+      id: operationId,
+      systemName,
+      resourceType,
+      amount,
+      priority,
+      requestTime: Date.now(),
+      status: 'queued',
+    };
+
+    this.operationQueue.push(operation);
+    this.emit('resource-requested', { operationId, systemName, resourceType, amount });
+
+    // Process queue immediately if possible
+    // Attempt processing of queued operations immediately; intentionally not awaited
+    try {
+      this.processQueuedOperations();
+    } catch (err) {
+      logger.error('Error processing queued operations:', err);
+    }
+
+    return operationId;
+  }
+
+  /**
+   * Get resource coordination statistics
+   */
+  public getCoordinationStats(): ResourceCoordinationStats & { coordinatorId: string } {
+    return {
+      coordinatorId: this.coordinatorId,
+      totalSystems: this.registeredSystems.size,
+      resourceUsage: this.currentUsage,
+      allocations: Array.from(this.allocations.values()),
+      restrictions: Array.from(this.restrictions.values()),
+      alerts: this.alerts.slice(-20),
+      coordinationMetrics: {
+        preventedContention: this.preventedContentionCount,
+        resourceSavings: this.calculateResourceSavings(),
+        coordinationOverhead: this.calculateCoordinationOverhead(),
+        fairnessScore: this.calculateFairnessScore(),
+      },
+    };
+  }
+
+  /**
+   * Dispose of the coordinator and clean up resources
+   */
+  public async dispose(): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+
+    this.disposed = true;
+    this.stopCoordination();
+
+    // Clean up all data structures
+    this.registeredSystems.clear();
+    this.allocations.clear();
+    this.restrictions.clear();
+    this.activeOperations.clear();
+    this.operationQueue = [];
+    this.connectionPools.clear();
+    this.memoryPools.clear();
+    this.removeAllListeners();
+
+    logger.info('🧹 Configurable Resource Coordinator disposed', {
+      coordinatorId: this.coordinatorId,
+    });
+
+    return Promise.resolve();
+  }
+
+  /**
+   * Check if the coordinator is disposed
+   */
+  public isDisposed(): boolean {
+    return this.disposed;
+  }
+
+  // The rest of the methods are copied from the original UnifiedResourceCoordinator
+  // but with checks for disposal state
+
+  private performResourceCoordination(): void {
+    if (this.disposed) return;
+
+    try {
+      // Update resource usage
+      this.updateResourceUsage();
+
+      // Check for resource violations
+      this.checkResourceViolations();
+
+      // Process queued operations
+      this.processQueuedOperations();
+
+      // Clean up expired resources and operations
+      this.cleanupExpiredResources();
+
+      // Update coordination metrics
+      this.coordinationOperations++;
+
+      this.emit('coordination-cycle-complete', {
+        coordinatorId: this.coordinatorId,
+        usage: this.currentUsage,
+        activeOperations: this.activeOperations.size,
+        queueSize: this.operationQueue.length,
+      });
+    } catch (error) {
+      logger.error('Resource coordination cycle error:', error);
+      this.emit('coordination-error', { coordinatorId: this.coordinatorId, error });
+    }
+  }
+
+  private updateResourceUsage(): void {
+    if (this.disposed) return;
+
+    const memUsage = process.memoryUsage();
+
+    this.currentUsage = {
+      timestamp: Date.now(),
+      memory: {
+        heapUsed: memUsage.heapUsed,
+        heapTotal: memUsage.heapTotal,
+        external: memUsage.external,
+        rss: memUsage.rss,
+        utilizationPercent: (memUsage.heapUsed / memUsage.heapTotal) * 100,
+      },
+      cpu: {
+        usagePercent: 0, // Would need process monitoring to calculate
+        loadAverage: [],
+        processTime: process.uptime() * 1000,
+      },
+      network: {
+        activeConnections: 0,
+        pendingRequests: 0,
+        bytesTransferred: 0,
+        errors: 0,
+      },
+      filesystem: {
+        openFiles: 0,
+        diskUsage: 0,
+        ioOperations: 0,
+      },
+      concurrency: {
+        activeOperations: this.activeOperations.size,
+        queuedOperations: this.operationQueue.length,
+        completedOperations: 0,
+        failedOperations: 0,
+      },
+    };
+  }
+
+  private checkResourceViolations(): void {
+    if (this.disposed) return;
+
+    const memoryViolation =
+      this.currentUsage.memory.utilizationPercent > this.resourceLimits.memory.warningThreshold;
+    const concurrencyViolation =
+      this.currentUsage.concurrency.activeOperations >
+      this.resourceLimits.concurrency.maxConcurrentOperations;
+
+    if (memoryViolation || concurrencyViolation) {
+      const alert: ResourceAlert = {
+        level: 'warning',
+        resourceType: memoryViolation ? 'memory' : 'concurrency',
+        current: memoryViolation
+          ? this.currentUsage.memory.utilizationPercent
+          : this.currentUsage.concurrency.activeOperations,
+        limit: memoryViolation
+          ? this.resourceLimits.memory.warningThreshold
+          : this.resourceLimits.concurrency.maxConcurrentOperations,
+        message: memoryViolation
+          ? `Memory usage ${this.currentUsage.memory.utilizationPercent.toFixed(1)}% exceeds warning threshold ${this.resourceLimits.memory.warningThreshold}%`
+          : `Active operations ${this.currentUsage.concurrency.activeOperations} exceeds limit ${this.resourceLimits.concurrency.maxConcurrentOperations}`,
+        timestamp: Date.now(),
+      };
+
+      this.alerts.push(alert);
+      this.emit('resource-violation', alert);
+
+      // Keep only recent alerts
+      if (this.alerts.length > 100) {
+        this.alerts = this.alerts.slice(-50);
+      }
+    }
+  }
+
+  private processQueuedOperations(): void {
+    if (this.disposed || this.operationQueue.length === 0) return;
+
+    // Process up to 3 operations per cycle
+    const toProcess = this.operationQueue.splice(0, 3);
+
+    for (const operation of toProcess) {
+      try {
+        // Simple allocation logic - in production this would be more sophisticated
+        this.activeOperations.set(operation.id, {
+          id: operation.id,
+          systemName: operation.systemName,
+          resourceType: operation.resourceType,
+          status: 'active',
+          startTime: Date.now(),
+          amount: operation.amount,
+        });
+
+        operation.status = 'allocated';
+        this.emit('resource-allocated', {
+          operationId: operation.id,
+          coordinatorId: this.coordinatorId,
+        });
+      } catch (error) {
+        operation.status = 'failed';
+        this.emit('resource-allocation-failed', {
+          operationId: operation.id,
+          coordinatorId: this.coordinatorId,
+          error,
+        });
+      }
+    }
+  }
+
+  private cleanupExpiredResources(): void {
+    if (this.disposed) return;
+
+    const now = Date.now();
+    for (const [id, operation] of this.activeOperations.entries()) {
+      if (operation.status === 'completed') {
+        this.activeOperations.delete(id);
+      } else if (now - operation.startTime > 300000) {
+        // 5 minutes timeout
+        operation.status = 'failed';
+        operation.endTime = now;
+        operation.error = new Error('Operation timeout');
+        this.activeOperations.delete(id);
+      }
+    }
+  }
+
+  // Duplicate method implementations removed — these helper methods are already
+  // defined earlier in the class (kept the original implementations above).
 }
 
 /**
@@ -572,7 +596,7 @@ export class ResourceCoordinatorFactory {
   /**
    * Set default configuration for all coordinators created by this factory
    */
-  static setDefaults(config: Partial<ResourceCoordinatorConfig>): void {
+  public static setDefaults(config: Readonly<Partial<ResourceCoordinatorConfig>>): void {
     ResourceCoordinatorFactory.defaultConfig = {
       ...ResourceCoordinatorFactory.defaultConfig,
       ...config,
@@ -582,7 +606,7 @@ export class ResourceCoordinatorFactory {
   /**
    * Create a new resource coordinator with the given configuration
    */
-  static create(config: ResourceCoordinatorConfig = {}): ConfigurableResourceCoordinator {
+  public static create(config: Readonly<ResourceCoordinatorConfig> = {}): ConfigurableResourceCoordinator {
     const fullConfig = { ...ResourceCoordinatorFactory.defaultConfig, ...config };
     return new ConfigurableResourceCoordinator(fullConfig);
   }
@@ -590,8 +614,8 @@ export class ResourceCoordinatorFactory {
   /**
    * Create a test coordinator with minimal configuration
    */
-  static createForTesting(
-    config: Partial<ResourceCoordinatorConfig> = {}
+  public static createForTesting(
+    config: Readonly<Partial<ResourceCoordinatorConfig>> = {}
   ): ConfigurableResourceCoordinator {
     const testConfig: ResourceCoordinatorConfig = {
       monitoringInterval: 100, // Fast for testing
@@ -619,7 +643,7 @@ export class ResourceCoordinatorFactory {
   /**
    * Create a high-performance coordinator for production
    */
-  static createHighPerformance(): ConfigurableResourceCoordinator {
+  public static createHighPerformance(): ConfigurableResourceCoordinator {
     return new ConfigurableResourceCoordinator({
       coordinatorId: 'high_perf_coordinator',
       monitoringInterval: 5000, // More frequent monitoring

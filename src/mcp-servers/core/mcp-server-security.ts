@@ -10,7 +10,7 @@
 
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
-import path from 'path';
+import * as path from 'path';
 import { promises as fs } from 'fs';
 
 export interface SecurityConfig {

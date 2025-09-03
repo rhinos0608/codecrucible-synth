@@ -40,14 +40,14 @@ export interface TuningConfiguration {
 
 export class AdaptivePerformanceTuner extends EventEmitter {
   private metrics: PerformanceMetrics;
-  private thresholds: PerformanceThresholds;
-  private config: TuningConfiguration;
+  private readonly thresholds: PerformanceThresholds;
+  private readonly config: TuningConfiguration;
   private monitoringInterval: NodeJS.Timeout | null = null;
-  private adjustmentHistory: Array<{
+  private readonly adjustmentHistory: Array<{
     timestamp: number;
     metric: string;
-    oldValue: any;
-    newValue: any;
+    oldValue: unknown;
+    newValue: unknown;
     reason: string;
   }> = [];
   private responseTimeHistory: number[] = [];
@@ -55,7 +55,7 @@ export class AdaptivePerformanceTuner extends EventEmitter {
   private errorCount: number = 0;
   private lastError: Error | undefined;
 
-  constructor() {
+  public constructor() {
     super();
 
     this.metrics = {
@@ -91,7 +91,7 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     };
   }
 
-  startMonitoring(intervalMs: number = 5000): void {
+  public startMonitoring(intervalMs: number = 5000): void {
     if (this.monitoringInterval) {
       this.stopMonitoring();
     }
@@ -99,15 +99,16 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     logger.info('Starting adaptive performance monitoring');
 
     this.monitoringInterval = setInterval(() => {
-      this.collectMetrics()
-        .then(async () => this.analyzeAndTune())
-        .catch(error => {
-          logger.error('Performance monitoring error:', error);
-        });
+      try {
+        this.collectMetrics();
+        this.analyzeAndTune();
+      } catch (error) {
+        logger.error('Performance monitoring error:', error as Error);
+      }
     }, intervalMs);
   }
 
-  stopMonitoring(): void {
+  public stopMonitoring(): void {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = null;
@@ -115,16 +116,16 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     }
   }
 
-  async collectMetrics(): Promise<void> {
+  public collectMetrics(): void {
     try {
       // Collect system metrics (simplified implementation)
       this.metrics = {
-        cpuUsage: await this.getCpuUsage(),
-        memoryUsage: await this.getMemoryUsage(),
-        responseTime: await this.getAverageResponseTime(),
-        requestRate: await this.getRequestRate(),
-        errorRate: await this.getErrorRate(),
-        activeConnections: await this.getActiveConnections(),
+        cpuUsage: this.getCpuUsage(),
+        memoryUsage: this.getMemoryUsage(),
+        responseTime: this.getAverageResponseTime(),
+        requestRate: this.getRequestRate(),
+        errorRate: this.getErrorRate(),
+        activeConnections: this.getActiveConnections(),
       };
 
       this.emit('metricsCollected', this.metrics);
@@ -133,36 +134,36 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     }
   }
 
-  async analyzeAndTune(): Promise<void> {
+  public analyzeAndTune(): void {
     const adjustments: string[] = [];
 
     // CPU-based tuning
     if (this.metrics.cpuUsage > this.thresholds.cpu.high) {
-      await this.reduceConcurrency();
+      this.reduceConcurrency();
       adjustments.push('reduced concurrency due to high CPU');
     } else if (this.metrics.cpuUsage < this.thresholds.cpu.low) {
-      await this.increaseConcurrency();
+      this.increaseConcurrency();
       adjustments.push('increased concurrency due to low CPU');
     }
 
     // Memory-based tuning
     if (this.metrics.memoryUsage > this.thresholds.memory.high) {
-      await this.reduceBatchSize();
-      await this.enableAggresiveCaching();
+      this.reduceBatchSize();
+      this.enableAggresiveCaching();
       adjustments.push('reduced batch size and enabled aggressive caching due to high memory');
     }
 
     // Response time tuning
     if (this.metrics.responseTime > this.thresholds.responseTime.high) {
-      await this.reduceTimeouts();
-      await this.increaseCacheHitRate();
+      this.reduceTimeouts();
+      this.increaseCacheHitRate();
       adjustments.push('reduced timeouts due to high response time');
     }
 
     // Error rate tuning
     if (this.metrics.errorRate > this.thresholds.errorRate.high) {
-      await this.enableCircuitBreaker();
-      await this.increaseRetryDelays();
+      this.enableCircuitBreaker();
+      this.increaseRetryDelays();
       adjustments.push('enabled circuit breaker due to high error rate');
     }
 
@@ -172,20 +173,26 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     }
   }
 
-  getCurrentConfiguration(): TuningConfiguration {
+  public getCurrentConfiguration(): TuningConfiguration {
     return { ...this.config };
   }
 
-  getPerformanceMetrics(): PerformanceMetrics {
+  public getPerformanceMetrics(): PerformanceMetrics {
     return { ...this.metrics };
   }
 
-  getAdjustmentHistory(): Array<any> {
+  public getAdjustmentHistory(): Array<{
+    timestamp: number;
+    metric: string;
+    oldValue: unknown;
+    newValue: unknown;
+    reason: string;
+  }> {
     return [...this.adjustmentHistory];
   }
 
   // Private tuning methods
-  private async reduceConcurrency(): Promise<void> {
+  private reduceConcurrency(): void {
     const oldValue = this.config.concurrency.max;
     this.config.concurrency.max = Math.max(10, Math.floor(this.config.concurrency.max * 0.8));
     this.config.concurrency.optimal = Math.floor(this.config.concurrency.max * 0.7);
@@ -193,7 +200,7 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     this.recordAdjustment('concurrency', oldValue, this.config.concurrency.max, 'high CPU usage');
   }
 
-  private async increaseConcurrency(): Promise<void> {
+  private increaseConcurrency(): void {
     const oldValue = this.config.concurrency.max;
     this.config.concurrency.max = Math.min(100, Math.floor(this.config.concurrency.max * 1.2));
     this.config.concurrency.optimal = Math.floor(this.config.concurrency.max * 0.7);
@@ -201,21 +208,21 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     this.recordAdjustment('concurrency', oldValue, this.config.concurrency.max, 'low CPU usage');
   }
 
-  private async reduceBatchSize(): Promise<void> {
+  private reduceBatchSize(): void {
     const oldValue = this.config.batchSize;
     this.config.batchSize = Math.max(1, Math.floor(this.config.batchSize * 0.8));
 
     this.recordAdjustment('batchSize', oldValue, this.config.batchSize, 'high memory usage');
   }
 
-  private async enableAggresiveCaching(): Promise<void> {
+  private enableAggresiveCaching(): void {
     if (!this.config.caching.enabled) {
       this.config.caching.enabled = true;
       this.recordAdjustment('caching', false, true, 'memory optimization');
     }
   }
 
-  private async reduceTimeouts(): Promise<void> {
+  private reduceTimeouts(): void {
     const oldValue = this.config.timeouts.request;
     this.config.timeouts.request = Math.max(5000, Math.floor(this.config.timeouts.request * 0.8));
 
@@ -227,24 +234,24 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     );
   }
 
-  private async increaseCacheHitRate(): Promise<void> {
+  private increaseCacheHitRate(): void {
     const oldValue = this.config.caching.ttl;
     this.config.caching.ttl = Math.min(600000, Math.floor(this.config.caching.ttl * 1.2)); // Max 10 minutes
 
     this.recordAdjustment('cacheTTL', oldValue, this.config.caching.ttl, 'improve response time');
   }
 
-  private async enableCircuitBreaker(): Promise<void> {
+  private enableCircuitBreaker(): void {
     // Circuit breaker logic would be implemented here
     logger.info('Circuit breaker patterns enabled due to high error rate');
   }
 
-  private async increaseRetryDelays(): Promise<void> {
+  private increaseRetryDelays(): void {
     // Retry delay logic would be implemented here
     logger.info('Increased retry delays due to high error rate');
   }
 
-  private recordAdjustment(metric: string, oldValue: any, newValue: any, reason: string): void {
+  private recordAdjustment(metric: string, oldValue: unknown, newValue: unknown, reason: string): void {
     this.adjustmentHistory.push({
       timestamp: Date.now(),
       metric,
@@ -260,32 +267,32 @@ export class AdaptivePerformanceTuner extends EventEmitter {
   }
 
   // Metric collection methods (simplified implementations)
-  private async getCpuUsage(): Promise<number> {
+  private getCpuUsage(): number {
     // In a real implementation, this would use system APIs
     return Math.random() * 100;
   }
 
-  private async getMemoryUsage(): Promise<number> {
+  private getMemoryUsage(): number {
     const usage = process.memoryUsage();
     return (usage.heapUsed / usage.heapTotal) * 100;
   }
 
-  private async getAverageResponseTime(): Promise<number> {
+  private getAverageResponseTime(): number {
     // Would track actual response times
     return 100 + Math.random() * 400;
   }
 
-  private async getRequestRate(): Promise<number> {
+  private getRequestRate(): number {
     // Would track actual request rate
     return Math.random() * 100;
   }
 
-  private async getErrorRate(): Promise<number> {
+  private getErrorRate(): number {
     // Would track actual error rate
     return Math.random() * 10;
   }
 
-  private async getActiveConnections(): Promise<number> {
+  private getActiveConnections(): number {
     // Would track actual connections
     return Math.floor(Math.random() * 50);
   }
@@ -293,7 +300,7 @@ export class AdaptivePerformanceTuner extends EventEmitter {
   /**
    * Record metrics for performance tracking
    */
-  recordMetrics(responseTime: number, requestCount: number, errorRate: number): void {
+  public recordMetrics(responseTime: number, requestCount: number, errorRate: number): void {
     // Update metrics
     this.responseTimeHistory.push(responseTime);
     if (this.responseTimeHistory.length > 100) {
@@ -319,7 +326,7 @@ export class AdaptivePerformanceTuner extends EventEmitter {
   /**
    * Reset statistics (for testing or maintenance)
    */
-  resetStats(): void {
+  public resetStats(): void {
     this.responseTimeHistory = [];
     this.errorCount = 0;
     this.requestCount = 0;

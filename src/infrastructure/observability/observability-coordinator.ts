@@ -2,14 +2,14 @@ import { EventEmitter } from 'events';
 import { createLogger } from '../logging/logger-adapter.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import {
-  MetricsCollector,
   MetricPoint,
+  MetricsCollector,
   MetricsConfig,
   MetricsStats,
   MetricsSummary,
 } from './metrics-collector.js';
-import { HealthMonitor, HealthConfig, SystemHealth, HealthStats } from './health-monitor.js';
-import { AlertManager, AlertConfig, Alert, AlertStats } from './alert-manager.js';
+import { HealthConfig, HealthMonitor, HealthStats, SystemHealth } from './health-monitor.js';
+import { Alert, AlertConfig, AlertManager, AlertStats } from './alert-manager.js';
 import { TelemetryExporter, TelemetryExporterConfig } from './telemetry-exporter.js';
 import { mcpServerMonitoring } from '../../mcp-servers/core/mcp-server-monitoring.js';
 
@@ -25,13 +25,13 @@ export interface TracingConfig {
   provider?: string;
   samplingRate?: number;
   maxSpansPerTrace?: number;
-  exporters?: any[];
+  exporters?: unknown[];
   options?: Record<string, unknown>;
 }
 
 export interface LoggingConfig {
   level?: string;
-  outputs?: any[];
+  outputs?: unknown[];
   structured?: boolean;
   includeStackTrace?: boolean;
   transports?: Record<string, unknown>;
@@ -73,10 +73,10 @@ export class ObservabilityCoordinator extends EventEmitter {
     this.telemetry = new TelemetryExporter(config.telemetry);
   }
 
-  async initialize(): Promise<void> {
-    await this.metrics.initialize();
-    await this.health.initialize();
-    await this.alerts.initialize();
+  public async initialize(): Promise<void> {
+    this.metrics.initialize();
+    this.health.initialize();
+    this.alerts.initialize();
     await this.telemetry.initialize();
     this.scheduleHealthChecks();
   }
@@ -190,7 +190,7 @@ export class ObservabilityCoordinator extends EventEmitter {
       this.alerts.evaluateRules();
     };
     run().catch(() => {});
-    this.healthInterval = setInterval(run, this.config.health.checkInterval);
+    this.healthInterval = setInterval(() => { run().catch(() => {}); }, this.config.health.checkInterval);
   }
 }
 

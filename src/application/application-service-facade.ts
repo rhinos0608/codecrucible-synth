@@ -68,7 +68,8 @@ export class ApplicationServiceFacade {
 
     this.livingSpiralProcessUseCase = new LivingSpiralProcessUseCase(
       voiceOrchestrationService,
-      modelSelectionService
+      modelSelectionService,
+      modelClient || {} as UnifiedModelClient
     );
 
     this.analyzeCodebaseUseCase = new AnalyzeCodebaseUseCase(

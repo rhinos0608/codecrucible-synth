@@ -14,6 +14,7 @@ import { CLIOptions, UnifiedCLI } from './application/interfaces/unified-cli.js'
 import { createRuntimeContext } from './application/runtime/runtime-context.js';
 import { ConcreteWorkflowOrchestrator } from './application/services/concrete-workflow-orchestrator.js';
 import { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-interaction.js';
+import { createAdaptersFromProviders } from './application/services/adapter-factory.js';
 // getGlobalEventBus intentionally not imported anymore – event bus is injected via RuntimeContext.
 import { getErrorMessage } from './utils/error-utils.js';
 import { logger } from './infrastructure/logging/logger.js';
@@ -228,25 +229,32 @@ export async function initialize(
       selectedModelInfo = await quickSelectModel();
     }
 
+    // Import adapter classes
+    const { OllamaAdapter, LMStudioAdapter } = await import('./application/services/provider-adapters.js');
+    
     // Create model client configuration based on selected model
-    // Create model client configuration based on selected model
+    const endpoint = selectedModelInfo.provider === 'ollama'
+      ? (process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434')
+      : (process.env.LM_STUDIO_ENDPOINT ?? 'ws://localhost:8080');
+    
+    // Build provider config and adapters using factory
+    const providersConfig = [
+      {
+        type: selectedModelInfo.provider as 'ollama' | 'lm-studio',
+        name: `${selectedModelInfo.provider}-selected`,
+        endpoint,
+        enabled: true,
+        priority: 1,
+        models: [selectedModelInfo.selectedModel.id],
+        timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
+      },
+    ];
+    const adapters = createAdaptersFromProviders(providersConfig);
+    
     const modelClientConfig = {
-      adapters: [], // Empty for now, adapters would be created from providers
+      adapters, // Now properly populated with adapter instances
       defaultProvider: selectedModelInfo.provider,
-      providers: [
-        {
-          type: selectedModelInfo.provider as 'ollama' | 'lm-studio',
-          name: `${selectedModelInfo.provider}-selected`,
-          endpoint:
-            selectedModelInfo.provider === 'ollama'
-              ? (process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434')
-              : (process.env.LM_STUDIO_ENDPOINT ?? 'ws://localhost:8080'),
-          enabled: true,
-          priority: 1,
-          models: [selectedModelInfo.selectedModel.id],
-          timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
-        },
-      ],
+      providers: providersConfig,
       fallbackStrategy: 'priority',
       timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '30000', 10),
       retryAttempts: 3,
@@ -502,3 +510,5 @@ if (process.argv[1]?.includes('index.js') || process.argv[1]?.includes('index.ts
 
 // Export the main function for programmatic use
 export default main;
+
+

@@ -151,14 +151,242 @@ export class MetricsCollector {
   }
 
   private async exportMetrics(): Promise<void> {
+    if (this.metrics.length === 0) {
+      this.logger.debug('No metrics to export');
+      return;
+    }
+
+    const metricsToExport = [...this.metrics];
+    
     for (const exporter of this.config.exporters) {
       try {
-        this.logger.debug(`Exporting metrics to ${exporter.type}`);
+        this.logger.debug(`Exporting ${metricsToExport.length} metrics to ${exporter.type}`);
+        
+        switch (exporter.type) {
+          case 'prometheus':
+            await this.exportToPrometheus(metricsToExport, exporter);
+            break;
+          case 'statsd':
+            await this.exportToStatsD(metricsToExport, exporter);
+            break;
+          case 'opentelemetry':
+            await this.exportToOpenTelemetry(metricsToExport, exporter);
+            break;
+          case 'file':
+            await this.exportToFile(metricsToExport, exporter);
+            break;
+          default:
+            this.logger.warn(`Unsupported exporter type: ${exporter.type}`);
+        }
+        
+        this.logger.info(`Successfully exported ${metricsToExport.length} metrics to ${exporter.type}`);
       } catch (error) {
         this.logger.error(`Failed to export to ${exporter.type}:`, error);
       }
     }
-    return Promise.resolve();
+  }
+
+  /**
+   * Export metrics to Prometheus format
+   */
+  private async exportToPrometheus(metrics: MetricPoint[], exporter: MetricExporter): Promise<void> {
+    const prometheusFormat = this.convertToPrometheusFormat(metrics);
+    
+    if (exporter.endpoint) {
+      // Push to Prometheus Push Gateway
+      const response = await fetch(`${exporter.endpoint}/metrics/job/codecrucible-synth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain',
+          ...exporter.authentication,
+        },
+        body: prometheusFormat,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Prometheus export failed: ${response.status} ${response.statusText}`);
+      }
+    } else {
+      // Log metrics in Prometheus format for scraping
+      this.logger.info('Prometheus metrics:\n' + prometheusFormat);
+    }
+  }
+
+  /**
+   * Export metrics to StatsD
+   */
+  private async exportToStatsD(metrics: MetricPoint[], exporter: MetricExporter): Promise<void> {
+    if (!exporter.endpoint) {
+      throw new Error('StatsD endpoint is required');
+    }
+
+    const { createSocket } = await import('dgram');
+    const client = createSocket('udp4');
+    
+    try {
+      for (const metric of metrics) {
+        const statsdFormat = this.convertToStatsDFormat(metric);
+        const [host, port] = exporter.endpoint.split(':');
+        
+        await new Promise<void>((resolve, reject) => {
+          client.send(statsdFormat, parseInt(port) || 8125, host || 'localhost', (error) => {
+            if (error) reject(error);
+            else resolve();
+          });
+        });
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
+   * Export metrics to OpenTelemetry
+   */
+  private async exportToOpenTelemetry(metrics: MetricPoint[], exporter: MetricExporter): Promise<void> {
+    if (!exporter.endpoint) {
+      throw new Error('OpenTelemetry endpoint is required');
+    }
+
+    const otlpPayload = this.convertToOTLPFormat(metrics);
+    
+    const response = await fetch(`${exporter.endpoint}/v1/metrics`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...exporter.authentication,
+      },
+      body: JSON.stringify(otlpPayload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenTelemetry export failed: ${response.status} ${response.statusText}`);
+    }
+  }
+
+  /**
+   * Export metrics to file
+   */
+  private async exportToFile(metrics: MetricPoint[], exporter: MetricExporter): Promise<void> {
+    const { writeFile, mkdir } = await import('fs/promises');
+    const { dirname } = await import('path');
+    
+    const filePath = exporter.endpoint || `./metrics/metrics-${Date.now()}.json`;
+    await mkdir(dirname(filePath), { recursive: true });
+    
+    const data = {
+      timestamp: new Date().toISOString(),
+      metrics,
+      summary: this.getSummary(),
+    };
+
+    await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    this.logger.info(`Metrics exported to file: ${filePath}`);
+  }
+
+  /**
+   * Convert metrics to Prometheus format
+   */
+  private convertToPrometheusFormat(metrics: MetricPoint[]): string {
+    const lines: string[] = [];
+    const groupedMetrics = new Map<string, MetricPoint[]>();
+
+    // Group metrics by name
+    for (const metric of metrics) {
+      if (!groupedMetrics.has(metric.name)) {
+        groupedMetrics.set(metric.name, []);
+      }
+      groupedMetrics.get(metric.name)!.push(metric);
+    }
+
+    // Convert each metric group
+    for (const [name, metricGroup] of groupedMetrics) {
+      const sanitizedName = name.replace(/[^a-zA-Z0-9_]/g, '_');
+      
+      // Add help comment
+      lines.push(`# HELP ${sanitizedName} ${name} metric`);
+      lines.push(`# TYPE ${sanitizedName} ${metricGroup[0].type}`);
+
+      for (const metric of metricGroup) {
+        const tagsStr = Object.entries(metric.tags)
+          .map(([key, value]) => `${key}="${value}"`)
+          .join(',');
+        
+        const labelsStr = tagsStr ? `{${tagsStr}}` : '';
+        lines.push(`${sanitizedName}${labelsStr} ${metric.value} ${metric.timestamp.getTime()}`);
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Convert metric to StatsD format
+   */
+  private convertToStatsDFormat(metric: MetricPoint): string {
+    const tags = Object.entries(metric.tags)
+      .map(([key, value]) => `${key}:${value}`)
+      .join(',');
+    
+    const tagsSuffix = tags ? `|#${tags}` : '';
+    
+    switch (metric.type) {
+      case 'counter':
+        return `${metric.name}:${metric.value}|c${tagsSuffix}`;
+      case 'gauge':
+        return `${metric.name}:${metric.value}|g${tagsSuffix}`;
+      case 'timer':
+        return `${metric.name}:${metric.value}|ms${tagsSuffix}`;
+      case 'histogram':
+        return `${metric.name}:${metric.value}|h${tagsSuffix}`;
+      default:
+        return `${metric.name}:${metric.value}|g${tagsSuffix}`;
+    }
+  }
+
+  /**
+   * Convert metrics to OpenTelemetry OTLP format
+   */
+  private convertToOTLPFormat(metrics: MetricPoint[]): any {
+    return {
+      resourceMetrics: [
+        {
+          resource: {
+            attributes: [
+              {
+                key: 'service.name',
+                value: { stringValue: 'codecrucible-synth' },
+              },
+            ],
+          },
+          scopeMetrics: [
+            {
+              scope: {
+                name: 'codecrucible-synth-metrics',
+                version: '1.0.0',
+              },
+              metrics: metrics.map(metric => ({
+                name: metric.name,
+                description: `${metric.name} metric`,
+                unit: metric.unit,
+                gauge: {
+                  dataPoints: [
+                    {
+                      attributes: Object.entries(metric.tags).map(([key, value]) => ({
+                        key,
+                        value: { stringValue: value },
+                      })),
+                      timeUnixNano: metric.timestamp.getTime() * 1_000_000,
+                      asDouble: metric.value,
+                    },
+                  ],
+                },
+              })),
+            },
+          ],
+        },
+      ],
+    };
   }
 
   private getTopMetrics(metrics: MetricPoint[]): Record<string, number> {

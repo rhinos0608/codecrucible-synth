@@ -13,6 +13,7 @@ import { cpus, loadavg } from 'os';
 import { performance, PerformanceObserver } from 'perf_hooks';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
+import { loadRustExecutorSafely } from '../../utils/rust-module-loader.js';
 
 export interface MetricsConfig {
   enableMetrics: boolean;
@@ -236,6 +237,7 @@ export class MCPServerMonitoring extends EventEmitter {
   // Performance tracking
   private metricsCollectionTime = 0;
   private lastCleanup = Date.now();
+  private rustMetrics: { available: boolean; module: any | null } = { available: false, module: null };
 
   constructor(config: Partial<MetricsConfig> = {}) {
     super();
@@ -257,6 +259,15 @@ export class MCPServerMonitoring extends EventEmitter {
 
     this.setMaxListeners(100);
     this.setupSystemMonitoring();
+
+    // Attempt to load optional Rust metrics binding
+    try {
+      const { available, module } = loadRustExecutorSafely();
+      this.rustMetrics = { available, module };
+      if (available) logger.info('Rust metrics module available for MCP monitoring');
+    } catch (err) {
+      logger.warn('Rust metrics module not available:', err);
+    }
   }
 
   /**
@@ -518,8 +529,7 @@ export class MCPServerMonitoring extends EventEmitter {
       const memoryUsage = process.memoryUsage();
       serverMetric.metrics.memoryUsage = memoryUsage.heapUsed;
 
-      // TODO: Replace with Rust-backed metrics
-      // This is where we'll integrate with Rust resource monitors
+      // Prefer Rust-backed metrics if available, else fall back to Node-based
       serverMetric.metrics.cpuUsage = await this.getCpuUsage();
 
       this.emit('metricsCollected', serverId, serverMetric.metrics);
@@ -734,8 +744,29 @@ export class MCPServerMonitoring extends EventEmitter {
    * Placeholder CPU usage - to be replaced with Rust implementation
    */
   private async getCpuUsage(): Promise<number> {
-    // TODO: Replace with Rust NAPI binding for accurate CPU usage
-    return Math.random() * 20; // Mock value
+    if (this.rustMetrics.available && this.rustMetrics.module) {
+      const mod = this.rustMetrics.module;
+      try {
+        if (typeof mod.get_cpu_usage === 'function') {
+          const v = mod.get_cpu_usage();
+          return typeof v?.then === 'function' ? await v : Number(v) || 0;
+        }
+        if (mod.metrics && typeof mod.metrics.get_cpu_usage === 'function') {
+          const v = mod.metrics.get_cpu_usage();
+          return typeof v?.then === 'function' ? await v : Number(v) || 0;
+        }
+        if (typeof mod.getSystemMetrics === 'function') {
+          const m = await mod.getSystemMetrics();
+          const v = m?.cpu_usage ?? m?.cpu?.usage;
+          if (v != null) return Number(v) || 0;
+        }
+      } catch (error) {
+        logger.warn('Rust CPU metrics failed, falling back:', error);
+      }
+    }
+
+    // Fallback using Node os.cpus()
+    return SystemMonitoringUtils.getCPUUsage();
   }
 
   private formatBytes(bytes: number): string {

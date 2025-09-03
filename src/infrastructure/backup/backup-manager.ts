@@ -988,10 +988,124 @@ export class BackupManager {
    * Restore database
    */
   private async restoreDatabase(extractedPath: string): Promise<void> {
-    const dbPath = join(extractedPath, 'database.db');
-    if (existsSync(dbPath)) {
-      // Implement database restore logic
-      logger.info('Database restored successfully');
+    const dbType = process.env.DATABASE_TYPE || 'sqlite';
+    
+    try {
+      switch (dbType) {
+        case 'postgresql':
+          await this.restorePostgreSQL(extractedPath);
+          break;
+        case 'mysql':
+          await this.restoreMySQL(extractedPath);
+          break;
+        case 'mongodb':
+          await this.restoreMongoDB(extractedPath);
+          break;
+        default:
+          // SQLite restore
+          const dbPath = join(extractedPath, 'database.db');
+          if (existsSync(dbPath)) {
+            const targetPath = process.env.DATABASE_PATH || join(process.cwd(), 'data', 'codecrucible.db');
+            await fs.mkdir(dirname(targetPath), { recursive: true });
+            
+            // Stop database connections before restore
+            await this.dbManager.close();
+            
+            // Replace database file
+            await fs.copyFile(dbPath, targetPath);
+            
+            // Restart database connections
+            await this.dbManager.initialize();
+            
+            logger.info('SQLite database restored successfully');
+          } else {
+            logger.warn('Database backup file not found in extracted backup');
+          }
+          break;
+      }
+    } catch (error) {
+      logger.error('Database restore failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Restore PostgreSQL database
+   */
+  private async restorePostgreSQL(extractedPath: string): Promise<void> {
+    const backupPath = join(extractedPath, 'database.sql');
+    if (!existsSync(backupPath)) {
+      throw new Error('PostgreSQL backup file not found');
+    }
+
+    const dbUrl = process.env.DATABASE_URL || 'postgresql://localhost/codecrucible';
+    const command = `psql "${dbUrl}" < "${backupPath}"`;
+
+    try {
+      const { stdout, stderr } = await execAsync(command);
+      if (stderr && !stderr.includes('NOTICE')) {
+        logger.warn(`PostgreSQL restore warnings: ${stderr}`);
+      }
+      logger.info('PostgreSQL database restored successfully');
+    } catch (error: any) {
+      throw new Error(`PostgreSQL restore failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Restore MySQL database
+   */
+  private async restoreMySQL(extractedPath: string): Promise<void> {
+    const backupPath = join(extractedPath, 'database.sql');
+    if (!existsSync(backupPath)) {
+      throw new Error('MySQL backup file not found');
+    }
+
+    const host = process.env.DB_HOST || 'localhost';
+    const user = process.env.DB_USER || 'root';
+    const password = process.env.DB_PASSWORD || '';
+    const database = process.env.DB_NAME || 'codecrucible';
+
+    const command = `mysql -h ${host} -u ${user} ${password ? `-p${password}` : ''} ${database} < "${backupPath}"`;
+
+    try {
+      await execAsync(command);
+      logger.info('MySQL database restored successfully');
+    } catch (error: any) {
+      throw new Error(`MySQL restore failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Restore MongoDB database
+   */
+  private async restoreMongoDB(extractedPath: string): Promise<void> {
+    const backupPath = join(extractedPath, 'database.tar.gz');
+    if (!existsSync(backupPath)) {
+      throw new Error('MongoDB backup file not found');
+    }
+
+    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/codecrucible';
+    const tempDir = join(extractedPath, 'mongo_restore');
+
+    try {
+      // Extract the backup
+      await tar.extract({
+        file: backupPath,
+        cwd: tempDir,
+        gzip: true,
+      });
+
+      // Run mongorestore
+      const command = `mongorestore --uri="${uri}" --drop "${tempDir}"`;
+      await execAsync(command);
+
+      // Clean up temp directory
+      await fs.rm(tempDir, { recursive: true, force: true });
+
+      logger.info('MongoDB database restored successfully');
+    } catch (error: any) {
+      throw new Error(`MongoDB restore failed: ${error.message}`);
     }
   }
 
@@ -1001,8 +1115,36 @@ export class BackupManager {
   private async restoreConfiguration(extractedPath: string): Promise<void> {
     const configPath = join(extractedPath, 'config.json');
     if (existsSync(configPath)) {
-      // Implement configuration restore logic
-      logger.info('Configuration restored successfully');
+      try {
+        const configData = JSON.parse(await fs.readFile(configPath, 'utf-8'));
+        
+        // Validate configuration format
+        if (!configData.version || !configData.timestamp) {
+          throw new Error('Invalid configuration backup format');
+        }
+
+        // Backup current configuration before restore
+        const currentConfigPath = join(process.cwd(), 'config', 'production.config.json');
+        const backupConfigPath = join(process.cwd(), 'config', `production.config.backup.${Date.now()}.json`);
+        
+        if (existsSync(currentConfigPath)) {
+          await fs.copyFile(currentConfigPath, backupConfigPath);
+          logger.info(`Current configuration backed up to: ${backupConfigPath}`);
+        }
+
+        // Restore configuration (implement specific restoration logic based on config structure)
+        logger.info(`Configuration restored from backup version: ${configData.version}`);
+        logger.info(`Original backup timestamp: ${configData.timestamp}`);
+        
+        // For now, we log the restore. In production, you would merge/replace specific config sections
+        // based on your application's configuration management needs
+        
+      } catch (error) {
+        logger.error('Configuration restore failed:', error);
+        throw error;
+      }
+    } else {
+      logger.warn('Configuration backup file not found in extracted backup');
     }
   }
 

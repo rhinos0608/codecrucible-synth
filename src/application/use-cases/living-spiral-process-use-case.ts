@@ -9,6 +9,7 @@
 import { IVoiceOrchestrationService } from '../../domain/services/voice-orchestration-service.js';
 import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
 import { ProcessingRequest } from '../../domain/entities/request.js';
+import { IModelClient } from '../../domain/interfaces/model-client.js';
 
 export interface LivingSpiralInput {
   initialPrompt: string;
@@ -43,7 +44,8 @@ export interface SpiralIteration {
 export class LivingSpiralProcessUseCase {
   constructor(
     private voiceOrchestrationService: IVoiceOrchestrationService,
-    private modelSelectionService: IModelSelectionService
+    private modelSelectionService: IModelSelectionService,
+    private modelClient: IModelClient
   ) {}
 
   async execute(input: LivingSpiralInput): Promise<LivingSpiralOutput> {
@@ -114,23 +116,21 @@ export class LivingSpiralProcessUseCase {
   }
 
   private async collapsePhase(input: string): Promise<{ output: string; voices: string[] }> {
-    const request = ProcessingRequest.create(
-      this.buildCollapsePrompt(input),
-      'problem-decomposition' as any,
-      'medium',
-      {},
-      { mustIncludeVoices: ['explorer'] }
-    );
-
-    const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse
-      ? await model.generateResponse(request.prompt)
-      : 'Generated response placeholder';
-
-    return {
-      output: response,
-      voices: ['explorer'],
-    };
+    const prompt = this.buildCollapsePrompt(input);
+    
+    try {
+      const response = await this.modelClient.generate(prompt);
+      return {
+        output: response,
+        voices: ['explorer'],
+      };
+    } catch (error) {
+      console.warn('Collapse phase failed, using fallback:', error);
+      return {
+        output: `Problem decomposition failed: ${prompt}\n\nFallback analysis:\n1. Core requirements: Needs detailed analysis\n2. Key constraints: Requires investigation\n3. Essential sub-problems: To be identified\n4. Dependencies: Unknown\n5. Success criteria: Undefined`,
+        voices: ['explorer'],
+      };
+    }
   }
 
   private async councilPhase(collapsed: {
@@ -158,14 +158,21 @@ export class LivingSpiralProcessUseCase {
     // Generate responses from multiple voices
     const responses = [];
     for (const voice of allVoices) {
-      const response = model.generateResponse
-        ? await Promise.resolve(model.generateResponse(request.prompt))
-        : 'Generated response placeholder';
-      responses.push({
-        voiceId: voice.id,
-        content: response,
-        confidence: 0.8,
-      });
+      try {
+        const response = await this.modelClient.generate(`${voice.id} perspective: ${request.prompt}`);
+        responses.push({
+          voiceId: voice.id,
+          content: response,
+          confidence: 0.8,
+        });
+      } catch (error) {
+        console.warn(`Council phase failed for voice ${voice.id}, using fallback:`, error);
+        responses.push({
+          voiceId: voice.id,
+          content: `${voice.id} analysis would appear here after model integration`,
+          confidence: 0.3,
+        });
+      }
     }
 
     // Synthesize council perspectives
@@ -184,46 +191,42 @@ export class LivingSpiralProcessUseCase {
     output: string;
     voices: string[];
   }): Promise<{ output: string; voices: string[] }> {
-    const request = ProcessingRequest.create(
-      this.buildSynthesisPrompt(council.output),
-      'solution-synthesis' as any,
-      'medium',
-      {},
-      { mustIncludeVoices: ['architect'] }
-    );
+    const prompt = this.buildSynthesisPrompt(council.output);
 
-    const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse
-      ? await model.generateResponse(request.prompt)
-      : 'Generated response placeholder';
-
-    return {
-      output: response,
-      voices: [...council.voices, 'architect'],
-    };
+    try {
+      const response = await this.modelClient.generate(prompt);
+      return {
+        output: response,
+        voices: [...council.voices, 'architect'],
+      };
+    } catch (error) {
+      console.warn('Synthesis phase failed, using fallback:', error);
+      return {
+        output: `Synthesis of council perspectives:\n\n${council.output}\n\nArchitect synthesis would appear here after model integration.\n\nUnified approach: Requires proper model connection\nImplementation guidance: Pending model integration`,
+        voices: [...council.voices, 'architect'],
+      };
+    }
   }
 
   private async rebirthPhase(synthesis: {
     output: string;
     voices: string[];
   }): Promise<{ output: string; voices: string[] }> {
-    const request = ProcessingRequest.create(
-      this.buildRebirthPrompt(synthesis.output),
-      'implementation-planning' as any,
-      'medium',
-      {},
-      { mustIncludeVoices: ['implementor'] }
-    );
+    const prompt = this.buildRebirthPrompt(synthesis.output);
 
-    const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse
-      ? await model.generateResponse(request.prompt)
-      : 'Generated response placeholder';
-
-    return {
-      output: response,
-      voices: [...synthesis.voices, 'implementor'],
-    };
+    try {
+      const response = await this.modelClient.generate(prompt);
+      return {
+        output: response,
+        voices: [...synthesis.voices, 'implementor'],
+      };
+    } catch (error) {
+      console.warn('Rebirth phase failed, using fallback:', error);
+      return {
+        output: `Implementation planning for:\n\n${synthesis.output}\n\nImplementor guidance would appear here after model integration.\n\n1. Specific implementation steps: Requires model connection\n2. Code examples: Pending AI model integration\n3. Testing strategies: To be generated\n4. Deployment considerations: Awaiting analysis\n5. Success metrics: TBD\n6. Potential risks: Require assessment`,
+        voices: [...synthesis.voices, 'implementor'],
+      };
+    }
   }
 
   private async reflectionPhase(rebirth: {
@@ -238,17 +241,25 @@ export class LivingSpiralProcessUseCase {
       { mustIncludeVoices: ['guardian'] }
     );
 
-    const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse
-      ? await model.generateResponse(request.prompt)
-      : 'Generated response placeholder';
+    try {
+      const response = await this.modelClient.generate(this.buildReflectionPrompt(rebirth.output));
+      const enhancedOutput = `${rebirth.output}\n\n---\n\n## REFLECTION INSIGHTS:\n${response}`;
 
-    const enhancedOutput = `${rebirth.output}\n\n---\n\n## REFLECTION INSIGHTS:\n${response}`;
+      return {
+        output: enhancedOutput,
+        voices: [...rebirth.voices, 'guardian'],
+      };
+    } catch (error) {
+      console.warn('Reflection phase failed, using fallback:', error);
+      const fallbackReflection = `Guardian quality assessment would appear here after model integration.\n\n1. Quality assessment: Requires AI analysis\n2. Gaps identification: Pending model connection\n3. Lessons learned: To be analyzed\n4. Improvement recommendations: Awaiting AI insights\n5. Deployment readiness: Needs evaluation`;
+      
+      const enhancedOutput = `${rebirth.output}\n\n---\n\n## REFLECTION INSIGHTS:\n${fallbackReflection}`;
 
-    return {
-      output: enhancedOutput,
-      voices: [...rebirth.voices, 'guardian'],
-    };
+      return {
+        output: enhancedOutput,
+        voices: [...rebirth.voices, 'guardian'],
+      };
+    }
   }
 
   private buildConfig(input: LivingSpiralInput) {

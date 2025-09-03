@@ -6,6 +6,8 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import knex, { Knex } from 'knex';
 import Redis from 'redis';
+import { mkdir, writeFile } from 'fs/promises';
+import { join } from 'path';
 import { logger } from '../infrastructure/logging/logger.js';
 import { performance } from 'perf_hooks';
 
@@ -691,10 +693,227 @@ export class ProductionDatabaseManager {
   /**
    * Backup database (stub for backup manager)
    */
-  async backup(options?: any): Promise<string> {
-    // This is a stub - implement actual backup logic
-    logger.info('Database backup requested');
-    return 'backup-placeholder-path';
+  // Overload: legacy signature accepts a single destination file path
+  async backup(destFilePath: string): Promise<string>;
+  async backup(options?: {
+    outputDir?: string;
+    format?: 'json';
+    includeSchemas?: string[];
+    includeTables?: string[];
+    excludeTables?: string[];
+    chunkSize?: number; // reserved for future streaming implementation
+  }): Promise<string>;
+  async backup(optionsOrPath?:
+    | string
+    | {
+        outputDir?: string;
+        format?: 'json';
+        includeSchemas?: string[];
+        includeTables?: string[];
+        excludeTables?: string[];
+        chunkSize?: number;
+      }
+  ): Promise<string> {
+    const start = Date.now();
+    if (!this.knexInstance) {
+      throw new Error('Database not initialized');
+    }
+
+    const dbType = this.config.type;
+    if (dbType !== 'postgresql' && dbType !== 'mysql') {
+      throw new Error(`Backup not supported for database type: ${dbType}`);
+    }
+
+    // Support legacy string path overload
+    if (typeof optionsOrPath === 'string') {
+      const destFile = optionsOrPath as string;
+      logger.info('Starting database backup (single file JSON)', { dbType, destFile });
+
+      const tables = await this.listTablesForBackup();
+      const dump: Record<string, any[]> = {};
+
+      for (const t of tables) {
+        try {
+          const rows = await (async () => {
+            if (dbType === 'postgresql') {
+              if (t.schema) {
+                return await this.knex.withSchema(t.schema).select('*').from(t.name);
+              }
+              return await this.knex.select('*').from(t.name);
+            }
+            return await this.knex.select('*').from(t.name);
+          })();
+
+          const key = t.schema ? `${t.schema}.${t.name}` : t.name;
+          dump[key] = rows;
+        } catch (error: any) {
+          logger.warn('Failed to back up table', { table: t.name, schema: t.schema, error: error?.message });
+        }
+      }
+
+      const json = JSON.stringify(
+        {
+          database: this.config.database,
+          dbType,
+          dumpedAt: new Date().toISOString(),
+          tables: dump,
+        },
+        (_key, value) => {
+          if (typeof value === 'bigint') return value.toString();
+          if (Buffer.isBuffer(value)) return value.toString('base64');
+          return value;
+        }
+      );
+
+      // Ensure directory exists
+      const dir = destFile.substring(0, destFile.lastIndexOf('/')) || process.cwd();
+      await mkdir(dir, { recursive: true });
+      await writeFile(destFile, json, 'utf8');
+
+      logger.info('Database backup (single file JSON) completed', {
+        path: destFile,
+        durationMs: Date.now() - start,
+      });
+      return destFile;
+    }
+
+    const opts = optionsOrPath as {
+      outputDir?: string;
+      format?: 'json';
+      includeSchemas?: string[];
+      includeTables?: string[];
+      excludeTables?: string[];
+      chunkSize?: number;
+    } | undefined;
+
+    const outRoot = opts?.outputDir || 'backups';
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const dbName = this.config.database;
+    const outDir = join(outRoot, `${dbName}-${stamp}`);
+
+    await mkdir(outDir, { recursive: true });
+
+    logger.info('Starting database backup', { dbType, dbName, outDir });
+
+    // Discover tables
+    const tables = await this.listTablesForBackup({
+      includeSchemas: opts?.includeSchemas,
+      includeTables: opts?.includeTables,
+      excludeTables: opts?.excludeTables,
+    });
+
+    const manifest: {
+      database: string;
+      dbType: string;
+      startedAt: string;
+      completedAt?: string;
+      durationMs?: number;
+      tables: Array<{ schema?: string; name: string; rows: number; file: string }>;
+    } = {
+      database: dbName,
+      dbType,
+      startedAt: new Date(start).toISOString(),
+      tables: [],
+    };
+
+    // Serialize each table to JSON
+    for (const t of tables) {
+      try {
+        const rows = await (async () => {
+          if (dbType === 'postgresql') {
+            if (t.schema) {
+              return await this.knex.withSchema(t.schema).select('*').from(t.name);
+            }
+            return await this.knex.select('*').from(t.name);
+          }
+        
+          // mysql
+          return await this.knex.select('*').from(t.name);
+        })();
+
+        const filename = t.schema ? `${t.schema}.${t.name}.json` : `${t.name}.json`;
+        const filePath = join(outDir, filename);
+
+        const json = JSON.stringify(
+          rows,
+          (_key, value) => {
+            if (typeof value === 'bigint') return value.toString();
+            if (Buffer.isBuffer(value)) return value.toString('base64');
+            return value;
+          },
+          2
+        );
+        await writeFile(filePath, json, 'utf8');
+
+        manifest.tables.push({ schema: t.schema, name: t.name, rows: rows.length, file: filename });
+        logger.debug('Backed up table', { table: t.name, schema: t.schema, rows: rows.length });
+      } catch (error: any) {
+        logger.warn('Failed to back up table', { table: t.name, schema: t.schema, error: error?.message });
+      }
+    }
+
+    manifest.completedAt = new Date().toISOString();
+    manifest.durationMs = Date.now() - start;
+    await writeFile(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+
+    logger.info('Database backup completed', {
+      outDir,
+      tables: manifest.tables.length,
+      durationMs: manifest.durationMs,
+    });
+
+    return outDir;
+  }
+
+  private async listTablesForBackup(options?: {
+    includeSchemas?: string[];
+    includeTables?: string[];
+    excludeTables?: string[];
+  }): Promise<Array<{ schema?: string; name: string }>> {
+    const includeSchemas = options?.includeSchemas?.map(s => s.toLowerCase());
+    const includeTables = options?.includeTables?.map(t => t.toLowerCase());
+    const excludeTables = new Set((options?.excludeTables || []).map(t => t.toLowerCase()));
+
+    if (!this.knexInstance) return [];
+
+    const type = this.config.type;
+    let rawTables: Array<{ table_schema?: string; table_name: string }> = [];
+
+    if (type === 'postgresql') {
+      const res = await this.knex.raw<{
+        rows: Array<{ table_schema: string; table_name: string }>;
+      }>(
+        `select table_schema, table_name
+         from information_schema.tables
+         where table_type = 'BASE TABLE'
+           and table_schema not in ('pg_catalog','information_schema')`
+      );
+      // Knex pg returns { rows }
+      rawTables = (res as any).rows || [];
+    } else if (type === 'mysql') {
+      const res = await this.knex.raw(
+        `select table_schema, table_name
+           from information_schema.tables
+          where table_type = 'BASE TABLE'
+            and table_schema = database()`
+      );
+      // knex mysql2 returns [rows, fields]
+      rawTables = Array.isArray(res) ? (res[0] as any[]) : ((res as any)[0] as any[]);
+    }
+
+    let tables = rawTables.map(r => ({ schema: r.table_schema, name: r.table_name }));
+
+    if (includeSchemas && includeSchemas.length) {
+      tables = tables.filter(t => (t.schema || '').toLowerCase() && includeSchemas.includes((t.schema || '').toLowerCase()));
+    }
+    if (includeTables && includeTables.length) {
+      tables = tables.filter(t => includeTables.includes(t.name.toLowerCase()));
+    }
+    if (excludeTables.size) {
+      tables = tables.filter(t => !excludeTables.has(t.name.toLowerCase()));
+    }
+
+    return tables;
   }
 }
 

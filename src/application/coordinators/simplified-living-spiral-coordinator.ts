@@ -289,7 +289,5 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
     );
   }
 }
-function _iter(this: unknown, _value: Readonly<IterationResult>, _index: number, _array: ReadonlyArray<IterationResult>): unknown {
-  throw new Error('Function not implemented.');
-}
+
 

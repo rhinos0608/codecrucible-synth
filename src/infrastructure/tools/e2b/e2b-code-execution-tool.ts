@@ -413,6 +413,43 @@ export class E2BCodeExecutionTool {
           tempFile: rustFile,
         };
 
+      case 'go': {
+        const goFile = await this.createTemporaryFile(request.code, language, environment);
+        // Prefer go run for simplicity to avoid binary cleanup complexity
+        return { command: `go run "${goFile}"`, tempFile: goFile };
+      }
+
+      case 'java': {
+        // Use jshell when available to avoid class wrapping; fall back to javac/java
+        // Write snippet to a temporary .jsh file and feed into jshell
+        const jshFile = await this.createTemporaryFile(request.code, 'java', environment);
+        // Try jshell with input redirection; if unavailable, attempt compile/run assuming a Main class exists
+        const jshellCmd = `jshell < "${jshFile}" || (javac "${jshFile}" 2> /dev/null && java "${jshFile.replace(/\.java$/, '')}")`;
+        return { command: jshellCmd, tempFile: jshFile };
+      }
+
+      case 'c': {
+        const cFile = await this.createTemporaryFile(request.code, language, environment);
+        const exe = cFile.replace(/\.c$/, '');
+        return { command: `gcc "${cFile}" -O2 -o "${exe}" && "${exe}"`, tempFile: cFile };
+      }
+
+      case 'cpp': {
+        const cppFile = await this.createTemporaryFile(request.code, language, environment);
+        const exe = cppFile.replace(/\.cpp$/, '');
+        return { command: `g++ "${cppFile}" -O2 -std=c++17 -o "${exe}" && "${exe}"`, tempFile: cppFile };
+      }
+
+      case 'ruby': {
+        // Direct execution via -e, taking care to escape quotes
+        return { command: `ruby -e "${request.code.replace(/"/g, '\\"')}"` };
+      }
+
+      case 'php': {
+        // Direct execution via -r, escape quotes
+        return { command: `php -r "${request.code.replace(/"/g, '\\"')}"` };
+      }
+
       default:
         throw new Error(`Execution command preparation not implemented for ${language}`);
     }

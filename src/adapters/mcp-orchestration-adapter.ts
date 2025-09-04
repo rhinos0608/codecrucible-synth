@@ -744,7 +744,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       }
     }
 
-    throw (lastError ?? new Error('Unknown error during retry operation'));
+    throw lastError ?? new Error('Unknown error during retry operation');
   }
 
   private getDefaultRetryPolicy(): RetryPolicy {

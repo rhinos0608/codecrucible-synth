@@ -63,33 +63,33 @@ global.testUtils = {
       name: 'test-model',
       timeout: 30000,
       maxTokens: 1000,
-      temperature: 0.7
+      temperature: 0.7,
     },
     voices: {
       available: ['developer', 'analyzer', 'security'],
-      default: ['developer']
+      default: ['developer'],
     },
     mcp: {
-      servers: []
-    }
+      servers: [],
+    },
   }),
-  
+
   // Helper to create mock project context
   createMockProjectContext: () => ({
     files: [
       {
         path: 'test.js',
         content: 'console.log("hello world");',
-        language: 'javascript'
-      }
+        language: 'javascript',
+      },
     ],
     projectType: 'node',
     dependencies: ['express', 'jest'],
-    gitStatus: 'clean'
+    gitStatus: 'clean',
   }),
-  
+
   // Helper to wait for async operations
-  delay: (ms) => new Promise(resolve => setTimeout(resolve, ms))
+  delay: ms => new Promise(resolve => setTimeout(resolve, ms)),
 };
 
 // Suppress specific warnings that are expected in test environment

@@ -1,6 +1,9 @@
 import type { Command, CommandHandler } from '../command-bus.js';
 
-interface PluginExecutePayload { readonly name: string; readonly args: readonly unknown[]; }
+interface PluginExecutePayload {
+  readonly name: string;
+  readonly args: readonly unknown[];
+}
 type PluginExecuteResult = unknown;
 
 interface PluginCommandEntry {
@@ -11,7 +14,9 @@ interface SafeCommandRegistry {
   readonly getCommand: (name: string) => PluginCommandEntry | undefined;
 }
 
-export class PluginDispatchHandler implements CommandHandler<Readonly<PluginExecutePayload>, PluginExecuteResult> {
+export class PluginDispatchHandler
+  implements CommandHandler<Readonly<PluginExecutePayload>, PluginExecuteResult>
+{
   public readonly type = 'plugin:execute';
 
   public constructor(private readonly registry: SafeCommandRegistry) {}
@@ -24,4 +29,3 @@ export class PluginDispatchHandler implements CommandHandler<Readonly<PluginExec
     return commandEntry.handler(...args);
   }
 }
-

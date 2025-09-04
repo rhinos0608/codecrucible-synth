@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { StreamingManager, StreamToken, StreamConfig, StreamMetrics } from '../../src/core/streaming/streaming-manager.js';
+import {
+  StreamingManager,
+  StreamToken,
+  StreamConfig,
+  StreamMetrics,
+} from '../../src/core/streaming/streaming-manager.js';
 import { EventEmitter } from 'events';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -19,14 +24,14 @@ describe('StreamingManager Real Integration Tests', () => {
   beforeEach(async () => {
     // Create temporary directory for test isolation
     tempDir = await mkdtemp(join(tmpdir(), 'streaming-test-'));
-    
+
     // Create real event emitter for testing
     testEventEmitter = new EventEmitter();
-    
+
     // Initialize StreamingManager with real configuration
     streamingManager = new StreamingManager({
       chunkSize: 10, // Small chunks for predictable testing
-      delayMs: 10,   // Fast for testing
+      delayMs: 10, // Fast for testing
       enableMetrics: true,
       enableSession: true,
       sessionDir: tempDir,
@@ -38,16 +43,17 @@ describe('StreamingManager Real Integration Tests', () => {
     if (streamingManager) {
       await streamingManager.cleanup();
     }
-    
+
     // Remove temporary directory
     await rm(tempDir, { recursive: true, force: true });
   });
 
   describe('Real Token Streaming', () => {
     it('should stream real content progressively', async () => {
-      const testContent = 'This is a real test of streaming content that will be chunked progressively.';
+      const testContent =
+        'This is a real test of streaming content that will be chunked progressively.';
       const receivedTokens: StreamToken[] = [];
-      
+
       const onToken = (token: StreamToken) => {
         receivedTokens.push(token);
       };
@@ -56,14 +62,14 @@ describe('StreamingManager Real Integration Tests', () => {
 
       // Verify streaming completed
       expect(result).toBe(testContent);
-      
+
       // Verify tokens were generated
       expect(receivedTokens.length).toBeGreaterThan(0);
-      
+
       // Verify content reconstruction
       const reconstructedContent = receivedTokens.map(t => t.content).join('');
       expect(reconstructedContent).toBe(testContent);
-      
+
       // Verify token properties
       receivedTokens.forEach((token, index) => {
         expect(token.content).toBeDefined();
@@ -78,7 +84,7 @@ describe('StreamingManager Real Integration Tests', () => {
 
     it('should handle empty content gracefully', async () => {
       const receivedTokens: StreamToken[] = [];
-      
+
       const onToken = (token: StreamToken) => {
         receivedTokens.push(token);
       };
@@ -99,7 +105,7 @@ describe('StreamingManager Real Integration Tests', () => {
 
       const testContent = 'Short test content';
       const receivedTokens: StreamToken[] = [];
-      
+
       const onToken = (token: StreamToken) => {
         receivedTokens.push(token);
       };
@@ -110,7 +116,7 @@ describe('StreamingManager Real Integration Tests', () => {
 
       // Should have multiple tokens due to small chunk size
       expect(receivedTokens.length).toBeGreaterThan(1);
-      
+
       // Should take some time due to delays
       expect(endTime - startTime).toBeGreaterThan(receivedTokens.length * customConfig.delayMs!);
     });
@@ -119,7 +125,7 @@ describe('StreamingManager Real Integration Tests', () => {
       // Generate large content (1MB of text)
       const largeContent = 'A'.repeat(1024 * 1024);
       const receivedTokens: StreamToken[] = [];
-      
+
       const onToken = (token: StreamToken) => {
         receivedTokens.push(token);
       };
@@ -127,14 +133,14 @@ describe('StreamingManager Real Integration Tests', () => {
       const startTime = Date.now();
       const result = await streamingManager.startStream(largeContent, onToken, {
         chunkSize: 1024, // 1KB chunks
-        delayMs: 1,      // Minimal delay
+        delayMs: 1, // Minimal delay
       });
       const endTime = Date.now();
 
       expect(result).toBe(largeContent);
       expect(receivedTokens.length).toBeGreaterThan(100); // Should be chunked
       expect(endTime - startTime).toBeLessThan(5000); // Should complete within 5 seconds
-      
+
       // Verify content integrity
       const reconstructed = receivedTokens.map(t => t.content).join('');
       expect(reconstructed).toBe(largeContent);
@@ -144,7 +150,7 @@ describe('StreamingManager Real Integration Tests', () => {
   describe('Real Session Management', () => {
     it('should create and persist real sessions', async () => {
       const sessionId = await streamingManager.createSession();
-      
+
       expect(sessionId).toBeDefined();
       expect(typeof sessionId).toBe('string');
       expect(sessionId.length).toBeGreaterThan(0);
@@ -152,7 +158,7 @@ describe('StreamingManager Real Integration Tests', () => {
       // Verify session file was created
       const sessionFile = join(tempDir, `${sessionId}.json`);
       const sessionData = JSON.parse(await readFile(sessionFile, 'utf-8'));
-      
+
       expect(sessionData.id).toBe(sessionId);
       expect(sessionData.startTime).toBeDefined();
       expect(Array.isArray(sessionData.tokens)).toBe(true);
@@ -160,7 +166,7 @@ describe('StreamingManager Real Integration Tests', () => {
 
     it('should add real tokens to session', async () => {
       const sessionId = await streamingManager.createSession();
-      
+
       const testTokens: StreamToken[] = [
         { content: 'Hello', timestamp: Date.now(), index: 0, isComplete: false },
         { content: ' world', timestamp: Date.now(), index: 1, isComplete: true },
@@ -179,10 +185,10 @@ describe('StreamingManager Real Integration Tests', () => {
 
     it('should retrieve session content correctly', async () => {
       const sessionId = await streamingManager.createSession();
-      
+
       const testContent = 'Real session content test';
       const receivedTokens: StreamToken[] = [];
-      
+
       const onToken = (token: StreamToken) => {
         receivedTokens.push(token);
       };
@@ -195,7 +201,7 @@ describe('StreamingManager Real Integration Tests', () => {
 
     it('should clean up sessions properly', async () => {
       const sessionId = await streamingManager.createSession();
-      
+
       // Verify session exists
       const sessionBefore = await streamingManager.getSession(sessionId);
       expect(sessionBefore).toBeDefined();
@@ -213,7 +219,7 @@ describe('StreamingManager Real Integration Tests', () => {
     it('should collect real streaming metrics', async () => {
       const testContent = 'Test content for metrics collection';
       const receivedTokens: StreamToken[] = [];
-      
+
       const onToken = (token: StreamToken) => {
         receivedTokens.push(token);
       };
@@ -227,14 +233,14 @@ describe('StreamingManager Real Integration Tests', () => {
       const endTime = Date.now();
 
       const metrics = streamingManager.getMetrics();
-      
+
       expect(metrics).toBeDefined();
       expect(metrics.totalTokens).toBe(receivedTokens.length);
       expect(metrics.totalCharacters).toBe(testContent.length);
       expect(metrics.averageLatency).toBeGreaterThan(0);
       expect(metrics.throughput).toBeGreaterThan(0);
       expect(metrics.sessionsCreated).toBeGreaterThanOrEqual(0);
-      
+
       // Timing should be reasonable
       expect(metrics.averageLatency).toBeLessThan(endTime - startTime);
     });
@@ -242,38 +248,36 @@ describe('StreamingManager Real Integration Tests', () => {
     it('should track multiple streams in metrics', async () => {
       const stream1Content = 'First stream content';
       const stream2Content = 'Second stream content is longer';
-      
+
       const onToken = () => {}; // No-op token handler
 
       // Stream first content
       await streamingManager.startStream(stream1Content, onToken, { enableMetrics: true });
-      
+
       const metricsAfterFirst = streamingManager.getMetrics();
       const firstTokenCount = metricsAfterFirst.totalTokens;
       const firstCharCount = metricsAfterFirst.totalCharacters;
 
       // Stream second content
       await streamingManager.startStream(stream2Content, onToken, { enableMetrics: true });
-      
+
       const metricsAfterSecond = streamingManager.getMetrics();
-      
+
       // Metrics should accumulate
       expect(metricsAfterSecond.totalTokens).toBeGreaterThan(firstTokenCount);
       expect(metricsAfterSecond.totalCharacters).toBeGreaterThan(firstCharCount);
-      expect(metricsAfterSecond.totalCharacters).toBe(
-        firstCharCount + stream2Content.length
-      );
+      expect(metricsAfterSecond.totalCharacters).toBe(firstCharCount + stream2Content.length);
     });
 
     it('should reset metrics correctly', () => {
       // Get baseline metrics
       const initialMetrics = streamingManager.getMetrics();
-      
+
       // Reset metrics
       streamingManager.resetMetrics();
-      
+
       const resetMetrics = streamingManager.getMetrics();
-      
+
       expect(resetMetrics.totalTokens).toBe(0);
       expect(resetMetrics.totalCharacters).toBe(0);
       expect(resetMetrics.averageLatency).toBe(0);
@@ -285,7 +289,7 @@ describe('StreamingManager Real Integration Tests', () => {
   describe('Real Error Handling', () => {
     it('should handle streaming errors gracefully', async () => {
       const receivedTokens: StreamToken[] = [];
-      
+
       // Create a token handler that throws after a few tokens
       let tokenCount = 0;
       const errorOnToken = (token: StreamToken) => {
@@ -297,30 +301,28 @@ describe('StreamingManager Real Integration Tests', () => {
       };
 
       const testContent = 'This content will cause an error during streaming';
-      
-      await expect(
-        streamingManager.startStream(testContent, errorOnToken)
-      ).rejects.toThrow('Simulated token handler error');
-      
+
+      await expect(streamingManager.startStream(testContent, errorOnToken)).rejects.toThrow(
+        'Simulated token handler error'
+      );
+
       // Should have received some tokens before error
       expect(receivedTokens.length).toBe(3);
     });
 
     it('should handle invalid session operations', async () => {
       const nonExistentSessionId = 'non-existent-session-id';
-      
+
       // Should handle getting non-existent session
       const session = await streamingManager.getSession(nonExistentSessionId);
       expect(session).toBeNull();
-      
+
       // Should handle getting content from non-existent session
       const content = await streamingManager.getSessionContent(nonExistentSessionId);
       expect(content).toBe('');
-      
+
       // Should handle cleanup of non-existent session
-      await expect(
-        streamingManager.cleanupSession(nonExistentSessionId)
-      ).not.toThrow();
+      await expect(streamingManager.cleanupSession(nonExistentSessionId)).not.toThrow();
     });
   });
 
@@ -344,10 +346,10 @@ describe('StreamingManager Real Integration Tests', () => {
       // Calculate performance consistency
       const avgTime = streamTimes.reduce((a, b) => a + b) / streamTimes.length;
       const maxDeviation = Math.max(...streamTimes.map(t => Math.abs(t - avgTime)));
-      
+
       // Performance should be reasonably consistent (within 50% deviation)
       expect(maxDeviation / avgTime).toBeLessThan(0.5);
-      
+
       // All streams should complete in reasonable time
       expect(Math.max(...streamTimes)).toBeLessThan(1000); // Less than 1 second
     }, 10000);

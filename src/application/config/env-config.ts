@@ -144,7 +144,7 @@ export function validateRequiredConfig(): { valid: boolean; missing: string[] } 
   const requiredFields: (keyof EnvironmentConfig)[] = [
     'ollamaEndpoint',
     'lmStudioEndpoint',
-    'requestTimeout'
+    'requestTimeout',
   ];
 
   for (const field of requiredFields) {

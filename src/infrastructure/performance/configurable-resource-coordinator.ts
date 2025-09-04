@@ -218,7 +218,9 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
     });
   }
 
-  public constructor(config: Readonly<ResourceCoordinatorConfig> = {} as Readonly<ResourceCoordinatorConfig>) {
+  public constructor(
+    config: Readonly<ResourceCoordinatorConfig> = {} as Readonly<ResourceCoordinatorConfig>
+  ) {
     super();
     this.config = Object.freeze({ ...config }) as Readonly<ResourceCoordinatorConfig>;
 
@@ -606,7 +608,9 @@ export class ResourceCoordinatorFactory {
   /**
    * Create a new resource coordinator with the given configuration
    */
-  public static create(config: Readonly<ResourceCoordinatorConfig> = {}): ConfigurableResourceCoordinator {
+  public static create(
+    config: Readonly<ResourceCoordinatorConfig> = {}
+  ): ConfigurableResourceCoordinator {
     const fullConfig = { ...ResourceCoordinatorFactory.defaultConfig, ...config };
     return new ConfigurableResourceCoordinator(fullConfig);
   }

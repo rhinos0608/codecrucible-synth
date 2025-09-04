@@ -354,7 +354,8 @@ export class EnhancedMCPToolDefinitions {
     securityLevel: 'high',
     requiredPermissions: ['execute'],
     fallbackBehavior: 'Fail safely with detailed error message and suggestions',
-    performanceNotes: 'Command output limits are configurable via performance.output.max_command_output_chars in configuration',
+    performanceNotes:
+      'Command output limits are configurable via performance.output.max_command_output_chars in configuration',
     usage: {
       whenToUse: [
         'Installing packages or dependencies',

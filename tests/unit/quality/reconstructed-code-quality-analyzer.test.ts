@@ -17,12 +17,12 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
       performance: {
         maxMemoryMB: 256,
         maxAnalysisTimeMs: 30000,
-        maxConcurrentAnalyses: 2
+        maxConcurrentAnalyses: 2,
       },
       analysis: {
         enableProgressReporting: true,
-        enablePerformanceMonitoring: true
-      }
+        enablePerformanceMonitoring: true,
+      },
     });
   });
 
@@ -97,9 +97,11 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
       expect(result.qualityMetrics.astMetrics.cyclomaticComplexity).toBeGreaterThan(10);
       expect(result.qualityMetrics.complexityScore).toBeLessThan(80);
       expect(result.qualityMetrics.recommendations.length).toBeGreaterThan(0);
-      
+
       // Should have complexity recommendations
-      const complexityRecs = result.qualityMetrics.recommendations.filter(r => r.category === 'complexity');
+      const complexityRecs = result.qualityMetrics.recommendations.filter(
+        r => r.category === 'complexity'
+      );
       expect(complexityRecs.length).toBeGreaterThan(0);
     }, 15000);
 
@@ -184,12 +186,14 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
     it('should respect timeout limits', async () => {
       const analyzer = new ReconstructedCodeQualityAnalyzer({
         performance: {
-          maxAnalysisTimeMs: 1000 // 1 second timeout
-        }
+          maxAnalysisTimeMs: 1000, // 1 second timeout
+        },
       });
 
       // Large code that might take time to analyze
-      const largeCode = Array(1000).fill(`
+      const largeCode = Array(1000)
+        .fill(
+          `
         function test${Math.random()}() {
           if (Math.random() > 0.5) {
             return 'test';
@@ -197,10 +201,12 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
             return 'other';
           }
         }
-      `).join('\n');
+      `
+        )
+        .join('\n');
 
       const startTime = Date.now();
-      
+
       try {
         await analyzer.analyzeCode(largeCode, 'typescript');
         // If it completes without timeout, check duration
@@ -240,7 +246,7 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
       expect(status.analytics).toBeDefined();
       expect(status.toolAvailability).toBeDefined();
       expect(status.configuration).toBeDefined();
-      
+
       expect(status.performance.activeAnalyses).toBeGreaterThanOrEqual(0);
       expect(status.performance.memoryUsage).toBeGreaterThan(0);
       expect(status.performance.efficiency).toBeGreaterThanOrEqual(0);
@@ -271,15 +277,19 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
       const result = await analyzer.analyzeCode(problemCode, 'typescript');
 
       expect(result.qualityMetrics.recommendations.length).toBeGreaterThan(0);
-      
+
       // Check for different types of recommendations
       const categories = new Set(result.qualityMetrics.recommendations.map(r => r.category));
       expect(categories.size).toBeGreaterThan(1); // Should have multiple categories
-      
+
       // Should have at least complexity and documentation recommendations
-      const hasComplexity = result.qualityMetrics.recommendations.some(r => r.category === 'complexity');
-      const hasDocumentation = result.qualityMetrics.recommendations.some(r => r.category === 'documentation');
-      
+      const hasComplexity = result.qualityMetrics.recommendations.some(
+        r => r.category === 'complexity'
+      );
+      const hasDocumentation = result.qualityMetrics.recommendations.some(
+        r => r.category === 'documentation'
+      );
+
       expect(hasComplexity || hasDocumentation).toBe(true);
     }, 15000);
 
@@ -332,15 +342,17 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
       const highPriorityRecs = result.qualityMetrics.recommendations.filter(
         r => r.priority === 'critical' || r.priority === 'high'
       );
-      
+
       expect(highPriorityRecs.length).toBeGreaterThan(0);
-      
+
       // Recommendations should be sorted by priority
       const priorities = result.qualityMetrics.recommendations.map(r => r.priority);
       const priorityWeights = { critical: 4, high: 3, medium: 2, low: 1 };
-      
+
       for (let i = 1; i < priorities.length; i++) {
-        expect(priorityWeights[priorities[i-1]]).toBeGreaterThanOrEqual(priorityWeights[priorities[i]]);
+        expect(priorityWeights[priorities[i - 1]]).toBeGreaterThanOrEqual(
+          priorityWeights[priorities[i]]
+        );
       }
     }, 15000);
   });
@@ -376,7 +388,10 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
         class UserManager {
           private users: User[] = [];
           
-          ${Array(50).fill(null).map((_, i) => `
+          ${Array(50)
+            .fill(null)
+            .map(
+              (_, i) => `
             method${i}(param: string): string {
               if (param.length > 0) {
                 return 'result' + param;
@@ -384,7 +399,9 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
                 return 'default';
               }
             }
-          `).join('\n')}
+          `
+            )
+            .join('\n')}
         }
       `;
 
@@ -400,15 +417,15 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
       const customAnalyzer = new ReconstructedCodeQualityAnalyzer({
         quality: {
           weights: {
-            complexity: 0.5,      // Emphasize complexity more
+            complexity: 0.5, // Emphasize complexity more
             maintainability: 0.3,
             linting: 0.1,
             formatting: 0.05,
             typeScript: 0.05,
-            documentation: 0.0,   // Ignore documentation
-            security: 0.0
-          }
-        }
+            documentation: 0.0, // Ignore documentation
+            security: 0.0,
+          },
+        },
       });
 
       const code = `
@@ -429,8 +446,8 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
     it('should allow configuration updates', async () => {
       analyzer.updateConfiguration({
         performance: {
-          maxMemoryMB: 128
-        }
+          maxMemoryMB: 128,
+        },
       });
 
       const status = analyzer.getSystemStatus();
@@ -441,14 +458,14 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
   describe('Trend Analysis and History', () => {
     it('should track quality trends over multiple analyses', async () => {
       const identifier = 'test-file-trend';
-      
+
       // First analysis - simple code
       const simpleCode = `
         function add(a: number, b: number): number {
           return a + b;
         }
       `;
-      
+
       const result1 = await analyzer.analyzeCode(simpleCode, 'typescript', { identifier });
       expect(result1.qualityMetrics.trendData).toBeUndefined(); // No trend on first analysis
 
@@ -468,7 +485,7 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
           }
         }
       `;
-      
+
       const result2 = await analyzer.analyzeCode(complexCode, 'typescript', { identifier });
       expect(result2.qualityMetrics.trendData).toBeDefined();
       expect(result2.qualityMetrics.trendData?.trendDirection).toBeDefined();
@@ -476,7 +493,7 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
       // Third analysis - back to simple (improvement)
       const result3 = await analyzer.analyzeCode(simpleCode, 'typescript', { identifier });
       expect(result3.qualityMetrics.trendData?.trendDirection).toBeDefined();
-      
+
       // Check history
       const history = analyzer.getQualityHistory(identifier);
       expect(history.length).toBe(3);
@@ -486,8 +503,8 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
   describe('Event Emission', () => {
     it('should emit progress events during analysis', async () => {
       const progressEvents: any[] = [];
-      
-      analyzer.on('progress', (data) => {
+
+      analyzer.on('progress', data => {
         progressEvents.push(data);
       });
 
@@ -500,7 +517,7 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
       await analyzer.analyzeCode(code, 'typescript');
 
       expect(progressEvents.length).toBeGreaterThan(0);
-      
+
       // Should have different stages
       const stages = progressEvents.map(e => e.progress.stage);
       expect(new Set(stages).size).toBeGreaterThan(1);
@@ -508,8 +525,8 @@ describe('ReconstructedCodeQualityAnalyzer', () => {
 
     it('should emit completion events', async () => {
       let completionEvent: any = null;
-      
-      analyzer.on('analysisComplete', (data) => {
+
+      analyzer.on('analysisComplete', data => {
         completionEvent = data;
       });
 
@@ -611,7 +628,7 @@ describe('ASTComplexityAnalyzer', () => {
       expect(halstead.uniqueOperands).toBeGreaterThan(0);
       expect(halstead.totalOperators).toBeGreaterThan(0);
       expect(halstead.totalOperands).toBeGreaterThan(0);
-      
+
       // Verify calculated metrics
       expect(halstead.programVocabulary).toBe(halstead.uniqueOperators + halstead.uniqueOperands);
       expect(halstead.programLength).toBe(halstead.totalOperators + halstead.totalOperands);
@@ -632,12 +649,12 @@ describe('AsyncToolIntegrationManager', () => {
   describe('Tool Availability', () => {
     it('should check tool availability status', async () => {
       const status = manager.getToolAvailabilityStatus();
-      
+
       expect(status).toBeDefined();
       expect(status.eslint).toBeDefined();
       expect(status.prettier).toBeDefined();
       expect(status.typescript).toBeDefined();
-      
+
       expect(typeof status.eslint.available).toBe('boolean');
       expect(typeof status.prettier.available).toBe('boolean');
       expect(typeof status.typescript.available).toBe('boolean');
@@ -645,7 +662,7 @@ describe('AsyncToolIntegrationManager', () => {
 
     it('should provide health status', () => {
       const health = manager.getHealthStatus();
-      
+
       expect(health.activeJobs).toBeGreaterThanOrEqual(0);
       expect(health.queuedJobs).toBeGreaterThanOrEqual(0);
       expect(health.toolAvailability).toBeDefined();
@@ -656,7 +673,7 @@ describe('AsyncToolIntegrationManager', () => {
   describe('Circuit Breaker Functionality', () => {
     it('should reset circuit breakers', () => {
       manager.resetCircuitBreakers();
-      
+
       const health = manager.getHealthStatus();
       Object.values(health.circuitBreakerStatus).forEach(status => {
         expect(status).toBe('closed');
@@ -679,8 +696,8 @@ describe('Integration Tests', () => {
     analyzer = new ReconstructedCodeQualityAnalyzer({
       performance: {
         maxAnalysisTimeMs: 60000,
-        maxMemoryMB: 512
-      }
+        maxMemoryMB: 512,
+      },
     });
   });
 
@@ -877,7 +894,7 @@ describe('Integration Tests', () => {
 
     const result = await analyzer.analyzeCode(realWorldCode, 'typescript', {
       filename: 'authentication-service.ts',
-      identifier: 'auth-service'
+      identifier: 'auth-service',
     });
 
     // Validate comprehensive analysis
@@ -885,14 +902,14 @@ describe('Integration Tests', () => {
     expect(result.qualityMetrics.astMetrics.functionCount).toBeGreaterThan(5);
     expect(result.qualityMetrics.astMetrics.classCount).toBe(1);
     expect(result.qualityMetrics.astMetrics.commentRatio).toBeGreaterThan(10);
-    
+
     // Should have meaningful recommendations
     expect(result.qualityMetrics.recommendations.length).toBeGreaterThan(0);
-    
+
     // Performance should be reasonable
     expect(result.performanceMetrics.totalDuration).toBeLessThan(30000);
     expect(result.performanceMetrics.analysisEfficiencyScore).toBeGreaterThan(50);
-    
+
     // System should be healthy
     expect(result.systemHealth.systemLoad).toMatch(/^(low|medium|high)$/);
   }, 60000);

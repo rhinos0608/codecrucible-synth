@@ -39,14 +39,57 @@ export class TerminalMCPServer {
     this.config = {
       workingDirectory: config.workingDirectory || process.cwd(),
       allowedCommands: config.allowedCommands || [
-        'npm', 'node', 'git', 'ls', 'cat', 'pwd', 'echo', 'mkdir', 'touch',
-        'grep', 'find', 'head', 'tail', 'wc', 'sort', 'uniq', 'tree', 'tsc',
-        'tsx', 'eslint', 'prettier', 'jest', 'mocha', 'vitest', 'curl', 'wget',
-        'python', 'python3', 'pip', 'pip3', 'cargo', 'rustc', 'go'
+        'npm',
+        'node',
+        'git',
+        'ls',
+        'cat',
+        'pwd',
+        'echo',
+        'mkdir',
+        'touch',
+        'grep',
+        'find',
+        'head',
+        'tail',
+        'wc',
+        'sort',
+        'uniq',
+        'tree',
+        'tsc',
+        'tsx',
+        'eslint',
+        'prettier',
+        'jest',
+        'mocha',
+        'vitest',
+        'curl',
+        'wget',
+        'python',
+        'python3',
+        'pip',
+        'pip3',
+        'cargo',
+        'rustc',
+        'go',
       ],
       blockedCommands: config.blockedCommands || [
-        'rm', 'del', 'sudo', 'su', 'chmod', 'chown', 'kill', 'killall',
-        'shutdown', 'reboot', 'halt', 'format', 'fdisk', 'dd', 'mkfs', 'mount'
+        'rm',
+        'del',
+        'sudo',
+        'su',
+        'chmod',
+        'chown',
+        'kill',
+        'killall',
+        'shutdown',
+        'reboot',
+        'halt',
+        'format',
+        'fdisk',
+        'dd',
+        'mkfs',
+        'mount',
       ],
       timeout: config.timeout || 30000, // 30 seconds default
       maxOutputSize: config.maxOutputSize || 1000000, // 1MB default
@@ -81,10 +124,10 @@ export class TerminalMCPServer {
               type: 'object',
               properties: {
                 command: { type: 'string', description: 'Command to execute' },
-                args: { 
+                args: {
                   type: 'array',
                   items: { type: 'string' },
-                  description: 'Command arguments'
+                  description: 'Command arguments',
                 },
                 workingDirectory: { type: 'string', description: 'Working directory' },
                 timeout: { type: 'number', description: 'Timeout in milliseconds' },
@@ -100,7 +143,10 @@ export class TerminalMCPServer {
               type: 'object',
               properties: {
                 script: { type: 'string', description: 'Script content' },
-                interpreter: { type: 'string', description: 'Script interpreter (bash, python, node)' },
+                interpreter: {
+                  type: 'string',
+                  description: 'Script interpreter (bash, python, node)',
+                },
                 workingDirectory: { type: 'string', description: 'Working directory' },
                 timeout: { type: 'number', description: 'Timeout in milliseconds' },
               },
@@ -152,7 +198,7 @@ export class TerminalMCPServer {
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
       const typedArgs = args as Record<string, any>;
 
@@ -206,7 +252,7 @@ export class TerminalMCPServer {
 
   private isCommandAllowed(command: string): boolean {
     const baseCommand = command.split(' ')[0].toLowerCase();
-    
+
     // Check blocked commands first
     for (const blocked of this.config.blockedCommands!) {
       if (baseCommand.includes(blocked) || command.toLowerCase().includes(blocked)) {
@@ -215,9 +261,9 @@ export class TerminalMCPServer {
     }
 
     // Check if command is in allowed list
-    return this.config.allowedCommands!.some(allowed => 
-      baseCommand === allowed.toLowerCase() || 
-      baseCommand.startsWith(allowed.toLowerCase())
+    return this.config.allowedCommands!.some(
+      allowed =>
+        baseCommand === allowed.toLowerCase() || baseCommand.startsWith(allowed.toLowerCase())
     );
   }
 
@@ -229,7 +275,7 @@ export class TerminalMCPServer {
   ): Promise<TerminalResult> {
     const startTime = Date.now();
     const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
-    
+
     if (!this.isCommandAllowed(fullCommand)) {
       throw new Error(`Command not allowed: ${command}`);
     }
@@ -269,7 +315,7 @@ export class TerminalMCPServer {
     captureOutput = true
   ) {
     const result = await this.executeCommand(command, args, workingDirectory, timeout);
-    
+
     if (!captureOutput) {
       return {
         content: [{ type: 'text', text: `Command executed: ${result.command}` }],
@@ -309,14 +355,19 @@ export class TerminalMCPServer {
     const fs = await import('fs/promises');
     const os = await import('os');
     const tempDir = os.tmpdir();
-    const scriptExt = interpreter === 'python' || interpreter === 'python3' ? '.py' : 
-                    interpreter === 'node' ? '.js' :
-                    interpreter === 'bash' ? '.sh' : '.txt';
+    const scriptExt =
+      interpreter === 'python' || interpreter === 'python3'
+        ? '.py'
+        : interpreter === 'node'
+          ? '.js'
+          : interpreter === 'bash'
+            ? '.sh'
+            : '.txt';
     const scriptPath = path.join(tempDir, `script_${Date.now()}${scriptExt}`);
 
     try {
       await fs.writeFile(scriptPath, script, 'utf8');
-      
+
       const result = await this.executeCommand(
         interpreter,
         [scriptPath],
@@ -374,10 +425,12 @@ export class TerminalMCPServer {
     try {
       const fs = await import('fs/promises');
       await fs.access(dirPath); // Check if directory exists
-      
+
       this.config.workingDirectory = path.resolve(dirPath);
       return {
-        content: [{ type: 'text', text: `Working directory set to: ${this.config.workingDirectory}` }],
+        content: [
+          { type: 'text', text: `Working directory set to: ${this.config.workingDirectory}` },
+        ],
         isError: false,
       };
     } catch (error) {
@@ -386,15 +439,17 @@ export class TerminalMCPServer {
   }
 
   async listProcesses() {
-    const processList = Array.from(this.activeProcesses.entries()).map(([id, process]) => 
-      `${id}: PID ${process.pid} (${process.killed ? 'killed' : 'running'})`
+    const processList = Array.from(this.activeProcesses.entries()).map(
+      ([id, process]) => `${id}: PID ${process.pid} (${process.killed ? 'killed' : 'running'})`
     );
 
     return {
-      content: [{ 
-        type: 'text', 
-        text: processList.length > 0 ? processList.join('\n') : 'No active processes'
-      }],
+      content: [
+        {
+          type: 'text',
+          text: processList.length > 0 ? processList.join('\n') : 'No active processes',
+        },
+      ],
       isError: false,
     };
   }
@@ -437,7 +492,7 @@ export class TerminalMCPServer {
       } catch {} // Ignore errors during shutdown
     }
     this.activeProcesses.clear();
-    
+
     this.initialized = false;
     logger.info('Terminal MCP Server shutdown');
   }

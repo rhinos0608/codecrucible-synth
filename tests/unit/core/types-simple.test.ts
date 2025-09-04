@@ -16,17 +16,14 @@ import {
   isNumber,
   isObject,
   isDefined,
-  isNotNull
+  isNotNull,
 } from '../../../src/core/types/global.types';
 
 describe('Enterprise Error Types', () => {
   test('should create application error with all properties', () => {
-    const error = new ApplicationError(
-      'Test error message',
-      'TEST_ERROR',
-      500,
-      { additional: 'data' }
-    );
+    const error = new ApplicationError('Test error message', 'TEST_ERROR', 500, {
+      additional: 'data',
+    });
 
     expect(error.message).toBe('Test error message');
     expect(error.code).toBe('TEST_ERROR');

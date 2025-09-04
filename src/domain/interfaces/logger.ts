@@ -58,10 +58,20 @@ export function createConsoleLogger(name: string = 'domain'): ILogger {
   };
 
   return {
-    info: (message: string, meta?: unknown): void => { prefixed('INFO', message, meta); },
-    error: (message: string, error?: unknown): void => { prefixed('ERROR', message, error); },
-    warn: (message: string, meta?: unknown): void => { prefixed('WARN', message, meta); },
-    debug: (message: string, meta?: unknown): void => { prefixed('DEBUG', message, meta); },
-    trace: (message: string, meta?: unknown): void => { prefixed('TRACE', message, meta); },
+    info: (message: string, meta?: unknown): void => {
+      prefixed('INFO', message, meta);
+    },
+    error: (message: string, error?: unknown): void => {
+      prefixed('ERROR', message, error);
+    },
+    warn: (message: string, meta?: unknown): void => {
+      prefixed('WARN', message, meta);
+    },
+    debug: (message: string, meta?: unknown): void => {
+      prefixed('DEBUG', message, meta);
+    },
+    trace: (message: string, meta?: unknown): void => {
+      prefixed('TRACE', message, meta);
+    },
   };
 }

@@ -1,12 +1,12 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 // Core Intelligence Schemas for Smart Voice Selection
 export const promptAnalysisSchema = z.object({
-  domain: z.array(z.string()),                    // ["react", "typescript", "api"]
+  domain: z.array(z.string()), // ["react", "typescript", "api"]
   complexity: z.union([z.literal(1), z.literal(2), z.literal(3)]), // Simple/Medium/Complex
-  requirements: z.array(z.string()),              // ["security", "performance", "ux"]
-  keywords: z.array(z.string()),                  // extracted technical keywords
-  projectType: z.string().optional(),             // "component", "api", "database", etc.
+  requirements: z.array(z.string()), // ["security", "performance", "ux"]
+  keywords: z.array(z.string()), // extracted technical keywords
+  projectType: z.string().optional(), // "component", "api", "database", etc.
 });
 
 export const voiceCombinationSchema = z.object({
@@ -26,24 +26,28 @@ export const conversationMemoryEntrySchema = z.object({
   id: z.string(),
   prompt: z.string(),
   voicesUsed: z.array(z.string()),
-  generatedSolutions: z.array(z.string()),        // solution IDs
+  generatedSolutions: z.array(z.string()), // solution IDs
   userFeedback: z.enum(['good', 'bad', 'excellent', 'none']),
-  finalChoice: z.string().optional(),             // which solution they picked
+  finalChoice: z.string().optional(), // which solution they picked
   timestamp: z.date(),
   sessionId: z.number(),
 });
 
 export const voiceAnalyticsSchema = z.object({
-  mostUsedVoices: z.array(z.object({
-    voice: z.string(),
-    usageCount: z.number(),
-    successRate: z.number(),
-  })),
-  successfulCombinations: z.array(z.object({
-    combination: z.array(z.string()),
-    successRate: z.number(),
-    usageCount: z.number(),
-  })),
+  mostUsedVoices: z.array(
+    z.object({
+      voice: z.string(),
+      usageCount: z.number(),
+      successRate: z.number(),
+    })
+  ),
+  successfulCombinations: z.array(
+    z.object({
+      combination: z.array(z.string()),
+      successRate: z.number(),
+      usageCount: z.number(),
+    })
+  ),
   projectTypePreferences: z.record(z.array(z.string())),
 });
 
@@ -56,11 +60,13 @@ export const qualityMetricsSchema = z.object({
 
 export const synthesisResultSchema = z.object({
   synthesizedCode: z.string(),
-  conflictsResolved: z.array(z.object({
-    conflict: z.string(),
-    chosenApproach: z.string(),
-    reasoning: z.string(),
-  })),
+  conflictsResolved: z.array(
+    z.object({
+      conflict: z.string(),
+      chosenApproach: z.string(),
+      reasoning: z.string(),
+    })
+  ),
   patterns: z.object({
     commonApproaches: z.array(z.string()),
     innovativeElements: z.array(z.string()),

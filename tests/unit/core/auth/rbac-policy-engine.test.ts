@@ -1,7 +1,7 @@
 /**
  * Critical Security Tests - RBAC Policy Engine
  * Following Living Spiral Methodology - Security Guardian & Access Control Specialist
- * 
+ *
  * Test Coverage Areas:
  * - Role-based access control validation
  * - Permission inheritance and delegation
@@ -13,7 +13,13 @@
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { RBACPolicyEngine } from '../../../../src/core/auth/rbac-policy-engine.js';
-import { Policy, PolicyContext, Role, Permission, User } from '../../../../src/core/auth/auth-types.js';
+import {
+  Policy,
+  PolicyContext,
+  Role,
+  Permission,
+  User,
+} from '../../../../src/core/auth/auth-types.js';
 
 describe('RBACPolicyEngine - Critical Security Tests', () => {
   let rbacEngine: RBACPolicyEngine;
@@ -30,56 +36,56 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         id: 'read:public',
         name: 'Read Public Resources',
         resource: 'public:*',
-        action: 'read'
+        action: 'read',
       },
       readOwn: {
         id: 'read:own',
         name: 'Read Own Resources',
         resource: 'user:*',
-        action: 'read'
+        action: 'read',
       },
       writeOwn: {
         id: 'write:own',
         name: 'Write Own Resources',
         resource: 'user:*',
-        action: 'write'
+        action: 'write',
       },
       analyzeCode: {
         id: 'analyze:code',
         name: 'Analyze Code',
         resource: 'analysis:*',
-        action: 'read'
+        action: 'read',
       },
       generateCode: {
         id: 'generate:code',
         name: 'Generate Code',
         resource: 'generation:*',
-        action: 'write'
+        action: 'write',
       },
       manageVoices: {
         id: 'manage:voices',
         name: 'Manage Voice Systems',
         resource: 'voices:*',
-        action: '*'
+        action: '*',
       },
       adminAll: {
         id: 'admin:all',
         name: 'Full Admin Access',
         resource: '*',
-        action: '*'
+        action: '*',
       },
       viewMetrics: {
         id: 'view:metrics',
         name: 'View Metrics',
         resource: 'metrics:*',
-        action: 'read'
+        action: 'read',
       },
       manageConfig: {
         id: 'manage:config',
         name: 'Manage Configuration',
         resource: 'config:*',
-        action: '*'
-      }
+        action: '*',
+      },
     };
 
     // Define test roles with proper permission hierarchy
@@ -88,7 +94,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         id: 'guest',
         name: 'Guest User',
         description: 'Limited read-only access to public resources',
-        permissions: [testPermissions.readPublic]
+        permissions: [testPermissions.readPublic],
       },
       user: {
         id: 'user',
@@ -98,8 +104,8 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
           testPermissions.readPublic,
           testPermissions.readOwn,
           testPermissions.analyzeCode,
-          testPermissions.generateCode
-        ]
+          testPermissions.generateCode,
+        ],
       },
       developer: {
         id: 'developer',
@@ -112,15 +118,15 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
           testPermissions.analyzeCode,
           testPermissions.generateCode,
           testPermissions.manageVoices,
-          testPermissions.viewMetrics
-        ]
+          testPermissions.viewMetrics,
+        ],
       },
       admin: {
         id: 'admin',
         name: 'Administrator',
         description: 'Full system access',
-        permissions: [testPermissions.adminAll]
-      }
+        permissions: [testPermissions.adminAll],
+      },
     };
 
     // Define test users with different role assignments
@@ -132,7 +138,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         permissions: [],
         isActive: true,
         lastLoginAt: new Date(),
-        createdAt: new Date()
+        createdAt: new Date(),
       },
       regularUser: {
         id: 'user-456',
@@ -141,7 +147,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         permissions: [],
         isActive: true,
         lastLoginAt: new Date(),
-        createdAt: new Date()
+        createdAt: new Date(),
       },
       developer: {
         id: 'dev-789',
@@ -150,7 +156,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         permissions: [],
         isActive: true,
         lastLoginAt: new Date(),
-        createdAt: new Date()
+        createdAt: new Date(),
       },
       admin: {
         id: 'admin-001',
@@ -159,7 +165,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         permissions: [],
         isActive: true,
         lastLoginAt: new Date(),
-        createdAt: new Date()
+        createdAt: new Date(),
       },
       multiRole: {
         id: 'multi-002',
@@ -168,7 +174,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         permissions: [],
         isActive: true,
         lastLoginAt: new Date(),
-        createdAt: new Date()
+        createdAt: new Date(),
       },
       inactiveUser: {
         id: 'inactive-003',
@@ -177,8 +183,8 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         permissions: [],
         isActive: false, // Inactive user
         lastLoginAt: new Date(),
-        createdAt: new Date()
-      }
+        createdAt: new Date(),
+      },
     };
 
     // Add roles to the engine
@@ -195,7 +201,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'read',
         timestamp: new Date(),
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const result = await rbacEngine.authorize(context);
@@ -212,7 +218,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'write',
         timestamp: new Date(),
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const result = await rbacEngine.authorize(context);
@@ -229,7 +235,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'write',
         timestamp: new Date(),
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const result = await rbacEngine.authorize(context);
@@ -245,7 +251,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'read',
         timestamp: new Date(),
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const result = await rbacEngine.authorize(context);
@@ -263,7 +269,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'read',
         timestamp: new Date(),
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const privateContext: PolicyContext = {
@@ -272,7 +278,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'read',
         timestamp: new Date(),
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const publicResult = await rbacEngine.authorize(publicContext);
@@ -287,18 +293,18 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         {
           user: testUsers.admin,
           resource: 'any:resource:path',
-          action: 'read'
+          action: 'read',
         },
         {
           user: testUsers.admin,
           resource: 'system:critical:config',
-          action: 'write'
+          action: 'write',
         },
         {
           user: testUsers.admin,
           resource: 'users:all:data',
-          action: 'delete'
-        }
+          action: 'delete',
+        },
       ];
 
       for (const ctx of contexts) {
@@ -306,7 +312,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
           ...ctx,
           timestamp: new Date(),
           ipAddress: '127.0.0.1',
-          userAgent: 'test-agent'
+          userAgent: 'test-agent',
         } as PolicyContext);
 
         expect(result.granted).toBe(true);
@@ -319,18 +325,18 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         {
           user: testUsers.regularUser,
           resource: 'config:system',
-          action: 'write' // Regular user cannot modify system config
+          action: 'write', // Regular user cannot modify system config
         },
         {
           user: testUsers.developer,
           resource: 'admin:users',
-          action: 'delete' // Developer cannot delete admin resources
+          action: 'delete', // Developer cannot delete admin resources
         },
         {
           user: testUsers.guest,
           resource: 'metrics:performance',
-          action: 'read' // Guest cannot view metrics
-        }
+          action: 'read', // Guest cannot view metrics
+        },
       ];
 
       for (const ctx of unauthorizedContexts) {
@@ -338,7 +344,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
           ...ctx,
           timestamp: new Date(),
           ipAddress: '127.0.0.1',
-          userAgent: 'test-agent'
+          userAgent: 'test-agent',
         } as PolicyContext);
 
         expect(result.granted).toBe(false);
@@ -355,11 +361,13 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         subjects: ['user'],
         actions: ['read'],
         resources: ['sensitive:*'],
-        conditions: [{
-          type: 'time',
-          operator: 'between',
-          values: ['09:00', '17:00']
-        }]
+        conditions: [
+          {
+            type: 'time',
+            operator: 'between',
+            values: ['09:00', '17:00'],
+          },
+        ],
       };
 
       rbacEngine.addPolicy(timeBasedPolicy);
@@ -374,11 +382,11 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'read',
         timestamp: businessHoursTime,
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const result = await rbacEngine.authorize(context);
-      
+
       // Result depends on actual implementation of time conditions
       expect(typeof result.granted).toBe('boolean');
       expect(result.evaluatedConditions).toBeDefined();
@@ -392,11 +400,13 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         subjects: ['admin'],
         actions: ['*'],
         resources: ['admin:*'],
-        conditions: [{
-          type: 'ip',
-          operator: 'in_network',
-          values: ['192.168.1.0/24', '10.0.0.0/8']
-        }]
+        conditions: [
+          {
+            type: 'ip',
+            operator: 'in_network',
+            values: ['192.168.1.0/24', '10.0.0.0/8'],
+          },
+        ],
       };
 
       rbacEngine.addPolicy(ipBasedPolicy);
@@ -407,7 +417,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'write',
         timestamp: new Date(),
         ipAddress: '192.168.1.100',
-        userAgent: 'internal-client'
+        userAgent: 'internal-client',
       };
 
       const externalContext: PolicyContext = {
@@ -416,7 +426,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'write',
         timestamp: new Date(),
         ipAddress: '203.0.113.100', // External IP
-        userAgent: 'external-client'
+        userAgent: 'external-client',
       };
 
       const internalResult = await rbacEngine.authorize(internalContext);
@@ -436,7 +446,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'read',
         timestamp: new Date(),
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const result = await rbacEngine.authorize(user1Context);
@@ -452,7 +462,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'write',
         timestamp: new Date(),
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const result = await rbacEngine.authorize(escalationContext);
@@ -469,7 +479,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         permissions: [],
         isActive: true,
         lastLoginAt: new Date(),
-        createdAt: new Date()
+        createdAt: new Date(),
       };
 
       // User should not be able to self-assign admin role
@@ -479,7 +489,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'delete',
         timestamp: new Date(),
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const result = await rbacEngine.authorize(context);
@@ -497,7 +507,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         effect: 'allow',
         subjects: ['user'],
         actions: ['read'],
-        resources: ['documents:*']
+        resources: ['documents:*'],
       };
 
       const denyPolicy: Policy = {
@@ -506,7 +516,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         effect: 'deny',
         subjects: ['*'],
         actions: ['*'],
-        resources: ['documents:sensitive:*']
+        resources: ['documents:sensitive:*'],
       };
 
       rbacEngine.addPolicy(allowPolicy);
@@ -518,7 +528,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'read',
         timestamp: new Date(),
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const result = await rbacEngine.authorize(context);
@@ -535,7 +545,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         effect: 'allow',
         subjects: ['user'],
         actions: ['*'],
-        resources: ['files:*']
+        resources: ['files:*'],
       };
 
       const specificPolicy: Policy = {
@@ -544,7 +554,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         effect: 'deny',
         subjects: ['user'],
         actions: ['delete'],
-        resources: ['files:important:*']
+        resources: ['files:important:*'],
       };
 
       rbacEngine.addPolicy(generalPolicy);
@@ -556,7 +566,7 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
         action: 'delete',
         timestamp: new Date(),
         ipAddress: '127.0.0.1',
-        userAgent: 'test-agent'
+        userAgent: 'test-agent',
       };
 
       const result = await rbacEngine.authorize(context);
@@ -568,22 +578,24 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
 
   describe('Performance and Security Stress Tests', () => {
     it('should handle large numbers of concurrent authorization requests', async () => {
-      const requests = Array(100).fill(null).map((_, index) => {
-        return rbacEngine.authorize({
-          user: index % 2 === 0 ? testUsers.regularUser : testUsers.developer,
-          resource: `resource:${index}`,
-          action: 'read',
-          timestamp: new Date(),
-          ipAddress: `127.0.0.${Math.floor(index / 254) + 1}`,
-          userAgent: `client-${index}`
+      const requests = Array(100)
+        .fill(null)
+        .map((_, index) => {
+          return rbacEngine.authorize({
+            user: index % 2 === 0 ? testUsers.regularUser : testUsers.developer,
+            resource: `resource:${index}`,
+            action: 'read',
+            timestamp: new Date(),
+            ipAddress: `127.0.0.${Math.floor(index / 254) + 1}`,
+            userAgent: `client-${index}`,
+          });
         });
-      });
 
       const results = await Promise.allSettled(requests);
 
       // All requests should complete successfully
       expect(results.every(r => r.status === 'fulfilled')).toBe(true);
-      
+
       const successfulResults = results
         .filter(r => r.status === 'fulfilled')
         .map(r => (r as any).value);
@@ -608,11 +620,11 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
           action: 'read',
           timestamp: new Date(),
           ipAddress: '127.0.0.1',
-          userAgent: 'test-agent'
+          userAgent: 'test-agent',
         };
 
         const result = await rbacEngine.authorize(context);
-        
+
         // Should not grant access to malicious patterns
         expect(result.granted).toBe(false);
       }
@@ -622,19 +634,21 @@ describe('RBACPolicyEngine - Critical Security Tests', () => {
       const startTime = process.hrtime.bigint();
       const iterations = 50;
 
-      const promises = Array(iterations).fill(null).map(() => {
-        return rbacEngine.authorize({
-          user: testUsers.developer,
-          resource: 'voices:system',
-          action: 'read',
-          timestamp: new Date(),
-          ipAddress: '127.0.0.1',
-          userAgent: 'perf-test'
+      const promises = Array(iterations)
+        .fill(null)
+        .map(() => {
+          return rbacEngine.authorize({
+            user: testUsers.developer,
+            resource: 'voices:system',
+            action: 'read',
+            timestamp: new Date(),
+            ipAddress: '127.0.0.1',
+            userAgent: 'perf-test',
+          });
         });
-      });
 
       await Promise.all(promises);
-      
+
       const endTime = process.hrtime.bigint();
       const totalTime = Number(endTime - startTime) / 1000000; // Convert to milliseconds
       const avgTime = totalTime / iterations;

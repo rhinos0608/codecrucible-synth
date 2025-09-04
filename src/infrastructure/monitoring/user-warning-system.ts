@@ -138,7 +138,6 @@ Used: ${usage.count} times in ${duration} minutes
     }, this.config.longRunningWarningInterval);
   }
 
-
   /**
    * Warn user about long-running sessions (helpful, not alarming)
    */

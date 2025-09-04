@@ -1,6 +1,6 @@
 /**
  * Error Recovery System - Stub Implementation
- * 
+ *
  * Provides error recovery and resilience capabilities for the CLI system.
  */
 
@@ -58,7 +58,9 @@ export class ErrorRecoverySystem extends EventEmitter {
   private readonly defaultBaseDelayMs: number; // exponential backoff base
   private readonly maxDelayMs = 30_000;
 
-  public constructor(opts: Readonly<{ defaultMaxAttempts?: number; defaultBaseDelayMs?: number }> = {}) {
+  public constructor(
+    opts: Readonly<{ defaultMaxAttempts?: number; defaultBaseDelayMs?: number }> = {}
+  ) {
     super();
     this.defaultMaxAttempts = opts.defaultMaxAttempts ?? 3;
     this.defaultBaseDelayMs = opts.defaultBaseDelayMs ?? 200;
@@ -103,7 +105,7 @@ export class ErrorRecoverySystem extends EventEmitter {
     if (!lockPromise) {
       // Create a placeholder promise that will be replaced by the actual attempt
       let resolveLock: ((v: boolean) => void) | undefined;
-      lockPromise = new Promise<boolean>((res) => {
+      lockPromise = new Promise<boolean>(res => {
         resolveLock = res;
       });
       this.locks.set(id, lockPromise);
@@ -165,10 +167,15 @@ export class ErrorRecoverySystem extends EventEmitter {
    * Execute the provided RecoveryAction.
    * Returns true if recovery succeeded, false otherwise.
    */
-  public async executeRecoveryAction(action: RecoveryAction, context: Readonly<ErrorContext>): Promise<boolean> {
+  public async executeRecoveryAction(
+    action: RecoveryAction,
+    context: Readonly<ErrorContext>
+  ): Promise<boolean> {
     // Normalize max attempts and delay
-    const maxAttempts = action.maxAttempts ?? (context.metadata?.maxAttempts as number) ?? this.defaultMaxAttempts;
-    const baseDelay = action.delay ?? (context.metadata?.delayMs as number) ?? this.defaultBaseDelayMs;
+    const maxAttempts =
+      action.maxAttempts ?? (context.metadata?.maxAttempts as number) ?? this.defaultMaxAttempts;
+    const baseDelay =
+      action.delay ?? (context.metadata?.delayMs as number) ?? this.defaultBaseDelayMs;
 
     const runOperationFromContext = async (): Promise<unknown> => {
       // If a concrete retryable function is attached in metadata use it.
@@ -236,10 +243,14 @@ export class ErrorRecoverySystem extends EventEmitter {
 
   getErrorStats(): ErrorStats {
     const totalErrors = this.history.length;
-    const recoveredErrors = this.history.filter((h) => h.success).length;
+    const recoveredErrors = this.history.filter(h => h.success).length;
     const failedRecoveries = totalErrors - recoveredErrors;
-    const durations = this.history.filter((h) => typeof h.duration === 'number').map((h) => h.duration as number);
-    const averageRecoveryTime = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
+    const durations = this.history
+      .filter(h => typeof h.duration === 'number')
+      .map(h => h.duration as number);
+    const averageRecoveryTime = durations.length
+      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+      : 0;
     return {
       totalErrors,
       recoveredErrors,
@@ -253,7 +264,10 @@ export class ErrorRecoverySystem extends EventEmitter {
     const uptime = uptimeMs;
 
     const stats = this.getErrorStats();
-    const errorRate = uptimeMs > 0 ? stats.totalErrors / Math.max(1, Math.floor(uptimeMs / 60_000)) : stats.totalErrors;
+    const errorRate =
+      uptimeMs > 0
+        ? stats.totalErrors / Math.max(1, Math.floor(uptimeMs / 60_000))
+        : stats.totalErrors;
     const recoveryRate = stats.totalErrors ? stats.recoveredErrors / stats.totalErrors : 1;
 
     // Determine status heuristically
@@ -293,14 +307,19 @@ export class ErrorRecoverySystem extends EventEmitter {
         type: 'fallback',
         maxAttempts: 1,
         delay: 0,
-        fallbackOperation: context.metadata?.fallbackOperation as (() => Promise<unknown>) | undefined,
+        fallbackOperation: context.metadata?.fallbackOperation as
+          | (() => Promise<unknown>)
+          | undefined,
       };
     }
 
     if (severity === 'warning' || severity === 'info') {
       return {
         type: 'retry',
-        maxAttempts: Math.max(1, (context.metadata?.maxAttempts as number) ?? this.defaultMaxAttempts),
+        maxAttempts: Math.max(
+          1,
+          (context.metadata?.maxAttempts as number) ?? this.defaultMaxAttempts
+        ),
         delay: context.metadata?.delayMs as number | undefined,
       };
     }
@@ -314,7 +333,7 @@ export class ErrorRecoverySystem extends EventEmitter {
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise((res) => setTimeout(res, ms));
+    return new Promise(res => setTimeout(res, ms));
   }
 
   clearHistory(): void {

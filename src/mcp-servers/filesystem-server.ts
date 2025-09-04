@@ -126,23 +126,36 @@ export class FilesystemMCPServer {
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
       const typedArgs = args as Record<string, any>;
 
       try {
         switch (name) {
           case 'read_file':
-            return await this.readFile(typedArgs.path as string, typedArgs.encoding as BufferEncoding);
+            return await this.readFile(
+              typedArgs.path as string,
+              typedArgs.encoding as BufferEncoding
+            );
 
           case 'write_file':
-            return await this.writeFile(typedArgs.path as string, typedArgs.content as string, typedArgs.encoding as BufferEncoding);
+            return await this.writeFile(
+              typedArgs.path as string,
+              typedArgs.content as string,
+              typedArgs.encoding as BufferEncoding
+            );
 
           case 'list_directory':
-            return await this.listDirectory(typedArgs.path as string, typedArgs.recursive as boolean);
+            return await this.listDirectory(
+              typedArgs.path as string,
+              typedArgs.recursive as boolean
+            );
 
           case 'create_directory':
-            return await this.createDirectory(typedArgs.path as string, typedArgs.recursive as boolean);
+            return await this.createDirectory(
+              typedArgs.path as string,
+              typedArgs.recursive as boolean
+            );
 
           case 'delete_file':
             return await this.deleteFile(typedArgs.path as string);
@@ -169,7 +182,7 @@ export class FilesystemMCPServer {
 
   private isPathAllowed(targetPath: string): boolean {
     const normalizedPath = path.resolve(targetPath);
-    
+
     // Check if path contains blocked patterns
     for (const blocked of this.config.blockedPaths!) {
       if (normalizedPath.includes(blocked)) {
@@ -275,17 +288,23 @@ export class FilesystemMCPServer {
 
     const stats = await fs.stat(filePath);
     return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          size: stats.size,
-          isFile: stats.isFile(),
-          isDirectory: stats.isDirectory(),
-          created: stats.birthtime,
-          modified: stats.mtime,
-          accessed: stats.atime,
-        }, null, 2),
-      }],
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              size: stats.size,
+              isFile: stats.isFile(),
+              isDirectory: stats.isDirectory(),
+              created: stats.birthtime,
+              modified: stats.mtime,
+              accessed: stats.atime,
+            },
+            null,
+            2
+          ),
+        },
+      ],
       isError: false,
     };
   }

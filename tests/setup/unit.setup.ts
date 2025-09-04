@@ -23,7 +23,7 @@ beforeEach(() => {
 // Cleanup after each test - Enhanced EventEmitter resource management
 afterEach(() => {
   jest.clearAllTimers();
-  
+
   // Clean up any global EventEmitters that might have been created
   if (global.process && global.process.removeAllListeners) {
     // Don't remove critical process listeners, but clean up test-specific ones
@@ -50,7 +50,7 @@ global.testUtils = {
       emitter.removeAllListeners();
     });
     return emitter;
-  }
+  },
 };
 
 // Enhanced cleanup for EventEmitter-based tests
@@ -59,7 +59,7 @@ afterAll(() => {
   if (typeof global.gc === 'function') {
     global.gc();
   }
-  
+
   // Clean up any remaining timers
   jest.clearAllTimers();
 });

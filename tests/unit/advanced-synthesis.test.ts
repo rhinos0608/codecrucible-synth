@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
-import { 
-  AdvancedSynthesisEngine, 
-  SynthesisMode, 
+import {
+  AdvancedSynthesisEngine,
+  SynthesisMode,
   WeightingStrategy,
-  ConflictResolutionStrategy 
+  ConflictResolutionStrategy,
 } from '../../src/core/advanced-synthesis-engine';
 import { ResponseFactory, AgentResponse } from '../../src/core/response-types';
 
@@ -17,11 +17,11 @@ describe('Advanced Synthesis Engine', () => {
 
   beforeEach(() => {
     mockModelClient = {
-      generateVoiceResponse: jest.fn()
+      generateVoiceResponse: jest.fn(),
     };
-    
+
     engine = new AdvancedSynthesisEngine(mockModelClient);
-    
+
     sampleResponses = [
       ResponseFactory.createAgentResponse(
         'This is a TypeScript solution using interfaces and strong typing.',
@@ -34,14 +34,14 @@ describe('Advanced Synthesis Engine', () => {
       ResponseFactory.createAgentResponse(
         'Security considerations include input validation and authentication.',
         { confidence: 0.85, voiceId: 'security', tokensUsed: 40 }
-      )
+      ),
     ];
   });
 
   describe('Synthesis Configuration', () => {
     test('should use default configuration when none provided', async () => {
       const result = await engine.synthesizeAdvanced(sampleResponses);
-      
+
       expect(result).toBeDefined();
       expect(result.synthesisStrategy).toBeDefined();
       expect(result.qualityMetrics).toBeDefined();
@@ -52,11 +52,11 @@ describe('Advanced Synthesis Engine', () => {
       const customConfig = {
         mode: SynthesisMode.CONSENSUS,
         qualityThreshold: 90,
-        maxIterations: 5
+        maxIterations: 5,
       };
-      
+
       const result = await engine.synthesizeAdvanced(sampleResponses, customConfig);
-      
+
       expect(result.synthesisStrategy).toBe(SynthesisMode.CONSENSUS);
     });
   });
@@ -65,7 +65,7 @@ describe('Advanced Synthesis Engine', () => {
     test('should handle competitive synthesis', async () => {
       const config = { mode: SynthesisMode.COMPETITIVE };
       const result = await engine.synthesizeAdvanced(sampleResponses, config);
-      
+
       expect(result.synthesisStrategy).toBe(SynthesisMode.COMPETITIVE);
       expect(result.combinedContent).toBeDefined();
       expect(result.combinedContent.length).toBeGreaterThan(0);
@@ -74,7 +74,7 @@ describe('Advanced Synthesis Engine', () => {
     test('should handle collaborative synthesis', async () => {
       const config = { mode: SynthesisMode.COLLABORATIVE };
       const result = await engine.synthesizeAdvanced(sampleResponses, config);
-      
+
       expect(result.synthesisStrategy).toBe(SynthesisMode.COLLABORATIVE);
       expect(result.voicesUsed).toHaveLength(3);
     });
@@ -82,7 +82,7 @@ describe('Advanced Synthesis Engine', () => {
     test('should handle consensus synthesis', async () => {
       const config = { mode: SynthesisMode.CONSENSUS };
       const result = await engine.synthesizeAdvanced(sampleResponses, config);
-      
+
       expect(result.synthesisStrategy).toBe(SynthesisMode.CONSENSUS);
       expect(result.qualityMetrics.overall).toBeGreaterThan(0);
     });
@@ -90,7 +90,7 @@ describe('Advanced Synthesis Engine', () => {
     test('should handle hierarchical synthesis', async () => {
       const config = { mode: SynthesisMode.HIERARCHICAL };
       const result = await engine.synthesizeAdvanced(sampleResponses, config);
-      
+
       expect(result.synthesisStrategy).toBe(SynthesisMode.HIERARCHICAL);
       expect(result.voiceWeights).toBeDefined();
     });
@@ -105,12 +105,12 @@ describe('Advanced Synthesis Engine', () => {
         ResponseFactory.createAgentResponse(
           'Functional programming is the better approach for this problem.',
           { confidence: 0.8, voiceId: 'fp-advocate', tokensUsed: 30 }
-        )
+        ),
       ];
-      
+
       const config = { mode: SynthesisMode.DIALECTICAL };
       const result = await engine.synthesizeAdvanced(conflictingResponses, config);
-      
+
       expect(result.synthesisStrategy).toBe(SynthesisMode.DIALECTICAL);
       // Should detect programming paradigm conflict
       expect(result.conflictAnalysis.conflictingTopics).toContain('programming paradigm');
@@ -119,13 +119,13 @@ describe('Advanced Synthesis Engine', () => {
     test('should handle adaptive synthesis mode selection', async () => {
       const config = { mode: SynthesisMode.ADAPTIVE };
       const result = await engine.synthesizeAdvanced(sampleResponses, config);
-      
+
       expect(result.synthesisStrategy).toBeDefined();
       expect([
         SynthesisMode.COMPETITIVE,
         SynthesisMode.COLLABORATIVE,
         SynthesisMode.CONSENSUS,
-        SynthesisMode.DIALECTICAL
+        SynthesisMode.DIALECTICAL,
       ]).toContain(result.synthesisStrategy as SynthesisMode);
     });
   });
@@ -133,7 +133,7 @@ describe('Advanced Synthesis Engine', () => {
   describe('Quality Assessment', () => {
     test('should provide comprehensive quality metrics', async () => {
       const result = await engine.synthesizeAdvanced(sampleResponses);
-      
+
       expect(result.qualityMetrics).toBeDefined();
       expect(result.qualityMetrics.coherence).toBeGreaterThanOrEqual(0);
       expect(result.qualityMetrics.coherence).toBeLessThanOrEqual(100);
@@ -147,11 +147,11 @@ describe('Advanced Synthesis Engine', () => {
     test('should trigger adaptive refinement for low quality', async () => {
       const config = {
         qualityThreshold: 95, // Set very high threshold
-        enableAdaptiveSynthesis: true
+        enableAdaptiveSynthesis: true,
       };
-      
+
       const result = await engine.synthesizeAdvanced(sampleResponses, config);
-      
+
       // Should have attempted adaptive adjustments
       expect(result.adaptiveAdjustments).toBeDefined();
     });
@@ -160,7 +160,7 @@ describe('Advanced Synthesis Engine', () => {
   describe('Conflict Analysis', () => {
     test('should analyze conflicts between responses', async () => {
       const result = await engine.synthesizeAdvanced(sampleResponses);
-      
+
       expect(result.conflictAnalysis).toBeDefined();
       expect(result.conflictAnalysis.agreementLevel).toBeGreaterThanOrEqual(0);
       expect(result.conflictAnalysis.agreementLevel).toBeLessThanOrEqual(1);
@@ -169,18 +169,20 @@ describe('Advanced Synthesis Engine', () => {
 
     test('should identify high agreement when responses are similar', async () => {
       const similarResponses = [
-        ResponseFactory.createAgentResponse(
-          'Use TypeScript for better type safety.',
-          { confidence: 0.9, voiceId: 'dev1', tokensUsed: 20 }
-        ),
-        ResponseFactory.createAgentResponse(
-          'TypeScript provides excellent type safety features.',
-          { confidence: 0.8, voiceId: 'dev2', tokensUsed: 25 }
-        )
+        ResponseFactory.createAgentResponse('Use TypeScript for better type safety.', {
+          confidence: 0.9,
+          voiceId: 'dev1',
+          tokensUsed: 20,
+        }),
+        ResponseFactory.createAgentResponse('TypeScript provides excellent type safety features.', {
+          confidence: 0.8,
+          voiceId: 'dev2',
+          tokensUsed: 25,
+        }),
       ];
-      
+
       const result = await engine.synthesizeAdvanced(similarResponses);
-      
+
       expect(result.conflictAnalysis.agreementLevel).toBeGreaterThan(0.5);
     });
   });
@@ -188,10 +190,10 @@ describe('Advanced Synthesis Engine', () => {
   describe('Voice Weighting', () => {
     test('should calculate appropriate voice weights', async () => {
       const result = await engine.synthesizeAdvanced(sampleResponses);
-      
+
       expect(result.voiceWeights).toBeDefined();
       expect(result.voiceWeights).toHaveLength(sampleResponses.length);
-      
+
       result.voiceWeights.forEach(weight => {
         expect(weight.voiceId).toBeDefined();
         expect(weight.weight).toBeGreaterThanOrEqual(0);
@@ -201,14 +203,14 @@ describe('Advanced Synthesis Engine', () => {
 
     test('should prioritize higher confidence responses in weighting', async () => {
       const result = await engine.synthesizeAdvanced(sampleResponses);
-      
+
       // Find the weight for the developer voice (highest confidence: 0.9)
       const developerWeight = result.voiceWeights.find(w => w.voiceId === 'developer');
       const optimizerWeight = result.voiceWeights.find(w => w.voiceId === 'optimizer');
-      
+
       expect(developerWeight).toBeDefined();
       expect(optimizerWeight).toBeDefined();
-      
+
       // Developer should have higher weight due to higher confidence
       if (developerWeight && optimizerWeight) {
         expect(developerWeight.weight).toBeGreaterThanOrEqual(optimizerWeight.weight);
@@ -224,7 +226,7 @@ describe('Advanced Synthesis Engine', () => {
     test('should handle single response gracefully', async () => {
       const singleResponse = [sampleResponses[0]];
       const result = await engine.synthesizeAdvanced(singleResponse);
-      
+
       expect(result).toBeDefined();
       expect(result.voicesUsed).toHaveLength(1);
       expect(result.conflictAnalysis.agreementLevel).toBe(1.0);
@@ -233,11 +235,11 @@ describe('Advanced Synthesis Engine', () => {
     test('should provide fallback for synthesis failures', async () => {
       // Mock a synthesis failure
       const invalidResponses = [
-        ResponseFactory.createAgentResponse('', { confidence: 0, voiceId: 'invalid' })
+        ResponseFactory.createAgentResponse('', { confidence: 0, voiceId: 'invalid' }),
       ];
-      
+
       const result = await engine.synthesizeAdvanced(invalidResponses);
-      
+
       expect(result).toBeDefined();
       expect(result.success).toBeDefined();
     });
@@ -246,26 +248,26 @@ describe('Advanced Synthesis Engine', () => {
   describe('Performance and Efficiency', () => {
     test('should complete synthesis within reasonable time', async () => {
       const startTime = Date.now();
-      
+
       await engine.synthesizeAdvanced(sampleResponses);
-      
+
       const endTime = Date.now();
       const duration = endTime - startTime;
-      
+
       // Should complete within 5 seconds for test environment
       expect(duration).toBeLessThan(5000);
     });
 
     test('should handle large number of responses efficiently', async () => {
-      const manyResponses = Array.from({ length: 10 }, (_, i) => 
+      const manyResponses = Array.from({ length: 10 }, (_, i) =>
         ResponseFactory.createAgentResponse(
           `Response ${i} with different content and perspectives.`,
-          { confidence: 0.7 + (i * 0.02), voiceId: `voice${i}`, tokensUsed: 30 }
+          { confidence: 0.7 + i * 0.02, voiceId: `voice${i}`, tokensUsed: 30 }
         )
       );
-      
+
       const result = await engine.synthesizeAdvanced(manyResponses);
-      
+
       expect(result).toBeDefined();
       expect(result.voicesUsed).toHaveLength(10);
       expect(result.voiceWeights).toHaveLength(10);
@@ -275,7 +277,7 @@ describe('Advanced Synthesis Engine', () => {
   describe('Integration with Response Types', () => {
     test('should maintain response type consistency', async () => {
       const result = await engine.synthesizeAdvanced(sampleResponses);
-      
+
       // Should be a valid SynthesisResponse
       expect(result.success).toBeDefined();
       expect(result.timestamp).toBeDefined();
@@ -286,7 +288,7 @@ describe('Advanced Synthesis Engine', () => {
 
     test('should preserve individual response metadata', async () => {
       const result = await engine.synthesizeAdvanced(sampleResponses);
-      
+
       // Should reference all original voices
       expect(result.voicesUsed).toContain('developer');
       expect(result.voicesUsed).toContain('optimizer');

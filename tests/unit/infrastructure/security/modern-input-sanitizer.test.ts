@@ -11,7 +11,11 @@ import {
   SanitizationResult,
   ConsentManager,
 } from '../../../../src/infrastructure/security/modern-input-sanitizer.js';
-import { ClaudeCodeSecurity, SecurityContext, SecurityDecision } from '../../../../src/infrastructure/security/claude-code-security.js';
+import {
+  ClaudeCodeSecurity,
+  SecurityContext,
+  SecurityDecision,
+} from '../../../../src/infrastructure/security/claude-code-security.js';
 
 // Mock implementations for testing
 class MockClaudeCodeSecurity {
@@ -95,12 +99,12 @@ class MockConsentManager extends EventEmitter implements ConsentManager {
 
   async requestConsent(requestId: string, message: string, options: string[]): Promise<string> {
     const response = this.responses.get(requestId) || this.defaultResponse;
-    
+
     this.emit('consent-requested', { requestId, message, options, response });
-    
+
     // Simulate user response delay
     await new Promise(resolve => setTimeout(resolve, 10));
-    
+
     return response;
   }
 }
@@ -190,7 +194,7 @@ describe('ModernInputSanitizer - Comprehensive Security Tests', () => {
 
       const auditLog = mockSecurity.getAuditLog();
       expect(auditLog).toHaveLength(1);
-      
+
       const logEntry = auditLog[0];
       expect(logEntry.operation).toBe('test_operation');
       expect(logEntry.filePath).toBe('/test/path');
@@ -226,7 +230,7 @@ describe('ModernInputSanitizer - Comprehensive Security Tests', () => {
 
     it('should handle consent request failures gracefully', async () => {
       const consentPrompt = 'requires-consent operation with failure';
-      
+
       // Mock consent manager to throw error
       mockConsentManager.requestConsent = jest.fn().mockRejectedValue(new Error('Consent failed'));
 
@@ -384,8 +388,15 @@ describe('ModernInputSanitizer - Comprehensive Security Tests', () => {
 
     it('should handle all valid voice names', () => {
       const allValidVoices = [
-        'explorer', 'maintainer', 'analyzer', 'developer', 'implementor',
-        'security', 'architect', 'designer', 'optimizer'
+        'explorer',
+        'maintainer',
+        'analyzer',
+        'developer',
+        'implementor',
+        'security',
+        'architect',
+        'designer',
+        'optimizer',
       ];
       const result = ModernInputSanitizer.sanitizeVoiceNames(allValidVoices);
 
@@ -414,13 +425,7 @@ describe('ModernInputSanitizer - Comprehensive Security Tests', () => {
     });
 
     it('should reject unauthorized commands', () => {
-      const unauthorizedCommands = [
-        '/execute',
-        '/hack',
-        '/delete',
-        '/system',
-        '/admin',
-      ];
+      const unauthorizedCommands = ['/execute', '/hack', '/delete', '/system', '/admin'];
 
       for (const command of unauthorizedCommands) {
         const result = ModernInputSanitizer.sanitizeSlashCommand(command);
@@ -613,12 +618,10 @@ describe('ModernInputSanitizer - Comprehensive Security Tests', () => {
         () => ModernInputSanitizer.sanitizeVoiceNames(['explorer']),
       ];
 
-      const promises = Array.from({ length: 50 }, (_, i) =>
-        operations[i % operations.length]()
-      );
+      const promises = Array.from({ length: 50 }, (_, i) => operations[i % operations.length]());
 
       const results = await Promise.allSettled(promises);
-      
+
       expect(results.every(r => r.status === 'fulfilled')).toBe(true);
     });
 
@@ -654,7 +657,7 @@ describe('ModernInputSanitizer - Comprehensive Security Tests', () => {
 
       const auditLog = ModernInputSanitizer.getAuditLog();
       expect(auditLog.length).toBeGreaterThan(0);
-      
+
       const lastEntry = auditLog[auditLog.length - 1];
       expect(lastEntry.operation).toBe('integration_test');
     });
@@ -662,7 +665,9 @@ describe('ModernInputSanitizer - Comprehensive Security Tests', () => {
     it('should handle security system errors gracefully', async () => {
       // Mock security system to throw error
       const originalEvaluate = mockSecurity.evaluateSecurity;
-      mockSecurity.evaluateSecurity = jest.fn().mockRejectedValue(new Error('Security system error'));
+      mockSecurity.evaluateSecurity = jest
+        .fn()
+        .mockRejectedValue(new Error('Security system error'));
 
       // Should handle error and default to safe behavior
       await expect(ModernInputSanitizer.sanitizePrompt('test')).resolves.toBeDefined();

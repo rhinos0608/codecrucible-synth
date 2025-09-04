@@ -5,8 +5,15 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
-import { AdvancedSearchCacheManager, CachedSearchExecutor } from '../../src/core/search/advanced-search-cache.js';
-import type { CacheConfig, CacheEntry, CacheStats } from '../../src/core/search/advanced-search-cache.js';
+import {
+  AdvancedSearchCacheManager,
+  CachedSearchExecutor,
+} from '../../src/core/search/advanced-search-cache.js';
+import type {
+  CacheConfig,
+  CacheEntry,
+  CacheStats,
+} from '../../src/core/search/advanced-search-cache.js';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtemp, rm, writeFile, mkdir } from 'fs/promises';
@@ -15,14 +22,14 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
   let testWorkspace: string;
   let cacheManager: AdvancedSearchCacheManager;
   let cachedExecutor: CachedSearchExecutor;
-  
+
   const testConfig: CacheConfig = {
     maxCacheSize: 50,
     maxCacheAge: 5000, // 5 seconds for testing
     enableFileHashTracking: true,
     enablePerformanceMetrics: true,
     compactionInterval: 1000, // 1 second for testing
-    compressionThreshold: 1000 // 1KB for testing
+    compressionThreshold: 1000, // 1KB for testing
   };
 
   // Mock search results for testing
@@ -34,12 +41,12 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
           content: 'export function testFunction() {}',
           line: 1,
           column: 0,
-          similarity: 0.95
-        }
+          similarity: 0.95,
+        },
       ],
       query: 'testFunction',
       totalDocuments: 1,
-      processingTimeMs: 100
+      processingTimeMs: 100,
     },
     complex: {
       documents: Array.from({ length: 10 }, (_, i) => ({
@@ -47,23 +54,23 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
         content: `export function func${i}() { return ${i}; }`,
         line: i + 1,
         column: 0,
-        similarity: 0.8 + (i * 0.01)
+        similarity: 0.8 + i * 0.01,
       })),
       query: 'func.*',
       totalDocuments: 10,
-      processingTimeMs: 250
-    }
+      processingTimeMs: 250,
+    },
   };
 
   beforeAll(async () => {
     // Create isolated test workspace
     testWorkspace = await mkdtemp(join(tmpdir(), 'cache-test-'));
-    
+
     // Create some test files for file tracking
     const testFiles = {
       'src/test.ts': 'export function testFunction() {}',
       'src/utils.ts': 'export function utilFunction() {}',
-      'src/main.ts': 'import { testFunction } from "./test";'
+      'src/main.ts': 'import { testFunction } from "./test";',
     };
 
     for (const [filePath, content] of Object.entries(testFiles)) {
@@ -93,18 +100,18 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
     it('should cache and retrieve search results', async () => {
       const queryKey = 'test-query-1';
       const searchResults = mockSearchResults.simple;
-      
+
       // Cache results
       await cacheManager.setCachedResults(queryKey, searchResults, {
         searchMethod: 'ripgrep',
         queryType: 'function',
         confidence: 0.9,
-        duration: 100
+        duration: 100,
       });
 
       // Retrieve results
       const cached = await cacheManager.getCachedResults(queryKey);
-      
+
       expect(cached).toBeDefined();
       expect(cached).toEqual(searchResults);
     });
@@ -116,7 +123,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
 
     it('should respect cache size limits', async () => {
       const promises: Promise<void>[] = [];
-      
+
       // Add more entries than maxCacheSize
       for (let i = 0; i < testConfig.maxCacheSize + 10; i++) {
         promises.push(
@@ -124,29 +131,29 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
             searchMethod: 'ripgrep',
             queryType: 'function',
             confidence: 0.8,
-            duration: 50
+            duration: 50,
           })
         );
       }
-      
+
       await Promise.all(promises);
-      
+
       // Allow maintenance to run
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
+
       const stats = cacheManager.getStats();
       expect(stats.totalEntries).toBeLessThanOrEqual(testConfig.maxCacheSize);
     });
 
     it('should expire old cache entries', async () => {
       const queryKey = 'expiring-query';
-      
+
       // Cache with short TTL
       await cacheManager.setCachedResults(queryKey, mockSearchResults.simple, {
         searchMethod: 'ripgrep',
         queryType: 'function',
         confidence: 0.8,
-        duration: 50
+        duration: 50,
       });
 
       // Should be available immediately
@@ -166,19 +173,19 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
     it('should track file modifications and invalidate cache', async () => {
       const testFile = join(testWorkspace, 'src/test.ts');
       const queryKey = 'file-tracking-query';
-      
+
       // Cache results with file tracking
       await cacheManager.setCachedResults(queryKey, mockSearchResults.simple, {
         searchMethod: 'ripgrep',
         queryType: 'function',
         confidence: 0.9,
         duration: 100,
-        filePaths: [testFile]
+        filePaths: [testFile],
       });
 
       // Should be cached
       let cached = await cacheManager.getCachedResults(queryKey, {
-        checkFileModifications: true
+        checkFileModifications: true,
       });
       expect(cached).toBeDefined();
 
@@ -187,7 +194,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
 
       // Should be invalidated due to file change
       cached = await cacheManager.getCachedResults(queryKey, {
-        checkFileModifications: true
+        checkFileModifications: true,
       });
       expect(cached).toBeNull();
     });
@@ -195,19 +202,19 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
     it('should handle non-existent files gracefully', async () => {
       const nonExistentFile = join(testWorkspace, 'non-existent.ts');
       const queryKey = 'missing-file-query';
-      
+
       // Cache results with non-existent file
       await cacheManager.setCachedResults(queryKey, mockSearchResults.simple, {
         searchMethod: 'ripgrep',
         queryType: 'function',
         confidence: 0.9,
         duration: 100,
-        filePaths: [nonExistentFile]
+        filePaths: [nonExistentFile],
       });
 
       // Should invalidate due to missing file
       const cached = await cacheManager.getCachedResults(queryKey, {
-        checkFileModifications: true
+        checkFileModifications: true,
       });
       expect(cached).toBeNull();
     });
@@ -216,22 +223,22 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
       const testFiles = [
         join(testWorkspace, 'src/test.ts'),
         join(testWorkspace, 'src/utils.ts'),
-        join(testWorkspace, 'src/main.ts')
+        join(testWorkspace, 'src/main.ts'),
       ];
       const queryKey = 'multi-file-query';
-      
+
       // Cache results with multiple files
       await cacheManager.setCachedResults(queryKey, mockSearchResults.complex, {
         searchMethod: 'ripgrep',
         queryType: 'function',
         confidence: 0.85,
         duration: 200,
-        filePaths: testFiles
+        filePaths: testFiles,
       });
 
       // Should be cached
       let cached = await cacheManager.getCachedResults(queryKey, {
-        checkFileModifications: true
+        checkFileModifications: true,
       });
       expect(cached).toBeDefined();
 
@@ -240,7 +247,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
 
       // Should be invalidated due to any file change
       cached = await cacheManager.getCachedResults(queryKey, {
-        checkFileModifications: true
+        checkFileModifications: true,
       });
       expect(cached).toBeNull();
     });
@@ -249,14 +256,14 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
   describe('Cache Statistics and Analytics', () => {
     it('should track hit and miss rates', async () => {
       const queries = ['query1', 'query2', 'query3'];
-      
+
       // Cache some results
       for (const query of queries) {
         await cacheManager.setCachedResults(query, mockSearchResults.simple, {
           searchMethod: 'ripgrep',
           queryType: 'function',
           confidence: 0.8,
-          duration: 50
+          duration: 50,
         });
       }
 
@@ -270,7 +277,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
       await cacheManager.getCachedResults('miss2');
 
       const stats = cacheManager.getStats();
-      
+
       expect(stats.totalEntries).toBe(3);
       expect(stats.hitRate).toBeGreaterThan(0);
       expect(stats.missRate).toBeGreaterThan(0);
@@ -287,7 +294,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
           searchMethod: 'ripgrep',
           queryType: 'function',
           confidence: 0.8,
-          duration: 100
+          duration: 100,
         });
       }
 
@@ -299,7 +306,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
     it('should provide invalidation statistics', async () => {
       const testFile = join(testWorkspace, 'src/invalidation-test.ts');
       await writeFile(testFile, 'export function originalFunction() {}');
-      
+
       // Cache and then invalidate multiple entries
       for (let i = 0; i < 5; i++) {
         await cacheManager.setCachedResults(`invalidation-${i}`, mockSearchResults.simple, {
@@ -307,7 +314,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
           queryType: 'function',
           confidence: 0.8,
           duration: 50,
-          filePaths: [testFile]
+          filePaths: [testFile],
         });
       }
 
@@ -317,7 +324,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
       // Trigger invalidation checks
       for (let i = 0; i < 5; i++) {
         await cacheManager.getCachedResults(`invalidation-${i}`, {
-          checkFileModifications: true
+          checkFileModifications: true,
         });
       }
 
@@ -331,7 +338,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
       const testFiles = [
         join(testWorkspace, 'src/component.tsx'),
         join(testWorkspace, 'src/utils.ts'),
-        join(testWorkspace, 'tests/test.spec.ts')
+        join(testWorkspace, 'tests/test.spec.ts'),
       ];
 
       // Create test files
@@ -348,17 +355,17 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
           queryType: 'function',
           confidence: 0.8,
           duration: 50,
-          filePaths: [testFiles[i]]
+          filePaths: [testFiles[i]],
         });
       }
 
       // Invalidate only TypeScript files (not test files)
       const invalidatedCount = await cacheManager.invalidateByPattern({
-        filePattern: /\.ts$/
+        filePattern: /\.ts$/,
       });
 
       expect(invalidatedCount).toBe(1); // Only utils.ts should match
-      
+
       // Verify correct entries were invalidated
       const remaining = await cacheManager.getCachedResults('pattern-query-0'); // component.tsx
       const invalidated = await cacheManager.getCachedResults('pattern-query-1'); // utils.ts
@@ -371,24 +378,24 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
 
     it('should invalidate by query pattern', async () => {
       const queries = ['function-search', 'class-search', 'import-search'];
-      
+
       // Cache different types of queries
       for (const query of queries) {
         await cacheManager.setCachedResults(query, mockSearchResults.simple, {
           searchMethod: 'ripgrep',
           queryType: 'function',
           confidence: 0.8,
-          duration: 50
+          duration: 50,
         });
       }
 
       // Invalidate only function-related queries
       const invalidatedCount = await cacheManager.invalidateByPattern({
-        queryPattern: /function/
+        queryPattern: /function/,
       });
 
       expect(invalidatedCount).toBe(1);
-      
+
       // Verify correct entries were invalidated
       expect(await cacheManager.getCachedResults('function-search')).toBeNull();
       expect(await cacheManager.getCachedResults('class-search')).toBeDefined();
@@ -398,24 +405,24 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
     it('should invalidate by search method', async () => {
       const queries = ['ripgrep-1', 'ripgrep-2', 'rag-1'];
       const methods = ['ripgrep', 'ripgrep', 'rag'] as const;
-      
+
       // Cache results from different search methods
       for (let i = 0; i < queries.length; i++) {
         await cacheManager.setCachedResults(queries[i], mockSearchResults.simple, {
           searchMethod: methods[i],
           queryType: 'function',
           confidence: 0.8,
-          duration: 50
+          duration: 50,
         });
       }
 
       // Invalidate only ripgrep results
       const invalidatedCount = await cacheManager.invalidateByPattern({
-        searchMethod: 'ripgrep'
+        searchMethod: 'ripgrep',
       });
 
       expect(invalidatedCount).toBe(2);
-      
+
       // Verify correct entries were invalidated
       expect(await cacheManager.getCachedResults('ripgrep-1')).toBeNull();
       expect(await cacheManager.getCachedResults('ripgrep-2')).toBeNull();
@@ -429,13 +436,13 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
         {
           query: 'export function',
           searchMethod: 'ripgrep' as const,
-          executor: async () => mockSearchResults.simple
+          executor: async () => mockSearchResults.simple,
         },
         {
           query: 'import.*from',
           searchMethod: 'ripgrep' as const,
-          executor: async () => mockSearchResults.complex
-        }
+          executor: async () => mockSearchResults.complex,
+        },
       ];
 
       await cacheManager.preloadCommonPatterns(patterns);
@@ -449,7 +456,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
       const pattern = {
         query: 'test-pattern',
         searchMethod: 'ripgrep' as const,
-        executor: jest.fn().mockResolvedValue(mockSearchResults.simple)
+        executor: jest.fn().mockResolvedValue(mockSearchResults.simple),
       };
 
       // Manually cache the pattern first
@@ -458,7 +465,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
         searchMethod: 'ripgrep',
         queryType: 'preload',
         confidence: 0.8,
-        duration: 50
+        duration: 50,
       });
 
       // Preload should skip already cached patterns
@@ -477,7 +484,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
           searchMethod: 'ripgrep',
           queryType: 'function',
           confidence: 0.8,
-          duration: 50 + i * 10
+          duration: 50 + i * 10,
         });
       }
 
@@ -487,7 +494,10 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
       // Verify export file was created
       // (In a real test, we'd read and validate the JSON structure)
       const fs = await import('fs/promises');
-      const exportExists = await fs.access(exportPath).then(() => true).catch(() => false);
+      const exportExists = await fs
+        .access(exportPath)
+        .then(() => true)
+        .catch(() => false);
       expect(exportExists).toBe(true);
     });
   });
@@ -495,16 +505,12 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
   describe('Cached Search Executor', () => {
     it('should execute and cache search results automatically', async () => {
       const searchFunction = jest.fn().mockResolvedValue(mockSearchResults.simple);
-      
-      const result = await cachedExecutor.executeWithCache(
-        'auto-cache-test',
-        searchFunction,
-        {
-          searchMethod: 'ripgrep',
-          queryType: 'function',
-          confidence: 0.9
-        }
-      );
+
+      const result = await cachedExecutor.executeWithCache('auto-cache-test', searchFunction, {
+        searchMethod: 'ripgrep',
+        queryType: 'function',
+        confidence: 0.9,
+      });
 
       expect(result).toEqual(mockSearchResults.simple);
       expect(searchFunction).toHaveBeenCalledTimes(1);
@@ -516,7 +522,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
         {
           searchMethod: 'ripgrep',
           queryType: 'function',
-          confidence: 0.9
+          confidence: 0.9,
         }
       );
 
@@ -526,12 +532,12 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
 
     it('should bypass cache when requested', async () => {
       const searchFunction = jest.fn().mockResolvedValue(mockSearchResults.simple);
-      
+
       // First call
       await cachedExecutor.executeWithCache('bypass-test', searchFunction, {
         searchMethod: 'ripgrep',
         queryType: 'function',
-        confidence: 0.9
+        confidence: 0.9,
       });
 
       // Second call with bypass
@@ -539,7 +545,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
         searchMethod: 'ripgrep',
         queryType: 'function',
         confidence: 0.9,
-        bypassCache: true
+        bypassCache: true,
       });
 
       expect(searchFunction).toHaveBeenCalledTimes(2);
@@ -550,12 +556,12 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
       await writeFile(testFiles[0], 'export function dependencyFunc() {}');
 
       const searchFunction = jest.fn().mockResolvedValue(mockSearchResults.simple);
-      
+
       await cachedExecutor.executeWithCache('dependency-test', searchFunction, {
         searchMethod: 'ripgrep',
         queryType: 'function',
         confidence: 0.9,
-        filePaths: testFiles
+        filePaths: testFiles,
       });
 
       // Modify the file
@@ -566,7 +572,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
         searchMethod: 'ripgrep',
         queryType: 'function',
         confidence: 0.9,
-        filePaths: testFiles
+        filePaths: testFiles,
       });
 
       expect(searchFunction).toHaveBeenCalledTimes(2);
@@ -581,7 +587,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
           searchMethod: 'ripgrep',
           queryType: 'function',
           confidence: 0.8,
-          duration: 50
+          duration: 50,
         });
       }
 
@@ -599,7 +605,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
           searchMethod: 'ripgrep',
           queryType: 'function',
           confidence: 0.8,
-          duration: 50
+          duration: 50,
         });
       }
 
@@ -626,7 +632,7 @@ describe('Advanced Search Cache - Comprehensive Tests', () => {
             searchMethod: 'ripgrep',
             queryType: 'function',
             confidence: 0.8,
-            duration: 50
+            duration: 50,
           });
         }
 

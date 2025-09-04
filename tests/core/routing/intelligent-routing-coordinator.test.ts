@@ -101,7 +101,10 @@ describe('IntelligentRoutingCoordinator', () => {
     test('should route complex task to hybrid-quality strategy', async () => {
       // Arrange
       const context: RoutingContext = {
-        request: createMockRequest('complex', 'Analyze this complex codebase for security vulnerabilities'),
+        request: createMockRequest(
+          'complex',
+          'Analyze this complex codebase for security vulnerabilities'
+        ),
         priority: 'high',
         preferences: { prioritizeQuality: true, enableHybridRouting: true },
       };
@@ -172,7 +175,10 @@ describe('IntelligentRoutingCoordinator', () => {
     test('should route synthesis phase to single-voice-quality strategy', async () => {
       // Arrange
       const context: RoutingContext = {
-        request: createMockRequest('medium', 'Synthesize council perspectives into unified solution'),
+        request: createMockRequest(
+          'medium',
+          'Synthesize council perspectives into unified solution'
+        ),
         priority: 'medium',
         phase: 'synthesis',
       };
@@ -412,7 +418,8 @@ describe('IntelligentRoutingCoordinator', () => {
       priority: { value: 'medium', numericValue: 2 },
       context: { languages: ['typescript'] },
       constraints: {},
-      calculateComplexity: () => complexity === 'simple' ? 0.2 : complexity === 'complex' ? 0.9 : 0.5,
+      calculateComplexity: () =>
+        complexity === 'simple' ? 0.2 : complexity === 'complex' ? 0.9 : 0.5,
       requiresCapabilities: () => ['text-generation'],
       estimateProcessingTime: () => 10000,
     } as any;
@@ -453,17 +460,24 @@ describe('IntelligentRoutingCoordinator', () => {
     // Mock voice selection
     mockVoiceService.selectVoicesForRequest.mockResolvedValue({
       primaryVoice: {
-        id: complexity === 'simple' ? 'explorer' : 
-             complexity === 'complex' ? 'architect' : 'developer',
+        id:
+          complexity === 'simple'
+            ? 'explorer'
+            : complexity === 'complex'
+              ? 'architect'
+              : 'developer',
         name: 'Test Voice',
         expertise: ['general'],
         style: { value: 'analytical' },
         temperature: { value: 0.7 },
       },
-      supportingVoices: complexity === 'complex' ? [
-        { id: 'assistant1', name: 'Assistant 1' },
-        { id: 'assistant2', name: 'Assistant 2' },
-      ] : [],
+      supportingVoices:
+        complexity === 'complex'
+          ? [
+              { id: 'assistant1', name: 'Assistant 1' },
+              { id: 'assistant2', name: 'Assistant 2' },
+            ]
+          : [],
       synthesisMode: 'SINGLE' as any,
       reasoning: 'Test voice selection',
     } as any);

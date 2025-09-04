@@ -1,25 +1,24 @@
 import { describe, test, expect } from '@jest/globals';
-import { 
-  ResponseFactory, 
-  ResponseValidator, 
-  AgentResponse, 
+import {
+  ResponseFactory,
+  ResponseValidator,
+  AgentResponse,
   SynthesisResponse,
   ToolResponse,
-  FileResponse 
+  FileResponse,
 } from '../../src/core/response-types';
 
 /**
  * Test suite for standardized response system
  */
 describe('Standardized Response System', () => {
-  
   describe('ResponseFactory', () => {
     test('should create AgentResponse with correct structure', () => {
       const response = ResponseFactory.createAgentResponse('Test content', {
         confidence: 0.9,
         voiceId: 'developer',
         tokensUsed: 50,
-        reasoning: 'Test reasoning'
+        reasoning: 'Test reasoning',
       });
 
       expect(response.success).toBe(true);
@@ -32,10 +31,10 @@ describe('Standardized Response System', () => {
     });
 
     test('should create SynthesisResponse with default values', () => {
-      const response = ResponseFactory.createSynthesisResponse(
-        'Combined content',
-        ['developer', 'analyzer']
-      );
+      const response = ResponseFactory.createSynthesisResponse('Combined content', [
+        'developer',
+        'analyzer',
+      ]);
 
       expect(response.success).toBe(true);
       expect(response.combinedContent).toBe('Combined content');
@@ -47,10 +46,14 @@ describe('Standardized Response System', () => {
     });
 
     test('should create ToolResponse with execution metadata', () => {
-      const response = ResponseFactory.createToolResponse('file-reader', { content: 'file data' }, {
-        executionTime: 150,
-        retryCount: 1
-      });
+      const response = ResponseFactory.createToolResponse(
+        'file-reader',
+        { content: 'file data' },
+        {
+          executionTime: 150,
+          retryCount: 1,
+        }
+      );
 
       expect(response.success).toBe(true);
       expect(response.toolName).toBe('file-reader');
@@ -63,7 +66,7 @@ describe('Standardized Response System', () => {
       const response = ResponseFactory.createFileResponse('/path/to/file.ts', 'read', {
         content: 'file content',
         size: 1024,
-        language: 'typescript'
+        language: 'typescript',
       });
 
       expect(response.success).toBe(true);
@@ -91,14 +94,14 @@ describe('Standardized Response System', () => {
   describe('ResponseValidator', () => {
     test('should validate correct responses', () => {
       const response = ResponseFactory.createAgentResponse('test');
-      
+
       expect(ResponseValidator.isValidResponse(response)).toBe(true);
       expect(ResponseValidator.hasError(response)).toBe(false);
     });
 
     test('should detect invalid responses', () => {
       const invalidResponse = { invalid: true };
-      
+
       expect(ResponseValidator.isValidResponse(invalidResponse)).toBe(false);
     });
 
@@ -117,7 +120,9 @@ describe('Standardized Response System', () => {
     });
 
     test('should extract content from SynthesisResponse', () => {
-      const synthesisResponse = ResponseFactory.createSynthesisResponse('Synthesis content', ['voice1']);
+      const synthesisResponse = ResponseFactory.createSynthesisResponse('Synthesis content', [
+        'voice1',
+      ]);
       expect(ResponseValidator.extractContent(synthesisResponse)).toBe('Synthesis content');
     });
   });
@@ -157,7 +162,7 @@ describe('Standardized Response System', () => {
       response.metadata = {
         source: 'unit-test',
         version: '1.0.0',
-        custom: { data: 'value' }
+        custom: { data: 'value' },
       };
 
       expect(response.metadata).toBeDefined();

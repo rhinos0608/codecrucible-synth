@@ -19,13 +19,13 @@
     "noImplicitThis": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
-    "exactOptionalPropertyTypes": false, // Temporarily disabled - 156 errors  
+    "exactOptionalPropertyTypes": false, // Temporarily disabled - 156 errors
     "noUncheckedIndexedAccess": false, // Temporarily disabled - 185 errors
     "noPropertyAccessFromIndexSignature": false, // Temporarily disabled - 301 errors
 
     // Additional Checks - 2025 Standards (Gradual Migration)
-    "noUnusedLocals": true, // Re-enabled - will fix unused variables systematically
-    "noUnusedParameters": false, // Temporarily disabled
+    "noUnusedLocals": false, // Disabled - ESLint handles this with better underscore support
+    "noUnusedParameters": false, // Disabled - ESLint handles this with better underscore support
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "forceConsistentCasingInFileNames": true,

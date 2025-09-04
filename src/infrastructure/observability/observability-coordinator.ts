@@ -190,7 +190,9 @@ export class ObservabilityCoordinator extends EventEmitter {
       this.alerts.evaluateRules();
     };
     run().catch(() => {});
-    this.healthInterval = setInterval(() => { run().catch(() => {}); }, this.config.health.checkInterval);
+    this.healthInterval = setInterval(() => {
+      run().catch(() => {});
+    }, this.config.health.checkInterval);
   }
 }
 

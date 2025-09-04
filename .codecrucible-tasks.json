@@ -34,27 +34,21 @@
         "agent_id": "test-runner",
         "role": "Testing and Validation",
         "status": "assigned",
-        "assigned_steps": [
-          "fix_unit_tests"
-        ],
+        "assigned_steps": ["fix_unit_tests"],
         "last_activity": "2025-08-20T08:35:59.303Z"
       },
       {
         "agent_id": "cleaner",
         "role": "Cleanup and Optimization",
         "status": "assigned",
-        "assigned_steps": [
-          "clean_emergency_scripts"
-        ],
+        "assigned_steps": ["clean_emergency_scripts"],
         "last_activity": "2025-08-20T08:35:59.303Z"
       },
       {
         "agent_id": "coordinator",
         "role": "Task Coordination",
         "status": "assigned",
-        "assigned_steps": [
-          "validate_core_functionality"
-        ],
+        "assigned_steps": ["validate_core_functionality"],
         "last_activity": "2025-08-20T08:35:59.304Z"
       }
     ],

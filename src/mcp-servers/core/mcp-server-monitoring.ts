@@ -1,10 +1,10 @@
 /**
  * MCP Server Monitoring and Metrics
- * 
+ *
  * Comprehensive health monitoring with performance metrics and alerting
  * Designed to orchestrate Rust-backed resource monitors through NAPI bindings
  * Implements circuit breaker patterns and adaptive thresholds
- * 
+ *
  * Memory-efficient with streaming metrics and bounded collection
  */
 
@@ -119,8 +119,8 @@ class SystemMonitoringUtils {
 
     const idle = totalIdle / cpuInfo.length;
     const total = totalTick / cpuInfo.length;
-    const usage = 100 - ~~(100 * idle / total);
-    
+    const usage = 100 - ~~((100 * idle) / total);
+
     return Math.max(0, Math.min(100, usage));
   }
 
@@ -140,20 +140,21 @@ class SystemMonitoringUtils {
    * Measure event loop lag
    */
   static measureEventLoopLag(): Promise<number> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const start = process.hrtime.bigint();
       setImmediate(() => {
         const end = process.hrtime.bigint();
         const lagMs = Number(end - start) / 1000000; // Convert nanoseconds to milliseconds
-        
+
         // Keep history for smoothing
         this.eventLoopLagHistory.push(lagMs);
         if (this.eventLoopLagHistory.length > 10) {
           this.eventLoopLagHistory.shift();
         }
-        
+
         // Return smoothed average
-        const avgLag = this.eventLoopLagHistory.reduce((a, b) => a + b, 0) / this.eventLoopLagHistory.length;
+        const avgLag =
+          this.eventLoopLagHistory.reduce((a, b) => a + b, 0) / this.eventLoopLagHistory.length;
         resolve(Math.max(0, avgLag));
       });
     });
@@ -197,7 +198,7 @@ class SystemMonitoringUtils {
     if (this.performanceObserver) return;
 
     try {
-      this.performanceObserver = new PerformanceObserver((list) => {
+      this.performanceObserver = new PerformanceObserver(list => {
         // Track performance entries for detailed monitoring
         list.getEntries().forEach(entry => {
           if (entry.entryType === 'measure') {
@@ -237,11 +238,14 @@ export class MCPServerMonitoring extends EventEmitter {
   // Performance tracking
   private metricsCollectionTime = 0;
   private _lastCleanup = Date.now();
-  private rustMetrics: { available: boolean; module: any | null } = { available: false, module: null };
+  private rustMetrics: { available: boolean; module: any | null } = {
+    available: false,
+    module: null,
+  };
 
   constructor(config: Partial<MetricsConfig> = {}) {
     super();
-    
+
     this.config = {
       enableMetrics: true,
       metricsRetentionMs: 60 * 60 * 1000, // 1 hour
@@ -249,12 +253,12 @@ export class MCPServerMonitoring extends EventEmitter {
         responseTime: 5000, // 5 seconds
         errorRate: 10, // 10%
         memoryUsage: outputConfig.getConfig().maxBufferSize, // Use config limit
-        cpuUsage: 80 // 80%
+        cpuUsage: 80, // 80%
       },
       healthCheckInterval: 30000, // 30 seconds
       maxMetricsEntries: 1000,
       enableDetailedProfiling: false,
-      ...config
+      ...config,
     };
 
     this.setMaxListeners(100);
@@ -292,15 +296,15 @@ export class MCPServerMonitoring extends EventEmitter {
         cpuUsage: 0,
         lastHealth: 'unknown',
         lastHealthCheck: new Date(),
-        errorRate: 0
+        errorRate: 0,
       },
       recentActivity: [],
-      alerts: []
+      alerts: [],
     };
 
     this.serverMetrics.set(serverId, serverMetric);
     this.startServerMonitoring(serverId);
-    
+
     logger.info(`📊 Server ${serverId} registered for monitoring`);
     this.emit('serverRegistered', serverId);
   }
@@ -324,7 +328,7 @@ export class MCPServerMonitoring extends EventEmitter {
     }
 
     const startMemory = process.memoryUsage().heapUsed;
-    
+
     // Update aggregate metrics
     serverMetric.metrics.totalRequests++;
     if (success) {
@@ -336,12 +340,12 @@ export class MCPServerMonitoring extends EventEmitter {
     // Update response time (rolling average)
     const currentAvg = serverMetric.metrics.avgResponseTime;
     const totalRequests = serverMetric.metrics.totalRequests;
-    serverMetric.metrics.avgResponseTime = 
-      ((currentAvg * (totalRequests - 1)) + duration) / totalRequests;
+    serverMetric.metrics.avgResponseTime =
+      (currentAvg * (totalRequests - 1) + duration) / totalRequests;
     serverMetric.metrics.currentResponseTime = duration;
 
     // Calculate error rate
-    serverMetric.metrics.errorRate = 
+    serverMetric.metrics.errorRate =
       (serverMetric.metrics.failedRequests / serverMetric.metrics.totalRequests) * 100;
 
     // Record activity entry
@@ -352,9 +356,9 @@ export class MCPServerMonitoring extends EventEmitter {
       duration,
       success,
       error,
-      memoryDelta
+      memoryDelta,
     };
-    
+
     serverMetric.recentActivity.push(activity);
     this.trimActivityHistory(serverId);
 
@@ -371,7 +375,7 @@ export class MCPServerMonitoring extends EventEmitter {
    * Update server health status
    */
   updateServerHealth(
-    serverId: string, 
+    serverId: string,
     health: 'healthy' | 'degraded' | 'unhealthy',
     details?: any
   ): void {
@@ -429,13 +433,14 @@ export class MCPServerMonitoring extends EventEmitter {
   } {
     const servers = Array.from(this.serverMetrics.values());
     const totalRequests = servers.reduce((sum, s) => sum + s.metrics.totalRequests, 0);
-    const avgResponseTime = servers.length > 0 
-      ? servers.reduce((sum, s) => sum + s.metrics.avgResponseTime, 0) / servers.length 
-      : 0;
+    const avgResponseTime =
+      servers.length > 0
+        ? servers.reduce((sum, s) => sum + s.metrics.avgResponseTime, 0) / servers.length
+        : 0;
 
     const healthyCount = servers.filter(s => s.metrics.lastHealth === 'healthy').length;
     const unhealthyCount = servers.filter(s => s.metrics.lastHealth === 'unhealthy').length;
-    
+
     let systemHealth: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
     if (unhealthyCount > servers.length / 2) {
       systemHealth = 'unhealthy';
@@ -443,8 +448,9 @@ export class MCPServerMonitoring extends EventEmitter {
       systemHealth = 'degraded';
     }
 
-    const activeAlerts = servers.reduce((sum, s) => 
-      sum + s.alerts.filter(a => !a.acknowledged).length, 0
+    const activeAlerts = servers.reduce(
+      (sum, s) => sum + s.alerts.filter(a => !a.acknowledged).length,
+      0
     );
 
     return {
@@ -454,7 +460,7 @@ export class MCPServerMonitoring extends EventEmitter {
       totalRequests,
       avgResponseTime,
       systemHealth,
-      activeAlerts
+      activeAlerts,
     };
   }
 
@@ -473,9 +479,12 @@ export class MCPServerMonitoring extends EventEmitter {
     }
 
     // Start periodic cleanup
-    const cleanupInterval = setInterval(() => {
-      this.performCleanup();
-    }, 5 * 60 * 1000); // Every 5 minutes
+    const cleanupInterval = setInterval(
+      () => {
+        this.performCleanup();
+      },
+      5 * 60 * 1000
+    ); // Every 5 minutes
 
     this.monitoringIntervals.set('cleanup', cleanupInterval);
     this.emit('monitoringStarted');
@@ -488,7 +497,7 @@ export class MCPServerMonitoring extends EventEmitter {
     if (!this.isMonitoring) return;
 
     this.isMonitoring = false;
-    
+
     // Clear all intervals
     for (const interval of this.monitoringIntervals.values()) {
       clearInterval(interval);
@@ -533,7 +542,6 @@ export class MCPServerMonitoring extends EventEmitter {
       serverMetric.metrics.cpuUsage = await this.getCpuUsage();
 
       this.emit('metricsCollected', serverId, serverMetric.metrics);
-      
     } catch (error) {
       logger.error(`Failed to collect metrics for server ${serverId}:`, error);
     }
@@ -545,17 +553,17 @@ export class MCPServerMonitoring extends EventEmitter {
   private setupSystemMonitoring(): void {
     // Setup performance monitoring
     SystemMonitoringUtils.setupPerformanceMonitoring();
-    
+
     const collectSystemMetrics = async () => {
       const memoryUsage = process.memoryUsage();
-      
+
       // Collect real system metrics
       const cpuUsage = SystemMonitoringUtils.getCPUUsage();
       const loadAverage = SystemMonitoringUtils.getLoadAverage();
       const eventLoopLag = await SystemMonitoringUtils.measureEventLoopLag();
       const eventLoopUtilization = SystemMonitoringUtils.getEventLoopUtilization();
       const activeConnections = SystemMonitoringUtils.getActiveConnections();
-      
+
       const systemMetric: SystemResourceMetrics = {
         timestamp: new Date(),
         memory: {
@@ -563,32 +571,32 @@ export class MCPServerMonitoring extends EventEmitter {
           used: memoryUsage.heapUsed,
           available: memoryUsage.rss - memoryUsage.heapUsed,
           heapUsed: memoryUsage.heapUsed,
-          heapTotal: memoryUsage.heapTotal
+          heapTotal: memoryUsage.heapTotal,
         },
         cpu: {
           usage: cpuUsage, // Real CPU monitoring
-          loadAverage: loadAverage // Real load average
+          loadAverage: loadAverage, // Real load average
         },
         eventLoop: {
           lag: eventLoopLag, // Real event loop lag monitoring
-          utilization: eventLoopUtilization
+          utilization: eventLoopUtilization,
         },
         concurrent: {
           activeConnections: activeConnections, // Real active connections tracking
-          pendingOperations: this.metricsCollectionTime
-        }
+          pendingOperations: this.metricsCollectionTime,
+        },
       };
 
       this.systemMetrics.push(systemMetric);
       this.trimSystemMetrics();
-      
+
       this.emit('systemMetricsCollected', systemMetric);
     };
 
     // Collect system metrics every 30 seconds
     const systemInterval = setInterval(collectSystemMetrics, 30000);
     this.monitoringIntervals.set('system', systemInterval);
-    
+
     // Initial collection
     collectSystemMetrics();
   }
@@ -604,7 +612,8 @@ export class MCPServerMonitoring extends EventEmitter {
     // Response time alert
     if (metrics.currentResponseTime > thresholds.responseTime) {
       this.createAlert(
-        serverId, 'warn', 
+        serverId,
+        'warn',
         `High response time: ${metrics.currentResponseTime}ms`,
         'responseTime',
         metrics.currentResponseTime,
@@ -615,7 +624,8 @@ export class MCPServerMonitoring extends EventEmitter {
     // Error rate alert
     if (metrics.errorRate > thresholds.errorRate) {
       this.createAlert(
-        serverId, 'error',
+        serverId,
+        'error',
         `High error rate: ${metrics.errorRate.toFixed(1)}%`,
         'errorRate',
         metrics.errorRate,
@@ -626,7 +636,8 @@ export class MCPServerMonitoring extends EventEmitter {
     // Memory usage alert
     if (metrics.memoryUsage > thresholds.memoryUsage) {
       this.createAlert(
-        serverId, 'warn',
+        serverId,
+        'warn',
         `High memory usage: ${this.formatBytes(metrics.memoryUsage)}`,
         'memoryUsage',
         metrics.memoryUsage,
@@ -656,7 +667,7 @@ export class MCPServerMonitoring extends EventEmitter {
       metric,
       value,
       threshold,
-      acknowledged: false
+      acknowledged: false,
     };
 
     serverMetric.alerts.push(alert);
@@ -714,16 +725,16 @@ export class MCPServerMonitoring extends EventEmitter {
    */
   private performCleanup(): void {
     const now = Date.now();
-    
+
     // Clean up old metrics based on retention policy
     for (const [_serverId, serverMetric] of this.serverMetrics) {
       const cutoffTime = now - this.config.metricsRetentionMs;
-      
+
       // Remove old activities
       serverMetric.recentActivity = serverMetric.recentActivity.filter(
         activity => activity.timestamp.getTime() > cutoffTime
       );
-      
+
       // Remove old acknowledged alerts
       serverMetric.alerts = serverMetric.alerts.filter(
         alert => !alert.acknowledged || alert.timestamp.getTime() > cutoffTime
@@ -731,7 +742,7 @@ export class MCPServerMonitoring extends EventEmitter {
     }
 
     // Clean up old system metrics
-    const systemCutoff = now - (this.config.metricsRetentionMs / 2); // Keep system metrics for half retention
+    const systemCutoff = now - this.config.metricsRetentionMs / 2; // Keep system metrics for half retention
     this.systemMetrics = this.systemMetrics.filter(
       metric => metric.timestamp.getTime() > systemCutoff
     );
@@ -782,10 +793,10 @@ export class MCPServerMonitoring extends EventEmitter {
    */
   cleanup(): void {
     this.stopMonitoring();
-    
+
     // Cleanup system monitoring utilities
     SystemMonitoringUtils.cleanup();
-    
+
     this.removeAllListeners();
     this.serverMetrics.clear();
     this.systemMetrics.length = 0;

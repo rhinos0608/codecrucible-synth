@@ -13,13 +13,19 @@ if (typeof afterEach !== 'undefined') {
       // Clean up singleton instances that may have EventEmitters
       await subAgentIsolationSystem.destroyInstance();
       await unifiedCache.destroy();
-      
+
       // Clear any remaining timers
       jest.clearAllTimers();
       jest.useRealTimers();
-      
+
       // Ensure process cleanup (but preserve critical listeners)
-      const criticalEvents = ['exit', 'SIGTERM', 'SIGINT', 'uncaughtException', 'unhandledRejection'];
+      const criticalEvents = [
+        'exit',
+        'SIGTERM',
+        'SIGINT',
+        'uncaughtException',
+        'unhandledRejection',
+      ];
       if (process && process.eventNames) {
         process.eventNames().forEach(eventName => {
           if (!criticalEvents.includes(eventName as string)) {
@@ -42,11 +48,11 @@ if (typeof afterAll !== 'undefined') {
     try {
       await subAgentIsolationSystem.destroyInstance();
       await unifiedCache.destroy();
-      
+
       // Final timer cleanup
       jest.clearAllTimers();
       jest.useRealTimers();
-      
+
       // Force garbage collection if available
       if (typeof global.gc === 'function') {
         global.gc();

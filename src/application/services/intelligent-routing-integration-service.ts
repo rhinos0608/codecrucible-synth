@@ -23,9 +23,7 @@ import {
 const logger = createLogger('IntelligentRouting');
 
 // Use case imports
-import {
-  SpiralIteration,
-} from '../use-cases/living-spiral-process-use-case.js';
+import { SpiralIteration } from '../use-cases/living-spiral-process-use-case.js';
 
 export interface CLIRoutingRequest {
   command: string;
@@ -98,9 +96,7 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
   private routingCoordinator: IIntelligentRoutingCoordinator;
   private executionTracking: Map<string, { plan: ExecutionPlan; startTime: number }> = new Map();
 
-  constructor(
-    routingCoordinator: IIntelligentRoutingCoordinator
-  ) {
+  constructor(routingCoordinator: IIntelligentRoutingCoordinator) {
     this.routingCoordinator = routingCoordinator;
   }
 

@@ -7,7 +7,7 @@ export default function createSecurityPlugin(): IPlugin {
       version: '1.0.0',
       description: 'Security checks and auditing',
       lifecycle: 'both',
-      tags: ['security']
+      tags: ['security'],
     },
     async initialize(ctx: PluginContext) {
       if (ctx.registerCommand) {

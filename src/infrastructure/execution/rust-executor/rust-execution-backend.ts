@@ -396,16 +396,21 @@ export class RustExecutionBackend {
       throw new Error('Rust executor not initialized');
     }
 
-    const operation = request.arguments?.operation || 'read';
+    const operation = String(request.arguments?.operation || 'read');
     const path = request.arguments?.path || request.arguments?.filePath || '';
-    const content = request.arguments?.content;
+    const content =
+      typeof request.arguments?.content === 'string'
+        ? request.arguments.content
+        : request.arguments?.content
+          ? String(request.arguments.content)
+          : '';
     const options = {
       securityLevel: this.mapSecurityLevel(request.context?.securityLevel),
       capabilities: this.extractCapabilities(request),
       workingDirectory: request.context?.workingDirectory || process.cwd(),
     };
 
-    return await this.rustExecutor.executeFilesystem(operation, path, content, options);
+    return await (this.rustExecutor as any).executeFilesystem(operation, path, content, options);
   }
 
   private async executeCommandOperation(
@@ -415,17 +420,21 @@ export class RustExecutionBackend {
       throw new Error('Rust executor not initialized');
     }
 
-    const command = request.arguments?.command || request.arguments?.cmd || '';
-    const args = request.arguments?.args || request.arguments?.arguments || [];
+    const command = String(request.arguments?.command || request.arguments?.cmd || '');
+    const args = Array.isArray(request.arguments?.args)
+      ? request.arguments.args
+      : Array.isArray(request.arguments?.arguments)
+        ? request.arguments.arguments
+        : [];
     const options = {
       securityLevel: this.mapSecurityLevel(request.context?.securityLevel),
       capabilities: this.extractCapabilities(request),
       workingDirectory: request.context?.workingDirectory || process.cwd(),
-      environment: request.context?.environment || {},
+      environment: request.context?.environment || ({} as Record<string, string>),
       timeoutMs: this.options.timeoutMs,
     };
 
-    return await this.rustExecutor.executeCommand(command, args, options);
+    return await this.rustExecutor.executeCommand(command, args, options as any);
   }
 
   private async executeGenericOperation(
@@ -441,7 +450,7 @@ export class RustExecutionBackend {
       securityLevel: this.mapSecurityLevel(request.context?.securityLevel),
       capabilities: this.extractCapabilities(request),
       workingDirectory: request.context?.workingDirectory || process.cwd(),
-      environment: request.context?.environment || {},
+      environment: request.context?.environment || ({} as Record<string, string>),
       timeoutMs: this.options.timeoutMs,
     };
 

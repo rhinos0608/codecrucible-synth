@@ -144,42 +144,37 @@ export class LivingSpiralIntegrationTest {
       // Test single voice response (for simple phases)
       let singleVoiceResult;
       if (finalVoices.length === 1) {
-        singleVoiceResult = await this.voiceSystem.generateSingleVoiceResponse(
+        singleVoiceResult = (await this.voiceSystem.generateSingleVoiceResponse(
           finalVoices[0],
           testPrompt
-        ) as { confidence?: number; tokens_used?: number };
-
+        )) as { confidence?: number; tokens_used?: number };
       } else {
         // Test multi-voice coordination
-        await this.voiceSystem.generateMultiVoiceSolutions(
-          finalVoices,
-          testPrompt,
-          {
-            taskType: phase.name.toLowerCase(),
-            timeConstraint: 'thorough',
-            qualityRequirement: 'high',
-          }
-        );
+        await this.voiceSystem.generateMultiVoiceSolutions(finalVoices, testPrompt, {
+          taskType: phase.name.toLowerCase(),
+          timeConstraint: 'thorough',
+          qualityRequirement: 'high',
+        });
 
         // Use synthesis for final result
-        singleVoiceResult = await this.voiceSystem.synthesize(
+        singleVoiceResult = (await this.voiceSystem.synthesize(
           testPrompt,
           finalVoices,
           'consensus'
-        ) as { confidence?: number; tokens_used?: number };
+        )) as { confidence?: number; tokens_used?: number };
       }
 
       const duration = Date.now() - startTime;
-      const quality: number = typeof singleVoiceResult?.confidence === 'number'
-        ? singleVoiceResult.confidence
-        : 0;
+      const quality: number =
+        typeof singleVoiceResult?.confidence === 'number' ? singleVoiceResult.confidence : 0;
       const success = duration <= phase.expectedDuration * 1.5 && quality >= phase.qualityThreshold;
 
       // Calculate cost savings (comparison with baseline)
       const baselineCost = finalVoices.length * 0.08; // Baseline cost per voice
-      const actualCost = (typeof singleVoiceResult?.tokens_used === 'number'
-        ? singleVoiceResult.tokens_used
-        : 1000) * 0.00001;
+      const actualCost =
+        (typeof singleVoiceResult?.tokens_used === 'number'
+          ? singleVoiceResult.tokens_used
+          : 1000) * 0.00001;
       const costSavings = Math.max(0, baselineCost - actualCost);
 
       const result: SpiralTestResult = {
@@ -235,7 +230,10 @@ export class LivingSpiralIntegrationTest {
         'Assess the quality and effectiveness of the implemented e-commerce platform solution. What lessons were learned and what improvements can be made?',
     };
 
-    return prompts[phase.name as keyof typeof prompts] || `Execute ${phase.name} phase: ${phase.description}`;
+    return (
+      prompts[phase.name as keyof typeof prompts] ||
+      `Execute ${phase.name} phase: ${phase.description}`
+    );
   }
 
   /**
@@ -323,7 +321,7 @@ export class LivingSpiralIntegrationTest {
     };
     conclusions: string[];
   }> {
-    const analytics = await this.voiceSystem.getSystemAnalytics() as {
+    const analytics = (await this.voiceSystem.getSystemAnalytics()) as unknown as {
       systemOverview: {
         optimizationsActive: boolean;
         recommendationsGenerated: number;
@@ -334,12 +332,24 @@ export class LivingSpiralIntegrationTest {
     return {
       testSummary: {
         totalPhases: this.testResults.length,
-        successfulPhases: this.testResults.filter((r: Readonly<SpiralTestResult>) => r.success).length,
-        successRate: this.testResults.filter((r: Readonly<SpiralTestResult>) => r.success).length / this.testResults.length,
-        totalDuration: this.testResults.reduce((sum: number, r: Readonly<SpiralTestResult>) => sum + r.duration, 0),
+        successfulPhases: this.testResults.filter((r: Readonly<SpiralTestResult>) => r.success)
+          .length,
+        successRate:
+          this.testResults.filter((r: Readonly<SpiralTestResult>) => r.success).length /
+          this.testResults.length,
+        totalDuration: this.testResults.reduce(
+          (sum: number, r: Readonly<SpiralTestResult>) => sum + r.duration,
+          0
+        ),
         averageQuality:
-          this.testResults.reduce((sum: number, r: Readonly<SpiralTestResult>) => sum + r.quality, 0) / this.testResults.length,
-        totalCostSavings: this.testResults.reduce((sum: number, r: Readonly<SpiralTestResult>) => sum + r.costSavings, 0),
+          this.testResults.reduce(
+            (sum: number, r: Readonly<SpiralTestResult>) => sum + r.quality,
+            0
+          ) / this.testResults.length,
+        totalCostSavings: this.testResults.reduce(
+          (sum: number, r: Readonly<SpiralTestResult>) => sum + r.costSavings,
+          0
+        ),
       },
       phaseResults: this.testResults,
       systemAnalytics: analytics,

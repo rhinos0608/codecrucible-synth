@@ -127,8 +127,8 @@ export class ModelClient extends EventEmitter implements IModelClient {
   }
 
   async streamRequest(
-    request: ModelRequest, 
-    onToken: (token: StreamToken) => void, 
+    request: ModelRequest,
+    onToken: (token: StreamToken) => void,
     context?: any
   ): Promise<ModelResponse> {
     const tokens: StreamToken[] = [];
@@ -136,14 +136,14 @@ export class ModelClient extends EventEmitter implements IModelClient {
       tokens.push(token);
       onToken(token);
     }
-    
+
     // Reconstruct response from tokens
     const content = tokens.map(t => t.content).join('');
     return {
       id: `stream_${Date.now()}`,
       content,
       model: request.model || 'unknown',
-      provider: 'stream'
+      provider: 'stream',
     };
   }
 

@@ -39,7 +39,7 @@ export class EnterpriseConfigManager {
   public constructor(configPath: string = './config/enterprise.json') {
     this.configPath = configPath;
     this.config = this.getDefaultConfig();
-    this.loadConfig().catch((error) => {
+    this.loadConfig().catch(error => {
       logger.error('Failed to load config during initialization:', error);
     });
   }
@@ -78,7 +78,7 @@ export class EnterpriseConfigManager {
       // TODO: Implement actual config loading from this.configPath
       logger.debug(`Loading enterprise config from: ${this.configPath}`);
       // Simulate an asynchronous operation, e.g., reading a file
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Simulated delay
+      await new Promise(resolve => setTimeout(resolve, 100)); // Simulated delay
       logger.info('Enterprise configuration loaded successfully');
     } catch (error) {
       logger.warn('Failed to load enterprise config, using defaults:', error);
@@ -113,7 +113,7 @@ export class EnterpriseConfigManager {
   public async saveConfig(): Promise<void> {
     try {
       // Simulate an asynchronous operation, e.g., saving to a file
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Simulated delay
+      await new Promise(resolve => setTimeout(resolve, 100)); // Simulated delay
       logger.info('Enterprise configuration saved successfully');
     } catch (error) {
       logger.error('Failed to save enterprise config:', error);

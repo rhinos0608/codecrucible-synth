@@ -16,7 +16,7 @@ import * as os from 'os';
 describe('Command Line Search Engine - Cross-Platform Tests', () => {
   let testWorkspace: string;
   let searchEngine: CommandLineSearchEngine;
-  
+
   // Test files with various programming language patterns
   const testFiles = {
     'src/typescript/utils.ts': `
@@ -46,7 +46,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       // TODO: Add input validation
       // FIXME: Handle null cases
     `,
-    
+
     'src/javascript/helpers.js': `
       // JavaScript ES6+ patterns
       const calculateTotal = (items) => {
@@ -71,7 +71,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       
       // TODO: Add discount calculations
     `,
-    
+
     'src/python/analyzer.py': `
       # Python functions and classes
       import json
@@ -101,7 +101,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       # TODO: Add more analysis functions
       # FIXME: Handle edge cases
     `,
-    
+
     'tests/unit/utils.test.js': `
       // Jest test patterns
       describe('Utils', () => {
@@ -115,7 +115,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
         });
       });
     `,
-    
+
     'config/settings.json': `{
       "database": {
         "host": "localhost",
@@ -131,7 +131,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
         "format": "json"
       }
     }`,
-    
+
     'README.md': `
       # Test Project
       
@@ -152,13 +152,13 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       \`\`\`
       
       TODO: Add more documentation
-    `
+    `,
   };
 
   beforeAll(async () => {
     // Create isolated test workspace
     testWorkspace = await mkdtemp(join(tmpdir(), 'search-engine-test-'));
-    
+
     // Create test file structure
     for (const [filePath, content] of Object.entries(testFiles)) {
       const fullPath = join(testWorkspace, filePath);
@@ -166,7 +166,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       await mkdir(dir, { recursive: true });
       await writeFile(fullPath, content);
     }
-    
+
     // Initialize search engine
     searchEngine = new CommandLineSearchEngine(testWorkspace);
   });
@@ -184,17 +184,16 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
     it('should find simple text patterns', async () => {
       const options: SearchOptions = {
         query: 'parseJsonData',
-        maxResults: 10
+        maxResults: 10,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results).toBeDefined();
       expect(results.length).toBeGreaterThan(0);
-      
-      const match = results.find(result => 
-        result.content.includes('parseJsonData') && 
-        result.filePath?.includes('utils.ts')
+
+      const match = results.find(
+        result => result.content.includes('parseJsonData') && result.filePath?.includes('utils.ts')
       );
       expect(match).toBeDefined();
       expect(match?.line).toBeGreaterThan(0);
@@ -205,15 +204,13 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       const options: SearchOptions = {
         query: 'PARSEJSONDATA',
         caseSensitive: false,
-        maxResults: 10
+        maxResults: 10,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
-      const match = results.find(result => 
-        result.content.toLowerCase().includes('parsejsondata')
-      );
+      const match = results.find(result => result.content.toLowerCase().includes('parsejsondata'));
       expect(match).toBeDefined();
     });
 
@@ -221,14 +218,14 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       const options: SearchOptions = {
         query: 'data',
         wholeWord: true,
-        maxResults: 20
+        maxResults: 20,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       // Should find 'data' as a whole word, not as part of other words
       expect(results.length).toBeGreaterThan(0);
-      
+
       // Verify whole word matching
       results.forEach(result => {
         const content = result.content.toLowerCase();
@@ -252,96 +249,91 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
   describe('Pattern-Based Searches', () => {
     it('should generate and find function patterns', async () => {
       const pattern = CodePatternGenerator.generateFunctionPattern('calculate', 'javascript');
-      
+
       const options: SearchOptions = {
         query: pattern,
         regex: true,
         fileTypes: ['js'],
-        maxResults: 10
+        maxResults: 10,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
-      const match = results.find(result => 
-        result.content.includes('calculateTotal')
-      );
+      const match = results.find(result => result.content.includes('calculateTotal'));
       expect(match).toBeDefined();
     });
 
     it('should generate and find class patterns', async () => {
       const pattern = CodePatternGenerator.generateClassPattern('.*Cart', 'javascript');
-      
+
       const options: SearchOptions = {
         query: pattern,
         regex: true,
         fileTypes: ['js'],
-        maxResults: 10
+        maxResults: 10,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
-      const match = results.find(result => 
-        result.content.includes('ShoppingCart')
-      );
+      const match = results.find(result => result.content.includes('ShoppingCart'));
       expect(match).toBeDefined();
     });
 
     it('should find TypeScript interface patterns', async () => {
       const pattern = CodePatternGenerator.generateInterfacePattern('UserData');
-      
+
       const options: SearchOptions = {
         query: pattern,
         regex: true,
         fileTypes: ['ts'],
-        maxResults: 10
+        maxResults: 10,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
-      const match = results.find(result => 
-        result.content.includes('interface UserData')
-      );
+      const match = results.find(result => result.content.includes('interface UserData'));
       expect(match).toBeDefined();
     });
 
     it('should find import/export patterns', async () => {
       const pattern = CodePatternGenerator.generateImportPattern('json');
-      
+
       const options: SearchOptions = {
         query: pattern,
         regex: true,
-        maxResults: 10
+        maxResults: 10,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
-      const match = results.find(result => 
-        result.content.includes('import') && result.content.includes('json')
+      const match = results.find(
+        result => result.content.includes('import') && result.content.includes('json')
       );
       expect(match).toBeDefined();
     });
 
     it('should find test patterns', async () => {
       const pattern = CodePatternGenerator.generateTestPattern('parse', 'javascript');
-      
+
       const options: SearchOptions = {
         query: pattern,
         regex: true,
         fileTypes: ['js'],
-        maxResults: 10
+        maxResults: 10,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
-      const match = results.find(result => 
-        result.content.includes('should parse') || 
-        result.content.includes('it(') ||
-        result.content.includes('describe(')
+      const match = results.find(
+        result =>
+          result.content.includes('should parse') ||
+          result.content.includes('it(') ||
+          result.content.includes('describe(')
       );
       expect(match).toBeDefined();
     });
@@ -350,16 +342,16 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       const options: SearchOptions = {
         query: '(TODO|FIXME):.*',
         regex: true,
-        maxResults: 20
+        maxResults: 20,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
-      
+
       const todoCount = results.filter(r => r.content.includes('TODO')).length;
       const fixmeCount = results.filter(r => r.content.includes('FIXME')).length;
-      
+
       expect(todoCount).toBeGreaterThan(0);
       expect(fixmeCount).toBeGreaterThan(0);
     });
@@ -370,11 +362,11 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       const options: SearchOptions = {
         query: 'function',
         fileTypes: ['ts'],
-        maxResults: 10
+        maxResults: 10,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
       results.forEach(result => {
         expect(result.filePath).toMatch(/\.ts$/);
@@ -385,11 +377,11 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       const options: SearchOptions = {
         query: 'class',
         fileTypes: ['ts', 'js', 'py'],
-        maxResults: 20
+        maxResults: 20,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
       results.forEach(result => {
         expect(result.filePath).toMatch(/\.(ts|js|py)$/);
@@ -399,17 +391,15 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
     it('should search all files when no type specified', async () => {
       const options: SearchOptions = {
         query: 'TODO',
-        maxResults: 20
+        maxResults: 20,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
-      
+
       // Should find results in different file types
-      const fileTypes = new Set(
-        results.map(r => r.filePath?.split('.').pop()).filter(Boolean)
-      );
+      const fileTypes = new Set(results.map(r => r.filePath?.split('.').pop()).filter(Boolean));
       expect(fileTypes.size).toBeGreaterThan(1);
     });
   });
@@ -419,17 +409,17 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       const options: SearchOptions = {
         query: 'DataProcessor',
         contextLines: { context: 2 },
-        maxResults: 5
+        maxResults: 5,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
       const match = results[0];
-      
+
       expect(match.content).toBeDefined();
       expect(match.content.length).toBeGreaterThan(0);
-      
+
       // Context should include surrounding lines
       expect(match.content.split('\n').length).toBeGreaterThanOrEqual(3);
     });
@@ -437,25 +427,25 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
     it('should limit results when maxResults specified', async () => {
       const options: SearchOptions = {
         query: 'function',
-        maxResults: 3
+        maxResults: 3,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeLessThanOrEqual(3);
     });
 
     it('should provide accurate line and column information', async () => {
       const options: SearchOptions = {
         query: 'export function parseJsonData',
-        maxResults: 5
+        maxResults: 5,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
       const match = results[0];
-      
+
       expect(match.line).toBeGreaterThan(0);
       expect(match.column).toBeGreaterThanOrEqual(0);
       expect(match.filePath).toContain('utils.ts');
@@ -466,14 +456,14 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
     it('should work on current platform', async () => {
       const platform = os.platform();
       console.log(`Testing on platform: ${platform}`);
-      
+
       const options: SearchOptions = {
         query: 'function',
-        maxResults: 5
+        maxResults: 5,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       // Should work regardless of platform
       expect(results).toBeDefined();
       expect(Array.isArray(results)).toBe(true);
@@ -482,16 +472,16 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
     it('should handle file paths correctly on current platform', async () => {
       const options: SearchOptions = {
         query: 'ShoppingCart',
-        maxResults: 5
+        maxResults: 5,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
       results.forEach(result => {
         expect(result.filePath).toBeDefined();
         expect(result.filePath!.length).toBeGreaterThan(0);
-        
+
         // Path should be valid for current platform
         if (os.platform() === 'win32') {
           expect(result.filePath).toMatch(/[A-Za-z]:\\|^\\\\/);
@@ -504,16 +494,17 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
     it('should detect and use best available search tool', async () => {
       // This test verifies the tool selection logic
       const methods = await searchEngine.detectAvailableTools();
-      
+
       expect(methods).toBeDefined();
       expect(methods.length).toBeGreaterThan(0);
-      
+
       // Should prefer ripgrep if available, otherwise use platform-specific tools
       const hasRipgrep = methods.includes('ripgrep');
-      const hasPlatformTool = os.platform() === 'win32' 
-        ? methods.includes('powershell') || methods.includes('findstr')
-        : methods.includes('grep') || methods.includes('find');
-      
+      const hasPlatformTool =
+        os.platform() === 'win32'
+          ? methods.includes('powershell') || methods.includes('findstr')
+          : methods.includes('grep') || methods.includes('find');
+
       expect(hasRipgrep || hasPlatformTool).toBe(true);
     });
   });
@@ -522,7 +513,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
     it('should cache results for identical queries', async () => {
       const options: SearchOptions = {
         query: 'calculateTotal',
-        maxResults: 5
+        maxResults: 5,
       };
 
       // First search
@@ -538,7 +529,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       // Results should be identical
       expect(results1.length).toBe(results2.length);
       expect(results1[0]?.content).toBe(results2[0]?.content);
-      
+
       // Second search should be faster (cached)
       expect(time2).toBeLessThan(time1 * 0.8); // At least 20% faster
     });
@@ -547,7 +538,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       const options: SearchOptions = {
         query: '\\w+', // Match any word
         regex: true,
-        maxResults: 100
+        maxResults: 100,
       };
 
       const start = Date.now();
@@ -556,7 +547,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
 
       expect(results.length).toBeGreaterThan(0);
       expect(results.length).toBeLessThanOrEqual(100);
-      
+
       // Should complete in reasonable time (less than 5 seconds)
       expect(time).toBeLessThan(5000);
     });
@@ -564,14 +555,14 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
     it('should provide performance statistics', async () => {
       const options: SearchOptions = {
         query: 'function',
-        maxResults: 10
+        maxResults: 10,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       // Check if performance metrics are available
       const stats = searchEngine.getPerformanceStats();
-      
+
       expect(stats).toBeDefined();
       expect(stats.totalSearches).toBeGreaterThan(0);
       expect(stats.cacheHitRate).toBeGreaterThanOrEqual(0);
@@ -584,27 +575,27 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       const options: SearchOptions = {
         query: '[invalid[regex',
         regex: true,
-        maxResults: 5
+        maxResults: 5,
       };
 
       // Should not throw, but return empty results or fallback
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results).toBeDefined();
       expect(Array.isArray(results)).toBe(true);
     });
 
     it('should handle non-existent directory gracefully', async () => {
       const invalidSearchEngine = new CommandLineSearchEngine('/non/existent/path');
-      
+
       const options: SearchOptions = {
         query: 'test',
-        maxResults: 5
+        maxResults: 5,
       };
 
       // Should not throw, but return empty results
       const results = await invalidSearchEngine.searchInFiles(options);
-      
+
       expect(results).toBeDefined();
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBe(0);
@@ -613,25 +604,25 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
     it('should handle empty queries gracefully', async () => {
       const options: SearchOptions = {
         query: '',
-        maxResults: 5
+        maxResults: 5,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results).toBeDefined();
       expect(Array.isArray(results)).toBe(true);
     });
 
     it('should handle very large queries', async () => {
       const largeQuery = 'a'.repeat(10000); // 10KB query
-      
+
       const options: SearchOptions = {
         query: largeQuery,
-        maxResults: 5
+        maxResults: 5,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results).toBeDefined();
       expect(Array.isArray(results)).toBe(true);
     });
@@ -642,7 +633,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       const patterns = [
         CodePatternGenerator.generateFunctionPattern('process', 'typescript'),
         CodePatternGenerator.generateClassPattern('DataProcessor', 'typescript'),
-        CodePatternGenerator.generateInterfacePattern('UserData')
+        CodePatternGenerator.generateInterfacePattern('UserData'),
       ];
 
       for (const pattern of patterns) {
@@ -650,7 +641,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
           query: pattern,
           regex: true,
           fileTypes: ['ts'],
-          maxResults: 10
+          maxResults: 10,
         };
 
         const results = await searchEngine.searchInFiles(options);
@@ -661,7 +652,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
     it('should correctly identify Python patterns', async () => {
       const patterns = [
         CodePatternGenerator.generateFunctionPattern('analyze', 'python'),
-        CodePatternGenerator.generateClassPattern('DataAnalyzer', 'python')
+        CodePatternGenerator.generateClassPattern('DataAnalyzer', 'python'),
       ];
 
       for (const pattern of patterns) {
@@ -669,7 +660,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
           query: pattern,
           regex: true,
           fileTypes: ['py'],
-          maxResults: 10
+          maxResults: 10,
         };
 
         const results = await searchEngine.searchInFiles(options);
@@ -682,14 +673,14 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
         query: '"host":\\s*"[^"]*"',
         regex: true,
         fileTypes: ['json'],
-        maxResults: 10
+        maxResults: 10,
       };
 
       const results = await searchEngine.searchInFiles(options);
-      
+
       expect(results.length).toBeGreaterThan(0);
-      const match = results.find(result => 
-        result.content.includes('"host"') && result.content.includes('localhost')
+      const match = results.find(
+        result => result.content.includes('"host"') && result.content.includes('localhost')
       );
       expect(match).toBeDefined();
     });

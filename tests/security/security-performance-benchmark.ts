@@ -12,7 +12,7 @@ import { createHash } from 'crypto';
 const logger = {
   info: (...args: any[]) => console.log('[INFO]', ...args),
   warn: (...args: any[]) => console.warn('[WARN]', ...args),
-  error: (...args: any[]) => console.error('[ERROR]', ...args)
+  error: (...args: any[]) => console.error('[ERROR]', ...args),
 };
 
 // Minimal security framework implementation for testing
@@ -51,43 +51,47 @@ class ASTSecurityAnalyzer {
               type: 'dangerous_eval_call',
               severity: 'critical' as const,
               description: 'Direct eval() call detected - potential code injection vulnerability',
-              remediation: 'Replace eval() with safer alternatives like JSON.parse() or function constructors',
-              confidence: 95
+              remediation:
+                'Replace eval() with safer alternatives like JSON.parse() or function constructors',
+              confidence: 95,
             };
           }
           return null;
-        }
+        },
       },
       {
         id: 'detect-function-constructor',
         nodeTypes: [ts.SyntaxKind.NewExpression, ts.SyntaxKind.CallExpression],
         check: (node: ts.Node, sourceFile: ts.SourceFile) => {
           let expression: ts.Expression | undefined;
-          
+
           if (ts.isNewExpression(node)) {
             expression = node.expression;
           } else if (ts.isCallExpression(node)) {
             expression = node.expression;
           }
-          
+
           if (expression && ts.isIdentifier(expression) && expression.text === 'Function') {
             return {
               type: 'function_constructor_call',
               severity: 'high' as const,
               description: 'Function constructor call detected - potential code injection risk',
               remediation: 'Use regular function declarations or arrow functions instead',
-              confidence: 90
+              confidence: 90,
             };
           }
           return null;
-        }
-      }
+        },
+      },
     ];
   }
 
-  async analyzeCode(code: string, language: 'typescript' | 'javascript'): Promise<ASTAnalysisResult> {
+  async analyzeCode(
+    code: string,
+    language: 'typescript' | 'javascript'
+  ): Promise<ASTAnalysisResult> {
     const startTime = performance.now();
-    
+
     try {
       const sourceFile = this.parseCode(code, language);
       const violations: SecurityViolation[] = [];
@@ -95,7 +99,7 @@ class ASTSecurityAnalyzer {
 
       const visitNode = (node: ts.Node) => {
         nodeCount++;
-        
+
         for (const rule of this.securityRules) {
           if (rule.nodeTypes.includes(node.kind)) {
             const violation = rule.check(node, sourceFile);
@@ -103,12 +107,12 @@ class ASTSecurityAnalyzer {
               violations.push({
                 ...violation,
                 location: this.getNodeLocation(node, sourceFile),
-                context: this.getNodeContext(node, sourceFile)
+                context: this.getNodeContext(node, sourceFile),
               });
             }
           }
         }
-        
+
         ts.forEachChild(node, visitNode);
       };
 
@@ -125,7 +129,7 @@ class ASTSecurityAnalyzer {
         analysisTime,
         language,
         nodeCount,
-        cacheHit: false
+        cacheHit: false,
       };
     } catch (error: any) {
       logger.error('AST analysis failed:', error);
@@ -135,7 +139,7 @@ class ASTSecurityAnalyzer {
 
   private parseCode(code: string, language: 'typescript' | 'javascript'): ts.SourceFile {
     const scriptKind = language === 'typescript' ? ts.ScriptKind.TS : ts.ScriptKind.JS;
-    
+
     return ts.createSourceFile(
       'security-analysis.ts',
       code,
@@ -145,13 +149,16 @@ class ASTSecurityAnalyzer {
     );
   }
 
-  private getNodeLocation(node: ts.Node, sourceFile: ts.SourceFile): { line: number; column: number; length: number } {
+  private getNodeLocation(
+    node: ts.Node,
+    sourceFile: ts.SourceFile
+  ): { line: number; column: number; length: number } {
     const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-    
+
     return {
       line: start.line + 1,
       column: start.character + 1,
-      length: node.getEnd() - node.getStart(sourceFile)
+      length: node.getEnd() - node.getStart(sourceFile),
     };
   }
 
@@ -161,28 +168,32 @@ class ASTSecurityAnalyzer {
     return sourceFile.text.substring(start, end);
   }
 
-  private calculateConfidence(violations: SecurityViolation[], nodeCount: number, analysisTime: number): number {
+  private calculateConfidence(
+    violations: SecurityViolation[],
+    nodeCount: number,
+    analysisTime: number
+  ): number {
     let confidence = 90;
-    
+
     if (analysisTime < 10) {
       confidence -= 10;
     }
-    
+
     if (violations.every(v => v.location)) {
       confidence += 5;
     }
-    
+
     return Math.max(50, Math.min(100, confidence));
   }
 
   private calculateRiskScore(violations: SecurityViolation[]): number {
     if (violations.length === 0) return 0;
-    
+
     const severityWeights = { low: 10, medium: 25, high: 50, critical: 80 };
     const totalScore = violations.reduce((sum, violation) => {
       return sum + severityWeights[violation.severity];
     }, 0);
-    
+
     return Math.min(100, totalScore);
   }
 }
@@ -190,28 +201,28 @@ class ASTSecurityAnalyzer {
 // Test Cases
 const testCases = [
   {
-    name: "Direct eval() call",
+    name: 'Direct eval() call',
     code: `function executeUserCode(userInput) { return eval(userInput); }`,
     language: 'javascript' as const,
     expectedViolations: ['dangerous_eval_call'],
-    expectedSeverity: 'critical' as const
+    expectedSeverity: 'critical' as const,
   },
   {
-    name: "Function constructor",
+    name: 'Function constructor',
     code: `const dynamicFunction = new Function('return process.env'); const result = dynamicFunction();`,
     language: 'javascript' as const,
     expectedViolations: ['function_constructor_call'],
-    expectedSeverity: 'high' as const
+    expectedSeverity: 'high' as const,
   },
   {
-    name: "Safe code",
+    name: 'Safe code',
     code: `function safeFunction() { return "Hello, World!"; } console.log(safeFunction());`,
     language: 'javascript' as const,
     expectedViolations: [],
-    expectedSeverity: 'low' as const
+    expectedSeverity: 'low' as const,
   },
   {
-    name: "Complex TypeScript code",
+    name: 'Complex TypeScript code',
     code: `
       interface User {
         id: string;
@@ -235,10 +246,10 @@ const testCases = [
     `,
     language: 'typescript' as const,
     expectedViolations: [],
-    expectedSeverity: 'low' as const
+    expectedSeverity: 'low' as const,
   },
   {
-    name: "Obfuscated eval",
+    name: 'Obfuscated eval',
     code: `
       const dangerousFunction = eval;
       const userCode = "process.exit(1)";
@@ -246,49 +257,56 @@ const testCases = [
     `,
     language: 'javascript' as const,
     expectedViolations: ['dangerous_eval_call'],
-    expectedSeverity: 'critical' as const
-  }
+    expectedSeverity: 'critical' as const,
+  },
 ];
 
 // Performance Benchmark
 async function runBenchmark(): Promise<void> {
   console.log('🔒 AST-Based Security Analysis Performance Benchmark');
-  console.log('=' .repeat(60));
-  
+  console.log('='.repeat(60));
+
   const analyzer = new ASTSecurityAnalyzer();
-  const results: Array<{ name: string; duration: number; confidence: number; violations: number; success: boolean }> = [];
-  
+  const results: Array<{
+    name: string;
+    duration: number;
+    confidence: number;
+    violations: number;
+    success: boolean;
+  }> = [];
+
   for (const testCase of testCases) {
     console.log(`\n🧪 Testing: ${testCase.name}`);
-    
+
     try {
       const startTime = performance.now();
       const result = await analyzer.analyzeCode(testCase.code, testCase.language);
       const totalDuration = performance.now() - startTime;
-      
+
       // Validate results
       const hasExpectedViolations = testCase.expectedViolations.every(expectedType =>
         result.violations.some(v => v.type === expectedType)
       );
-      
-      const success = testCase.expectedViolations.length === 0 
-        ? result.violations.length === 0
-        : hasExpectedViolations;
-      
+
+      const success =
+        testCase.expectedViolations.length === 0
+          ? result.violations.length === 0
+          : hasExpectedViolations;
+
       results.push({
         name: testCase.name,
         duration: totalDuration,
         confidence: result.confidence,
         violations: result.violations.length,
-        success
+        success,
       });
-      
+
       console.log(`   Duration: ${totalDuration.toFixed(2)}ms`);
       console.log(`   Confidence: ${result.confidence}%`);
       console.log(`   Violations: ${result.violations.length}`);
       console.log(`   Node count: ${result.nodeCount}`);
       console.log(`   Success: ${success ? '✅' : '❌'}`);
-      
+
       if (result.violations.length > 0) {
         result.violations.forEach(v => {
           console.log(`     - ${v.type} (${v.severity}): ${v.description}`);
@@ -297,7 +315,6 @@ async function runBenchmark(): Promise<void> {
           }
         });
       }
-      
     } catch (error) {
       console.error(`   ❌ Error: ${error}`);
       results.push({
@@ -305,60 +322,72 @@ async function runBenchmark(): Promise<void> {
         duration: -1,
         confidence: 0,
         violations: 0,
-        success: false
+        success: false,
       });
     }
   }
-  
+
   // Performance Summary
   console.log('\n📊 Performance Summary');
-  console.log('=' .repeat(60));
-  
+  console.log('='.repeat(60));
+
   const successfulResults = results.filter(r => r.success && r.duration > 0);
-  const avgDuration = successfulResults.reduce((sum, r) => sum + r.duration, 0) / successfulResults.length;
+  const avgDuration =
+    successfulResults.reduce((sum, r) => sum + r.duration, 0) / successfulResults.length;
   const maxDuration = Math.max(...successfulResults.map(r => r.duration));
   const minDuration = Math.min(...successfulResults.map(r => r.duration));
-  const avgConfidence = successfulResults.reduce((sum, r) => sum + r.confidence, 0) / successfulResults.length;
-  
+  const avgConfidence =
+    successfulResults.reduce((sum, r) => sum + r.confidence, 0) / successfulResults.length;
+
   console.log(`Total tests: ${results.length}`);
   console.log(`Successful tests: ${results.filter(r => r.success).length}`);
   console.log(`Average analysis time: ${avgDuration.toFixed(2)}ms`);
   console.log(`Max analysis time: ${maxDuration.toFixed(2)}ms`);
   console.log(`Min analysis time: ${minDuration.toFixed(2)}ms`);
   console.log(`Average confidence: ${avgConfidence.toFixed(1)}%`);
-  
+
   // Performance Requirements Check
   console.log('\n🎯 Performance Requirements');
-  console.log('=' .repeat(60));
-  
+  console.log('='.repeat(60));
+
   const meetsPerformanceReq = maxDuration < 500;
   const meetsConfidenceReq = avgConfidence >= 85;
   const meetsAccuracyReq = results.filter(r => r.success).length === results.length;
-  
-  console.log(`Analysis time < 500ms: ${meetsPerformanceReq ? '✅' : '❌'} (max: ${maxDuration.toFixed(2)}ms)`);
-  console.log(`Average confidence >= 85%: ${meetsConfidenceReq ? '✅' : '❌'} (avg: ${avgConfidence.toFixed(1)}%)`);
-  console.log(`All tests successful: ${meetsAccuracyReq ? '✅' : '❌'} (${results.filter(r => r.success).length}/${results.length})`);
-  
+
+  console.log(
+    `Analysis time < 500ms: ${meetsPerformanceReq ? '✅' : '❌'} (max: ${maxDuration.toFixed(2)}ms)`
+  );
+  console.log(
+    `Average confidence >= 85%: ${meetsConfidenceReq ? '✅' : '❌'} (avg: ${avgConfidence.toFixed(1)}%)`
+  );
+  console.log(
+    `All tests successful: ${meetsAccuracyReq ? '✅' : '❌'} (${results.filter(r => r.success).length}/${results.length})`
+  );
+
   if (meetsPerformanceReq && meetsConfidenceReq && meetsAccuracyReq) {
-    console.log('\n🎉 All performance requirements met! AST-based security analysis is ready for production.');
+    console.log(
+      '\n🎉 All performance requirements met! AST-based security analysis is ready for production.'
+    );
   } else {
-    console.log('\n⚠️  Some performance requirements not met. Review and optimize before production deployment.');
+    console.log(
+      '\n⚠️  Some performance requirements not met. Review and optimize before production deployment.'
+    );
   }
 }
 
 // Cache Performance Test
 async function runCacheTest(): Promise<void> {
   console.log('\n💾 Cache Performance Test');
-  console.log('=' .repeat(60));
-  
+  console.log('='.repeat(60));
+
   const analyzer = new ASTSecurityAnalyzer();
   const testCode = `function test() { return "cache test"; }`;
-  
+
   // First analysis (no cache)
   const start1 = performance.now();
   const result1 = await analyzer.analyzeCode(testCode, 'javascript');
   const duration1 = performance.now() - start1;
-  
+
   console.log(`First analysis: ${duration1.toFixed(2)}ms`);
   console.log(`Violations found: ${result1.violations.length}`);
   console.log(`Node count: ${result1.nodeCount}`);

@@ -7,7 +7,7 @@ export interface VoiceOutput {
  * Combine multiple voice outputs into a single synthesized perspective.
  */
 export function synthesizePerspectives(outputs: VoiceOutput[]): string {
-  if (outputs.length === 0) return "";
+  if (outputs.length === 0) return '';
 
   // Group outputs by content
   const contentMap: Map<string, string[]> = new Map();
@@ -21,27 +21,27 @@ export function synthesizePerspectives(outputs: VoiceOutput[]): string {
     }
   }
 
-  const consensus: {content: string, voices: string[]}[] = [];
-  const divergences: {content: string, voices: string[]}[] = [];
+  const consensus: { content: string; voices: string[] }[] = [];
+  const divergences: { content: string; voices: string[] }[] = [];
 
   for (const [content, voices] of contentMap.entries()) {
     if (voices.length > 1) {
-      consensus.push({content, voices});
+      consensus.push({ content, voices });
     } else {
-      divergences.push({content, voices});
+      divergences.push({ content, voices });
     }
   }
 
-  let result = "";
+  let result = '';
   if (consensus.length > 0) {
-    result += "Consensus:\n";
+    result += 'Consensus:\n';
     for (const c of consensus) {
-      result += `- (${c.voices.join(", ")}) ${c.content}\n`;
+      result += `- (${c.voices.join(', ')}) ${c.content}\n`;
     }
   }
   if (divergences.length > 0) {
-    if (result.length > 0) result += "\n";
-    result += "Divergences:\n";
+    if (result.length > 0) result += '\n';
+    result += 'Divergences:\n';
     for (const d of divergences) {
       result += `- (${d.voices[0]}) ${d.content}\n`;
     }

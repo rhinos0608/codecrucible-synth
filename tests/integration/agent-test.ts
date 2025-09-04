@@ -9,7 +9,7 @@ import os from 'os';
 
 /**
  * Integration Tests for CodeCrucible Agent
- * 
+ *
  * Tests the complete agent workflow including ReAct loops,
  * tool execution, and multi-voice processing.
  */
@@ -21,7 +21,7 @@ describe('CodeCrucible Agent Integration Tests', () => {
   beforeAll(async () => {
     // Create temporary directory for test files
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codecrucible-test-'));
-    
+
     // Mock configuration
     mockConfig = {
       model: {
@@ -29,25 +29,25 @@ describe('CodeCrucible Agent Integration Tests', () => {
         name: 'test-model',
         timeout: 30000,
         maxTokens: 1000,
-        temperature: 0.7
+        temperature: 0.7,
       },
       voices: {
         available: ['developer', 'analyzer', 'security'],
         default: ['developer'],
         parallel: false,
-        maxConcurrent: 1
+        maxConcurrent: 1,
       },
       safety: {
         commandValidation: true,
         fileSystemRestrictions: true,
-        requireConsent: []
+        requireConsent: [],
       },
       mcp: {
-        servers: {}
+        servers: {},
       },
       e2b: {
-        enabled: false // Disable E2B for tests
-      }
+        enabled: false, // Disable E2B for tests
+      },
     };
   });
 
@@ -64,9 +64,9 @@ describe('CodeCrucible Agent Integration Tests', () => {
       servers: new Map(),
       isReady: () => true,
       initialize: async () => {},
-      destroy: async () => {}
+      destroy: async () => {},
     } as any;
-    
+
     cli = new CLI(mockClient as any, mockVoiceSystem, mockMcpManager, mockConfig);
   });
 
@@ -80,7 +80,7 @@ describe('CodeCrucible Agent Integration Tests', () => {
         console.warn('Cleanup error (ignored):', error.message);
       }
     }
-    
+
     // Force close any remaining connections
     if (global.gc) {
       global.gc();
@@ -96,12 +96,12 @@ describe('CodeCrucible Agent Integration Tests', () => {
 
     test('should handle simple prompts without tools', async () => {
       const prompt = 'What is TypeScript?';
-      
+
       // Mock console.log to capture output
       const originalLog = console.log;
       const outputCapture: string[] = [];
-      console.log = jest.fn((msg) => outputCapture.push(msg));
-      
+      console.log = jest.fn(msg => outputCapture.push(msg));
+
       try {
         await cli.processPrompt(prompt, { quick: true });
         expect(outputCapture.length).toBeGreaterThan(0);
@@ -112,23 +112,26 @@ describe('CodeCrucible Agent Integration Tests', () => {
 
     test('should handle file analysis requests', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
+
       // Create a test file
       const testFile = path.join(tempDir, 'test.js');
-      await fs.writeFile(testFile, `
+      await fs.writeFile(
+        testFile,
+        `
         function hello(name) {
           console.log('Hello ' + name);
         }
         hello('World');
-      `);
-      
+      `
+      );
+
       const prompt = `Analyze the file ${testFile}`;
-      const response = await cli.processPrompt(prompt, { 
+      const response = await cli.processPrompt(prompt, {
         mode: 'agentic',
         maxIterations: 3,
-        noStream: true  // Disable streaming for tests to get actual content
+        noStream: true, // Disable streaming for tests to get actual content
       });
-      
+
       expect(response).toBeDefined();
       expect(response).toContain('function');
     }, 30000);
@@ -137,60 +140,63 @@ describe('CodeCrucible Agent Integration Tests', () => {
   describe('Tool Execution', () => {
     test('should execute file reading tools', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
+
       // Create test file
       const testFile = path.join(tempDir, 'readme.txt');
       const testContent = 'This is a test file for CodeCrucible';
       await fs.writeFile(testFile, testContent);
-      
+
       const prompt = `Read the contents of ${testFile}`;
       const response = await cli.processPrompt(prompt, {
         mode: 'agentic',
         maxIterations: 2,
-        noStream: true  // Disable streaming to get actual content
+        noStream: true, // Disable streaming to get actual content
       });
-      
+
       expect(response).toContain(testContent);
     }, 30000);
 
     test('should execute file writing tools with confirmation', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
+
       const targetFile = path.join(tempDir, 'output.txt');
       const prompt = `Create a file at ${targetFile} with the content "Hello from CodeCrucible"`;
-      
+
       // Mock confirmation system to auto-approve
       const originalConfirm = cli.confirmationSystem;
       cli.confirmationSystem = {
         requestConfirmation: async () => true,
         getPendingEdits: () => [],
-        confirmEdit: async () => true
+        confirmEdit: async () => true,
       };
-      
+
       const response = await cli.processPrompt(prompt, {
         mode: 'agentic',
-        maxIterations: 3
+        maxIterations: 3,
       });
-      
+
       // Check if file was created
-      const fileExists = await fs.access(targetFile).then(() => true).catch(() => false);
+      const fileExists = await fs
+        .access(targetFile)
+        .then(() => true)
+        .catch(() => false);
       if (fileExists) {
         const content = await fs.readFile(targetFile, 'utf-8');
         expect(content).toContain('Hello from CodeCrucible');
       }
-      
+
       expect(response).toBeDefined();
     }, 30000);
 
     test('should handle git status checks', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
+
       const prompt = 'Check the git status of this repository';
       const response = await cli.processPrompt(prompt, {
         mode: 'agentic',
-        maxIterations: 2
+        maxIterations: 2,
       });
-      
+
       expect(response).toBeDefined();
       expect(typeof response).toBe('string');
     }, 30000);
@@ -204,35 +210,35 @@ describe('CodeCrucible Agent Integration Tests', () => {
           available: ['developer', 'analyzer'],
           default: ['developer', 'analyzer'],
           parallel: true,
-          maxConcurrent: 2
-        }
+          maxConcurrent: 2,
+        },
       };
-      
+
       await cli.initialize(voiceConfig, tempDir);
-      
+
       const prompt = 'Explain the benefits of using TypeScript over JavaScript';
       const response = await cli.processPrompt(prompt, {
         voices: ['developer', 'analyzer'],
         mode: 'competitive',
-        noStream: true  // Disable streaming to get actual content
+        noStream: true, // Disable streaming to get actual content
       });
-      
+
       expect(response).toBeDefined();
       expect(response.length).toBeGreaterThan(50);
     }, 45000);
 
     test('should handle voice synthesis correctly', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
+
       // Use the voice system from the CLI context that was already properly set up
       const responses = await cli.context.voiceSystem.generateMultiVoiceSolutions(
-        ['developer', 'security'], 
+        ['developer', 'security'],
         'How to implement secure authentication?'
       );
-      
+
       expect(responses).toBeDefined();
       expect(Array.isArray(responses)).toBe(true);
-      
+
       if (responses.length > 0) {
         // Test that we got valid responses from the voice system
         expect(responses[0]).toBeDefined();
@@ -245,14 +251,14 @@ describe('CodeCrucible Agent Integration Tests', () => {
   describe('Error Handling', () => {
     test('should handle invalid file paths gracefully', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
+
       const prompt = 'Read the file /nonexistent/path/file.txt';
       const response = await cli.processPrompt(prompt, {
         mode: 'agentic',
         maxIterations: 2,
-        noStream: true  // Disable streaming to get actual content
+        noStream: true, // Disable streaming to get actual content
       });
-      
+
       expect(response).toBeDefined();
       expect(response.toLowerCase()).toMatch(/error|not found|does not exist/);
     }, 30000);
@@ -262,25 +268,25 @@ describe('CodeCrucible Agent Integration Tests', () => {
         ...mockConfig,
         model: {
           ...mockConfig.model,
-          endpoint: 'http://localhost:99999'
-        }
+          endpoint: 'http://localhost:99999',
+        },
       };
-      
+
       await cli.initialize(badConfig, tempDir);
-      
+
       const prompt = 'Simple test prompt';
       const response = await cli.processPrompt(prompt, {
         mode: 'simple',
-        maxIterations: 1
+        maxIterations: 1,
       });
-      
+
       expect(response).toBeDefined();
       expect(typeof response).toBe('string');
     }, 30000);
 
     test('should handle malformed prompts', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
+
       // Test that empty prompts throw appropriate errors
       await expect(cli.processPrompt('', {})).rejects.toThrow('Empty prompt provided');
       await expect(cli.processPrompt('   ', {})).rejects.toThrow('Empty prompt provided');
@@ -290,19 +296,19 @@ describe('CodeCrucible Agent Integration Tests', () => {
   describe('ReAct Loop Behavior', () => {
     test('should complete simple tasks in few iterations', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
+
       const iterationTracker = [];
       const originalProcess = cli.processPrompt;
-      
+
       // Mock to track iterations
-      cli.processPrompt = async function(prompt, options) {
+      cli.processPrompt = async function (prompt, options) {
         iterationTracker.push({ prompt, iteration: iterationTracker.length + 1 });
         return originalProcess.call(this, prompt, { ...options, maxIterations: 3 });
       };
-      
+
       const prompt = 'List the current directory contents';
       await cli.processPrompt(prompt, { mode: 'agentic' });
-      
+
       expect(iterationTracker.length).toBeLessThanOrEqual(3);
     }, 30000);
 
@@ -310,7 +316,9 @@ describe('CodeCrucible Agent Integration Tests', () => {
       // Skip CLI initialization to avoid network calls
       // Create a complex scenario
       const testFile = path.join(tempDir, 'complex.js');
-      await fs.writeFile(testFile, `
+      await fs.writeFile(
+        testFile,
+        `
         // This file has issues
         var x = 1;
         var y = 2;
@@ -318,15 +326,16 @@ describe('CodeCrucible Agent Integration Tests', () => {
           return x + y;
         }
         console.log(add());
-      `);
-      
+      `
+      );
+
       const prompt = `Analyze code and suggest improvements for code quality`;
-      
+
       // Mock console.log to capture output
       const originalLog = console.log;
       const outputCapture: string[] = [];
-      console.log = jest.fn((msg) => outputCapture.push(msg));
-      
+      console.log = jest.fn(msg => outputCapture.push(msg));
+
       try {
         await cli.processPrompt(prompt, { quick: true });
         expect(outputCapture.length).toBeGreaterThan(0);
@@ -339,32 +348,32 @@ describe('CodeCrucible Agent Integration Tests', () => {
   describe('Configuration and State Management', () => {
     test('should maintain state across multiple prompts', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
+
       // First prompt
       const response1 = await cli.processPrompt('Create a variable named testVar with value 42', {
-        mode: 'simple'
+        mode: 'simple',
       });
-      
+
       // Second prompt referring to first
       const response2 = await cli.processPrompt('What was the value of testVar?', {
-        mode: 'simple'
+        mode: 'simple',
       });
-      
+
       expect(response1).toBeDefined();
       expect(response2).toBeDefined();
     }, 30000);
 
     test('should handle configuration updates', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
+
       const newConfig = {
         ...mockConfig,
         voices: {
           ...mockConfig.voices,
-          default: ['analyzer']
-        }
+          default: ['analyzer'],
+        },
       };
-      
+
       const updateResult = await cli.updateConfiguration(newConfig);
       expect(updateResult).toBe(true);
     });
@@ -373,41 +382,35 @@ describe('CodeCrucible Agent Integration Tests', () => {
   describe('Performance and Reliability', () => {
     test('should handle concurrent requests appropriately', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
-      const prompts = [
-        'What is JavaScript?',
-        'What is Python?',
-        'What is TypeScript?'
-      ];
-      
+
+      const prompts = ['What is JavaScript?', 'What is Python?', 'What is TypeScript?'];
+
       const startTime = Date.now();
       const responses = await Promise.allSettled(
-        prompts.map(prompt => 
-          cli.processPrompt(prompt, { mode: 'simple', maxIterations: 1 })
-        )
+        prompts.map(prompt => cli.processPrompt(prompt, { mode: 'simple', maxIterations: 1 }))
       );
       const endTime = Date.now();
-      
+
       expect(responses).toHaveLength(3);
       expect(endTime - startTime).toBeLessThan(120000); // Should complete within 2 minutes
-      
+
       const successfulResponses = responses.filter(r => r.status === 'fulfilled');
       expect(successfulResponses.length).toBeGreaterThan(0);
     }, 120000);
 
     test('should handle memory efficiently with large inputs', async () => {
       await cli.initialize(mockConfig, tempDir);
-      
+
       const largeContent = 'a'.repeat(10000);
       const largeFile = path.join(tempDir, 'large.txt');
       await fs.writeFile(largeFile, largeContent);
-      
+
       const prompt = `Analyze the file ${largeFile}`;
       const response = await cli.processPrompt(prompt, {
         mode: 'agentic',
-        maxIterations: 2
+        maxIterations: 2,
       });
-      
+
       expect(response).toBeDefined();
       expect(typeof response).toBe('string');
     }, 30000);
@@ -440,7 +443,7 @@ class MockUnifiedModelClient {
       content: `Mock response from ${voice} voice`,
       voice,
       confidence: 0.8,
-      tokens_used: 50
+      tokens_used: 50,
     };
   }
 
@@ -449,7 +452,7 @@ class MockUnifiedModelClient {
       content: `Mock response from ${voice} voice`,
       voice,
       confidence: 0.8,
-      tokens_used: 50
+      tokens_used: 50,
     }));
   }
 
@@ -476,17 +479,21 @@ class MockUnifiedModelClient {
   async initialize(): Promise<void> {
     // Mock initialization - return immediately
   }
-  
+
   async generateVoiceResponse(prompt: string, voiceId: string, options: any) {
     // Handle file reading operations - check multiple patterns
-    if (prompt.includes('Read the contents of') || prompt.includes('contents of') || prompt.includes('Read the file')) {
+    if (
+      prompt.includes('Read the contents of') ||
+      prompt.includes('contents of') ||
+      prompt.includes('Read the file')
+    ) {
       // Handle invalid/nonexistent files first
       if (prompt.includes('/nonexistent/') || prompt.includes('does not exist')) {
         return {
           content: 'Error: File not found. The specified path does not exist.',
           voice: voiceId,
           confidence: 0.8,
-          tokens_used: 25
+          tokens_used: 25,
         };
       }
       // Check if it's a valid file path that exists
@@ -496,67 +503,75 @@ class MockUnifiedModelClient {
           content: 'This is a test file for CodeCrucible',
           voice: voiceId,
           confidence: 0.9,
-          tokens_used: 30
+          tokens_used: 30,
         };
       }
     }
-    
+
     // Handle TypeScript questions
     if (prompt.includes('TypeScript')) {
       return {
-        content: 'TypeScript is a superset of JavaScript that adds static typing, enabling better code quality, enhanced IDE support, and early error detection during development.',
+        content:
+          'TypeScript is a superset of JavaScript that adds static typing, enabling better code quality, enhanced IDE support, and early error detection during development.',
         voice: voiceId,
         confidence: 0.9,
-        tokens_used: 50
+        tokens_used: 50,
       };
     }
-    
+
     // Handle file analysis
     if (prompt.includes('analyze') || prompt.includes('Analyze')) {
       return {
-        content: 'This JavaScript file contains a simple function that demonstrates basic programming concepts. The code follows standard patterns and includes proper console output for user interaction.',
+        content:
+          'This JavaScript file contains a simple function that demonstrates basic programming concepts. The code follows standard patterns and includes proper console output for user interaction.',
         voice: voiceId,
         confidence: 0.8,
-        tokens_used: 40
+        tokens_used: 40,
       };
     }
-    
+
     // Handle complex tasks that should return longer responses
     if (prompt.includes('suggest improvements') || prompt.includes('complex')) {
       return {
-        content: 'After thorough analysis, I recommend several improvements: 1) Replace var with const/let for better scoping, 2) Add parameter validation for the add function, 3) Consider using ES6 arrow functions for conciseness, 4) Add JSDoc comments for better documentation, 5) Implement error handling for edge cases.',
+        content:
+          'After thorough analysis, I recommend several improvements: 1) Replace var with const/let for better scoping, 2) Add parameter validation for the add function, 3) Consider using ES6 arrow functions for conciseness, 4) Add JSDoc comments for better documentation, 5) Implement error handling for edge cases.',
         voice: voiceId,
         confidence: 0.9,
-        tokens_used: 80
+        tokens_used: 80,
       };
     }
-    
+
     return {
       content: 'This is a mock response for testing purposes.',
       voice: voiceId,
       confidence: 0.7,
-      tokens_used: 20
+      tokens_used: 20,
     };
   }
-  
+
   async checkConnection(): Promise<boolean> {
     return true;
   }
-  
+
   async getAvailableModels(): Promise<string[]> {
     return ['test-model', 'fallback-model'];
   }
 
-  async synthesize(request: { prompt: string; model?: string; temperature?: number; maxTokens?: number; }): Promise<any> {
+  async synthesize(request: {
+    prompt: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+  }): Promise<any> {
     // Handle invalid file paths
     if (request.prompt.includes('/nonexistent/') || request.prompt.includes('nonexistent')) {
       return {
         content: 'Error: File not found. The specified path does not exist.',
         tokensUsed: 25,
-        model: request.model || 'test-model'
+        model: request.model || 'test-model',
       };
     }
-    
+
     // Handle file reading requests
     if (request.prompt.includes('Read the contents of') || request.prompt.includes('contents of')) {
       const fileMatch = request.prompt.match(/[\w\/\.-]+\.txt/);
@@ -564,47 +579,48 @@ class MockUnifiedModelClient {
         return {
           content: 'This is a test file for CodeCrucible',
           tokensUsed: 30,
-          model: request.model || 'test-model'
+          model: request.model || 'test-model',
         };
       }
     }
-    
+
     // Handle TypeScript questions
     if (request.prompt.includes('TypeScript')) {
       return {
         content: 'TypeScript is a superset of JavaScript that adds static typing.',
         tokensUsed: 25,
-        model: request.model || 'test-model'
+        model: request.model || 'test-model',
       };
     }
 
     return {
       content: 'Mock response for testing purposes.',
       tokensUsed: 20,
-      model: request.model || 'test-model'
+      model: request.model || 'test-model',
     };
   }
 
-  async processRequest(request: { prompt: string; temperature?: number; }): Promise<any> {
+  async processRequest(request: { prompt: string; temperature?: number }): Promise<any> {
     // Handle TypeScript questions
     if (request.prompt.includes('TypeScript')) {
       return {
         content: 'TypeScript is a superset of JavaScript that adds static typing.',
-        tokensUsed: 25
+        tokensUsed: 25,
       };
     }
 
-    // Handle security questions  
+    // Handle security questions
     if (request.prompt.includes('secure authentication')) {
       return {
-        content: 'For secure authentication, implement multi-factor authentication, use secure password hashing, and validate all inputs.',
-        tokensUsed: 35
+        content:
+          'For secure authentication, implement multi-factor authentication, use secure password hashing, and validate all inputs.',
+        tokensUsed: 35,
       };
     }
 
     return {
       content: 'Mock response for testing purposes.',
-      tokensUsed: 20
+      tokensUsed: 20,
     };
   }
 
@@ -612,7 +628,7 @@ class MockUnifiedModelClient {
   async streamRequest(request: any, onToken: (token: any) => void, context?: any): Promise<any> {
     // Simulate streaming response
     const content = await this.synthesize(request);
-    
+
     // Emit token chunks to simulate streaming
     const words = content.content.split(' ');
     for (let i = 0; i < words.length; i++) {
@@ -622,18 +638,18 @@ class MockUnifiedModelClient {
         finished: i === words.length - 1,
         metadata: {
           totalTokens: words.length,
-          duration: 100 * i
-        }
+          duration: 100 * i,
+        },
       };
       onToken(token);
       // Small delay to simulate real streaming
       await new Promise(resolve => setTimeout(resolve, 10));
     }
-    
+
     return {
       content: content.content,
       cached: false,
-      processingTime: words.length * 10
+      processingTime: words.length * 10,
     };
   }
 

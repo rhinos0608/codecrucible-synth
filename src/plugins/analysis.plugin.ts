@@ -7,7 +7,7 @@ export default function createAnalysisPlugin(): IPlugin {
       version: '1.0.0',
       description: 'Provides analysis-related commands',
       lifecycle: 'both',
-      tags: ['analysis']
+      tags: ['analysis'],
     },
     async initialize(ctx: PluginContext) {
       if (ctx.registerCommand) {
@@ -18,4 +18,3 @@ export default function createAnalysisPlugin(): IPlugin {
     },
   };
 }
-

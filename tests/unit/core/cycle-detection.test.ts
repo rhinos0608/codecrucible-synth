@@ -4,8 +4,16 @@
  */
 
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { EnhancedAgenticPlanner, Task, PlanningContext } from '../../../src/core/planning/enhanced-agentic-planner.js';
-import { EnterpriseMCPOrchestrator, ToolExecutionStep, ExecutionContext } from '../../../src/core/mcp/enterprise-mcp-orchestrator.js';
+import {
+  EnhancedAgenticPlanner,
+  Task,
+  PlanningContext,
+} from '../../../src/core/planning/enhanced-agentic-planner.js';
+import {
+  EnterpriseMCPOrchestrator,
+  ToolExecutionStep,
+  ExecutionContext,
+} from '../../../src/core/mcp/enterprise-mcp-orchestrator.js';
 import { MCPServerManager } from '../../../src/mcp-servers/mcp-server-manager.js';
 
 describe('Cycle Detection in Orchestration Components', () => {
@@ -14,22 +22,22 @@ describe('Cycle Detection in Orchestration Components', () => {
 
   beforeEach(() => {
     planner = new EnhancedAgenticPlanner();
-    
+
     // Mock MCPServerManager for testing
     const mockMCPManager = {
       listServers: jest.fn().mockResolvedValue([]),
-      getServerStatus: jest.fn().mockReturnValue(null)
+      getServerStatus: jest.fn().mockReturnValue(null),
     } as any;
-    
+
     mcpOrchestrator = new EnterpriseMCPOrchestrator(mockMCPManager);
   });
 
   describe('EnhancedAgenticPlanner Cycle Detection', () => {
     it('should detect simple cycles in task dependencies', async () => {
       const cycleDetectedEvents: any[] = [];
-      
+
       // Listen for cycle detection events
-      planner.on('cycle-detected', (event) => {
+      planner.on('cycle-detected', event => {
         cycleDetectedEvents.push(event);
       });
 
@@ -67,7 +75,7 @@ describe('Cycle Detection in Orchestration Components', () => {
       const dependencies = new Map([
         ['taskA', ['taskC']],
         ['taskB', ['taskA']],
-        ['taskC', ['taskB']]
+        ['taskC', ['taskB']],
       ]);
 
       // Access the private method to test cycle detection directly
@@ -88,8 +96,8 @@ describe('Cycle Detection in Orchestration Components', () => {
 
     it('should handle self-referencing dependencies', async () => {
       const cycleDetectedEvents: any[] = [];
-      
-      planner.on('cycle-detected', (event) => {
+
+      planner.on('cycle-detected', event => {
         cycleDetectedEvents.push(event);
       });
 
@@ -106,9 +114,7 @@ describe('Cycle Detection in Orchestration Components', () => {
         },
       ];
 
-      const dependencies = new Map([
-        ['selfRef', ['selfRef']]
-      ]);
+      const dependencies = new Map([['selfRef', ['selfRef']]]);
 
       const plannerAny = planner as any;
       plannerAny.calculateExecutionOrder(tasks, dependencies);
@@ -119,8 +125,8 @@ describe('Cycle Detection in Orchestration Components', () => {
 
     it('should not report cycles when there are none', async () => {
       const cycleDetectedEvents: any[] = [];
-      
-      planner.on('cycle-detected', (event) => {
+
+      planner.on('cycle-detected', event => {
         cycleDetectedEvents.push(event);
       });
 
@@ -146,8 +152,8 @@ describe('Cycle Detection in Orchestration Components', () => {
   describe('EnterpriseMCPOrchestrator Cycle Detection', () => {
     it('should detect cycles in MCP tool execution steps', async () => {
       const cycleEvents: any[] = [];
-      
-      mcpOrchestrator.on('dependency-cycle-detected', (event) => {
+
+      mcpOrchestrator.on('dependency-cycle-detected', event => {
         cycleEvents.push(event);
       });
 
@@ -157,20 +163,20 @@ describe('Cycle Detection in Orchestration Components', () => {
           id: 'step1',
           toolName: 'tool-a',
           parameters: {},
-          dependencies: ['step3'] // Creates cycle
+          dependencies: ['step3'], // Creates cycle
         },
         {
           id: 'step2',
           toolName: 'tool-b',
           parameters: {},
-          dependencies: ['step1']
+          dependencies: ['step1'],
         },
         {
           id: 'step3',
           toolName: 'tool-c',
           parameters: {},
-          dependencies: ['step2'] // Completes the cycle
-        }
+          dependencies: ['step2'], // Completes the cycle
+        },
       ];
 
       const context: ExecutionContext = {
@@ -180,8 +186,8 @@ describe('Cycle Detection in Orchestration Components', () => {
         maxDuration: 30000,
         securityContext: {
           permissions: [],
-          userRole: 'user'
-        }
+          userRole: 'user',
+        },
       };
 
       // Access the private method to test cycle detection
@@ -195,8 +201,8 @@ describe('Cycle Detection in Orchestration Components', () => {
 
     it('should handle missing dependencies gracefully', async () => {
       const cycleEvents: any[] = [];
-      
-      mcpOrchestrator.on('dependency-cycle-detected', (event) => {
+
+      mcpOrchestrator.on('dependency-cycle-detected', event => {
         cycleEvents.push(event);
       });
 
@@ -205,14 +211,14 @@ describe('Cycle Detection in Orchestration Components', () => {
           id: 'step1',
           toolName: 'tool-a',
           parameters: {},
-          dependencies: ['nonexistent'] // Missing dependency
+          dependencies: ['nonexistent'], // Missing dependency
         },
         {
           id: 'step2',
           toolName: 'tool-b',
           parameters: {},
-          dependencies: ['step1']
-        }
+          dependencies: ['step1'],
+        },
       ];
 
       const context: ExecutionContext = {
@@ -222,8 +228,8 @@ describe('Cycle Detection in Orchestration Components', () => {
         maxDuration: 30000,
         securityContext: {
           permissions: [],
-          userRole: 'user'
-        }
+          userRole: 'user',
+        },
       };
 
       const orchestratorAny = mcpOrchestrator as any;
@@ -236,8 +242,8 @@ describe('Cycle Detection in Orchestration Components', () => {
 
     it('should process steps with no dependencies correctly', async () => {
       const cycleEvents: any[] = [];
-      
-      mcpOrchestrator.on('dependency-cycle-detected', (event) => {
+
+      mcpOrchestrator.on('dependency-cycle-detected', event => {
         cycleEvents.push(event);
       });
 
@@ -246,14 +252,14 @@ describe('Cycle Detection in Orchestration Components', () => {
           id: 'step1',
           toolName: 'tool-a',
           parameters: {},
-          dependencies: []
+          dependencies: [],
         },
         {
           id: 'step2',
           toolName: 'tool-b',
           parameters: {},
-          dependencies: []
-        }
+          dependencies: [],
+        },
       ];
 
       const context: ExecutionContext = {
@@ -262,8 +268,8 @@ describe('Cycle Detection in Orchestration Components', () => {
         requestId: 'test-request',
         maxDuration: 30000,
         securityContext: {
-          permissions: []
-        }
+          permissions: [],
+        },
       };
 
       expect(cycleEvents).toHaveLength(0);
@@ -275,7 +281,7 @@ describe('Cycle Detection in Orchestration Components', () => {
   describe('Performance and Safety', () => {
     it('should handle large dependency graphs efficiently', async () => {
       const start = Date.now();
-      
+
       // Test the planner with a normal workflow (no artificial cycles)
       const context: PlanningContext = {
         objective: 'create test implement analyze review',
@@ -294,8 +300,8 @@ describe('Cycle Detection in Orchestration Components', () => {
 
     it('should prevent infinite loops with complex cycles', async () => {
       const cycleEvents: any[] = [];
-      
-      mcpOrchestrator.on('dependency-cycle-detected', (event) => {
+
+      mcpOrchestrator.on('dependency-cycle-detected', event => {
         cycleEvents.push(event);
       });
 
@@ -316,8 +322,8 @@ describe('Cycle Detection in Orchestration Components', () => {
         maxDuration: 30000,
         securityContext: {
           permissions: [],
-          userRole: 'user'
-        }
+          userRole: 'user',
+        },
       };
 
       const orchestratorAny = mcpOrchestrator as any;

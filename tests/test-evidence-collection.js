@@ -6,11 +6,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 
-const testCommand = [
-  'node', 
-  path.join(process.cwd(), 'dist/index.js'),
-  'read package.json'
-];
+const testCommand = ['node', path.join(process.cwd(), 'dist/index.js'), 'read package.json'];
 
 console.log('🔍 TESTING EVIDENCE COLLECTION WITH COMMAND:', testCommand.join(' '));
 console.log('📍 Working directory:', process.cwd());
@@ -22,15 +18,15 @@ const child = spawn(testCommand[0], testCommand.slice(1), {
   env: {
     ...process.env,
     DEBUG: 'codecrucible:*',
-    NODE_ENV: 'development'
-  }
+    NODE_ENV: 'development',
+  },
 });
 
-child.on('error', (error) => {
+child.on('error', error => {
   console.error('❌ SPAWN ERROR:', error);
 });
 
-child.on('close', (code) => {
+child.on('close', code => {
   console.log(`\n🏁 PROCESS EXITED WITH CODE: ${code}`);
   console.log('⏰ Finished at:', new Date().toISOString());
 });

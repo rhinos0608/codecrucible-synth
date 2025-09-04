@@ -15,8 +15,8 @@ export default [
       'temp-dist/',
       '**/*.d.ts',
       'archive/',
-      'tests/__mocks__/'
-    ]
+      'tests/__mocks__/',
+    ],
   },
 
   // Base configuration for all files
@@ -27,8 +27,8 @@ export default [
       globals: {
         ...globals.node,
         ...globals.jest,
-      }
-    }
+      },
+    },
   },
 
   // JavaScript files
@@ -47,7 +47,7 @@ export default [
       'no-console': 'warn',
       'no-debugger': 'error',
       'no-alert': 'error',
-    }
+    },
   },
 
   // TypeScript files - 2025 Enterprise Standards
@@ -60,28 +60,31 @@ export default [
         sourceType: 'module',
         // Use a dedicated config so ESLint includes all src files without conflicting excludes
         project: './tsconfig.eslint.json',
-      }
+      },
     },
     plugins: {
-      '@typescript-eslint': tseslint
+      '@typescript-eslint': tseslint,
     },
     rules: {
       ...eslint.configs.recommended.rules,
       ...tseslint.configs.recommended.rules,
-      
+
       // 2025 TypeScript Best Practices - Production Readiness
       '@typescript-eslint/no-explicit-any': 'error', // Upgraded to error for production
-      '@typescript-eslint/no-unused-vars': ['error', { 
-        'vars': 'all',
-        'args': 'after-used',
-        'ignoreRestSiblings': true,
-        'argsIgnorePattern': '^_',
-        'varsIgnorePattern': '^_'
-      }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          vars: 'all',
+          args: 'after-used',
+          ignoreRestSiblings: true,
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
       '@typescript-eslint/no-non-null-assertion': 'error', // Production safety
       '@typescript-eslint/prefer-nullish-coalescing': 'warn', // Enable for better null handling
       '@typescript-eslint/prefer-optional-chain': 'error',
-      
+
       // Promise Safety - Critical for async operations
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
@@ -95,7 +98,7 @@ export default [
       '@typescript-eslint/restrict-plus-operands': 'warn', // Enable for type safety
       '@typescript-eslint/restrict-template-expressions': 'warn', // Enable with warnings
       '@typescript-eslint/unbound-method': 'error',
-      
+
       // Additional Production Rules
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
       '@typescript-eslint/explicit-function-return-type': 'warn',
@@ -123,16 +126,16 @@ export default [
       '@typescript-eslint/require-await': 'error',
       '@typescript-eslint/return-await': ['error', 'in-try-catch'],
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
-      
+
       // Security Rules
       '@typescript-eslint/no-implied-eval': 'error',
       '@typescript-eslint/no-throw-literal': 'error',
-      
+
       // Performance Rules
       '@typescript-eslint/prefer-for-of': 'error',
       '@typescript-eslint/prefer-includes': 'error',
       '@typescript-eslint/prefer-readonly-parameter-types': 'warn',
-      
+
       // Security & Best Practices - Enhanced Production Rules
       'no-eval': 'error',
       'no-implied-eval': 'off', // Handled by TypeScript version
@@ -160,17 +163,17 @@ export default [
       'no-useless-concat': 'error',
       'no-void': 'error',
       'no-with': 'error',
-      'radix': 'error',
+      radix: 'error',
       'wrap-iife': ['error', 'outside'],
-      'yoda': 'error',
-      
+      yoda: 'error',
+
       // Error Prevention
       'array-callback-return': 'error',
       'consistent-return': 'error',
       'default-case': 'error',
       'default-case-last': 'error',
       'dot-notation': 'error',
-      'eqeqeq': ['error', 'always'],
+      eqeqeq: ['error', 'always'],
       'guard-for-in': 'error',
       'no-case-declarations': 'error',
       'no-empty': 'error',
@@ -183,51 +186,58 @@ export default [
       'no-unsafe-finally': 'error',
       'use-isnan': 'error',
       'valid-typeof': 'error',
-      
+
       // Modern JavaScript/TypeScript - Enhanced
       'prefer-const': 'error',
       'no-var': 'error',
       'prefer-arrow-callback': 'error',
       'prefer-template': 'error',
-      'prefer-destructuring': ['error', {
-        'array': true,
-        'object': true
-      }, {
-        'enforceForRenamedProperties': false
-      }],
+      'prefer-destructuring': [
+        'error',
+        {
+          array: true,
+          object: true,
+        },
+        {
+          enforceForRenamedProperties: false,
+        },
+      ],
       'prefer-object-spread': 'error',
       'prefer-rest-params': 'error',
       'prefer-spread': 'error',
       'object-shorthand': 'error',
       'quote-props': ['error', 'as-needed'],
-      
+
       // Performance Rules
       'no-inner-declarations': 'error',
       'no-regex-spaces': 'error',
       'no-sparse-arrays': 'error',
       'no-template-curly-in-string': 'error',
-      
+
       // Import/Export Rules
       'no-duplicate-imports': 'error',
       'no-useless-rename': 'error',
-      'sort-imports': ['error', {
-        'ignoreCase': false,
-        'ignoreDeclarationSort': true, // Let import/order handle declaration sorting
-        'ignoreMemberSort': false,
-        'memberSyntaxSortOrder': ['none', 'all', 'multiple', 'single'],
-        'allowSeparatedGroups': false
-      }],
-      
+      'sort-imports': [
+        'error',
+        {
+          ignoreCase: false,
+          ignoreDeclarationSort: true, // Let import/order handle declaration sorting
+          ignoreMemberSort: false,
+          memberSyntaxSortOrder: ['none', 'all', 'multiple', 'single'],
+          allowSeparatedGroups: false,
+        },
+      ],
+
       // Code Quality - CLI Application Specific
       'no-console': 'off', // Allow console statements in CLI application
       'no-debugger': 'error',
       'no-alert': 'error',
-      
+
       // Disable base ESLint rules that are covered by TypeScript equivalents
       'no-unused-vars': 'off', // Handled by @typescript-eslint/no-unused-vars
-      'no-redeclare': 'off',   // TypeScript handles this
-      'no-undef': 'off',       // TypeScript handles this
-    }
+      'no-redeclare': 'off', // TypeScript handles this
+      'no-undef': 'off', // TypeScript handles this
+    },
   },
 
   // Test files - More lenient rules for testing patterns
@@ -252,7 +262,7 @@ export default [
       'no-empty': 'off', // Allow empty blocks in tests
       'no-unused-expressions': 'off', // Allow unused expressions for test assertions
       'prefer-arrow-callback': 'off', // Allow regular functions in test callbacks
-    }
+    },
   },
 
   // Configuration files
@@ -261,6 +271,6 @@ export default [
     rules: {
       'no-console': 'off',
       '@typescript-eslint/no-var-requires': 'off',
-    }
-  }
+    },
+  },
 ];

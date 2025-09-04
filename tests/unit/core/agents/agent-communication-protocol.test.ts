@@ -21,7 +21,7 @@ import {
   OrchestrationResult,
   TaskType,
   AgentSearchCriteria,
-  createAgentCommunicationProtocol
+  createAgentCommunicationProtocol,
 } from '../../../../src/core/agents/agent-communication-protocol.js';
 
 // Mock implementations for testing
@@ -33,11 +33,7 @@ class MockAgent extends EventEmitter implements Agent {
   public metadata: any;
   public status: AgentStatus;
 
-  constructor(
-    id: string,
-    capabilities: AgentCapability[] = [],
-    status: AgentStatus = 'active'
-  ) {
+  constructor(id: string, capabilities: AgentCapability[] = [], status: AgentStatus = 'active') {
     super();
     this.id = id;
     this.name = `Agent-${id}`;
@@ -87,9 +83,7 @@ class MockAgent extends EventEmitter implements Agent {
   }
 
   canHandle(task: AgentTask): boolean {
-    return this.capabilities.some(cap =>
-      task.requirements.some(req => req.value === cap.name)
-    );
+    return this.capabilities.some(cap => task.requirements.some(req => req.value === cap.name));
   }
 
   subscribe(eventType: string, handler: any): void {
@@ -127,7 +121,7 @@ class MockAgentRegistry implements IAgentRegistry {
 
   async findAgents(criteria: AgentSearchCriteria): Promise<Agent[]> {
     const allAgents = Array.from(this.agents.values());
-    
+
     return allAgents.filter(agent => {
       if (criteria.type && agent.type !== criteria.type) return false;
       if (criteria.status && agent.status !== criteria.status) return false;
@@ -138,7 +132,9 @@ class MockAgentRegistry implements IAgentRegistry {
         if (!hasCapabilities) return false;
       }
       if (criteria.minConfidence) {
-        const avgConfidence = agent.capabilities.reduce((sum, cap) => sum + cap.confidence, 0) / agent.capabilities.length;
+        const avgConfidence =
+          agent.capabilities.reduce((sum, cap) => sum + cap.confidence, 0) /
+          agent.capabilities.length;
         if (avgConfidence < criteria.minConfidence) return false;
       }
       return true;
@@ -191,7 +187,7 @@ class MockConversationManager extends EventEmitter implements ConversationManage
   async summarizeConversation(conversationId: string): Promise<any> {
     const conversation = this.conversations.get(conversationId);
     const messages = this.messages.get(conversationId) || [];
-    
+
     return {
       id: conversationId,
       topic: conversation?.topic || 'Unknown',
@@ -257,10 +253,10 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
     for (const agent of testAgents) {
       await agent.shutdown();
     }
-    
+
     protocol.removeAllListeners();
     conversationManager.removeAllListeners();
-    
+
     // Clear timers
     jest.clearAllTimers();
   });
@@ -329,11 +325,7 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
     });
 
     it('should handle messages to non-existent agents gracefully', async () => {
-      const message = await protocol.sendMessage(
-        'agent-1',
-        'non-existent-agent',
-        'test'
-      );
+      const message = await protocol.sendMessage('agent-1', 'non-existent-agent', 'test');
 
       // Should not throw error but message won't be processed
       expect(message).toBeDefined();
@@ -349,12 +341,8 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
         id: 'test-task-1',
         type: 'code-analysis',
         description: 'Analyze test code',
-        requirements: [
-          { type: 'capability', value: 'code-analysis', mandatory: true },
-        ],
-        constraints: [
-          { type: 'time', value: 60000, enforced: true },
-        ],
+        requirements: [{ type: 'capability', value: 'code-analysis', mandatory: true }],
+        constraints: [{ type: 'time', value: 60000, enforced: true }],
         expectedOutput: 'Analysis results',
         priority: 5,
       };
@@ -393,7 +381,7 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
       expect(result.success).toBe(true);
       expect(result.results.length).toBeGreaterThan(0);
       expect(result.executionPlan.length).toBeGreaterThan(0);
-      
+
       // In parallel execution, all steps should have overlapping time ranges
       if (result.executionPlan.length > 1) {
         const firstStart = result.executionPlan[0].startTime;
@@ -419,7 +407,7 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
 
       expect(result.success).toBe(true);
       expect(result.results.length).toBeGreaterThan(0);
-      
+
       // Results should be ordered by agent capability confidence
       // (This is tested indirectly through successful execution)
     });
@@ -434,23 +422,21 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
     });
 
     it('should throw error for unknown orchestration strategy', async () => {
-      await expect(
-        protocol.orchestrateTask(testTask, 'unknown-strategy')
-      ).rejects.toThrow('Unknown orchestration strategy: unknown-strategy');
+      await expect(protocol.orchestrateTask(testTask, 'unknown-strategy')).rejects.toThrow(
+        'Unknown orchestration strategy: unknown-strategy'
+      );
     });
 
     it('should throw error when no agents can handle task', async () => {
       const impossibleTask: AgentTask = {
         ...testTask,
         type: 'impossible-task' as TaskType,
-        requirements: [
-          { type: 'capability', value: 'non-existent-capability', mandatory: true },
-        ],
+        requirements: [{ type: 'capability', value: 'non-existent-capability', mandatory: true }],
       };
 
-      await expect(
-        protocol.orchestrateTask(impossibleTask)
-      ).rejects.toThrow('No agents found capable of handling task type: impossible-task');
+      await expect(protocol.orchestrateTask(impossibleTask)).rejects.toThrow(
+        'No agents found capable of handling task type: impossible-task'
+      );
     });
 
     it('should emit orchestration events', async () => {
@@ -463,11 +449,13 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
       await protocol.orchestrateTask(testTask, 'sequential');
 
       expect(startHandler).toHaveBeenCalledWith('sequential', expect.any(Number));
-      expect(completeHandler).toHaveBeenCalledWith(expect.objectContaining({
-        success: expect.any(Boolean),
-        results: expect.any(Array),
-        totalTime: expect.any(Number),
-      }));
+      expect(completeHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: expect.any(Boolean),
+          results: expect.any(Array),
+          totalTime: expect.any(Number),
+        })
+      );
     });
 
     it('should handle agent errors during orchestration', async () => {
@@ -500,7 +488,11 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
         priority: 3,
       };
 
-      const result = await protocol.negotiateCapabilities(testTask, ['agent-1', 'agent-2', 'agent-3']);
+      const result = await protocol.negotiateCapabilities(testTask, [
+        'agent-1',
+        'agent-2',
+        'agent-3',
+      ]);
 
       expect(result).toBeDefined();
       expect(result.task).toBe(testTask);
@@ -519,9 +511,7 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
         id: 'confidence-task',
         type: 'code-analysis',
         description: 'Test confidence calculation',
-        requirements: [
-          { type: 'capability', value: 'code-analysis', mandatory: true },
-        ],
+        requirements: [{ type: 'capability', value: 'code-analysis', mandatory: true }],
         constraints: [],
         expectedOutput: 'Confidence results',
         priority: 3,
@@ -539,9 +529,7 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
         id: 'impossible-task',
         type: 'code-analysis',
         description: 'Impossible task',
-        requirements: [
-          { type: 'capability', value: 'impossible-capability', mandatory: true },
-        ],
+        requirements: [{ type: 'capability', value: 'impossible-capability', mandatory: true }],
         constraints: [],
         expectedOutput: 'Nothing',
         priority: 1,
@@ -658,16 +646,14 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
 
       // Send many messages concurrently
       for (let i = 0; i < messageCount; i++) {
-        messagePromises.push(
-          protocol.sendMessage('agent-1', 'agent-2', `Message ${i}`)
-        );
+        messagePromises.push(protocol.sendMessage('agent-1', 'agent-2', `Message ${i}`));
       }
 
       const messages = await Promise.all(messagePromises);
-      
+
       expect(messages).toHaveLength(messageCount);
       expect(messages.every(m => m.id)).toBe(true);
-      
+
       // All message IDs should be unique
       const messageIds = messages.map(m => m.id);
       const uniqueIds = new Set(messageIds);
@@ -728,7 +714,7 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
   describe('Performance and Resource Management', () => {
     it('should complete orchestration within reasonable time', async () => {
       const startTime = Date.now();
-      
+
       const testTask: AgentTask = {
         id: 'perf-task',
         type: 'code-analysis',
@@ -773,7 +759,7 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
 
     it('should handle memory cleanup in scoped operations', async () => {
       const initialMemoryUsage = process.memoryUsage();
-      
+
       // Perform multiple orchestrations to potentially create memory pressure
       const tasks = Array.from({ length: 10 }, (_, i) => ({
         id: `memory-task-${i}`,
@@ -794,7 +780,7 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
       // Memory usage should not grow excessively
       const finalMemoryUsage = process.memoryUsage();
       const memoryGrowth = finalMemoryUsage.heapUsed - initialMemoryUsage.heapUsed;
-      
+
       // Allow some growth but not excessive (less than 50MB for this test)
       expect(memoryGrowth).toBeLessThan(50 * 1024 * 1024);
     });
@@ -804,9 +790,9 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
     it('should create protocol instance via factory function', () => {
       const registry = new MockAgentRegistry();
       const conversationManager = new MockConversationManager();
-      
+
       const createdProtocol = createAgentCommunicationProtocol(registry, conversationManager);
-      
+
       expect(createdProtocol).toBeInstanceOf(AgentCommunicationProtocol);
       expect(createdProtocol.getOrchestrationStrategies()).toContain('sequential');
     });
@@ -814,7 +800,7 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
     it('should provide consistent strategy listings', () => {
       const strategies1 = protocol.getOrchestrationStrategies();
       const strategies2 = protocol.getOrchestrationStrategies();
-      
+
       expect(strategies1).toEqual(strategies2);
       expect(strategies1.length).toBeGreaterThan(0);
     });
@@ -843,24 +829,24 @@ describe('AgentCommunicationProtocol - Comprehensive Tests', () => {
       const eventData: any[] = [];
 
       // Capture all events
-      protocol.on('message-sent', (data) => {
+      protocol.on('message-sent', data => {
         events.push('message-sent');
         eventData.push(data);
       });
-      
+
       protocol.on('orchestration-started', (strategy, agentCount) => {
         events.push('orchestration-started');
         eventData.push({ strategy, agentCount });
       });
-      
-      protocol.on('orchestration-completed', (result) => {
+
+      protocol.on('orchestration-completed', result => {
         events.push('orchestration-completed');
         eventData.push(result);
       });
 
       // Trigger events
       await protocol.sendMessage('agent-1', 'agent-2', 'monitoring test');
-      
+
       const testTask: AgentTask = {
         id: 'monitoring-task',
         type: 'code-analysis',

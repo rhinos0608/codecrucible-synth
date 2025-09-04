@@ -14,14 +14,14 @@ describe('Quality Analyzer Integration', () => {
     analyzer = new QualityAnalyzerIntegrationAdapter({
       weights: {
         cyclomaticComplexity: 0.25,
-        maintainabilityIndex: 0.20,
-        lintingScore: 0.20,
-        formattingScore: 0.10,
+        maintainabilityIndex: 0.2,
+        lintingScore: 0.2,
+        formattingScore: 0.1,
         typeCoverage: 0.15,
         documentation: 0.05,
         duplication: 0.03,
-        halsteadComplexity: 0.02
-      }
+        halsteadComplexity: 0.02,
+      },
     });
   });
 
@@ -66,12 +66,12 @@ describe('Quality Analyzer Integration', () => {
 
     it('should handle configuration updates', () => {
       const originalConfig = analyzer.getConfiguration();
-      
+
       analyzer.updateConfiguration({
         weights: {
           ...originalConfig.weights,
-          cyclomaticComplexity: 0.5
-        }
+          cyclomaticComplexity: 0.5,
+        },
       });
 
       const updatedConfig = analyzer.getConfiguration();
@@ -80,7 +80,7 @@ describe('Quality Analyzer Integration', () => {
 
     it('should provide quality history', async () => {
       const identifier = 'integration-test';
-      
+
       const code1 = `function simple() { return 1; }`;
       await analyzer.analyzeCode(code1, 'typescript', identifier);
 
@@ -108,7 +108,7 @@ describe('Quality Analyzer Integration', () => {
   describe('Enhanced Features', () => {
     it('should provide system status', () => {
       const status = analyzer.getSystemStatus();
-      
+
       expect(status).toBeDefined();
       expect(status.performance).toBeDefined();
       expect(status.analytics).toBeDefined();
@@ -126,7 +126,7 @@ describe('Quality Analyzer Integration', () => {
     it('should emit analysis complete events in legacy format', async () => {
       let emittedEvent: any = null;
 
-      analyzer.on('analysis_complete', (event) => {
+      analyzer.on('analysis_complete', event => {
         emittedEvent = event;
       });
 
@@ -136,7 +136,7 @@ describe('Quality Analyzer Integration', () => {
       expect(emittedEvent).toBeDefined();
       expect(emittedEvent.result).toBeDefined();
       expect(emittedEvent.duration).toBeGreaterThan(0);
-      
+
       // Verify the result has legacy format
       expect(emittedEvent.result.overallScore).toBeDefined();
       expect(emittedEvent.result.complexity).toBeDefined();
@@ -213,11 +213,11 @@ describe('Quality Analyzer Integration', () => {
       const result = await analyzer.analyzeCode(problemCode, 'typescript');
 
       expect(result.recommendations.length).toBeGreaterThan(0);
-      
+
       // Should have complexity recommendations
       const hasComplexityRec = result.recommendations.some(r => r.category === 'complexity');
       expect(hasComplexityRec).toBe(true);
-      
+
       // Recommendations should have required fields
       result.recommendations.forEach(rec => {
         expect(rec.priority).toMatch(/^(critical|high|medium|low)$/);
@@ -236,10 +236,12 @@ describe('Quality Analyzer Integration', () => {
 describe('SequentialDualAgentSystem Integration Compatibility', () => {
   it('should be importable with the same interface', async () => {
     // Test that the import structure works
-    const { CodeQualityAnalyzer } = await import('../../src/core/quality/quality-analyzer-integration-adapter.js');
-    
+    const { CodeQualityAnalyzer } = await import(
+      '../../src/core/quality/quality-analyzer-integration-adapter.js'
+    );
+
     expect(CodeQualityAnalyzer).toBeDefined();
-    
+
     const analyzer = new CodeQualityAnalyzer();
     expect(analyzer).toBeDefined();
     expect(typeof analyzer.analyzeCode).toBe('function');
@@ -247,7 +249,7 @@ describe('SequentialDualAgentSystem Integration Compatibility', () => {
     expect(typeof analyzer.updateConfiguration).toBe('function');
     expect(typeof analyzer.getQualityHistory).toBe('function');
     expect(typeof analyzer.clearHistory).toBe('function');
-    
+
     await analyzer.shutdown();
   });
 
@@ -255,26 +257,26 @@ describe('SequentialDualAgentSystem Integration Compatibility', () => {
     const analyzer = new QualityAnalyzerIntegrationAdapter({
       weights: {
         cyclomaticComplexity: 0.25,
-        maintainabilityIndex: 0.20,
-        lintingScore: 0.20,
-        formattingScore: 0.10,
+        maintainabilityIndex: 0.2,
+        lintingScore: 0.2,
+        formattingScore: 0.1,
         typeCoverage: 0.15,
         documentation: 0.05,
         duplication: 0.03,
-        halsteadComplexity: 0.02
-      }
+        halsteadComplexity: 0.02,
+      },
     });
 
     const config = analyzer.getConfiguration();
-    
+
     // Verify the expected structure from SequentialDualAgentSystem
     expect(config.weights).toBeDefined();
     expect(config.weights.cyclomaticComplexity).toBe(0.25);
-    expect(config.weights.maintainabilityIndex).toBe(0.20);
-    expect(config.weights.lintingScore).toBe(0.20);
+    expect(config.weights.maintainabilityIndex).toBe(0.2);
+    expect(config.weights.lintingScore).toBe(0.2);
     expect(config.cyclomaticComplexity).toBeDefined();
     expect(config.maintainabilityIndex).toBeDefined();
-    
+
     analyzer.shutdown();
   });
 });

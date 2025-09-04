@@ -50,7 +50,6 @@ export type * from './domain/interfaces/user-interaction.js';
 export type * from './domain/interfaces/event-bus.js';
 export type { CLIOptions, CLIContext } from './application/interfaces/unified-cli.js';
 
-
 const program = new Command();
 
 // Get package version
@@ -69,7 +68,6 @@ async function _getPackageVersion(): Promise<string> {
     return '4.0.7-unified';
   }
 }
-
 
 /**
  * Initialize the unified system with comprehensive capabilities
@@ -229,12 +227,12 @@ export async function initialize(
       selectedModelInfo = await quickSelectModel();
     }
 
-    
     // Create model client configuration based on selected model
-    const endpoint = selectedModelInfo.provider === 'ollama'
-      ? (process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434')
-      : (process.env.LM_STUDIO_ENDPOINT ?? 'ws://localhost:8080');
-    
+    const endpoint =
+      selectedModelInfo.provider === 'ollama'
+        ? (process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434')
+        : (process.env.LM_STUDIO_ENDPOINT ?? 'ws://localhost:8080');
+
     // Build provider config and adapters using factory
     const providersConfig = [
       {
@@ -248,7 +246,7 @@ export async function initialize(
       },
     ];
     const adapters = createAdaptersFromProviders(providersConfig);
-    
+
     const modelClientConfig = {
       adapters, // Now properly populated with adapter instances
       defaultProvider: selectedModelInfo.provider,
@@ -315,8 +313,6 @@ async function runCLI(
   isInteractive: boolean
 ): Promise<void> {
   try {
-
-
     const args = process.argv.slice(2);
 
     // Handle version command
@@ -330,7 +326,6 @@ async function runCLI(
       showHelp();
       return;
     }
-
 
     // Handle status command
     if (args[0] === 'status') {
@@ -470,9 +465,6 @@ program
   .option('--no-resilience', 'Disable error resilience')
   .action(
     async (
-
-
-
       prompt: string[] = [],
       options: {
         interactive?: boolean;
@@ -508,5 +500,3 @@ if (process.argv[1]?.includes('index.js') || process.argv[1]?.includes('index.ts
 
 // Export the main function for programmatic use
 export default main;
-
-

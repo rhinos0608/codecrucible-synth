@@ -73,7 +73,8 @@ export class E2BTerminalTool {
 
     try {
       // Validate the working directory
-      const validationResult = await this.securityValidator.validateEnvironment(effectiveWorkingDir);
+      const validationResult =
+        await this.securityValidator.validateEnvironment(effectiveWorkingDir);
 
       if (!validationResult.isValid) {
         throw new Error(`Invalid working directory: ${validationResult.reason}`);
@@ -124,7 +125,7 @@ export class E2BTerminalTool {
       const validationResult = await this.securityValidator.validateCode({
         code: fullCommand,
         language: 'bash',
-        environment: 'e2b_sandbox'
+        environment: 'e2b_sandbox',
       });
 
       if (!validationResult.isValid) {
@@ -313,7 +314,7 @@ export class E2BTerminalTool {
       const validationResult = await this.securityValidator.validateCode({
         code: input,
         language: 'text',
-        environment: 'e2b_sandbox'
+        environment: 'e2b_sandbox',
       });
 
       if (!validationResult.isValid) {

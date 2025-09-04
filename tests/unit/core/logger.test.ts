@@ -17,7 +17,7 @@ describe('Logger Enterprise System', () => {
       level: 'debug',
       toFile: true,
       toConsole: false,
-      logDirectory: testLogDir
+      logDirectory: testLogDir,
     });
   });
 
@@ -53,7 +53,7 @@ describe('Logger Enterprise System', () => {
       const warnLogger = new Logger('warn-logger', {
         level: 'warn',
         toConsole: false,
-        toFile: false
+        toFile: false,
       });
 
       // Should not log debug/info when level is warn
@@ -69,7 +69,7 @@ describe('Logger Enterprise System', () => {
       const testData = {
         userId: 'user123',
         sessionId: 'session456',
-        operation: 'file_analysis'
+        operation: 'file_analysis',
       };
 
       testLogger.info('Operation completed', testData);
@@ -83,7 +83,7 @@ describe('Logger Enterprise System', () => {
         userId: 'user123',
         ip: '192.168.1.1',
         userAgent: 'Mozilla/5.0',
-        status: 'success'
+        status: 'success',
       });
 
       expect(true).toBe(true); // Audit logging test
@@ -95,7 +95,7 @@ describe('Logger Enterprise System', () => {
         threatType: 'code_injection',
         userId: 'user123',
         ip: '192.168.1.1',
-        mitigated: true
+        mitigated: true,
       });
 
       expect(true).toBe(true); // Security logging test
@@ -104,7 +104,7 @@ describe('Logger Enterprise System', () => {
     test('should support performance metrics logging', () => {
       testLogger.metric('response_time', 150, 'ms', {
         endpoint: '/api/generate',
-        method: 'POST'
+        method: 'POST',
       });
 
       expect(true).toBe(true); // Metrics logging test
@@ -114,7 +114,7 @@ describe('Logger Enterprise System', () => {
       testLogger.business('Code generation completed', {
         codeType: 'typescript',
         linesGenerated: 45,
-        modelUsed: 'gpt-4'
+        modelUsed: 'gpt-4',
       });
 
       expect(true).toBe(true); // Business logging test
@@ -124,7 +124,7 @@ describe('Logger Enterprise System', () => {
   describe('Performance and Utility Features', () => {
     test('should support performance timing', () => {
       const timer = testLogger.time('test_operation');
-      
+
       // Simulate some work
       setTimeout(() => {
         timer(); // Complete timing
@@ -157,14 +157,14 @@ describe('Logger Enterprise System', () => {
     test('should handle error objects properly', () => {
       const testError = new Error('Test error message');
       testError.stack = 'Error: Test error\n    at test';
-      
+
       testLogger.error('Operation failed', testError);
       expect(true).toBe(true); // Error handling test
     });
 
     test('should handle mixed error parameters', () => {
       const testData = { operation: 'file_read', path: '/test/path' };
-      
+
       testLogger.error('File operation failed', testData);
       expect(true).toBe(true); // Mixed parameters test
     });
@@ -183,7 +183,7 @@ describe('Logger Enterprise System', () => {
     test('should maintain immutable config copies', () => {
       const config1 = testLogger.getConfig();
       const config2 = testLogger.getConfig();
-      
+
       config1.level = 'error';
       expect(config2.level).toBe('debug'); // Should not be modified
     });
@@ -193,7 +193,7 @@ describe('Logger Enterprise System', () => {
     test('should flush pending logs to file', async () => {
       testLogger.info('Test message for file flush');
       await testLogger.flush();
-      
+
       // Check that flush completes without error
       expect(true).toBe(true);
     });
@@ -202,12 +202,12 @@ describe('Logger Enterprise System', () => {
       const customLogger = new Logger('custom', {
         level: 'info',
         toFile: true,
-        logDirectory: join(process.cwd(), 'custom-test-logs')
+        logDirectory: join(process.cwd(), 'custom-test-logs'),
       });
 
       customLogger.info('Test directory creation');
       await customLogger.flush();
-      
+
       expect(true).toBe(true);
     });
   });
@@ -223,7 +223,7 @@ describe('Logger Enterprise System', () => {
       const testData = {
         correlationId: 'corr-123',
         userId: 'user-456',
-        sessionId: 'sess-789'
+        sessionId: 'sess-789',
       };
 
       testLogger.info('Operation with correlation ID', testData);

@@ -57,7 +57,7 @@ export class ProcessAIRequestUseCase {
     // Generate response through model (domain operation)
     const startTime = Date.now();
     let response;
-    
+
     try {
       if (selectedModel.generateResponse) {
         response = await selectedModel.generateResponse(request.prompt);
@@ -69,10 +69,10 @@ export class ProcessAIRequestUseCase {
           temperature: input.temperature,
           maxTokens: input.maxTokens,
         };
-        
+
         const modelResponse = await this.modelClient.request(modelRequest);
         const processingTime = Date.now() - startTime;
-        
+
         response = {
           content: modelResponse.content,
           model: selectedModel.primaryModel.name,

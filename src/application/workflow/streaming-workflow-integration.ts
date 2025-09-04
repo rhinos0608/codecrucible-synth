@@ -19,9 +19,7 @@ import {
   StreamConfig,
   StreamingManager,
 } from '../../infrastructure/streaming/streaming-manager.js';
-import {
-  AgenticWorkflowDisplay,
-} from './agentic-workflow-display.js';
+import { AgenticWorkflowDisplay } from './agentic-workflow-display.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 
 export interface StreamingWorkflowConfig extends StreamConfig {
@@ -109,7 +107,9 @@ export class StreamingWorkflowIntegration extends EventEmitter {
       // Start the actual stream with chunk processing
       const result = await this.streamingManager.startModernStream(
         content,
-        (chunk: Readonly<StreamChunk>) => { this.handleStreamChunk(chunk, streamProgress, startTime); },
+        (chunk: Readonly<StreamChunk>) => {
+          this.handleStreamChunk(chunk, streamProgress, startTime);
+        },
         this.config
       );
 

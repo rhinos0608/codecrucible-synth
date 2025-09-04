@@ -5,9 +5,7 @@
 
 import { ILogger } from '../interfaces/logger.js';
 import { IModelClient } from '../interfaces/model-client.js';
-import {
-  IVoiceOrchestrationService,
-} from '../interfaces/voice-orchestration.js';
+import { IVoiceOrchestrationService } from '../interfaces/voice-orchestration.js';
 import {
   LivingSpiralCoordinatorInterface,
   WorkflowContext,

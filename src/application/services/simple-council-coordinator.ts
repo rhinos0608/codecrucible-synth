@@ -72,9 +72,9 @@ export class SimpleCouncilCoordinator {
     // Synthesize responses using domain service
     const synthesisResult = await Promise.resolve(
       this.voiceOrchestrationService.synthesizeVoiceResponses(
-      voiceResponses,
-      this.mapSynthesisMode(request.synthesisMode)
-    )
+        voiceResponses,
+        this.mapSynthesisMode(request.synthesisMode)
+      )
     );
 
     // Output transformation

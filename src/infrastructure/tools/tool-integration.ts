@@ -249,4 +249,3 @@ export function setGlobalToolIntegrationRustBackend(backend: any): void {
     }
   }
 }
-

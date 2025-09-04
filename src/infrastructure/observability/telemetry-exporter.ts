@@ -19,33 +19,27 @@ export interface TelemetryExporterConfig {
   }>;
 }
 
-  
-  export interface TelemetryExporterConstructorConfig {
-    readonly enabled: boolean;
-    readonly interval?: number;
-    readonly exporters: ReadonlyArray<{
-      readonly type: 'prometheus' | 'statsd' | 'opentelemetry' | 'file';
-      readonly endpoint?: string;
-      readonly authentication?: Readonly<Record<string, string>>;
-      readonly batchSize?: number;
-      readonly flushInterval?: number;
-    }>;
-  }
-  
-  export class TelemetryExporter {
-    private readonly logger: ILogger = createLogger('TelemetryExporter');
-    private readonly fileHandles: Map<string, string> = new Map(); // For file exporters
-  
-    public constructor(
-      private readonly config: TelemetryExporterConstructorConfig
-    ) {}
+export interface TelemetryExporterConstructorConfig {
+  readonly enabled: boolean;
+  readonly interval?: number;
+  readonly exporters: ReadonlyArray<{
+    readonly type: 'prometheus' | 'statsd' | 'opentelemetry' | 'file';
+    readonly endpoint?: string;
+    readonly authentication?: Readonly<Record<string, string>>;
+    readonly batchSize?: number;
+    readonly flushInterval?: number;
+  }>;
+}
+
+export class TelemetryExporter {
+  private readonly logger: ILogger = createLogger('TelemetryExporter');
+  private readonly fileHandles: Map<string, string> = new Map(); // For file exporters
+
+  public constructor(private readonly config: TelemetryExporterConstructorConfig) {}
 
   public initialize(): void {
     // Validate configuration
-    if (
-      !Array.isArray(this.config.exporters) ||
-      this.config.exporters.length === 0
-    ) {
+    if (!Array.isArray(this.config.exporters) || this.config.exporters.length === 0) {
       throw new Error('TelemetryExporter: At least one exporter configuration is required.');
     }
     for (const [i, exporter] of this.config.exporters.entries()) {
@@ -62,10 +56,10 @@ export interface TelemetryExporterConfig {
         batchSize?: number;
         flushInterval?: number;
       };
-      if (
-        !['prometheus', 'statsd', 'opentelemetry', 'file'].includes(typedExporter.type)
-      ) {
-        throw new Error(`TelemetryExporter: Invalid exporter type at index ${i}: ${typedExporter.type}`);
+      if (!['prometheus', 'statsd', 'opentelemetry', 'file'].includes(typedExporter.type)) {
+        throw new Error(
+          `TelemetryExporter: Invalid exporter type at index ${i}: ${typedExporter.type}`
+        );
       }
       // Example: endpoint is required for all except 'file'
       if (
@@ -93,8 +87,6 @@ export interface TelemetryExporterConfig {
         );
       }
     }
-
-   
 
     this.logger.info(
       `TelemetryExporter initialized with ${this.config.exporters.length} exporters`
@@ -348,13 +340,20 @@ export interface TelemetryExporterConfig {
   private formatMetricsForPrometheus(metrics: readonly MetricPoint[]): string {
     const lines = metrics
       .map((metric: Readonly<MetricPoint>) => {
-        const entries = Object.entries(metric.tags ?? {}) as ReadonlyArray<readonly [string, string]>;
+        const entries = Object.entries(metric.tags ?? {}) as ReadonlyArray<
+          readonly [string, string]
+        >;
         const labels = entries
-          .map(([key, value]: readonly [string, string]) => `${key}="${String(value).replace(/"/g, '\\"')}"`)
+          .map(
+            ([key, value]: readonly [string, string]) =>
+              `${key}="${String(value).replace(/"/g, '\\"')}"`
+          )
           .join(',');
         const labelStr = labels.length ? `{${labels}}` : '';
         const timestamp =
-          metric.timestamp instanceof Date ? Math.floor(metric.timestamp.getTime() / 1000) : Number(metric.timestamp);
+          metric.timestamp instanceof Date
+            ? Math.floor(metric.timestamp.getTime() / 1000)
+            : Number(metric.timestamp);
         return `${metric.name}${labelStr} ${metric.value} ${timestamp}`;
       })
       .join('\n');
@@ -362,16 +361,15 @@ export interface TelemetryExporterConfig {
   }
 
   private formatMetricsForStatsd(metrics: readonly MetricPoint[]): string {
-    const lines = metrics
-      .map((metric: Readonly<MetricPoint>) => {
-        // StatsD format: metric.name:value|type|@sample_rate|#tags
-        const tags = (Object.entries(metric.tags ?? {}) as ReadonlyArray<readonly [string, string]>)
-          .map(([key, value]: readonly [string, string]) => `${key}:${value}`)
-          .join(',');
-        const tagStr = tags ? `|#${tags}` : '';
-        const type = this.getStatsdType(metric.unit);
-        return `${metric.name}:${metric.value}|${type}${tagStr}`;
-      });
+    const lines = metrics.map((metric: Readonly<MetricPoint>) => {
+      // StatsD format: metric.name:value|type|@sample_rate|#tags
+      const tags = (Object.entries(metric.tags ?? {}) as ReadonlyArray<readonly [string, string]>)
+        .map(([key, value]: readonly [string, string]) => `${key}:${value}`)
+        .join(',');
+      const tagStr = tags ? `|#${tags}` : '';
+      const type = this.getStatsdType(metric.unit);
+      return `${metric.name}:${metric.value}|${type}${tagStr}`;
+    });
 
     return `${lines.join('\n')}\n`;
   }

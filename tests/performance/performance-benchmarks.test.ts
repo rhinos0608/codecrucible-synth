@@ -14,7 +14,7 @@ describe('Performance Benchmarks', () => {
   const CLI_PATH = path.join(process.cwd(), 'dist', 'index.js');
   const INDUSTRY_STANDARD_RESPONSE_TIME = 1000; // 1 second
   const ACCEPTABLE_INITIALIZATION_TIME = 20000; // 20 seconds for cold start
-  
+
   beforeAll(async () => {
     // Ensure the CLI is built
     try {
@@ -27,14 +27,14 @@ describe('Performance Benchmarks', () => {
   describe('Response Time Benchmarks', () => {
     it('should respond to simple queries under 5 seconds (warm)', async () => {
       const startTime = Date.now();
-      
+
       const { stdout, stderr } = await execAsync(`node "${CLI_PATH}" "What is 2+2?"`, {
-        timeout: 30000
+        timeout: 30000,
       });
-      
+
       const endTime = Date.now();
       const responseTime = endTime - startTime;
-      
+
       expect(responseTime).toBeLessThan(5000); // Adjusted for current performance
       expect(stdout).toContain('4');
       expect(stderr).not.toMatch(/Error:/);
@@ -42,14 +42,14 @@ describe('Performance Benchmarks', () => {
 
     it('should handle code analysis requests efficiently', async () => {
       const startTime = Date.now();
-      
+
       const { stdout, stderr } = await execAsync(`node "${CLI_PATH}" analyze package.json`, {
-        timeout: 45000
+        timeout: 45000,
       });
-      
+
       const endTime = Date.now();
       const responseTime = endTime - startTime;
-      
+
       expect(responseTime).toBeLessThan(30000); // Current performance target
       expect(stdout).toContain('analysis');
       expect(stderr).not.toMatch(/Fatal error:/);
@@ -57,14 +57,17 @@ describe('Performance Benchmarks', () => {
 
     it('should generate code within reasonable time', async () => {
       const startTime = Date.now();
-      
-      const { stdout } = await execAsync(`node "${CLI_PATH}" "Create a function that adds two numbers"`, {
-        timeout: 60000
-      });
-      
+
+      const { stdout } = await execAsync(
+        `node "${CLI_PATH}" "Create a function that adds two numbers"`,
+        {
+          timeout: 60000,
+        }
+      );
+
       const endTime = Date.now();
       const responseTime = endTime - startTime;
-      
+
       expect(responseTime).toBeLessThan(35000);
       expect(stdout).toContain('function');
     }, 65000);
@@ -75,15 +78,15 @@ describe('Performance Benchmarks', () => {
       return new Promise<void>((resolve, reject) => {
         const startTime = Date.now();
         let initTime = 0;
-        
+
         const process = spawn('node', [CLI_PATH, 'status'], {
-          stdio: ['pipe', 'pipe', 'pipe']
+          stdio: ['pipe', 'pipe', 'pipe'],
         });
 
         let stdout = '';
         let stderr = '';
 
-        process.stdout.on('data', (data) => {
+        process.stdout.on('data', data => {
           stdout += data.toString();
           if (stdout.includes('✅ Initialized in')) {
             const match = stdout.match(/✅ Initialized in (\d+)ms/);
@@ -93,13 +96,13 @@ describe('Performance Benchmarks', () => {
           }
         });
 
-        process.stderr.on('data', (data) => {
+        process.stderr.on('data', data => {
           stderr += data.toString();
         });
 
-        process.on('close', (code) => {
+        process.on('close', code => {
           const totalTime = Date.now() - startTime;
-          
+
           try {
             expect(initTime).toBeLessThan(ACCEPTABLE_INITIALIZATION_TIME);
             expect(totalTime).toBeLessThan(60000);
@@ -121,33 +124,29 @@ describe('Performance Benchmarks', () => {
 
   describe('Throughput Benchmarks', () => {
     it('should handle multiple sequential requests', async () => {
-      const requests = [
-        'What is 1+1?',
-        'What is 2+3?', 
-        'What is 5+8?'
-      ];
-      
+      const requests = ['What is 1+1?', 'What is 2+3?', 'What is 5+8?'];
+
       const startTime = Date.now();
       const results = [];
-      
+
       for (const request of requests) {
         try {
           const { stdout } = await execAsync(`node "${CLI_PATH}" "${request}"`, {
-            timeout: 30000
+            timeout: 30000,
           });
           results.push(stdout);
         } catch (error) {
           results.push(`Error: ${error.message}`);
         }
       }
-      
+
       const endTime = Date.now();
       const totalTime = endTime - startTime;
       const avgTimePerRequest = totalTime / requests.length;
-      
+
       expect(results).toHaveLength(3);
       expect(avgTimePerRequest).toBeLessThan(25000); // Current realistic target
-      
+
       // Verify at least 2 out of 3 succeeded (66% success rate minimum)
       const successCount = results.filter(r => !r.includes('Error:')).length;
       expect(successCount).toBeGreaterThanOrEqual(2);
@@ -157,12 +156,12 @@ describe('Performance Benchmarks', () => {
   describe('Resource Usage', () => {
     it('should not consume excessive memory during operation', async () => {
       const { stdout } = await execAsync(`node "${CLI_PATH}" status`, {
-        timeout: 45000
+        timeout: 45000,
       });
-      
+
       // Check for memory reporting in status
       expect(stdout).toMatch(/memory.*available/i);
-      
+
       // Verify the process completes without memory errors
       expect(stdout).not.toMatch(/out of memory/i);
       expect(stdout).not.toMatch(/heap.*exceeded/i);
@@ -172,13 +171,13 @@ describe('Performance Benchmarks', () => {
   describe('Error Recovery', () => {
     it('should handle invalid commands gracefully', async () => {
       const startTime = Date.now();
-      
+
       const { stdout, stderr } = await execAsync(`node "${CLI_PATH}" invalidcommand123`, {
-        timeout: 30000
+        timeout: 30000,
       });
-      
+
       const responseTime = Date.now() - startTime;
-      
+
       expect(responseTime).toBeLessThan(20000);
       // Should either show help or handle gracefully, not crash
       expect(stdout.length).toBeGreaterThan(0);

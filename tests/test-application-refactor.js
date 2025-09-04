@@ -82,12 +82,13 @@ async function testApplicationRefactor() {
     console.log('✅ Infrastructure dependencies eliminated');
     console.log('✅ Architecture patterns demonstrated successfully');
     console.log('\n📊 Refactor Benefits:');
-    console.log('• Simplified complexity from 464-line LivingSpiralCoordinator to focused components');
+    console.log(
+      '• Simplified complexity from 464-line LivingSpiralCoordinator to focused components'
+    );
     console.log('• Eliminated 48 overlapping coordinators/managers');
     console.log('• Clean separation between application and domain layers');
     console.log('• Testable, maintainable code structure');
     console.log('• Following ARCHITECTURE.md principles');
-
   } catch (error) {
     console.error('❌ Test failed:', error);
     process.exit(1);

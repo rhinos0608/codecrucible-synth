@@ -147,8 +147,14 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     if (await this.fileExists(packageJsonPath)) {
       try {
         const packageJsonText = await this.readFile(packageJsonPath);
-        const packageJson = JSON.parse(packageJsonText) as unknown as { name?: string; version?: string };
-        projectInfo = { name: packageJson.name ?? 'Unknown', version: packageJson.version ?? 'Unknown' };
+        const packageJson = JSON.parse(packageJsonText) as unknown as {
+          name?: string;
+          version?: string;
+        };
+        projectInfo = {
+          name: packageJson.name ?? 'Unknown',
+          version: packageJson.version ?? 'Unknown',
+        };
       } catch (error) {
         // Continue with defaults
       }
@@ -252,12 +258,14 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
           devDependencies?: Record<string, unknown>;
         };
 
-        const dependencies = typeof packageJson.dependencies === 'object' && packageJson.dependencies !== null
-          ? packageJson.dependencies
-          : {};
-        const devDependencies = typeof packageJson.devDependencies === 'object' && packageJson.devDependencies !== null
-          ? packageJson.devDependencies
-          : {};
+        const dependencies =
+          typeof packageJson.dependencies === 'object' && packageJson.dependencies !== null
+            ? packageJson.dependencies
+            : {};
+        const devDependencies =
+          typeof packageJson.devDependencies === 'object' && packageJson.devDependencies !== null
+            ? packageJson.devDependencies
+            : {};
 
         prodDeps = Object.keys(dependencies).length;
         devDeps = Object.keys(devDependencies).length;
@@ -465,7 +473,9 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     if (await this.fileExists(tsconfigPath)) {
       try {
-        const tsconfig = JSON.parse(await this.readFile(tsconfigPath)) as { compilerOptions?: { strict?: boolean } };
+        const tsconfig = JSON.parse(await this.readFile(tsconfigPath)) as {
+          compilerOptions?: { strict?: boolean };
+        };
         if (tsconfig.compilerOptions?.strict !== true) {
           issues.push('🟡 **Warning**: TypeScript strict mode disabled - may hide type errors');
         }
@@ -643,7 +653,9 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
       if (fsSync.existsSync(tsconfigPath)) {
         try {
-          const tsconfig = JSON.parse(await this.readFile(tsconfigPath)) as { compilerOptions?: { strict?: boolean } };
+          const tsconfig = JSON.parse(await this.readFile(tsconfigPath)) as {
+            compilerOptions?: { strict?: boolean };
+          };
           if (tsconfig.compilerOptions?.strict !== true) {
             recommendations.push(
               `${priority++}. **Medium Priority**: Enable TypeScript strict mode for better type safety`

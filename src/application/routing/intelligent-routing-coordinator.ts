@@ -350,7 +350,6 @@ export class IntelligentRoutingCoordinator
     context: RoutingContext,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
-
     switch (strategy) {
       case 'single-voice-fast':
         return this.executeSingleVoiceFastStrategy(context, routingId);

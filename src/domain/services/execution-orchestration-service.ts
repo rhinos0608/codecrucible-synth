@@ -15,11 +15,7 @@ import {
   StepEstimate,
   SelectedTools,
 } from '../entities/execution-plan.js';
-import {
-  ReasoningStep,
-  ConfidenceScore,
-  ToolArguments,
-} from '../entities/reasoning-step.js';
+import { ReasoningStep, ConfidenceScore, ToolArguments } from '../entities/reasoning-step.js';
 import { WorkflowTemplate } from '../entities/workflow-template.js';
 
 /**

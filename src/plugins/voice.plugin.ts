@@ -7,7 +7,7 @@ export default function createVoicePlugin(): IPlugin {
       version: '1.0.0',
       description: 'Voice synthesis helpers',
       lifecycle: 'both',
-      tags: ['voice']
+      tags: ['voice'],
     },
     async initialize(ctx: PluginContext) {
       if (ctx.registerCommand) {

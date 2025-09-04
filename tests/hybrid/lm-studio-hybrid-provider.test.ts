@@ -72,14 +72,14 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
     it('should initialize and connect to actual LM Studio instance', async () => {
       try {
         lmStudioProvider = new LMStudioProvider(testConfig);
-        
+
         // Test actual connectivity
         const isAvailable = await lmStudioProvider.isAvailable();
-        
+
         if (isAvailable) {
           console.log('✅ LM Studio provider connected successfully');
           expect(isAvailable).toBe(true);
-          
+
           // Test provider properties
           expect(lmStudioProvider.name).toBe('lm-studio');
           expect(lmStudioProvider.endpoint).toBe(testConfig.endpoint);
@@ -101,7 +101,7 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       };
 
       lmStudioProvider = new LMStudioProvider(badConfig);
-      
+
       const isAvailable = await lmStudioProvider.isAvailable();
       expect(isAvailable).toBe(false);
 
@@ -112,9 +112,9 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
 
     it('should provide correct capabilities specification', () => {
       lmStudioProvider = new LMStudioProvider(testConfig);
-      
+
       const capabilities = lmStudioProvider.getCapabilities();
-      
+
       expect(capabilities).toBeDefined();
       expect(capabilities.strengths).toContain('speed');
       expect(capabilities.optimalFor).toContain('template-generation');
@@ -182,7 +182,9 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       expect(complexTaskDecision.selectedLLM).toBeTruthy();
       expect(complexTaskDecision.confidence).toBeGreaterThan(0);
 
-      console.log(`✅ Hybrid routing decisions: Fast→${fastTaskDecision.selectedLLM}, Complex→${complexTaskDecision.selectedLLM}`);
+      console.log(
+        `✅ Hybrid routing decisions: Fast→${fastTaskDecision.selectedLLM}, Complex→${complexTaskDecision.selectedLLM}`
+      );
     }, 30000);
 
     it('should work within UnifiedModelClient for end-to-end workflows', async () => {
@@ -216,14 +218,16 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       };
 
       const fastResponse = await unifiedClient.processRequest(fastRequest);
-      
+
       expect(fastResponse).toBeDefined();
       expect(fastResponse.content || fastResponse.error).toBeTruthy();
-      
+
       if (fastResponse.content) {
         expect(fastResponse.content.length).toBeGreaterThan(0);
         expect(fastResponse.metadata?.provider).toBeTruthy();
-        console.log(`✅ Fast mode execution completed with provider: ${fastResponse.metadata?.provider}`);
+        console.log(
+          `✅ Fast mode execution completed with provider: ${fastResponse.metadata?.provider}`
+        );
       }
 
       // Test auto execution mode (intelligent routing)
@@ -234,14 +238,16 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       };
 
       const autoResponse = await unifiedClient.processRequest(autoRequest);
-      
+
       expect(autoResponse).toBeDefined();
       expect(autoResponse.content || autoResponse.error).toBeTruthy();
-      
+
       if (autoResponse.content) {
         expect(autoResponse.content.length).toBeGreaterThan(50);
         expect(autoResponse.metadata?.provider).toBeTruthy();
-        console.log(`✅ Auto mode execution completed with provider: ${autoResponse.metadata?.provider}`);
+        console.log(
+          `✅ Auto mode execution completed with provider: ${autoResponse.metadata?.provider}`
+        );
       }
     }, 60000);
   });
@@ -254,7 +260,7 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       }
 
       lmStudioProvider = new LMStudioProvider(testConfig);
-      
+
       const isAvailable = await lmStudioProvider.isAvailable();
       if (!isAvailable) {
         console.log('⚠️ Skipping performance test - LM Studio not available');
@@ -263,7 +269,7 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
 
       // Measure response time for simple task
       const startTime = Date.now();
-      
+
       const testRequest = {
         prompt: 'Create a simple function that adds two numbers',
         temperature: 0.3,
@@ -273,17 +279,17 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       try {
         const response = await lmStudioProvider.generateCode(testRequest);
         const responseTime = Date.now() - startTime;
-        
+
         expect(response).toBeDefined();
         expect(responseTime).toBeLessThan(30000); // Should be fast
-        
+
         if (response.content) {
           expect(response.content).toContain('function');
           expect(response.usage?.totalTokens).toBeGreaterThan(0);
         }
 
         console.log(`✅ LM Studio performance: ${responseTime}ms for simple task`);
-        
+
         // Verify status tracking
         const status = await lmStudioProvider.getStatus();
         expect(status.responseTime).toBeGreaterThan(0);
@@ -291,7 +297,7 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       } catch (error) {
         console.log('⚠️ LM Studio request failed - testing error handling');
         expect(error).toBeInstanceOf(Error);
-        
+
         const status = await lmStudioProvider.getStatus();
         expect(status.errorRate).toBeGreaterThan(0);
         expect(status.lastError).toBeTruthy();
@@ -305,7 +311,7 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       }
 
       lmStudioProvider = new LMStudioProvider(testConfig);
-      
+
       const isAvailable = await lmStudioProvider.isAvailable();
       if (!isAvailable) {
         console.log('⚠️ Skipping concurrency test - LM Studio not available');
@@ -319,12 +325,12 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       }));
 
       const startTime = Date.now();
-      
+
       try {
         const results = await Promise.allSettled(
           concurrentRequests.map(req => lmStudioProvider!.generateCode(req))
         );
-        
+
         const endTime = Date.now();
         const totalTime = endTime - startTime;
 
@@ -334,7 +340,9 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
         expect(successful + failed).toBe(3);
         expect(totalTime).toBeLessThan(60000); // All requests within 60s
 
-        console.log(`✅ Concurrent requests completed: ${successful} successful, ${failed} failed in ${totalTime}ms`);
+        console.log(
+          `✅ Concurrent requests completed: ${successful} successful, ${failed} failed in ${totalTime}ms`
+        );
 
         // Verify status reflects concurrent processing
         const finalStatus = await lmStudioProvider.getStatus();
@@ -357,7 +365,7 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       };
 
       lmStudioProvider = new LMStudioProvider(timeoutConfig);
-      
+
       // This should timeout if LM Studio is slow or unavailable
       const request = {
         prompt: 'Generate a complex algorithm that might take time to process',
@@ -370,7 +378,7 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       } catch (error) {
         console.log('⚠️ Request timed out as expected');
         expect(error).toBeInstanceOf(Error);
-        
+
         const status = await lmStudioProvider.getStatus();
         expect(status.errorRate).toBeGreaterThan(0);
         expect(status.lastError).toContain('timeout');
@@ -379,10 +387,10 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
 
     it('should recover from temporary failures', async () => {
       lmStudioProvider = new LMStudioProvider(testConfig);
-      
+
       // First check if provider is available
       const initialAvailability = await lmStudioProvider.isAvailable();
-      
+
       // Simulate failure by using bad endpoint temporarily
       const badProvider = new LMStudioProvider({
         ...testConfig,
@@ -396,12 +404,14 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       const recoveredAvailability = await lmStudioProvider.isAvailable();
       expect(recoveredAvailability).toBe(initialAvailability);
 
-      console.log(`✅ Provider recovery test: Initial=${initialAvailability}, Failed=${failedAvailability}, Recovered=${recoveredAvailability}`);
+      console.log(
+        `✅ Provider recovery test: Initial=${initialAvailability}, Failed=${failedAvailability}, Recovered=${recoveredAvailability}`
+      );
     }, 30000);
 
     it('should maintain accurate status tracking through failures', async () => {
       lmStudioProvider = new LMStudioProvider(testConfig);
-      
+
       // Get initial status
       const initialStatus = await lmStudioProvider.getStatus();
       expect(initialStatus.errorRate).toBe(0);
@@ -420,7 +430,7 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       // Check status was updated
       const finalStatus = await lmStudioProvider.getStatus();
       expect(finalStatus.requestCount).toBe(1);
-      
+
       if (finalStatus.lastError) {
         expect(finalStatus.errorRate).toBeGreaterThan(0);
         console.log(`✅ Error tracking working: ${finalStatus.lastError}`);
@@ -434,34 +444,34 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
   describe('Real Provider Interface Compliance', () => {
     it('should implement all required provider methods', () => {
       lmStudioProvider = new LMStudioProvider(testConfig);
-      
+
       // Verify all required methods exist
       expect(typeof lmStudioProvider.isAvailable).toBe('function');
       expect(typeof lmStudioProvider.getCapabilities).toBe('function');
       expect(typeof lmStudioProvider.getStatus).toBe('function');
       expect(typeof lmStudioProvider.generateCode).toBe('function');
       expect(typeof lmStudioProvider.shutdown).toBe('function');
-      
+
       // Verify properties
       expect(typeof lmStudioProvider.name).toBe('string');
       expect(typeof lmStudioProvider.endpoint).toBe('string');
-      
+
       expect(lmStudioProvider.name).toBe('lm-studio');
       expect(lmStudioProvider.endpoint).toBe(testConfig.endpoint);
     });
 
     it('should provide consistent status interface', async () => {
       lmStudioProvider = new LMStudioProvider(testConfig);
-      
+
       const status = await lmStudioProvider.getStatus();
-      
+
       // Verify status structure
       expect(typeof status.available).toBe('boolean');
       expect(typeof status.currentLoad).toBe('number');
       expect(typeof status.responseTime).toBe('number');
       expect(typeof status.errorRate).toBe('number');
       expect(typeof status.maxLoad).toBe('number');
-      
+
       // Verify reasonable values
       expect(status.currentLoad).toBeGreaterThanOrEqual(0);
       expect(status.responseTime).toBeGreaterThanOrEqual(0);
@@ -471,9 +481,9 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
 
     it('should provide valid capabilities configuration', () => {
       lmStudioProvider = new LMStudioProvider(testConfig);
-      
+
       const capabilities = lmStudioProvider.getCapabilities();
-      
+
       // Verify capabilities structure
       expect(Array.isArray(capabilities.strengths)).toBe(true);
       expect(Array.isArray(capabilities.optimalFor)).toBe(true);
@@ -481,7 +491,7 @@ describe('LM Studio Hybrid Provider - Real Implementation Tests', () => {
       expect(typeof capabilities.contextWindow).toBe('number');
       expect(typeof capabilities.supportsStreaming).toBe('boolean');
       expect(typeof capabilities.maxConcurrent).toBe('number');
-      
+
       // Verify LM Studio specific capabilities
       expect(capabilities.strengths.includes('speed')).toBe(true);
       expect(capabilities.optimalFor.includes('template-generation')).toBe(true);

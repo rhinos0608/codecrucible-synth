@@ -55,7 +55,9 @@ export class ApplicationServiceFacade {
   ) {
     // Validate required dependencies - fail fast if critical services are missing
     if (!modelClient) {
-      throw new Error('UnifiedModelClient is required for ApplicationServiceFacade. Please ensure the model client is properly initialized.');
+      throw new Error(
+        'UnifiedModelClient is required for ApplicationServiceFacade. Please ensure the model client is properly initialized.'
+      );
     }
 
     // Initialize use cases with domain services (no infrastructure dependencies)
@@ -75,9 +77,7 @@ export class ApplicationServiceFacade {
       modelClient
     );
 
-    this.analyzeCodebaseUseCase = new AnalyzeCodebaseUseCase(
-      modelSelectionService
-    );
+    this.analyzeCodebaseUseCase = new AnalyzeCodebaseUseCase(modelSelectionService);
 
     this.simplifiedLivingSpiralCoordinator = new SimplifiedLivingSpiralCoordinator(
       voiceOrchestrationService,

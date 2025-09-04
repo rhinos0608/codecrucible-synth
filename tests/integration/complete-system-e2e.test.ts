@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
-import { UnifiedModelClient, createDefaultUnifiedClientConfig } from '../../src/application/services/client.js';
+import {
+  UnifiedModelClient,
+  createDefaultUnifiedClientConfig,
+} from '../../src/application/services/client.js';
 import { LivingSpiralCoordinator, SpiralPhase } from '../../src/core/living-spiral-coordinator.js';
 import { VoiceArchetypeSystem } from '../../src/voices/voice-archetype-system.js';
 import { CLI } from '../../src/application/interfaces/cli.js';
@@ -24,7 +27,7 @@ describe('Complete System End-to-End Integration Tests', () => {
   beforeAll(async () => {
     // Create isolated test workspace
     testWorkspace = await mkdtemp(join(tmpdir(), 'codecrucible-e2e-'));
-    
+
     // Initialize real system components
     const config = createDefaultUnifiedClientConfig({
       providers: [
@@ -36,7 +39,7 @@ describe('Complete System End-to-End Integration Tests', () => {
           timeout: 45000,
         },
         {
-          type: 'lm-studio', 
+          type: 'lm-studio',
           endpoint: process.env.TEST_LMSTUDIO_ENDPOINT || 'http://localhost:1234',
           enabled: true,
           timeout: 45000,
@@ -51,26 +54,22 @@ describe('Complete System End-to-End Integration Tests', () => {
 
     unifiedClient = new UnifiedModelClient(config);
     voiceSystem = new VoiceArchetypeSystem();
-    
-    spiralCoordinator = new LivingSpiralCoordinator(
-      voiceSystem,
-      unifiedClient,
-      {
-        maxIterations: 3,
-        qualityThreshold: 0.8,
-        convergenceTarget: 0.9,
-        enableReflection: true,
-        parallelVoices: false,
-        councilSize: 3,
-      }
-    );
+
+    spiralCoordinator = new LivingSpiralCoordinator(voiceSystem, unifiedClient, {
+      maxIterations: 3,
+      qualityThreshold: 0.8,
+      convergenceTarget: 0.9,
+      enableReflection: true,
+      parallelVoices: false,
+      councilSize: 3,
+    });
 
     cli = new CLI();
 
     // Initialize systems
     await unifiedClient.initialize();
     await voiceSystem.initialize();
-    
+
     console.log(`✅ Test workspace created: ${testWorkspace}`);
   }, 120000); // Extended timeout for real system initialization
 
@@ -96,8 +95,9 @@ describe('Complete System End-to-End Integration Tests', () => {
   describe('Real User Workflow: Code Generation', () => {
     it('should handle complete code generation workflow from user request to file output', async () => {
       // REAL USER WORKFLOW: "Generate a TypeScript utility function"
-      const userRequest = "Generate a TypeScript utility function that validates email addresses with comprehensive error handling";
-      
+      const userRequest =
+        'Generate a TypeScript utility function that validates email addresses with comprehensive error handling';
+
       // Step 1: Process through unified client (real AI provider)
       const response = await unifiedClient.processRequest({
         prompt: userRequest,
@@ -160,12 +160,12 @@ export const UserComponent: React.FC<UserProps> = ({ name, email }) => {
   );
 };
       `;
-      
+
       await writeFile(testCodeFile, sampleCode);
 
       // REAL USER WORKFLOW: "Analyze this React component"
       const analysisRequest = `Analyze this React component for best practices and suggest improvements:\n\n${sampleCode}`;
-      
+
       const analysis = await unifiedClient.processRequest({
         prompt: analysisRequest,
         type: 'code_analysis',
@@ -179,14 +179,14 @@ export const UserComponent: React.FC<UserProps> = ({ name, email }) => {
       expect(analysis).toBeDefined();
       expect(analysis.content).toContain('React');
       expect(analysis.content.length).toBeGreaterThan(100);
-      
+
       // Verify analysis mentions relevant concepts
       const analysisLower = analysis.content.toLowerCase();
       expect(
-        analysisLower.includes('component') || 
-        analysisLower.includes('props') || 
-        analysisLower.includes('state') ||
-        analysisLower.includes('typescript')
+        analysisLower.includes('component') ||
+          analysisLower.includes('props') ||
+          analysisLower.includes('state') ||
+          analysisLower.includes('typescript')
       ).toBe(true);
 
       console.log(`✅ Generated ${analysis.content.length} characters of code analysis`);
@@ -195,7 +195,8 @@ export const UserComponent: React.FC<UserProps> = ({ name, email }) => {
 
   describe('Real Living Spiral Workflow', () => {
     it('should execute complete Living Spiral iteration with real AI processing', async () => {
-      const complexPrompt = "Design a scalable architecture for a real-time chat application with user authentication, message persistence, and horizontal scaling";
+      const complexPrompt =
+        'Design a scalable architecture for a real-time chat application with user authentication, message persistence, and horizontal scaling';
 
       // Execute real Living Spiral process
       const spiralResult = await spiralCoordinator.executeSpiralProcess(complexPrompt);
@@ -210,7 +211,7 @@ export const UserComponent: React.FC<UserProps> = ({ name, email }) => {
       // Validate spiral phases were executed
       const phases = spiralResult.iterations.map(i => i.phase);
       expect(phases).toContain(SpiralPhase.COLLAPSE);
-      
+
       // Validate quality improvement over iterations
       if (spiralResult.iterations.length > 1) {
         const firstQuality = spiralResult.iterations[0].quality;
@@ -222,19 +223,21 @@ export const UserComponent: React.FC<UserProps> = ({ name, email }) => {
       expect(spiralResult.final.length).toBeGreaterThan(200);
       expect(spiralResult.final.toLowerCase()).toContain('architecture');
 
-      console.log(`✅ Living Spiral completed ${spiralResult.totalIterations} iterations with quality ${spiralResult.quality}`);
+      console.log(
+        `✅ Living Spiral completed ${spiralResult.totalIterations} iterations with quality ${spiralResult.quality}`
+      );
     }, 90000);
 
     it('should handle voice archetype specialization in real scenarios', async () => {
       // Test different voice archetypes for specialized tasks
-      const securityPrompt = "Review this authentication code for security vulnerabilities";
-      const performancePrompt = "Optimize this database query for better performance";
-      const designPrompt = "Create a user-friendly interface design for a dashboard";
+      const securityPrompt = 'Review this authentication code for security vulnerabilities';
+      const performancePrompt = 'Optimize this database query for better performance';
+      const designPrompt = 'Create a user-friendly interface design for a dashboard';
 
       // Security voice test
       const securityVoice = voiceSystem.getVoice('security');
       expect(securityVoice).toBeDefined();
-      
+
       const securityResponse = await unifiedClient.processRequest({
         prompt: securityPrompt,
         type: 'security_analysis',
@@ -245,7 +248,7 @@ export const UserComponent: React.FC<UserProps> = ({ name, email }) => {
       expect(securityResponse.content).toBeTruthy();
       expect(securityResponse.content.toLowerCase()).toContain('security');
 
-      // Performance voice test  
+      // Performance voice test
       const performanceResponse = await unifiedClient.processRequest({
         prompt: performancePrompt,
         type: 'performance_optimization',
@@ -267,7 +270,9 @@ export const UserComponent: React.FC<UserProps> = ({ name, email }) => {
       expect(designResponse.content).toBeTruthy();
       expect(designResponse.content.toLowerCase()).toContain('design');
 
-      console.log('✅ Voice archetype specialization validated across security, performance, and design domains');
+      console.log(
+        '✅ Voice archetype specialization validated across security, performance, and design domains'
+      );
     }, 90000);
   });
 
@@ -275,7 +280,7 @@ export const UserComponent: React.FC<UserProps> = ({ name, email }) => {
     it('should demonstrate intelligent routing between fast and quality models', async () => {
       // Fast task (should use LM Studio if available)
       const fastTask = "Format this JSON: { name: 'John', age: 30 }";
-      
+
       const fastResponse = await unifiedClient.processRequest({
         prompt: fastTask,
         type: 'formatting',
@@ -287,8 +292,9 @@ export const UserComponent: React.FC<UserProps> = ({ name, email }) => {
       expect(fastResponse.metadata.responseTimeMs).toBeLessThan(10000); // Fast response
 
       // Complex task (should use higher quality model)
-      const complexTask = "Analyze the time complexity of various sorting algorithms and provide mathematical proof";
-      
+      const complexTask =
+        'Analyze the time complexity of various sorting algorithms and provide mathematical proof';
+
       const qualityResponse = await unifiedClient.processRequest({
         prompt: complexTask,
         type: 'complex_analysis',
@@ -300,8 +306,8 @@ export const UserComponent: React.FC<UserProps> = ({ name, email }) => {
       expect(qualityResponse.content.toLowerCase()).toContain('algorithm');
 
       // Auto routing test
-      const autoTask = "Explain recursion with a practical example";
-      
+      const autoTask = 'Explain recursion with a practical example';
+
       const autoResponse = await unifiedClient.processRequest({
         prompt: autoTask,
         type: 'explanation',
@@ -325,21 +331,30 @@ export const UserComponent: React.FC<UserProps> = ({ name, email }) => {
       await mkdir(join(projectDir, 'tests'), { recursive: true });
 
       // Create package.json
-      await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-        name: 'test-project',
-        version: '1.0.0',
-        scripts: {
-          build: 'tsc',
-          test: 'jest',
-        },
-        dependencies: {
-          'express': '^4.18.0',
-          'typescript': '^5.0.0',
-        },
-      }, null, 2));
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify(
+          {
+            name: 'test-project',
+            version: '1.0.0',
+            scripts: {
+              build: 'tsc',
+              test: 'jest',
+            },
+            dependencies: {
+              express: '^4.18.0',
+              typescript: '^5.0.0',
+            },
+          },
+          null,
+          2
+        )
+      );
 
       // Create source files
-      await writeFile(join(projectDir, 'src', 'index.ts'), `
+      await writeFile(
+        join(projectDir, 'src', 'index.ts'),
+        `
 import express from 'express';
 
 const app = express();
@@ -352,9 +367,12 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(\`Server running on port \${PORT}\`);
 });
-      `);
+      `
+      );
 
-      await writeFile(join(projectDir, 'tests', 'index.test.ts'), `
+      await writeFile(
+        join(projectDir, 'tests', 'index.test.ts'),
+        `
 import request from 'supertest';
 import app from '../src/index';
 
@@ -365,7 +383,8 @@ describe('API Tests', () => {
     expect(response.body.message).toBe('Hello World');
   });
 });
-      `);
+      `
+      );
 
       // Process project analysis request
       const projectAnalysis = await unifiedClient.processRequest({
@@ -381,14 +400,14 @@ describe('API Tests', () => {
       expect(projectAnalysis).toBeDefined();
       expect(projectAnalysis.content).toBeTruthy();
       expect(projectAnalysis.content.length).toBeGreaterThan(100);
-      
+
       // Verify analysis mentions relevant concepts
       const analysisLower = projectAnalysis.content.toLowerCase();
       expect(
         analysisLower.includes('express') ||
-        analysisLower.includes('typescript') ||
-        analysisLower.includes('project') ||
-        analysisLower.includes('structure')
+          analysisLower.includes('typescript') ||
+          analysisLower.includes('project') ||
+          analysisLower.includes('structure')
       ).toBe(true);
 
       console.log(`✅ Project analysis completed for ${projectDir}`);
@@ -402,7 +421,7 @@ export const SimpleComponent = () => {
   return <div>Hello</div>;
 };
       `;
-      
+
       await writeFile(watchedFile, initialContent);
 
       // Initial analysis
@@ -431,7 +450,7 @@ export const EnhancedComponent = () => {
   );
 };
       `;
-      
+
       await writeFile(watchedFile, updatedContent);
 
       // Updated analysis
@@ -443,14 +462,14 @@ export const EnhancedComponent = () => {
 
       expect(updatedAnalysis.content).toBeTruthy();
       expect(updatedAnalysis.content).not.toBe(initialAnalysis.content);
-      
+
       // Verify updated analysis mentions new concepts
       const updatedLower = updatedAnalysis.content.toLowerCase();
       expect(
         updatedLower.includes('state') ||
-        updatedLower.includes('button') ||
-        updatedLower.includes('click') ||
-        updatedLower.includes('increment')
+          updatedLower.includes('button') ||
+          updatedLower.includes('click') ||
+          updatedLower.includes('increment')
       ).toBe(true);
 
       console.log('✅ Real-time file monitoring and incremental updates validated');
@@ -460,29 +479,31 @@ export const EnhancedComponent = () => {
   describe('Real Error Handling and Recovery', () => {
     it('should gracefully handle provider failures with fallback', async () => {
       // Test with intentionally unreachable endpoint
-      const clientWithFailure = new UnifiedModelClient(createDefaultUnifiedClientConfig({
-        providers: [
-          {
-            type: 'ollama',
-            endpoint: 'http://localhost:99999', // Non-existent port
-            enabled: true,
-            timeout: 5000,
-          },
-          {
-            type: 'lm-studio',
-            endpoint: process.env.TEST_LMSTUDIO_ENDPOINT || 'http://localhost:1234',
-            enabled: true,
-            timeout: 30000,
-          },
-        ],
-        fallbackChain: ['ollama', 'lm-studio'],
-      }));
+      const clientWithFailure = new UnifiedModelClient(
+        createDefaultUnifiedClientConfig({
+          providers: [
+            {
+              type: 'ollama',
+              endpoint: 'http://localhost:99999', // Non-existent port
+              enabled: true,
+              timeout: 5000,
+            },
+            {
+              type: 'lm-studio',
+              endpoint: process.env.TEST_LMSTUDIO_ENDPOINT || 'http://localhost:1234',
+              enabled: true,
+              timeout: 30000,
+            },
+          ],
+          fallbackChain: ['ollama', 'lm-studio'],
+        })
+      );
 
       try {
         await clientWithFailure.initialize();
 
         const response = await clientWithFailure.processRequest({
-          prompt: "Simple test request",
+          prompt: 'Simple test request',
           type: 'test',
         });
 
@@ -538,7 +559,7 @@ export const EnhancedComponent = () => {
 
   describe('Real Performance and Concurrency', () => {
     it('should handle concurrent requests efficiently', async () => {
-      const concurrentRequests = Array.from({ length: 5 }, (_, i) => 
+      const concurrentRequests = Array.from({ length: 5 }, (_, i) =>
         unifiedClient.processRequest({
           prompt: `Generate a simple function for task ${i}`,
           type: 'code_generation',
@@ -554,7 +575,9 @@ export const EnhancedComponent = () => {
       const failed = results.filter(r => r.status === 'rejected').length;
 
       expect(successful).toBeGreaterThan(0);
-      console.log(`✅ Concurrent requests: ${successful} successful, ${failed} failed in ${endTime - startTime}ms`);
+      console.log(
+        `✅ Concurrent requests: ${successful} successful, ${failed} failed in ${endTime - startTime}ms`
+      );
 
       // Verify individual responses
       results.forEach((result, index) => {
@@ -570,36 +593,42 @@ export const EnhancedComponent = () => {
 
     it('should maintain performance metrics across extended usage', async () => {
       const performanceTests = [];
-      
+
       // Collect performance data across multiple requests
       for (let i = 0; i < 3; i++) {
         const startTime = Date.now();
-        
+
         const response = await unifiedClient.processRequest({
           prompt: `Performance test iteration ${i}: Create a utility function`,
           type: 'code_generation',
         });
-        
+
         const endTime = Date.now();
-        
+
         performanceTests.push({
           iteration: i,
           responseTime: endTime - startTime,
           contentLength: response.content?.length || 0,
           provider: response.metadata?.provider,
         });
-        
+
         expect(response).toBeDefined();
       }
 
       // Analyze performance trends
-      const avgResponseTime = performanceTests.reduce((sum, test) => sum + test.responseTime, 0) / performanceTests.length;
-      const avgContentLength = performanceTests.reduce((sum, test) => sum + test.contentLength, 0) / performanceTests.length;
+      const avgResponseTime =
+        performanceTests.reduce((sum, test) => sum + test.responseTime, 0) /
+        performanceTests.length;
+      const avgContentLength =
+        performanceTests.reduce((sum, test) => sum + test.contentLength, 0) /
+        performanceTests.length;
 
       expect(avgResponseTime).toBeGreaterThan(0);
       expect(avgContentLength).toBeGreaterThan(0);
 
-      console.log(`✅ Performance metrics: Avg response ${avgResponseTime}ms, avg content ${Math.round(avgContentLength)} chars`);
+      console.log(
+        `✅ Performance metrics: Avg response ${avgResponseTime}ms, avg content ${Math.round(avgContentLength)} chars`
+      );
     }, 60000);
   });
 });

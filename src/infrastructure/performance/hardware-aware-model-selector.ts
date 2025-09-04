@@ -133,7 +133,9 @@ export class HardwareAwareModelSelector extends EventEmitter {
     }
 
     // Prioritize qwen2.5-coder if available
-    const qwenCoder = suitableModels.find((m: ModelInfo) => m.name.toLowerCase().includes('qwen2.5-coder'));
+    const qwenCoder = suitableModels.find((m: ModelInfo) =>
+      m.name.toLowerCase().includes('qwen2.5-coder')
+    );
     let sortedModels = this.sortModelsByHardwareCompatibility(suitableModels);
 
     if (qwenCoder) {

@@ -177,8 +177,8 @@ export class ServiceFactory {
       // Also expose the backend to the unified tool registry so tool handlers can use it
       try {
         unifiedToolRegistry.setRustBackend(rustBackend);
-  // Also set the backend on the global ToolIntegration if present
-  setGlobalToolIntegrationRustBackend(rustBackend);
+        // Also set the backend on the global ToolIntegration if present
+        setGlobalToolIntegrationRustBackend(rustBackend);
       } catch (e) {
         this.logger?.warn('Failed to set rustBackend on unifiedToolRegistry', e);
       }

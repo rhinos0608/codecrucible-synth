@@ -113,7 +113,11 @@ export interface PackageJson {
  * Project Configuration Loader with industry-standard file support
  */
 export class ProjectConfigurationLoader {
-  private readonly configFileNames = ['.codecrucible.yaml', '.codecrucible.yml', 'codecrucible.yaml'];
+  private readonly configFileNames = [
+    '.codecrucible.yaml',
+    '.codecrucible.yml',
+    'codecrucible.yaml',
+  ];
   private readonly instructionFileNames = ['CODECRUCIBLE.md', 'codecrucible.md'];
   private readonly cache: Map<string, CombinedProjectConfig> = new Map();
   private readonly cacheTimeout = 30000; // 30 seconds
@@ -121,7 +125,9 @@ export class ProjectConfigurationLoader {
   /**
    * Load complete project configuration for a directory
    */
-  public async loadProjectConfig(projectPath: string = process.cwd()): Promise<CombinedProjectConfig> {
+  public async loadProjectConfig(
+    projectPath: string = process.cwd()
+  ): Promise<CombinedProjectConfig> {
     const startTime = Date.now();
     const normalizedPath = resolve(projectPath);
 
@@ -162,14 +168,19 @@ export class ProjectConfigurationLoader {
       const packageInfo = await this.loadPackageInfo(normalizedPath);
       if (packageInfo && typeof packageInfo === 'object' && packageInfo !== null) {
         // Merge package.json info into configuration
-        config.configuration.name = config.configuration.name ?? (packageInfo as { name?: string }).name;
-        config.configuration.version = config.configuration.version ?? (packageInfo as { version?: string }).version;
+        config.configuration.name =
+          config.configuration.name ?? (packageInfo as { name?: string }).name;
+        config.configuration.version =
+          config.configuration.version ?? (packageInfo as { version?: string }).version;
         config.configuration.language =
-          config.configuration.language ?? this.detectLanguageFromPackage(packageInfo as {
-            [key: string]: unknown;
-            dependencies?: Record<string, unknown>;
-            devDependencies?: Record<string, unknown>;
-          });
+          config.configuration.language ??
+          this.detectLanguageFromPackage(
+            packageInfo as {
+              [key: string]: unknown;
+              dependencies?: Record<string, unknown>;
+              devDependencies?: Record<string, unknown>;
+            }
+          );
         config.configuration.framework =
           config.configuration.framework ?? this.detectFrameworkFromPackage(packageInfo);
         config.configuration.type =
@@ -330,44 +341,43 @@ export class ProjectConfigurationLoader {
   /**
    * Detect language from package.json
    */
-private detectLanguageFromPackage(packageJson: {
-  dependencies?: Record<string, unknown>;
-  devDependencies?: Record<string, unknown>;
-  [key: string]: unknown;
-}): string {
-  if (
-    packageJson &&
-    (packageJson.dependencies || packageJson.devDependencies)
-  ) {
-    const deps: Record<string, unknown> = {};
+  private detectLanguageFromPackage(packageJson: {
+    dependencies?: Record<string, unknown>;
+    devDependencies?: Record<string, unknown>;
+    [key: string]: unknown;
+  }): string {
+    if (packageJson && (packageJson.dependencies || packageJson.devDependencies)) {
+      const deps: Record<string, unknown> = {};
 
-    if (packageJson.dependencies && typeof packageJson.dependencies === 'object') {
-      Object.assign(deps, packageJson.dependencies);
-    }
-    if (packageJson.devDependencies && typeof packageJson.devDependencies === 'object') {
-      Object.assign(deps, packageJson.devDependencies);
+      if (packageJson.dependencies && typeof packageJson.dependencies === 'object') {
+        Object.assign(deps, packageJson.dependencies);
+      }
+      if (packageJson.devDependencies && typeof packageJson.devDependencies === 'object') {
+        Object.assign(deps, packageJson.devDependencies);
+      }
+
+      if ('typescript' in deps || '@types/node' in deps) return 'typescript';
+      if ('react' in deps || '@types/react' in deps) return 'javascript';
+      if ('vue' in deps) return 'javascript';
+      if ('angular' in deps || '@angular/core' in deps) return 'typescript';
     }
 
-    if ('typescript' in deps || '@types/node' in deps) return 'typescript';
-    if ('react' in deps || '@types/react' in deps) return 'javascript';
-    if ('vue' in deps) return 'javascript';
-    if ('angular' in deps || '@angular/core' in deps) return 'typescript';
+    // Fallback default when no clear language can be detected
+    return 'javascript';
   }
-
-  // Fallback default when no clear language can be detected
-  return 'javascript';
-}
 
   /**
    * Detect framework from package.json
    */
   private detectFrameworkFromPackage(packageJson: PackageJson): string | undefined {
-    const dependencies = typeof packageJson.dependencies === 'object' && packageJson.dependencies !== null
-      ? packageJson.dependencies
-      : {};
-    const devDependencies = typeof packageJson.devDependencies === 'object' && packageJson.devDependencies !== null
-      ? packageJson.devDependencies
-      : {};
+    const dependencies =
+      typeof packageJson.dependencies === 'object' && packageJson.dependencies !== null
+        ? packageJson.dependencies
+        : {};
+    const devDependencies =
+      typeof packageJson.devDependencies === 'object' && packageJson.devDependencies !== null
+        ? packageJson.devDependencies
+        : {};
     const deps = { ...dependencies, ...devDependencies };
 
     if ('react' in deps || '@types/react' in deps) return 'react';
@@ -390,12 +400,14 @@ private detectLanguageFromPackage(packageJson: {
     if ('bin' in packageJson && packageJson.bin !== undefined) return 'cli';
 
     // Check for common web frameworks
-    const dependencies = typeof packageJson.dependencies === 'object' && packageJson.dependencies !== null
-      ? packageJson.dependencies
-      : {};
-    const devDependencies = typeof packageJson.devDependencies === 'object' && packageJson.devDependencies !== null
-      ? packageJson.devDependencies
-      : {};
+    const dependencies =
+      typeof packageJson.dependencies === 'object' && packageJson.dependencies !== null
+        ? packageJson.dependencies
+        : {};
+    const devDependencies =
+      typeof packageJson.devDependencies === 'object' && packageJson.devDependencies !== null
+        ? packageJson.devDependencies
+        : {};
     const deps = { ...dependencies, ...devDependencies };
 
     if ('react' in deps || 'vue' in deps || 'angular' in deps || 'svelte' in deps) return 'web';
@@ -404,7 +416,11 @@ private detectLanguageFromPackage(packageJson: {
     if ('react-native' in deps || 'expo' in deps) return 'mobile';
 
     // Check scripts for project type hints
-    if ('scripts' in packageJson && typeof packageJson.scripts === 'object' && packageJson.scripts !== null) {
+    if (
+      'scripts' in packageJson &&
+      typeof packageJson.scripts === 'object' &&
+      packageJson.scripts !== null
+    ) {
       const scripts = Object.keys(packageJson.scripts).join(' ').toLowerCase();
       if (scripts.includes('start') && scripts.includes('build')) return 'web';
       if (scripts.includes('dev') || scripts.includes('serve')) return 'web';

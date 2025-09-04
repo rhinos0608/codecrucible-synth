@@ -56,7 +56,7 @@ export const mockTools = {
   FileWriter: { id: 'file_writer', execute: jest.fn() },
   NetworkRequest: { id: 'network_request', execute: jest.fn() },
   SecureCodeExecutor: { id: 'secure_code_executor', execute: jest.fn() },
-  DataAnalyzer: { id: 'data_analyzer', execute: jest.fn() }
+  DataAnalyzer: { id: 'data_analyzer', execute: jest.fn() },
 };
 
 // Export default mocks
@@ -66,5 +66,5 @@ export default {
   CLI,
   UnifiedCacheSystem,
   SecurityAuditLogger,
-  mockTools
+  mockTools,
 };

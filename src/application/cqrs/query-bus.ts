@@ -38,6 +38,6 @@ export class QueryBus {
       const next = pipeline;
       pipeline = async (): Promise<unknown> => mw(query, next);
     }
-    return await pipeline() as T;
+    return (await pipeline()) as T;
   }
 }

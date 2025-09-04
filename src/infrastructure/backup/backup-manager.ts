@@ -988,7 +988,7 @@ export class BackupManager {
    */
   private async restoreDatabase(extractedPath: string): Promise<void> {
     const dbType = process.env.DATABASE_TYPE || 'sqlite';
-    
+
     try {
       switch (dbType) {
         case 'postgresql':
@@ -1004,18 +1004,19 @@ export class BackupManager {
           // SQLite restore
           const dbPath = join(extractedPath, 'database.db');
           if (existsSync(dbPath)) {
-            const targetPath = process.env.DATABASE_PATH || join(process.cwd(), 'data', 'codecrucible.db');
+            const targetPath =
+              process.env.DATABASE_PATH || join(process.cwd(), 'data', 'codecrucible.db');
             await fs.mkdir(dirname(targetPath), { recursive: true });
-            
+
             // Stop database connections before restore
             await this.dbManager.close();
-            
+
             // Replace database file
             await fs.copyFile(dbPath, targetPath);
-            
+
             // Restart database connections
             await this.dbManager.initialize();
-            
+
             logger.info('SQLite database restored successfully');
           } else {
             logger.warn('Database backup file not found in extracted backup');
@@ -1116,7 +1117,7 @@ export class BackupManager {
     if (existsSync(configPath)) {
       try {
         const configData = JSON.parse(await fs.readFile(configPath, 'utf-8'));
-        
+
         // Validate configuration format
         if (!configData.version || !configData.timestamp) {
           throw new Error('Invalid configuration backup format');
@@ -1124,8 +1125,12 @@ export class BackupManager {
 
         // Backup current configuration before restore
         const currentConfigPath = join(process.cwd(), 'config', 'production.config.json');
-        const backupConfigPath = join(process.cwd(), 'config', `production.config.backup.${Date.now()}.json`);
-        
+        const backupConfigPath = join(
+          process.cwd(),
+          'config',
+          `production.config.backup.${Date.now()}.json`
+        );
+
         if (existsSync(currentConfigPath)) {
           await fs.copyFile(currentConfigPath, backupConfigPath);
           logger.info(`Current configuration backed up to: ${backupConfigPath}`);
@@ -1134,10 +1139,9 @@ export class BackupManager {
         // Restore configuration (implement specific restoration logic based on config structure)
         logger.info(`Configuration restored from backup version: ${configData.version}`);
         logger.info(`Original backup timestamp: ${configData.timestamp}`);
-        
+
         // For now, we log the restore. In production, you would merge/replace specific config sections
         // based on your application's configuration management needs
-        
       } catch (error) {
         logger.error('Configuration restore failed:', error);
         throw error;

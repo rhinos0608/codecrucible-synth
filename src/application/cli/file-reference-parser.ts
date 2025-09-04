@@ -78,16 +78,18 @@ export class FileReferenceParser {
         '.env',
       ]
     );
-    this.excludePatterns = options.excludePatterns ? Array.from(options.excludePatterns) : [
-      'node_modules/**',
-      '.git/**',
-      'dist/**',
-      'build/**',
-      '*.min.js',
-      '*.bundle.js',
-      '.DS_Store',
-      'thumbs.db',
-    ];
+    this.excludePatterns = options.excludePatterns
+      ? Array.from(options.excludePatterns)
+      : [
+          'node_modules/**',
+          '.git/**',
+          'dist/**',
+          'build/**',
+          '*.min.js',
+          '*.bundle.js',
+          '.DS_Store',
+          'thumbs.db',
+        ];
   }
 
   /**

@@ -26,11 +26,7 @@ import { IModelSelectionService } from '../../../../src/domain/services/model-se
 
 // Mock implementations for testing
 class MockVoiceOrchestrationService implements IVoiceOrchestrationService {
-  async orchestrateVoices(
-    prompt: string,
-    voiceNames: string[],
-    config?: any
-  ): Promise<any> {
+  async orchestrateVoices(prompt: string, voiceNames: string[], config?: any): Promise<any> {
     return {
       content: `Voice orchestration result for: ${prompt.substring(0, 50)}...`,
       voicesUsed: voiceNames,
@@ -45,10 +41,7 @@ class MockVoiceOrchestrationService implements IVoiceOrchestrationService {
     };
   }
 
-  async selectOptimalVoices(
-    task: string,
-    context?: any
-  ): Promise<string[]> {
+  async selectOptimalVoices(task: string, context?: any): Promise<string[]> {
     // Return different voices based on task keywords
     if (task.includes('analyze')) {
       return ['analyzer', 'security'];
@@ -76,10 +69,7 @@ class MockVoiceOrchestrationService implements IVoiceOrchestrationService {
 }
 
 class MockModelSelectionService implements IModelSelectionService {
-  async selectOptimalModel(
-    task: string,
-    requirements?: any
-  ): Promise<any> {
+  async selectOptimalModel(task: string, requirements?: any): Promise<any> {
     return {
       modelName: 'mock-model-v1',
       confidence: 0.9,
@@ -92,10 +82,7 @@ class MockModelSelectionService implements IModelSelectionService {
     };
   }
 
-  async evaluateModelPerformance(
-    modelName: string,
-    task: string
-  ): Promise<any> {
+  async evaluateModelPerformance(modelName: string, task: string): Promise<any> {
     return {
       quality: 0.8,
       latency: 150,
@@ -137,7 +124,7 @@ class MockSpiralPhaseExecutor {
 
     // Simulate phase-specific processing
     const processingTime = baseProcessingTime + (phaseSpecificTime[input.phase] || 150);
-    
+
     // Get optimal voices for this phase
     const optimalVoices = await this.voiceService.selectOptimalVoices(
       `${input.phase} phase: ${input.content.substring(0, 100)}`
@@ -158,22 +145,22 @@ class MockSpiralPhaseExecutor {
         phaseContent = `**Problem Decomposition (Iteration ${input.iteration})**\n${input.content}\n\nKey challenges identified and broken down into manageable components.`;
         qualityBoost = 0.1;
         break;
-      
+
       case 'council':
         phaseContent = `**Multi-Voice Council Analysis (Iteration ${input.iteration})**\n${input.content}\n\nDiverse perspectives gathered from: ${optimalVoices.join(', ')}`;
         qualityBoost = 0.15;
         break;
-      
+
       case 'synthesis':
         phaseContent = `**Unified Solution Synthesis (Iteration ${input.iteration})**\n${input.content}\n\nIntegrated solution combining all perspectives.`;
         qualityBoost = 0.2;
         break;
-      
+
       case 'rebirth':
         phaseContent = `**Implementation & Testing (Iteration ${input.iteration})**\n${input.content}\n\nSolution refined through practical implementation.`;
         qualityBoost = 0.1;
         break;
-      
+
       case 'reflection':
         phaseContent = `**Quality Reflection (Iteration ${input.iteration})**\n${input.content}\n\nReflective analysis and quality assessment completed.`;
         qualityBoost = 0.05;
@@ -181,7 +168,7 @@ class MockSpiralPhaseExecutor {
     }
 
     // Calculate quality metrics with phase-specific improvements
-    const baseQuality = Math.min(0.9, Math.max(0.5, 0.7 + (input.iteration * 0.1) + qualityBoost));
+    const baseQuality = Math.min(0.9, Math.max(0.5, 0.7 + input.iteration * 0.1 + qualityBoost));
     const qualityMetrics = {
       coherence: Math.min(0.95, baseQuality + 0.05),
       completeness: Math.min(0.95, baseQuality + 0.03),
@@ -349,7 +336,7 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
       if (result.iterations.length > 1) {
         const firstQuality = result.iterations[0].quality;
         const lastQuality = result.iterations[result.iterations.length - 1].quality;
-        
+
         // Allow for some variation but expect overall improvement or maintenance
         expect(lastQuality).toBeGreaterThanOrEqual(firstQuality - 0.1);
       }
@@ -368,7 +355,7 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
 
       expect(result.metadata.voicesUsed).toBeInstanceOf(Array);
       expect(result.metadata.voicesUsed.length).toBeGreaterThan(0);
-      
+
       // Should have unique voices (some may repeat but there should be variety)
       const uniqueVoices = new Set(result.metadata.voicesUsed);
       expect(uniqueVoices.size).toBeGreaterThan(0);
@@ -435,7 +422,7 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
 
       expect(result.recommendations).toBeInstanceOf(Array);
       expect(result.recommendations.length).toBeGreaterThan(0);
-      
+
       // Recommendations should be strings with meaningful content
       result.recommendations.forEach(rec => {
         expect(typeof rec).toBe('string');
@@ -490,13 +477,14 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
 
       const result = await coordinator.executeSpiralProcess(input);
 
-      const manualAverage = result.iterations.reduce((sum, iter) => sum + iter.quality, 0) / result.iterations.length;
+      const manualAverage =
+        result.iterations.reduce((sum, iter) => sum + iter.quality, 0) / result.iterations.length;
       expect(Math.abs(result.metadata.averageQuality - manualAverage)).toBeLessThan(0.01);
     });
 
     it('should track processing time accurately', async () => {
       const startTime = Date.now();
-      
+
       const input: SimplifiedSpiralInput = {
         initialPrompt: 'Performance tracking test',
         config: { maxIterations: 1 },
@@ -536,7 +524,7 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
 
       const allVoices = result.metadata.voicesUsed;
       const uniqueVoices = [...new Set(allVoices)];
-      
+
       // Should have collected voices from all iterations and phases
       expect(allVoices.length).toBeGreaterThanOrEqual(uniqueVoices.length);
       expect(uniqueVoices.length).toBeGreaterThan(0);
@@ -559,7 +547,7 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
 
     it('should handle very long prompts', async () => {
       const longPrompt = 'A'.repeat(10000) + ' - Design a complex system for this';
-      
+
       const input: SimplifiedSpiralInput = {
         initialPrompt: longPrompt,
         config: { maxIterations: 1 },
@@ -631,7 +619,7 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
   describe('Performance and Scalability', () => {
     it('should complete single iteration within reasonable time', async () => {
       const startTime = Date.now();
-      
+
       const input: SimplifiedSpiralInput = {
         initialPrompt: 'Performance test with single iteration',
         config: { maxIterations: 1 },
@@ -650,7 +638,7 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
 
       for (const maxIter of iterations) {
         const startTime = Date.now();
-        
+
         const input: SimplifiedSpiralInput = {
           initialPrompt: `Scaling test with ${maxIter} iterations`,
           config: { maxIterations: maxIter, qualityThreshold: 0.95 }, // High threshold to force iterations
@@ -683,7 +671,7 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
       const finalMemory = process.memoryUsage();
 
       expect(result).toBeDefined();
-      
+
       // Memory growth should be reasonable
       const memoryGrowth = finalMemory.heapUsed - initialMemory.heapUsed;
       expect(memoryGrowth).toBeLessThan(50 * 1024 * 1024); // Less than 50MB growth
@@ -714,7 +702,7 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
   describe('Integration and Compatibility', () => {
     it('should integrate properly with voice orchestration service', async () => {
       const voiceServiceSpy = jest.spyOn(mockVoiceService, 'selectOptimalVoices');
-      
+
       const input: SimplifiedSpiralInput = {
         initialPrompt: 'Voice integration test',
         config: { maxIterations: 1 },
@@ -724,13 +712,13 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
 
       expect(voiceServiceSpy).toHaveBeenCalled();
       expect(result.metadata.voicesUsed.length).toBeGreaterThan(0);
-      
+
       voiceServiceSpy.mockRestore();
     });
 
     it('should integrate properly with model selection service', async () => {
       const modelServiceSpy = jest.spyOn(mockModelService, 'selectOptimalModel');
-      
+
       const input: SimplifiedSpiralInput = {
         initialPrompt: 'Model integration test',
         config: { maxIterations: 1 },
@@ -739,13 +727,13 @@ describe('SimplifiedLivingSpiralCoordinator - Comprehensive Tests', () => {
       await coordinator.executeSpiralProcess(input);
 
       expect(modelServiceSpy).toHaveBeenCalled();
-      
+
       modelServiceSpy.mockRestore();
     });
 
     it('should support custom phase configurations', async () => {
       const customPhases = ['collapse', 'synthesis'];
-      
+
       const input: SimplifiedSpiralInput = {
         initialPrompt: 'Custom phase test',
         config: {

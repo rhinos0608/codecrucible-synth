@@ -108,7 +108,6 @@ export class ProductionRBACSystem extends EventEmitter {
 
   private cacheCleanupInterval: NodeJS.Timeout | null = null;
 
-
   constructor(db: ProductionDatabaseManager, secretsManager: SecretsManager) {
     super();
     this.db = db;
@@ -895,7 +894,6 @@ export class ProductionRBACSystem extends EventEmitter {
       this.cacheCleanupInterval = null;
     }
   }
-
 
   /**
    * Check if user has specific permission

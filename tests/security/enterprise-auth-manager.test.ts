@@ -4,7 +4,11 @@
  * Tests: JWT tokens, API keys, MFA, rate limiting, session management
  */
 
-import { EnterpriseAuthManager, AuthRequest, AuthConfig } from '../../src/core/security/enterprise-auth-manager.js';
+import {
+  EnterpriseAuthManager,
+  AuthRequest,
+  AuthConfig,
+} from '../../src/core/security/enterprise-auth-manager.js';
 import { RBACSystem, User } from '../../src/core/security/production-rbac-system.js';
 import { SecretsManager } from '../../src/core/security/secrets-manager.js';
 
@@ -18,10 +22,10 @@ describe('Enterprise Authentication Manager - Comprehensive Real Tests', () => {
     // Create real instances - NO MOCKS
     rbacSystem = new RBACSystem();
     secretsManager = new SecretsManager();
-    
+
     // Initialize secrets manager first
     await secretsManager.initialize('test-master-password');
-    
+
     const testConfig: Partial<AuthConfig> = {
       jwtSecret: 'test-secret-key-for-testing-only',
       jwtExpiresIn: '1h',
@@ -60,7 +64,7 @@ describe('Enterprise Authentication Manager - Comprehensive Real Tests', () => {
     };
 
     const userId = await rbacSystem.createUser(testUserData);
-    
+
     // Store password manually using secrets manager (as RBAC system does internally)
     const passwordHash = require('crypto')
       .createHash('sha256')
@@ -498,9 +502,7 @@ describe('Enterprise Authentication Manager - Comprehensive Real Tests', () => {
         userAgent: `Client-${i}`,
       }));
 
-      const results = await Promise.all(
-        requests.map(req => authManager.authenticate(req))
-      );
+      const results = await Promise.all(requests.map(req => authManager.authenticate(req)));
 
       // All should succeed (different IPs, so no rate limiting)
       results.forEach(result => {
@@ -514,7 +516,7 @@ describe('Enterprise Authentication Manager - Comprehensive Real Tests', () => {
     it('should efficiently manage memory for large session counts', () => {
       // This test verifies memory efficiency is maintained
       const initialStats = authManager.getAuthStats();
-      
+
       // The auth manager should handle session tracking efficiently
       expect(initialStats.activeSessions).toBeGreaterThanOrEqual(0);
       expect(initialStats.rateLimitedIPs).toBeGreaterThanOrEqual(0);

@@ -33,7 +33,17 @@ export class GitMCPServer {
     this.config = {
       repoPath: config.repoPath || process.cwd(),
       allowedOperations: config.allowedOperations || [
-        'status', 'log', 'diff', 'branch', 'add', 'commit', 'push', 'pull', 'fetch', 'checkout', 'merge'
+        'status',
+        'log',
+        'diff',
+        'branch',
+        'add',
+        'commit',
+        'push',
+        'pull',
+        'fetch',
+        'checkout',
+        'merge',
       ],
       blockedOperations: config.blockedOperations || ['reset --hard', 'force', 'clean -fd'],
       maxDiffSize: config.maxDiffSize || 1000000, // 1MB diff limit
@@ -111,10 +121,10 @@ export class GitMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                files: { 
-                  type: 'array', 
+                files: {
+                  type: 'array',
                   items: { type: 'string' },
-                  description: 'Files to add' 
+                  description: 'Files to add',
                 },
                 all: { type: 'boolean', description: 'Add all changes' },
               },
@@ -164,10 +174,10 @@ export class GitMCPServer {
               properties: {
                 branch: { type: 'string', description: 'Branch to checkout' },
                 createNew: { type: 'boolean', description: 'Create new branch' },
-                files: { 
-                  type: 'array', 
+                files: {
+                  type: 'array',
                   items: { type: 'string' },
-                  description: 'Files to restore' 
+                  description: 'Files to restore',
                 },
               },
             },
@@ -177,7 +187,7 @@ export class GitMCPServer {
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
       const typedArgs = args as Record<string, any>;
 
@@ -202,13 +212,25 @@ export class GitMCPServer {
             return await this.gitCommit(typedArgs.message as string, typedArgs.amend as boolean);
 
           case 'git_push':
-            return await this.gitPush(typedArgs.remote as string, typedArgs.branch as string, typedArgs.setUpstream as boolean);
+            return await this.gitPush(
+              typedArgs.remote as string,
+              typedArgs.branch as string,
+              typedArgs.setUpstream as boolean
+            );
 
           case 'git_pull':
-            return await this.gitPull(typedArgs.remote as string, typedArgs.branch as string, typedArgs.rebase as boolean);
+            return await this.gitPull(
+              typedArgs.remote as string,
+              typedArgs.branch as string,
+              typedArgs.rebase as boolean
+            );
 
           case 'git_checkout':
-            return await this.gitCheckout(typedArgs.branch as string, typedArgs.createNew as boolean, typedArgs.files as string[]);
+            return await this.gitCheckout(
+              typedArgs.branch as string,
+              typedArgs.createNew as boolean,
+              typedArgs.files as string[]
+            );
 
           default:
             return {
@@ -256,7 +278,7 @@ export class GitMCPServer {
     let command = 'git log';
     if (oneline) command += ' --oneline';
     if (limit) command += ` -n ${limit}`;
-    
+
     const result = await this.executeGitCommand(command);
     return {
       content: [{ type: 'text', text: result.stdout || result.stderr }],
@@ -268,17 +290,19 @@ export class GitMCPServer {
     let command = 'git diff';
     if (staged) command += ' --staged';
     if (commit) command += ` ${commit}`;
-    
+
     const result = await this.executeGitCommand(command);
-    
+
     // Check diff size
     if (result.stdout.length > this.config.maxDiffSize!) {
       return {
-        content: [{ type: 'text', text: 'Diff too large. Use more specific file paths or commits.' }],
+        content: [
+          { type: 'text', text: 'Diff too large. Use more specific file paths or commits.' },
+        ],
         isError: true,
       };
     }
-    
+
     return {
       content: [{ type: 'text', text: result.stdout || 'No changes' }],
       isError: result.exitCode !== 0,
@@ -287,7 +311,7 @@ export class GitMCPServer {
 
   private async gitBranch(options: any) {
     let command = 'git branch';
-    
+
     if (options.list) {
       command += ' -a';
     } else if (options.create) {
@@ -297,7 +321,7 @@ export class GitMCPServer {
     } else if (options.current) {
       command = 'git branch --show-current';
     }
-    
+
     const result = await this.executeGitCommand(command);
     return {
       content: [{ type: 'text', text: result.stdout || result.stderr }],
@@ -307,7 +331,7 @@ export class GitMCPServer {
 
   private async gitAdd(files?: string[], all?: boolean) {
     let command = 'git add';
-    
+
     if (all) {
       command += ' -A';
     } else if (files && files.length > 0) {
@@ -320,7 +344,7 @@ export class GitMCPServer {
         isError: true,
       };
     }
-    
+
     const result = await this.executeGitCommand(command);
     return {
       content: [{ type: 'text', text: result.stdout || 'Files added to staging' }],
@@ -335,15 +359,17 @@ export class GitMCPServer {
         isError: true,
       };
     }
-    
+
     // Sanitize commit message
     const sanitizedMessage = message.replace(/"/g, '\\"').replace(/\$/g, '\\$');
     let command = `git commit -m "${sanitizedMessage}"`;
-    
+
     if (amend) {
-      command = message ? `git commit --amend -m "${sanitizedMessage}"` : 'git commit --amend --no-edit';
+      command = message
+        ? `git commit --amend -m "${sanitizedMessage}"`
+        : 'git commit --amend --no-edit';
     }
-    
+
     const result = await this.executeGitCommand(command);
     return {
       content: [{ type: 'text', text: result.stdout || result.stderr }],
@@ -353,11 +379,11 @@ export class GitMCPServer {
 
   private async gitPush(remote?: string, branch?: string, setUpstream?: boolean) {
     let command = 'git push';
-    
+
     if (remote) command += ` ${remote}`;
     if (branch) command += ` ${branch}`;
     if (setUpstream) command += ' -u';
-    
+
     const result = await this.executeGitCommand(command);
     return {
       content: [{ type: 'text', text: result.stdout || result.stderr }],
@@ -367,11 +393,11 @@ export class GitMCPServer {
 
   private async gitPull(remote?: string, branch?: string, rebase?: boolean) {
     let command = 'git pull';
-    
+
     if (rebase) command += ' --rebase';
     if (remote) command += ` ${remote}`;
     if (branch) command += ` ${branch}`;
-    
+
     const result = await this.executeGitCommand(command);
     return {
       content: [{ type: 'text', text: result.stdout || result.stderr }],
@@ -381,7 +407,7 @@ export class GitMCPServer {
 
   private async gitCheckout(branch?: string, createNew?: boolean, files?: string[]) {
     let command = 'git checkout';
-    
+
     if (createNew && branch) {
       command += ` -b ${branch}`;
     } else if (branch) {
@@ -395,7 +421,7 @@ export class GitMCPServer {
         isError: true,
       };
     }
-    
+
     const result = await this.executeGitCommand(command);
     return {
       content: [{ type: 'text', text: result.stdout || result.stderr }],
@@ -405,13 +431,13 @@ export class GitMCPServer {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
-    
+
     // Check if current directory is a git repository
     const result = await this.executeGitCommand('git rev-parse --git-dir');
     if (result.exitCode !== 0) {
       logger.warn('Not in a git repository');
     }
-    
+
     this.initialized = true;
     logger.info('Git MCP Server initialized');
   }

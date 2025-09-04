@@ -16,13 +16,15 @@ function getExaSearchInstance(): ExaSearchTool {
       timeout: 30000,
       maxResults: 10,
     };
-    
+
     // Only enable if we have an API key
     if (!config.apiKey) {
-      logger.warn('No EXA_API_KEY or SMITHERY_API_KEY found - search tools will use basic web search fallback');
+      logger.warn(
+        'No EXA_API_KEY or SMITHERY_API_KEY found - search tools will use basic web search fallback'
+      );
       config.enabled = false;
     }
-    
+
     exaSearchInstance = new ExaSearchTool(config);
   }
   return exaSearchInstance;
@@ -32,20 +34,28 @@ function getExaSearchInstance(): ExaSearchTool {
 async function basicWebSearch(query: string, numResults: number = 5): Promise<any> {
   try {
     // Use a basic search API or web scraping as fallback
-    const response = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`, {
-      timeout: 10000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; CodeCrucibleBot/1.0)',
-      },
-    });
-    
-    const results = response.data?.AbstractText ? [{
-      title: `Search Results for: ${query}`,
-      url: response.data.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
-      snippet: response.data.AbstractText,
-      type: 'web',
-    }] : [];
-    
+    const response = await axios.get(
+      `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
+      {
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; CodeCrucibleBot/1.0)',
+        },
+      }
+    );
+
+    const results = response.data?.AbstractText
+      ? [
+          {
+            title: `Search Results for: ${query}`,
+            url:
+              response.data.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
+            snippet: response.data.AbstractText,
+            type: 'web',
+          },
+        ]
+      : [];
+
     return {
       success: true,
       query,
@@ -125,7 +135,7 @@ export class ExaWebSearchTool extends BaseTool {
       logger.info(`🔍 MCP Exa Web Search: ${params.query}`);
 
       const exaSearch = getExaSearchInstance();
-      
+
       // Try real Exa search first
       if (exaSearch.getUsageStats().isEnabled && exaSearch.getUsageStats().hasApiKey) {
         try {
@@ -134,7 +144,7 @@ export class ExaWebSearchTool extends BaseTool {
             includeText: true,
             useAutoprompt: true,
           });
-          
+
           return {
             success: true,
             query: searchResult.query,
@@ -158,7 +168,6 @@ export class ExaWebSearchTool extends BaseTool {
       // Fallback to basic web search
       const fallbackResult = await basicWebSearch(params.query, params.numResults);
       return fallbackResult;
-      
     } catch (error) {
       logger.error('MCP Exa Web Search failed:', error);
       return {
@@ -189,13 +198,13 @@ export class ExaDeepResearchTool extends BaseTool {
       logger.info(`🔬 MCP Exa Deep Research: ${params.topic}`);
 
       const exaSearch = getExaSearchInstance();
-      
+
       // Perform comprehensive research using multiple search strategies
       if (exaSearch.getUsageStats().isEnabled && exaSearch.getUsageStats().hasApiKey) {
         try {
           const depth = params.depth || 'detailed';
           const numResults = depth === 'comprehensive' ? 20 : depth === 'detailed' ? 12 : 5;
-          
+
           // Multi-faceted research approach
           const [generalSearch, academicSearch, newsSearch] = await Promise.allSettled([
             // General research
@@ -204,14 +213,14 @@ export class ExaDeepResearchTool extends BaseTool {
               useAutoprompt: true,
               type: 'neural',
             }),
-            
+
             // Academic/technical sources
             exaSearch.search(`${params.topic} academic research technical`, {
               numResults: Math.floor(numResults * 0.3),
               includeDomains: ['scholar.google.com', 'arxiv.org', 'researchgate.net', 'ieee.org'],
               useAutoprompt: true,
             }),
-            
+
             // Recent news and developments
             exaSearch.search(`${params.topic} recent news developments 2024 2025`, {
               numResults: Math.floor(numResults * 0.2),
@@ -267,7 +276,6 @@ export class ExaDeepResearchTool extends BaseTool {
             researchStrategy: 'multi-faceted-exa-search',
             source: 'exa-deep-research',
           };
-          
         } catch (exaError) {
           logger.warn('Exa deep research failed, using basic approach:', exaError);
         }
@@ -276,7 +284,7 @@ export class ExaDeepResearchTool extends BaseTool {
       // Fallback to basic research using web search
       try {
         const basicResult = await basicWebSearch(`${params.topic} research analysis`, 5);
-        
+
         return {
           success: true,
           topic: params.topic,
@@ -287,7 +295,6 @@ export class ExaDeepResearchTool extends BaseTool {
           researchStrategy: 'basic-web-search',
           source: 'basic-research-fallback',
         };
-        
       } catch (fallbackError) {
         // Ultimate fallback
         return {
@@ -299,7 +306,6 @@ export class ExaDeepResearchTool extends BaseTool {
           source: 'research-unavailable',
         };
       }
-      
     } catch (error) {
       logger.error('MCP Deep Research failed:', error);
       return {
@@ -330,8 +336,14 @@ export class ExaCompanyResearchTool extends BaseTool {
       logger.info(`🏢 MCP Company Research: ${params.company}`);
 
       const exaSearch = getExaSearchInstance();
-      const aspects = params.aspects || ['overview', 'financials', 'products', 'news', 'market_position'];
-      
+      const aspects = params.aspects || [
+        'overview',
+        'financials',
+        'products',
+        'news',
+        'market_position',
+      ];
+
       // Perform comprehensive company research using multiple search strategies
       if (exaSearch.getUsageStats().isEnabled && exaSearch.getUsageStats().hasApiKey) {
         try {
@@ -343,21 +355,27 @@ export class ExaCompanyResearchTool extends BaseTool {
               useAutoprompt: true,
               type: 'neural',
             }),
-            
+
             // Financial information and performance
             exaSearch.search(`${params.company} financial performance revenue earnings`, {
               numResults: 3,
-              includeDomains: ['sec.gov', 'investor.com', 'finance.yahoo.com', 'bloomberg.com', 'reuters.com'],
+              includeDomains: [
+                'sec.gov',
+                'investor.com',
+                'finance.yahoo.com',
+                'bloomberg.com',
+                'reuters.com',
+              ],
               useAutoprompt: true,
             }),
-            
+
             // Products and services
             exaSearch.search(`${params.company} products services offerings technology`, {
               numResults: 3,
               useAutoprompt: true,
               type: 'neural',
             }),
-            
+
             // Recent news and developments
             exaSearch.search(`${params.company} news 2024 2025 latest developments`, {
               numResults: 4,
@@ -367,10 +385,10 @@ export class ExaCompanyResearchTool extends BaseTool {
           ];
 
           const searchResults = await Promise.allSettled(searchPromises);
-          
+
           const research: any = {};
           const sources: string[] = [];
-          
+
           // Process overview results
           if (searchResults[0].status === 'fulfilled') {
             const overviewResults = searchResults[0].value.results;
@@ -380,7 +398,7 @@ export class ExaCompanyResearchTool extends BaseTool {
               .join(' ');
             overviewResults.forEach((r: any) => sources.push(r.url));
           }
-          
+
           // Process financial results
           if (searchResults[1].status === 'fulfilled') {
             const financialResults = searchResults[1].value.results;
@@ -390,7 +408,7 @@ export class ExaCompanyResearchTool extends BaseTool {
               .join(' ');
             financialResults.forEach((r: any) => sources.push(r.url));
           }
-          
+
           // Process products results
           if (searchResults[2].status === 'fulfilled') {
             const productResults = searchResults[2].value.results;
@@ -400,7 +418,7 @@ export class ExaCompanyResearchTool extends BaseTool {
               .join(' ');
             productResults.forEach((r: any) => sources.push(r.url));
           }
-          
+
           // Process news results
           if (searchResults[3].status === 'fulfilled') {
             const newsResults = searchResults[3].value.results;
@@ -424,7 +442,6 @@ export class ExaCompanyResearchTool extends BaseTool {
             researchStrategy: 'multi-faceted-company-research',
             source: 'exa-company-research',
           };
-          
         } catch (exaError) {
           logger.warn('Exa company research failed, using basic approach:', exaError);
         }
@@ -433,23 +450,25 @@ export class ExaCompanyResearchTool extends BaseTool {
       // Fallback to basic company research using web search
       try {
         const basicResult = await basicWebSearch(`${params.company} company information`, 5);
-        
+
         return {
           success: true,
           company: params.company,
           research: {
             overview: basicResult.results[0]?.snippet || `${params.company} company information`,
-            financials: basicResult.results[1]?.snippet || `Financial information for ${params.company}`,
-            products: basicResult.results[2]?.snippet || `Products and services by ${params.company}`,
+            financials:
+              basicResult.results[1]?.snippet || `Financial information for ${params.company}`,
+            products:
+              basicResult.results[2]?.snippet || `Products and services by ${params.company}`,
             news: basicResult.results[3]?.snippet || `Recent news about ${params.company}`,
-            market_position: basicResult.results[4]?.snippet || `Market position of ${params.company}`,
+            market_position:
+              basicResult.results[4]?.snippet || `Market position of ${params.company}`,
           },
           aspects_researched: aspects,
           sources: basicResult.results.map((r: any) => r.url),
           researchStrategy: 'basic-web-search',
           source: 'basic-company-research-fallback',
         };
-        
       } catch (fallbackError) {
         // Ultimate fallback
         return {
@@ -468,7 +487,6 @@ export class ExaCompanyResearchTool extends BaseTool {
           source: 'research-unavailable',
         };
       }
-      
     } catch (error) {
       logger.error('MCP Company Research failed:', error);
       return {

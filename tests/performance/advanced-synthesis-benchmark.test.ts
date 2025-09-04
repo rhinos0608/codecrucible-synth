@@ -6,7 +6,11 @@
 
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { performance } from 'perf_hooks';
-import { AdvancedSynthesisEngine, SynthesisMode, WeightingStrategy } from '../../src/core/advanced-synthesis-engine';
+import {
+  AdvancedSynthesisEngine,
+  SynthesisMode,
+  WeightingStrategy,
+} from '../../src/core/advanced-synthesis-engine';
 import { ResponseFactory, AgentResponse } from '../../src/core/response-types';
 
 interface PerformanceBenchmark {
@@ -28,17 +32,17 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
     mockModelClient = {
       generateVoiceResponse: jest.fn().mockResolvedValue({
         content: 'Mock response for performance testing',
-        confidence: 0.8
-      })
+        confidence: 0.8,
+      }),
     };
-    
+
     synthesisEngine = new AdvancedSynthesisEngine(mockModelClient);
     performanceResults = [];
   });
 
   afterEach(() => {
     synthesisEngine.removeAllListeners();
-    
+
     // Log performance results for analysis
     if (performanceResults.length > 0) {
       console.log('\n📊 Performance Benchmark Results:');
@@ -46,7 +50,9 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
         console.log(`\n${result.operation}:`);
         console.log(`  • Samples: ${result.samples}`);
         console.log(`  • Average: ${result.averageTimeMs.toFixed(2)}ms`);
-        console.log(`  • Range: ${result.minTimeMs.toFixed(2)}ms - ${result.maxTimeMs.toFixed(2)}ms`);
+        console.log(
+          `  • Range: ${result.minTimeMs.toFixed(2)}ms - ${result.maxTimeMs.toFixed(2)}ms`
+        );
         console.log(`  • Throughput: ${result.throughputPerSecond.toFixed(2)} ops/sec`);
         if (result.memoryUsedMB) {
           console.log(`  • Memory: ${result.memoryUsedMB.toFixed(2)}MB`);
@@ -93,7 +99,7 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
       minTimeMs: minTime,
       maxTimeMs: maxTime,
       throughputPerSecond: throughput,
-      memoryUsedMB
+      memoryUsedMB,
     };
 
     performanceResults.push(benchmark);
@@ -105,7 +111,7 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
       const smallGroupResponses = [
         ResponseFactory.createAgentResponse('Response 1', { confidence: 0.8, voiceId: 'voice1' }),
         ResponseFactory.createAgentResponse('Response 2', { confidence: 0.85, voiceId: 'voice2' }),
-        ResponseFactory.createAgentResponse('Response 3', { confidence: 0.75, voiceId: 'voice3' })
+        ResponseFactory.createAgentResponse('Response 3', { confidence: 0.75, voiceId: 'voice3' }),
       ];
 
       const benchmark = await runBenchmark(
@@ -125,7 +131,7 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
       const mediumGroupResponses = Array.from({ length: 6 }, (_, i) =>
         ResponseFactory.createAgentResponse(
           `Medium group response ${i + 1} with detailed content for testing performance characteristics.`,
-          { confidence: 0.7 + (i * 0.05), voiceId: `voice${i + 1}`, tokensUsed: 50 + i * 10 }
+          { confidence: 0.7 + i * 0.05, voiceId: `voice${i + 1}`, tokensUsed: 50 + i * 10 }
         )
       );
 
@@ -146,7 +152,7 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
       const largeGroupResponses = Array.from({ length: 12 }, (_, i) =>
         ResponseFactory.createAgentResponse(
           `Large group response ${i + 1} with comprehensive content including multiple perspectives, detailed analysis, and extensive recommendations for the problem at hand.`,
-          { confidence: 0.65 + (i * 0.02), voiceId: `voice${i + 1}`, tokensUsed: 100 + i * 15 }
+          { confidence: 0.65 + i * 0.02, voiceId: `voice${i + 1}`, tokensUsed: 100 + i * 15 }
         )
       );
 
@@ -178,7 +184,7 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
         SynthesisMode.COLLABORATIVE,
         SynthesisMode.CONSENSUS,
         SynthesisMode.HIERARCHICAL,
-        SynthesisMode.DIALECTICAL
+        SynthesisMode.DIALECTICAL,
       ];
 
       const modeBenchmarks: Record<string, PerformanceBenchmark> = {};
@@ -199,29 +205,27 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
       });
 
       // Competitive mode should be fastest (just selects best)
-      expect(modeBenchmarks[SynthesisMode.COMPETITIVE].averageTimeMs)
-        .toBeLessThan(modeBenchmarks[SynthesisMode.DIALECTICAL].averageTimeMs);
+      expect(modeBenchmarks[SynthesisMode.COMPETITIVE].averageTimeMs).toBeLessThan(
+        modeBenchmarks[SynthesisMode.DIALECTICAL].averageTimeMs
+      );
     });
   });
 
   describe('Weighting Strategy Performance', () => {
     test('should benchmark different weighting strategies', async () => {
       const testResponses = Array.from({ length: 8 }, (_, i) =>
-        ResponseFactory.createAgentResponse(
-          `Weighting strategy test response ${i + 1}.`,
-          { 
-            confidence: 0.7 + (i * 0.03), 
-            voiceId: `voice${i + 1}`, 
-            tokensUsed: 40 + (i * 5) 
-          }
-        )
+        ResponseFactory.createAgentResponse(`Weighting strategy test response ${i + 1}.`, {
+          confidence: 0.7 + i * 0.03,
+          voiceId: `voice${i + 1}`,
+          tokensUsed: 40 + i * 5,
+        })
       );
 
       const strategies = [
         WeightingStrategy.CONFIDENCE_BASED,
         WeightingStrategy.EXPERTISE_BASED,
         WeightingStrategy.PERFORMANCE_BASED,
-        WeightingStrategy.BALANCED
+        WeightingStrategy.BALANCED,
       ];
 
       for (const strategy of strategies) {
@@ -242,9 +246,18 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
     test('should handle multiple concurrent synthesis requests', async () => {
       const concurrentRequests = 5;
       const testResponses = [
-        ResponseFactory.createAgentResponse('Concurrent test response 1', { confidence: 0.8, voiceId: 'voice1' }),
-        ResponseFactory.createAgentResponse('Concurrent test response 2', { confidence: 0.85, voiceId: 'voice2' }),
-        ResponseFactory.createAgentResponse('Concurrent test response 3', { confidence: 0.75, voiceId: 'voice3' })
+        ResponseFactory.createAgentResponse('Concurrent test response 1', {
+          confidence: 0.8,
+          voiceId: 'voice1',
+        }),
+        ResponseFactory.createAgentResponse('Concurrent test response 2', {
+          confidence: 0.85,
+          voiceId: 'voice2',
+        }),
+        ResponseFactory.createAgentResponse('Concurrent test response 3', {
+          confidence: 0.75,
+          voiceId: 'voice3',
+        }),
       ];
 
       const benchmark = await runBenchmark(
@@ -270,19 +283,20 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
       const testResponses = Array.from({ length: 6 }, (_, i) =>
         ResponseFactory.createAgentResponse(
           `Quality threshold test response ${i + 1} with varying quality levels.`,
-          { confidence: 0.6 + (i * 0.05), voiceId: `voice${i + 1}` }
+          { confidence: 0.6 + i * 0.05, voiceId: `voice${i + 1}` }
         )
       );
 
       const qualityThresholds = [50, 75, 90];
-      
+
       for (const threshold of qualityThresholds) {
         const benchmark = await runBenchmark(
           `Quality Threshold: ${threshold}%`,
-          () => synthesisEngine.synthesizeAdvanced(testResponses, { 
-            qualityThreshold: threshold,
-            enableAdaptiveSynthesis: true
-          }),
+          () =>
+            synthesisEngine.synthesizeAdvanced(testResponses, {
+              qualityThreshold: threshold,
+              enableAdaptiveSynthesis: true,
+            }),
           10
         );
 
@@ -296,10 +310,10 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
   describe('Memory Usage Analysis', () => {
     test('should maintain stable memory usage across multiple synthesis operations', async () => {
       const testResponses = Array.from({ length: 4 }, (_, i) =>
-        ResponseFactory.createAgentResponse(
-          `Memory usage test response ${i + 1}.`,
-          { confidence: 0.8, voiceId: `voice${i + 1}` }
-        )
+        ResponseFactory.createAgentResponse(`Memory usage test response ${i + 1}.`, {
+          confidence: 0.8,
+          voiceId: `voice${i + 1}`,
+        })
       );
 
       const memoryReadings: number[] = [];
@@ -310,7 +324,7 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
         await synthesisEngine.synthesizeAdvanced(testResponses);
         const memoryAfter = process.memoryUsage().heapUsed;
         memoryReadings.push((memoryAfter - memoryBefore) / 1024 / 1024);
-        
+
         // Force garbage collection if available (for testing)
         if (global.gc) {
           global.gc();
@@ -329,7 +343,7 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
       const secondHalf = memoryReadings.slice(iterations / 2);
       const firstHalfAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
       const secondHalfAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
-      
+
       // Second half shouldn't use significantly more memory than first half
       expect(secondHalfAvg).toBeLessThan(firstHalfAvg * 1.5);
 
@@ -340,7 +354,7 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
         minTimeMs: 0,
         maxTimeMs: 0,
         throughputPerSecond: 0,
-        memoryUsedMB: avgMemoryUsage
+        memoryUsedMB: avgMemoryUsage,
       });
     });
   });
@@ -350,18 +364,16 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
       // Create a large number of responses with varying content sizes
       const stressResponses = Array.from({ length: 20 }, (_, i) => {
         const contentSize = i < 10 ? 'small' : 'large';
-        const content = contentSize === 'small' 
-          ? `Stress test response ${i + 1}.`
-          : `Stress test response ${i + 1} with extensive content: ${'detailed analysis '.repeat(20)}`;
-          
-        return ResponseFactory.createAgentResponse(
-          content,
-          { 
-            confidence: 0.5 + (Math.random() * 0.5), 
-            voiceId: `stress-voice-${i + 1}`, 
-            tokensUsed: contentSize === 'small' ? 20 + i : 200 + i * 10
-          }
-        );
+        const content =
+          contentSize === 'small'
+            ? `Stress test response ${i + 1}.`
+            : `Stress test response ${i + 1} with extensive content: ${'detailed analysis '.repeat(20)}`;
+
+        return ResponseFactory.createAgentResponse(content, {
+          confidence: 0.5 + Math.random() * 0.5,
+          voiceId: `stress-voice-${i + 1}`,
+          tokensUsed: contentSize === 'small' ? 20 + i : 200 + i * 10,
+        });
       });
 
       const benchmark = await runBenchmark(
@@ -379,17 +391,23 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
 
     test('should maintain performance under rapid-fire requests', async () => {
       const rapidFireResponses = [
-        ResponseFactory.createAgentResponse('Rapid response 1', { confidence: 0.8, voiceId: 'rapid1' }),
-        ResponseFactory.createAgentResponse('Rapid response 2', { confidence: 0.85, voiceId: 'rapid2' })
+        ResponseFactory.createAgentResponse('Rapid response 1', {
+          confidence: 0.8,
+          voiceId: 'rapid1',
+        }),
+        ResponseFactory.createAgentResponse('Rapid response 2', {
+          confidence: 0.85,
+          voiceId: 'rapid2',
+        }),
       ];
 
       const rapidFireCount = 50;
       const startTime = performance.now();
-      
+
       const promises = Array.from({ length: rapidFireCount }, () =>
         synthesisEngine.synthesizeAdvanced(rapidFireResponses)
       );
-      
+
       const results = await Promise.all(promises);
       const endTime = performance.now();
       const totalTime = endTime - startTime;
@@ -411,7 +429,7 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
         minTimeMs: 0,
         maxTimeMs: 0,
         throughputPerSecond: 1000 / avgTimePerRequest,
-        memoryUsedMB: process.memoryUsage().heapUsed / 1024 / 1024
+        memoryUsedMB: process.memoryUsage().heapUsed / 1024 / 1024,
       });
     });
   });
@@ -430,7 +448,7 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
         ResponseFactory.createAgentResponse(
           'Third baseline response maintaining consistent performance characteristics.',
           { confidence: 0.82, voiceId: 'baseline3', tokensUsed: 48 }
-        )
+        ),
       ];
 
       const benchmark = await runBenchmark(
@@ -445,15 +463,18 @@ describe('Advanced Synthesis Performance Benchmarks', () => {
         maxAverageTimeMs: 150,
         minThroughputPerSecond: 6,
         maxMemoryUsageMB: 15,
-        maxVariabilityPercent: 1000 // Max 1000% variance between min and max times (very permissive for test environment)
+        maxVariabilityPercent: 1000, // Max 1000% variance between min and max times (very permissive for test environment)
       };
 
       expect(benchmark.averageTimeMs).toBeLessThan(baselineExpectations.maxAverageTimeMs);
-      expect(benchmark.throughputPerSecond).toBeGreaterThan(baselineExpectations.minThroughputPerSecond);
+      expect(benchmark.throughputPerSecond).toBeGreaterThan(
+        baselineExpectations.minThroughputPerSecond
+      );
       expect(benchmark.memoryUsedMB || 0).toBeLessThan(baselineExpectations.maxMemoryUsageMB);
 
       // Check time variability
-      const variability = ((benchmark.maxTimeMs - benchmark.minTimeMs) / benchmark.averageTimeMs) * 100;
+      const variability =
+        ((benchmark.maxTimeMs - benchmark.minTimeMs) / benchmark.averageTimeMs) * 100;
       expect(variability).toBeLessThan(baselineExpectations.maxVariabilityPercent);
 
       // Log baseline for future reference

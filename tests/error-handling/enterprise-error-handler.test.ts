@@ -7,13 +7,13 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import {
   EnterpriseErrorHandler,
-  EnterpriseErrorConfig
+  EnterpriseErrorConfig,
 } from '../../src/core/error-handling/enterprise-error-handler.js';
 import {
   StructuredError,
   ErrorCategory,
   ErrorSeverity,
-  ServiceResponse
+  ServiceResponse,
 } from '../../src/core/error-handling/structured-error-system.js';
 import { SecurityAuditLogger } from '../../src/core/security/security-audit-logger.js';
 
@@ -28,7 +28,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
     auditLogger = new SecurityAuditLogger({
       enableRealTimeLogging: true,
       enableMetrics: true,
-      persistAuditTrail: true
+      persistAuditTrail: true,
     });
 
     testConfig = {
@@ -38,7 +38,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
       maxRetryAttempts: 3,
       circuitBreakerThreshold: 5,
       rateLimitingEnabled: true,
-      securityValidationEnabled: true
+      securityValidationEnabled: true,
     };
 
     errorHandler = new EnterpriseErrorHandler(auditLogger, undefined, testConfig);
@@ -54,7 +54,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
   describe('Real Enterprise Error Processing', () => {
     it('should handle standard JavaScript errors with enterprise features', async () => {
       const startTime = Date.now();
-      
+
       const testError = new Error('Database connection timeout');
       const context = {
         userId: 'enterprise-user-123',
@@ -63,11 +63,11 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
         operation: 'database_query',
         resource: 'user_profiles',
         ipAddress: '192.168.1.100',
-        userAgent: 'CodeCrucible-CLI/4.0.0'
+        userAgent: 'CodeCrucible-CLI/4.0.0',
       };
 
       const structuredError = await errorHandler.handleEnterpriseError(testError, context);
-      
+
       const duration = Date.now() - startTime;
       performanceMetrics.push({ operation: 'standard_error_handling', duration, success: true });
 
@@ -79,12 +79,12 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
       expect(structuredError.context).toMatchObject(context);
       expect(structuredError.severity).toBeDefined();
       expect(structuredError.category).toBeDefined();
-      
+
       // Verify audit logging
       expect(structuredError.auditTrail).toBeDefined();
       expect(structuredError.auditTrail.userId).toBe(context.userId);
       expect(structuredError.auditTrail.sessionId).toBe(context.sessionId);
-      
+
       // Performance requirement: <100ms for error processing
       expect(duration).toBeLessThan(100);
     });
@@ -95,26 +95,26 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
           error: new Error('ECONNREFUSED: Connection refused'),
           expectedCategory: ErrorCategory.INFRASTRUCTURE,
           expectedSeverity: ErrorSeverity.HIGH,
-          context: { operation: 'api_call', service: 'external_api' }
+          context: { operation: 'api_call', service: 'external_api' },
         },
         {
           error: new Error('Unauthorized access attempt'),
           expectedCategory: ErrorCategory.SECURITY,
           expectedSeverity: ErrorSeverity.CRITICAL,
-          context: { operation: 'authentication', resource: 'admin_panel' }
+          context: { operation: 'authentication', resource: 'admin_panel' },
         },
         {
           error: new Error('Invalid JSON format in request'),
           expectedCategory: ErrorCategory.VALIDATION,
           expectedSeverity: ErrorSeverity.MEDIUM,
-          context: { operation: 'input_processing', source: 'user_input' }
+          context: { operation: 'input_processing', source: 'user_input' },
         },
         {
           error: new Error('TypeError: Cannot read property of undefined'),
           expectedCategory: ErrorCategory.APPLICATION,
           expectedSeverity: ErrorSeverity.HIGH,
-          context: { operation: 'code_execution', component: 'data_processor' }
-        }
+          context: { operation: 'code_execution', component: 'data_processor' },
+        },
       ];
 
       for (const testCase of errorTestCases) {
@@ -126,7 +126,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
         expect(structuredError.category).toBe(testCase.expectedCategory);
         expect(structuredError.severity).toBe(testCase.expectedSeverity);
         expect(structuredError.context).toMatchObject(testCase.context);
-        
+
         // Verify enterprise metadata
         expect(structuredError.metadata.source).toBe('enterprise_error_handler');
         expect(structuredError.metadata.processingTime).toBeDefined();
@@ -136,19 +136,20 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
 
     it('should implement circuit breaker pattern for repeated failures', async () => {
       const failingService = 'unreliable_service';
-      const baseContext = { 
+      const baseContext = {
         operation: 'service_call',
         service: failingService,
-        userId: 'test-user'
+        userId: 'test-user',
       };
 
       // Generate multiple failures to trigger circuit breaker
       const failures: StructuredError[] = [];
-      
-      for (let i = 0; i < 7; i++) { // Exceed threshold of 5
+
+      for (let i = 0; i < 7; i++) {
+        // Exceed threshold of 5
         const error = new Error(`Service failure ${i + 1}`);
         const context = { ...baseContext, attemptNumber: i + 1 };
-        
+
         const structuredError = await errorHandler.handleEnterpriseError(error, context);
         failures.push(structuredError);
       }
@@ -156,7 +157,9 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
       // Check circuit breaker activation
       const circuitBreakerStatus = await errorHandler.getCircuitBreakerStatus(failingService);
       expect(circuitBreakerStatus.state).toBe('OPEN');
-      expect(circuitBreakerStatus.failureCount).toBeGreaterThanOrEqual(testConfig.circuitBreakerThreshold);
+      expect(circuitBreakerStatus.failureCount).toBeGreaterThanOrEqual(
+        testConfig.circuitBreakerThreshold
+      );
       expect(circuitBreakerStatus.lastFailureTime).toBeInstanceOf(Date);
 
       // Test that subsequent calls are fast-failed
@@ -173,10 +176,10 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
 
     it('should implement rate limiting for error-prone operations', async () => {
       const rateLimitedOperation = 'bulk_processing';
-      const context = { 
+      const context = {
         operation: rateLimitedOperation,
         userId: 'heavy-user',
-        rateLimitKey: 'user:heavy-user:bulk_processing'
+        rateLimitKey: 'user:heavy-user:bulk_processing',
       };
 
       // Generate rapid-fire errors to test rate limiting
@@ -187,7 +190,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
         const error = new Error(`Rapid error ${i + 1}`);
         const errorResult = await errorHandler.handleEnterpriseError(error, {
           ...context,
-          errorIndex: i
+          errorIndex: i,
         });
         rapidErrors.push(errorResult);
       }
@@ -216,7 +219,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
         { category: 'NETWORK', severity: 'MEDIUM', count: 8 },
         { category: 'VALIDATION', severity: 'LOW', count: 12 },
         { category: 'SECURITY', severity: 'CRITICAL', count: 2 },
-        { category: 'APPLICATION', severity: 'HIGH', count: 6 }
+        { category: 'APPLICATION', severity: 'HIGH', count: 6 },
       ];
 
       for (const scenario of errorScenarios) {
@@ -225,7 +228,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
           await errorHandler.handleEnterpriseError(error, {
             operation: scenario.category.toLowerCase(),
             severity: scenario.severity,
-            userId: `user-${i}`
+            userId: `user-${i}`,
           });
         }
       }
@@ -239,7 +242,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
         errorTrends: expect.any(Object),
         topErrorTypes: expect.any(Array),
         averageResolutionTime: expect.any(Number),
-        systemHealthScore: expect.any(Number)
+        systemHealthScore: expect.any(Number),
       });
 
       // Verify metrics accuracy
@@ -257,14 +260,14 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
     it('should generate enterprise-ready error reports and analytics', async () => {
       const reportingPeriod = {
         startTime: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
-        endTime: new Date()
+        endTime: new Date(),
       };
 
       // Generate sample errors for reporting
       const sampleErrors = [
         { type: 'TimeoutError', frequency: 'high', impact: 'medium' },
         { type: 'ValidationError', frequency: 'medium', impact: 'low' },
-        { type: 'SecurityViolation', frequency: 'low', impact: 'critical' }
+        { type: 'SecurityViolation', frequency: 'low', impact: 'critical' },
       ];
 
       for (const sample of sampleErrors) {
@@ -284,24 +287,24 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
           totalIncidents: expect.any(Number),
           criticalIssues: expect.any(Number),
           systemAvailability: expect.any(Number),
-          mttr: expect.any(Number) // Mean Time To Resolution
+          mttr: expect.any(Number), // Mean Time To Resolution
         }),
         detailedAnalysis: expect.objectContaining({
           errorDistribution: expect.any(Object),
           impactAssessment: expect.any(Object),
           rootCauseAnalysis: expect.any(Array),
-          recommendations: expect.any(Array)
+          recommendations: expect.any(Array),
         }),
         trends: expect.objectContaining({
           errorVelocity: expect.any(Array),
           severityTrends: expect.any(Object),
-          categoryTrends: expect.any(Object)
+          categoryTrends: expect.any(Object),
         }),
         complianceMetrics: expect.objectContaining({
           slaCompliance: expect.any(Number),
           auditScore: expect.any(Number),
-          governanceAlignment: expect.any(String)
-        })
+          governanceAlignment: expect.any(String),
+        }),
       });
 
       // Verify report quality
@@ -313,9 +316,9 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
 
     it('should integrate with enterprise alerting and notification systems', async () => {
       const alertsReceived: any[] = [];
-      
+
       // Register enterprise alert handler
-      errorHandler.registerAlertHandler((alert) => {
+      errorHandler.registerAlertHandler(alert => {
         alertsReceived.push(alert);
       });
 
@@ -323,16 +326,16 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
       const criticalErrors = [
         {
           error: new Error('CRITICAL: Database cluster is down'),
-          context: { severity: 'CRITICAL', service: 'database', impact: 'service_outage' }
+          context: { severity: 'CRITICAL', service: 'database', impact: 'service_outage' },
         },
         {
           error: new Error('SECURITY: Multiple failed authentication attempts'),
-          context: { severity: 'CRITICAL', service: 'auth', impact: 'security_incident' }
+          context: { severity: 'CRITICAL', service: 'auth', impact: 'security_incident' },
         },
         {
           error: new Error('SYSTEM: Memory usage exceeded 95%'),
-          context: { severity: 'CRITICAL', service: 'system', impact: 'performance_degradation' }
-        }
+          context: { severity: 'CRITICAL', service: 'system', impact: 'performance_degradation' },
+        },
       ];
 
       for (const { error, context } of criticalErrors) {
@@ -349,7 +352,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
           message: expect.any(String),
           context: expect.any(Object),
           escalationLevel: expect.any(Number),
-          notificationChannels: expect.any(Array)
+          notificationChannels: expect.any(Array),
         });
 
         expect(['CRITICAL', 'HIGH']).toContain(alert.severity);
@@ -370,7 +373,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
         const context = {
           operation: 'load_test',
           errorIndex: i,
-          userId: `load-user-${i % 10}` // Distribute across 10 users
+          userId: `load-user-${i % 10}`, // Distribute across 10 users
         };
         return errorHandler.handleEnterpriseError(error, context);
       });
@@ -381,7 +384,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
 
       expect(results.length).toBe(errorVolume);
       expect(averageLatency).toBeLessThan(maxAcceptableLatency);
-      
+
       // Verify all errors were processed correctly
       results.forEach(result => {
         expect(result).toBeInstanceOf(StructuredError);
@@ -389,7 +392,9 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
         expect(result.auditTrail).toBeDefined();
       });
 
-      console.log(`High volume performance: ${averageLatency.toFixed(2)}ms average latency for ${errorVolume} errors`);
+      console.log(
+        `High volume performance: ${averageLatency.toFixed(2)}ms average latency for ${errorVolume} errors`
+      );
     });
 
     it('should handle memory efficiently during extended operation', async () => {
@@ -400,7 +405,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
         const error = new Error(`Extended operation error ${i + 1}`);
         await errorHandler.handleEnterpriseError(error, {
           operation: 'memory_test',
-          iteration: i
+          iteration: i,
         });
 
         // Trigger cleanup every 200 operations
@@ -415,7 +420,9 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
 
       // Memory increase should be reasonable (<2KB per operation)
       expect(memoryIncreasePerOperation).toBeLessThan(2048);
-      console.log(`Memory efficiency: ${(memoryIncreasePerOperation / 1024).toFixed(2)}KB per error operation`);
+      console.log(
+        `Memory efficiency: ${(memoryIncreasePerOperation / 1024).toFixed(2)}KB per error operation`
+      );
     });
 
     it('should provide real-time error streaming for enterprise monitoring', async () => {
@@ -435,9 +442,9 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
         const error = new Error(`Stream test error ${i + 1}`);
         await errorHandler.handleEnterpriseError(error, {
           operation: 'stream_test',
-          streamIndex: i
+          streamIndex: i,
         });
-        
+
         // Small delay to test streaming
         await new Promise(resolve => setTimeout(resolve, 10));
       }
@@ -447,12 +454,14 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
       unsubscribe();
 
       expect(errorStream.length).toBe(streamTestErrors);
-      
+
       // Verify streaming latency
       const averageStreamLatency = streamLatency.reduce((a, b) => a + b, 0) / streamLatency.length;
       expect(averageStreamLatency).toBeLessThan(50); // <50ms stream latency
 
-      console.log(`Error streaming performance: ${averageStreamLatency.toFixed(2)}ms average latency`);
+      console.log(
+        `Error streaming performance: ${averageStreamLatency.toFixed(2)}ms average latency`
+      );
     });
   });
 
@@ -461,7 +470,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
       const enterpriseLogEntries: any[] = [];
 
       // Mock enterprise logging integration
-      errorHandler.registerEnterpriseLogger((logEntry) => {
+      errorHandler.registerEnterpriseLogger(logEntry => {
         enterpriseLogEntries.push(logEntry);
       });
 
@@ -471,7 +480,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
         costCenter: 'DEVOPS-001',
         complianceLevel: 'SOX',
         dataClassification: 'Internal',
-        operationalImpact: 'Service Degradation'
+        operationalImpact: 'Service Degradation',
       };
 
       await errorHandler.handleEnterpriseError(enterpriseError, enterpriseContext);
@@ -486,9 +495,9 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
           costCenter: 'DEVOPS-001',
           complianceLevel: 'SOX',
           errorId: expect.any(String),
-          correlationId: expect.any(String)
+          correlationId: expect.any(String),
         }),
-        tags: expect.arrayContaining(['enterprise', 'error-handling'])
+        tags: expect.arrayContaining(['enterprise', 'error-handling']),
       });
     });
 
@@ -501,8 +510,8 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
             complianceFramework: 'SOX',
             dataType: 'financial',
             userRole: 'analyst',
-            accessLevel: 'restricted'
-          }
+            accessLevel: 'restricted',
+          },
         },
         {
           name: 'GDPR Personal Data Processing',
@@ -511,8 +520,8 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
             complianceFramework: 'GDPR',
             dataType: 'personal',
             consentStatus: 'revoked',
-            processingPurpose: 'analytics'
-          }
+            processingPurpose: 'analytics',
+          },
         },
         {
           name: 'HIPAA Health Information Access',
@@ -521,9 +530,9 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
             complianceFramework: 'HIPAA',
             dataType: 'health',
             patientConsent: 'required',
-            accessReason: 'unauthorized'
-          }
-        }
+            accessReason: 'unauthorized',
+          },
+        },
       ];
 
       const complianceViolations: any[] = [];
@@ -538,20 +547,20 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
           complianceViolations.push({
             framework: scenario.context.complianceFramework,
             violation: structuredError.complianceViolation,
-            remediation: structuredError.recommendedActions
+            remediation: structuredError.recommendedActions,
           });
         }
       }
 
       expect(complianceViolations.length).toBe(complianceScenarios.length);
-      
+
       complianceViolations.forEach(violation => {
         expect(['SOX', 'GDPR', 'HIPAA']).toContain(violation.framework);
         expect(violation.violation).toMatchObject({
           type: expect.any(String),
           severity: expect.any(String),
           description: expect.any(String),
-          regulations: expect.any(Array)
+          regulations: expect.any(Array),
         });
         expect(violation.remediation.length).toBeGreaterThan(0);
       });
@@ -563,7 +572,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
         { type: 'service_outage', impact: 'high', businessValue: 10000 },
         { type: 'data_breach_attempt', impact: 'critical', businessValue: 50000 },
         { type: 'performance_degradation', impact: 'medium', businessValue: 5000 },
-        { type: 'compliance_violation', impact: 'critical', businessValue: 25000 }
+        { type: 'compliance_violation', impact: 'critical', businessValue: 25000 },
       ];
 
       for (const testError of executiveTestErrors) {
@@ -572,7 +581,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
           {
             businessImpact: testError.impact,
             estimatedBusinessValue: testError.businessValue,
-            operationalCategory: testError.type
+            operationalCategory: testError.type,
           }
         );
       }
@@ -582,28 +591,28 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
       expect(executiveDashboard).toMatchObject({
         kpis: expect.objectContaining({
           systemReliability: expect.any(Number), // Percentage
-          incidentResponse: expect.any(Number),  // Average time
-          businessImpact: expect.any(Number),    // Financial impact
-          complianceScore: expect.any(Number),   // Compliance percentage
-          customerSatisfaction: expect.any(Number) // Customer impact score
+          incidentResponse: expect.any(Number), // Average time
+          businessImpact: expect.any(Number), // Financial impact
+          complianceScore: expect.any(Number), // Compliance percentage
+          customerSatisfaction: expect.any(Number), // Customer impact score
         }),
         trends: expect.objectContaining({
           errorVelocity: expect.any(Array),
           impactTrends: expect.any(Object),
-          resolutionTimes: expect.any(Array)
+          resolutionTimes: expect.any(Array),
         }),
         businessMetrics: expect.objectContaining({
           revenueAtRisk: expect.any(Number),
           operationalEfficiency: expect.any(Number),
-          riskExposure: expect.any(String)
+          riskExposure: expect.any(String),
         }),
         recommendations: expect.arrayContaining([
           expect.objectContaining({
             priority: expect.any(String),
             businessJustification: expect.any(String),
-            estimatedROI: expect.any(Number)
-          })
-        ])
+            estimatedROI: expect.any(Number),
+          }),
+        ]),
       });
 
       // Verify executive KPIs are within reasonable ranges
@@ -619,7 +628,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
       // Analyze collected performance metrics
       const successfulOperations = performanceMetrics.filter(m => m.success);
       const latencies = successfulOperations.map(m => m.duration);
-      
+
       if (latencies.length > 0) {
         const averageLatency = latencies.reduce((a, b) => a + b, 0) / latencies.length;
         const maxLatency = Math.max(...latencies);
@@ -640,8 +649,8 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
     it('should demonstrate enterprise reliability and availability', async () => {
       const reliabilityTest = {
         duration: 10000, // 10 seconds
-        errorRate: 10,   // 10 errors per second
-        expectedAvailability: 99.9 // 99.9% availability
+        errorRate: 10, // 10 errors per second
+        expectedAvailability: 99.9, // 99.9% availability
       };
 
       const startTime = Date.now();
@@ -654,7 +663,7 @@ describe('Enterprise Error Handler - Comprehensive Real Tests', () => {
           const error = new Error(`Reliability test error ${errors.length + 1}`);
           const result = await errorHandler.handleEnterpriseError(error, {
             operation: 'reliability_test',
-            timestamp: new Date()
+            timestamp: new Date(),
           });
           errors.push(result);
         } catch (processingError) {

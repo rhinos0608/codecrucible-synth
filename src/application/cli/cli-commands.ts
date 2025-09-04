@@ -17,7 +17,6 @@ import { ServerModeInterface } from '../../server/server-mode.js';
 import { analysisWorkerPool } from './analysis-worker-pool.js';
 import { randomUUID } from 'crypto';
 
-
 export class CLICommands {
   private context: CLIContext;
   private workingDirectory: string;
@@ -151,18 +150,23 @@ export class CLICommands {
 
         if (models.length > 0) {
           console.log(chalk.cyan('📋 Available Models:'));
-          models.forEach((model: { name?: string; id?: string; size?: string; modified_at?: string }, index: number) => {
-            // TODO: Import AIModel from unified-types
-            console.log(chalk.white(`  ${index + 1}. ${model.name || model.id || model}`));
-            if (model?.size) {
-              console.log(chalk.gray(`     Size: ${model.size}`));
+          models.forEach(
+            (
+              model: { name?: string; id?: string; size?: string; modified_at?: string },
+              index: number
+            ) => {
+              // TODO: Import AIModel from unified-types
+              console.log(chalk.white(`  ${index + 1}. ${model.name || model.id || model}`));
+              if (model?.size) {
+                console.log(chalk.gray(`     Size: ${model.size}`));
+              }
+              if (model.modified_at) {
+                console.log(
+                  chalk.gray(`     Modified: ${new Date(model.modified_at).toLocaleDateString()}`)
+                );
+              }
             }
-            if (model.modified_at) {
-              console.log(
-                chalk.gray(`     Modified: ${new Date(model.modified_at).toLocaleDateString()}`)
-              );
-            }
-          });
+          );
         } else {
           console.log(chalk.yellow('No models found. Make sure your AI service is running.'));
         }
@@ -206,11 +210,12 @@ export class CLICommands {
       }
 
       // Generate multi-voice solutions
-      const results: MultiVoiceSolutionResult[] = await this.context.voiceSystem.generateMultiVoiceSolutions(
-        Array.isArray(voices) ? voices : [voices],
-        prompt,
-        { files: [] }
-      );
+      const results: MultiVoiceSolutionResult[] =
+        await this.context.voiceSystem.generateMultiVoiceSolutions(
+          Array.isArray(voices) ? voices : [voices],
+          prompt,
+          { files: [] }
+        );
 
       spinner.succeed('Code generation complete');
 
@@ -239,7 +244,10 @@ export class CLICommands {
   /**
    * Handle file and directory analysis
    */
-  public async handleAnalyze(files: readonly string[] = [], options: Readonly<CLIOptions> = {}): Promise<void> {
+  public async handleAnalyze(
+    files: readonly string[] = [],
+    options: Readonly<CLIOptions> = {}
+  ): Promise<void> {
     if (files.length === 0) {
       // Use our real codebase analysis for directory analysis
       console.log(chalk.cyan('🔍 Performing comprehensive codebase analysis...'));
@@ -326,10 +334,7 @@ export class CLICommands {
     function isAnalysisResult(obj: unknown): obj is AnalysisResult {
       if (typeof obj !== 'object' || obj === null) return false;
       const o = obj as { totalFiles?: unknown; chunks?: unknown };
-      return (
-        typeof o.totalFiles === 'number' &&
-        Array.isArray(o.chunks)
-      );
+      return typeof o.totalFiles === 'number' && Array.isArray(o.chunks);
     }
 
     console.log(chalk.bold(`\n📁 Analyzing Directory: ${dirPath}`));
@@ -376,33 +381,33 @@ export class CLICommands {
 
         // Execute analysis in worker thread
         try {
-            // Use worker pool for analysis
-            const result = await analysisWorkerPool.runTask({
-              ...analysisTask,
-              config: {
-                endpoint: this.context.config.model?.endpoint
-                  ? this.context.config.model.endpoint
-                  : 'http://localhost:11434',
-                providers: [{ type: 'ollama' as const }],
-                executionMode: 'auto' as const,
-                fallbackChain: ['ollama' as const],
-                performanceThresholds: {
-                  fastModeMaxTokens: 2048,
-                  timeoutMs: 300000, // 5 minutes for complex operations
-                  maxConcurrentRequests: 2,
-                },
-                security: {
-                  enableSandbox: true,
-                  maxInputLength: 100000,
-                  allowedCommands: ['node', 'npm', 'git'],
-                },
-              }
-            }) as {
-              success: boolean;
-              result?: unknown;
-              error?: unknown;
-              duration?: number;
-            };
+          // Use worker pool for analysis
+          const result = (await analysisWorkerPool.runTask({
+            ...analysisTask,
+            config: {
+              endpoint: this.context.config.model?.endpoint
+                ? this.context.config.model.endpoint
+                : 'http://localhost:11434',
+              providers: [{ type: 'ollama' as const }],
+              executionMode: 'auto' as const,
+              fallbackChain: ['ollama' as const],
+              performanceThresholds: {
+                fastModeMaxTokens: 2048,
+                timeoutMs: 300000, // 5 minutes for complex operations
+                maxConcurrentRequests: 2,
+              },
+              security: {
+                enableSandbox: true,
+                maxInputLength: 100000,
+                allowedCommands: ['node', 'npm', 'git'],
+              },
+            },
+          })) as {
+            success: boolean;
+            result?: unknown;
+            error?: unknown;
+            duration?: number;
+          };
 
           if (result.success && isAnalysisResult(result.result)) {
             spinner.succeed(`Analysis complete - processed ${result.result.totalFiles} files`);
@@ -410,21 +415,25 @@ export class CLICommands {
             console.log(chalk.green('\n✅ Analysis Results:'));
             console.log(chalk.cyan(`📊 Files processed: ${result.result.totalFiles}`));
             console.log(chalk.cyan(`⏱️ Duration: ${result.duration}ms`));
-            console.log(
-              chalk.cyan(
-                `📈 Success rate: ${result.result.summary?.successRate ?? 0}%`
-              )
-            );
+            console.log(chalk.cyan(`📈 Success rate: ${result.result.summary?.successRate ?? 0}%`));
 
             // Display chunk results
             result.result.chunks.forEach((chunk: unknown, index: number) => {
               if (typeof chunk !== 'object' || chunk === null) return;
-              const c = chunk as { error?: unknown; analysis?: Array<{ content: string }>; files?: Array<unknown> };
+              const c = chunk as {
+                error?: unknown;
+                analysis?: Array<{ content: string }>;
+                files?: Array<unknown>;
+              };
               console.log(chalk.yellow(`\n📦 Chunk ${index + 1}:`));
               if (c.error) {
                 console.log(chalk.red(`❌ Error: ${c.error}`));
               } else if (c.analysis && Array.isArray(c.analysis)) {
-                console.log(chalk.green(`✅ Successfully analyzed ${Array.isArray(c.files) ? c.files.length : 0} files`));
+                console.log(
+                  chalk.green(
+                    `✅ Successfully analyzed ${Array.isArray(c.files) ? c.files.length : 0} files`
+                  )
+                );
                 if (c.analysis.length > 0 && typeof c.analysis[0].content === 'string') {
                   console.log(chalk.white(`${c.analysis[0].content.substring(0, 200)}...`));
                 }
@@ -523,5 +532,4 @@ export class CLICommands {
       .map(([ext, count]) => `${ext}(${count})`)
       .join(', ');
   }
-
 }

@@ -196,7 +196,10 @@ export class GitMCPServer extends BaseMCPServer {
       git_push: this.handleGitPush.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
       git_pull: this.handleGitPull.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
       git_branch: this.handleGitBranch.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_checkout: this.handleGitCheckout.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
+      git_checkout: this.handleGitCheckout.bind(this) as unknown as ToolHandler<
+        ToolRequest,
+        unknown
+      >,
       git_merge: this.handleGitMerge.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
       git_rebase: this.handleGitRebase.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
       git_reset: this.handleGitReset.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,

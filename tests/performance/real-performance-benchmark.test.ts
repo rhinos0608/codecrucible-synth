@@ -24,7 +24,7 @@ describe('Real Performance Benchmarks', () => {
     console.log('\n📊 PERFORMANCE BENCHMARK REPORT:');
     console.log('================================');
     console.log(report);
-    
+
     // Cleanup
     requestBatcher.shutdown();
     responseCache.shutdown();
@@ -44,42 +44,42 @@ describe('Real Performance Benchmarks', () => {
     it('should demonstrate cache performance benefits', async () => {
       // Test without cache (clearing between each)
       const uncachedTimes: number[] = [];
-      
+
       for (const prompt of testPrompts) {
         responseCache.clear(); // Force cache miss
-        
+
         const startTime = Date.now();
-        
+
         // Simulate response processing
         responseCache.set(prompt, 'test-model', 'test-provider', {
           content: 'test response for ' + prompt,
-          usage: { totalTokens: 50 }
+          usage: { totalTokens: 50 },
         });
-        
+
         await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 50)); // Simulate API delay
-        
+
         const endTime = Date.now();
         uncachedTimes.push(endTime - startTime);
       }
 
       // Test with cache (keeping cache between requests)
       const cachedTimes: number[] = [];
-      
+
       for (const prompt of testPrompts) {
         const startTime = Date.now();
-        
+
         const cached = responseCache.get(prompt, 'test-model', 'test-provider');
-        
+
         if (!cached) {
           // Cache miss - simulate API call
           responseCache.set(prompt, 'test-model', 'test-provider', {
             content: 'test response for ' + prompt,
-            usage: { totalTokens: 50 }
+            usage: { totalTokens: 50 },
           });
           await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 50));
         }
         // Cache hit - immediate response
-        
+
         const endTime = Date.now();
         cachedTimes.push(endTime - startTime);
       }
@@ -103,39 +103,39 @@ describe('Real Performance Benchmarks', () => {
     it('should demonstrate batching efficiency', async () => {
       const testRequests = [
         'write a function',
-        'create a class', 
+        'create a class',
         'implement a method',
         'write a function', // Similar to first
-        'create a component' // Similar to second
+        'create a component', // Similar to second
       ];
 
       // Simulate individual processing times
       const individualTimes: number[] = [];
-      
+
       for (const request of testRequests) {
         const startTime = Date.now();
-        
+
         // Simulate individual request processing
         await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 100));
-        
+
         const endTime = Date.now();
         individualTimes.push(endTime - startTime);
       }
 
-      // Simulate batch processing  
+      // Simulate batch processing
       const batchStartTime = Date.now();
-      
+
       // Batch similar requests together (simulate intelligent grouping)
       const batches: string[][] = [];
       const processed = new Set<string>();
-      
+
       for (const request of testRequests) {
         if (processed.has(request)) continue;
-        
-        const similarRequests = testRequests.filter(r => 
-          r.includes(request.split(' ')[0]) || request.includes(r.split(' ')[0])
+
+        const similarRequests = testRequests.filter(
+          r => r.includes(request.split(' ')[0]) || request.includes(r.split(' ')[0])
         );
-        
+
         if (similarRequests.length > 1) {
           batches.push(similarRequests);
           similarRequests.forEach(r => processed.add(r));
@@ -151,7 +151,7 @@ describe('Real Performance Benchmarks', () => {
         const parallelTime = Math.max(...batch.map(() => Math.random() * 100 + 50)); // Parallel execution
         await new Promise(resolve => setTimeout(resolve, batchProcessingTime + parallelTime));
       }
-      
+
       const batchEndTime = Date.now();
       const totalBatchTime = batchEndTime - batchStartTime;
 
@@ -179,7 +179,7 @@ describe('Real Performance Benchmarks', () => {
         { name: 'Fast requests', baseTime: 50, errorRate: 0.1 },
         { name: 'Medium requests', baseTime: 150, errorRate: 0.05 },
         { name: 'Slow requests', baseTime: 500, errorRate: 0.02 },
-        { name: 'Improving requests', baseTime: 200, errorRate: 0.01 }
+        { name: 'Improving requests', baseTime: 200, errorRate: 0.01 },
       ];
 
       for (const scenario of scenarios) {
@@ -190,7 +190,7 @@ describe('Real Performance Benchmarks', () => {
 
           adaptiveTuner.recordMetrics(responseTime, throughput, errorRate);
           metrics.push({ responseTime, throughput, errorRate });
-          
+
           await new Promise(resolve => setTimeout(resolve, 10)); // Small delay
         }
       }
@@ -220,14 +220,14 @@ describe('Real Performance Benchmarks', () => {
       const coldStartTimes: number[] = [];
       for (const model of testModels) {
         const startTime = Date.now();
-        
+
         // Simulate cold model loading
         await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500));
-        
+
         const endTime = Date.now();
         const responseTime = endTime - startTime;
         coldStartTimes.push(responseTime);
-        
+
         modelPreloader.recordModelUsage(model, provider, responseTime, true);
       }
 
@@ -235,20 +235,22 @@ describe('Real Performance Benchmarks', () => {
       const warmStartTimes: number[] = [];
       for (const model of testModels) {
         const startTime = Date.now();
-        
+
         // Simulate warm model (much faster)
         await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 50));
-        
+
         const endTime = Date.now();
         const responseTime = endTime - startTime;
         warmStartTimes.push(responseTime);
-        
+
         modelPreloader.recordModelUsage(model, provider, responseTime, true);
       }
 
       // Calculate warmup benefits
-      const avgColdStart = coldStartTimes.reduce((sum, time) => sum + time, 0) / coldStartTimes.length;
-      const avgWarmStart = warmStartTimes.reduce((sum, time) => sum + time, 0) / warmStartTimes.length;
+      const avgColdStart =
+        coldStartTimes.reduce((sum, time) => sum + time, 0) / coldStartTimes.length;
+      const avgWarmStart =
+        warmStartTimes.reduce((sum, time) => sum + time, 0) / warmStartTimes.length;
       const warmupBenefit = ((avgColdStart - avgWarmStart) / avgColdStart) * 100;
 
       const stats = modelPreloader.getWarmupStats();

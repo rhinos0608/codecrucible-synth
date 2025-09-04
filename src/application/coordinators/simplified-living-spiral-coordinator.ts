@@ -71,7 +71,9 @@ export class SimplifiedLivingSpiralCoordinator {
    * Execute the complete Living Spiral process
    * Single responsibility: Process orchestration
    */
-  public async executeSpiralProcess(input: Readonly<SimplifiedSpiralInput>): Promise<SimplifiedSpiralOutput> {
+  public async executeSpiralProcess(
+    input: Readonly<SimplifiedSpiralInput>
+  ): Promise<SimplifiedSpiralOutput> {
     const startTime = Date.now();
     const config = { ...this.defaultConfig, ...input.config };
 
@@ -123,10 +125,9 @@ export class SimplifiedLivingSpiralCoordinator {
       [...iterations],
       config.maxIterations
     );
-    const recommendations = this.convergenceAnalyzer.getIterationRecommendations(
-      finalAnalysis,
-      [...iterations]
-    );
+    const recommendations = this.convergenceAnalyzer.getIterationRecommendations(finalAnalysis, [
+      ...iterations,
+    ]);
 
     return {
       finalSolution: iterations[iterations.length - 1]?.content || '',
@@ -207,7 +208,10 @@ export class SimplifiedLivingSpiralCoordinator {
     };
   }
 
-  private prepareNextIterationInput(iteration: IterationResult, analysis: { reasoning: string }): string {
+  private prepareNextIterationInput(
+    iteration: IterationResult,
+    analysis: { reasoning: string }
+  ): string {
     return `Based on the previous iteration results, please improve upon this solution:
 
 PREVIOUS OUTPUT:
@@ -227,7 +231,7 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
 
   private extractUniqueVoices(iterations: IterationResult[]): string[] {
     const allVoices = iterations.flatMap(
-      (_iter: Readonly<IterationResult>) => 
+      (_iter: Readonly<IterationResult>) =>
         // Extract voices from iteration metadata (simplified)
         ['explorer', 'architect', 'implementor', 'guardian'] // Default voices used
     );
@@ -289,5 +293,3 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
     );
   }
 }
-
-

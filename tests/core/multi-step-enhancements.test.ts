@@ -6,17 +6,17 @@
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import { FastMultiStepExecutor } from '../../src/core/tools/fast-multi-step-executor.js';
 import { ContextAwareWorkflowManager } from '../../src/core/tools/context-aware-workflow-manager.js';
-import { 
+import {
   ArchitectEditorCoordinator,
   Architect,
-  Editor 
+  Editor,
 } from '../../src/core/patterns/architect-editor-pattern.js';
 import { UnifiedModelClient } from '../../src/core/client.js';
 
 // Mock the model client
 const mockModelClient = {
   generate: jest.fn(),
-  generateText: jest.fn()
+  generateText: jest.fn(),
 } as unknown as UnifiedModelClient;
 
 describe('FastMultiStepExecutor', () => {
@@ -34,7 +34,7 @@ describe('FastMultiStepExecutor', () => {
         task: {
           id: 'test_task_1',
           description: 'Implement user authentication system',
-          priority: 'high'
+          priority: 'high',
         },
         steps: [
           {
@@ -45,7 +45,7 @@ describe('FastMultiStepExecutor', () => {
             inputs: [],
             outputs: ['user.model.ts'],
             estimatedDuration: 10000,
-            dependencies: []
+            dependencies: [],
           },
           {
             id: 'step_2',
@@ -55,15 +55,16 @@ describe('FastMultiStepExecutor', () => {
             inputs: ['user.model.ts'],
             outputs: ['auth.service.ts'],
             estimatedDuration: 15000,
-            dependencies: ['step_1']
-          }
-        ]
-      })
+            dependencies: ['step_1'],
+          },
+        ],
+      }),
     };
 
     (mockModelClient.generate as jest.Mock).mockResolvedValue(mockResponse);
 
-    const prompt = 'Implement a complete user authentication system with login, logout, and session management';
+    const prompt =
+      'Implement a complete user authentication system with login, logout, and session management';
     const task = await executor.analyzeAndPlan(prompt);
 
     expect(task.id).toBe('test_task_1');
@@ -77,7 +78,7 @@ describe('FastMultiStepExecutor', () => {
   test('should handle JSON parsing errors gracefully', async () => {
     // Mock invalid JSON response
     const mockResponse = {
-      content: 'Invalid JSON response'
+      content: 'Invalid JSON response',
     };
 
     (mockModelClient.generate as jest.Mock).mockResolvedValue(mockResponse);
@@ -107,15 +108,15 @@ describe('FastMultiStepExecutor', () => {
           outputs: ['output1'],
           estimatedDuration: 5000,
           dependencies: [],
-          status: 'pending' as const
-        }
+          status: 'pending' as const,
+        },
       ],
-      context: 'Test context'
+      context: 'Test context',
     };
 
     // Mock successful execution
     (mockModelClient.generate as jest.Mock).mockResolvedValue({
-      content: 'Step completed successfully'
+      content: 'Step completed successfully',
     });
 
     const result = await executor.execute(task);
@@ -152,13 +153,13 @@ describe('ContextAwareWorkflowManager', () => {
               description: 'Update authentication logic',
               dependencies: [],
               estimatedLines: 50,
-              priority: 1
-            }
+              priority: 1,
+            },
           ],
           estimatedComplexity: 5,
-          requiresAtomic: true
-        }
-      })
+          requiresAtomic: true,
+        },
+      }),
     };
 
     (mockModelClient.generate as jest.Mock).mockResolvedValue(mockResponse);
@@ -186,11 +187,11 @@ describe('ContextAwareWorkflowManager', () => {
           description: 'Create new feature file',
           dependencies: [],
           estimatedLines: 30,
-          priority: 1
-        }
+          priority: 1,
+        },
       ],
       estimatedComplexity: 3,
-      requiresAtomic: false
+      requiresAtomic: false,
     };
 
     // Mock successful file operations (would normally use fs operations)
@@ -219,7 +220,8 @@ describe('Architect/Editor Pattern', () => {
     const mockPlanResponse = 'Comprehensive development plan...';
     (mockModelClient.generateText as jest.Mock).mockResolvedValue(mockPlanResponse);
 
-    const request = 'Build a complete e-commerce platform with user management and payment processing';
+    const request =
+      'Build a complete e-commerce platform with user management and payment processing';
     const plan = await architect.createPlan(request);
 
     expect(plan.id).toMatch(/plan_\d+/);
@@ -240,7 +242,7 @@ describe('Architect/Editor Pattern', () => {
       phases: [],
       dependencies: [],
       risks: [],
-      successCriteria: []
+      successCriteria: [],
     };
 
     // Mock feasibility response
@@ -266,7 +268,7 @@ describe('Architect/Editor Pattern', () => {
       estimatedEffort: 30,
       requiredTools: ['code-tools'],
       files: ['feature.ts'],
-      dependencies: []
+      dependencies: [],
     };
 
     // Mock editor response
@@ -283,9 +285,9 @@ describe('Architect/Editor Pattern', () => {
   test('should coordinate full architect/editor workflow', async () => {
     // Mock all necessary responses
     (mockModelClient.generateText as jest.Mock)
-      .mockResolvedValueOnce('Planning response...')  // For plan creation
+      .mockResolvedValueOnce('Planning response...') // For plan creation
       .mockResolvedValueOnce('Feasibility analysis...') // For feasibility
-      .mockResolvedValueOnce('Task execution...');      // For execution
+      .mockResolvedValueOnce('Task execution...'); // For execution
 
     const request = 'Create a simple calculator application';
     const result = await coordinator.executeRequest(request);
@@ -302,19 +304,15 @@ describe('CLI Integration', () => {
   test('should detect multi-step execution patterns', () => {
     // This would test the CLI's shouldUseMultiStepExecution method
     // but since it's private, we test via the public interface
-    
+
     const multiStepPrompts = [
       'implement a complete user authentication system',
       'build a comprehensive dashboard with analytics',
       'create end-to-end e-commerce solution',
-      'refactor the entire codebase for better performance'
+      'refactor the entire codebase for better performance',
     ];
 
-    const simplePrompts = [
-      'fix this bug',
-      'add a comment',
-      'update the README'
-    ];
+    const simplePrompts = ['fix this bug', 'add a comment', 'update the README'];
 
     // Each prompt type should be detectable by the CLI logic
     // (This is more of a documentation test of expected behavior)
@@ -327,13 +325,13 @@ describe('CLI Integration', () => {
       'refactor across multiple files',
       'update the entire project structure',
       'migrate all components to use new API',
-      'update all *.ts files to use strict mode'
+      'update all *.ts files to use strict mode',
     ];
 
     const singleFilePrompts = [
       'fix the login function',
       'add validation to this form',
-      'update the header component'
+      'update the header component',
     ];
 
     // Each prompt type should be detectable by the CLI logic
@@ -346,13 +344,13 @@ describe('CLI Integration', () => {
       'design and implement a scalable solution',
       'create a comprehensive enterprise system',
       'plan and build a production-ready application',
-      'architect a complete microservices solution'
+      'architect a complete microservices solution',
     ];
 
     const directImplementationPrompts = [
       'write this function',
       'create a simple component',
-      'fix this specific issue'
+      'fix this specific issue',
     ];
 
     // Each prompt type should be detectable by the CLI logic
@@ -364,28 +362,30 @@ describe('CLI Integration', () => {
 describe('Performance and Integration', () => {
   test('should handle concurrent multi-step executions', async () => {
     const executor = new FastMultiStepExecutor(mockModelClient, { maxConcurrentSteps: 2 });
-    
+
     // Mock responses for multiple tasks
     (mockModelClient.generate as jest.Mock).mockResolvedValue({
       content: JSON.stringify({
         task: { id: 'concurrent_task', description: 'Test', priority: 'medium' },
-        steps: [{ 
-          id: 'step_1', 
-          name: 'Test step', 
-          description: 'Test', 
-          type: 'analysis',
-          inputs: [], 
-          outputs: [], 
-          estimatedDuration: 1000, 
-          dependencies: [] 
-        }]
-      })
+        steps: [
+          {
+            id: 'step_1',
+            name: 'Test step',
+            description: 'Test',
+            type: 'analysis',
+            inputs: [],
+            outputs: [],
+            estimatedDuration: 1000,
+            dependencies: [],
+          },
+        ],
+      }),
     });
 
     const promises = [
       executor.analyzeAndPlan('Task 1'),
       executor.analyzeAndPlan('Task 2'),
-      executor.analyzeAndPlan('Task 3')
+      executor.analyzeAndPlan('Task 3'),
     ];
 
     const results = await Promise.all(promises);
@@ -397,11 +397,11 @@ describe('Performance and Integration', () => {
 
   test('should maintain context across workflow steps', async () => {
     const workflowManager = new ContextAwareWorkflowManager(mockModelClient, '/test');
-    
+
     // Test that context is preserved between operations
     const request1 = 'Create user model';
     const request2 = 'Add authentication to the user model';
-    
+
     (mockModelClient.generate as jest.Mock).mockResolvedValue({
       content: JSON.stringify({
         operation: {
@@ -411,14 +411,14 @@ describe('Performance and Integration', () => {
           affectedFiles: ['user.ts'],
           plannedChanges: [],
           estimatedComplexity: 1,
-          requiresAtomic: false
-        }
-      })
+          requiresAtomic: false,
+        },
+      }),
     });
 
     const operation1 = await workflowManager.planMultiFileWorkflow(request1);
     const operation2 = await workflowManager.planMultiFileWorkflow(request2);
-    
+
     expect(operation1.id).toBeDefined();
     expect(operation2.id).toBeDefined();
     // Context should be maintained in real implementation
@@ -426,13 +426,13 @@ describe('Performance and Integration', () => {
 
   test('should gracefully handle system failures', async () => {
     const coordinator = new ArchitectEditorCoordinator(mockModelClient);
-    
+
     // Simulate model client failure
     (mockModelClient.generateText as jest.Mock).mockRejectedValue(new Error('Model unavailable'));
-    
+
     const request = 'Build something complex';
     const result = await coordinator.executeRequest(request);
-    
+
     expect(result.success).toBe(false);
     expect(result.plan).toBeDefined(); // Should have fallback plan
     expect(result.duration).toBeGreaterThan(0);
@@ -443,37 +443,35 @@ describe('2025 Best Practices Compliance', () => {
   test('should implement parallel execution optimization', () => {
     const executor = new FastMultiStepExecutor(mockModelClient, { maxConcurrentSteps: 5 });
     expect(executor).toBeDefined();
-    
+
     // Parallel execution capability is built into the executor
     // Real test would verify actual parallel execution performance
   });
 
   test('should implement context window utilization', () => {
-    const workflowManager = new ContextAwareWorkflowManager(
-      mockModelClient, 
-      '/test',
-      { maxContextTokens: 64000 }
-    );
-    
+    const workflowManager = new ContextAwareWorkflowManager(mockModelClient, '/test', {
+      maxContextTokens: 64000,
+    });
+
     expect(workflowManager).toBeDefined();
     // Context window management is built into the workflow manager
   });
 
   test('should separate planning from execution (Architect/Editor)', async () => {
     const coordinator = new ArchitectEditorCoordinator(mockModelClient);
-    
+
     // Mock responses to ensure separation
     (mockModelClient.generateText as jest.Mock)
-      .mockResolvedValueOnce('Planning phase complete')  // Architect
-      .mockResolvedValueOnce('Feasibility confirmed')    // Architect  
-      .mockResolvedValueOnce('Execution complete');      // Editor
-    
+      .mockResolvedValueOnce('Planning phase complete') // Architect
+      .mockResolvedValueOnce('Feasibility confirmed') // Architect
+      .mockResolvedValueOnce('Execution complete'); // Editor
+
     const result = await coordinator.executeRequest('Test separation');
-    
-    expect(result.plan).toBeDefined();     // Architect output
+
+    expect(result.plan).toBeDefined(); // Architect output
     expect(result.feasibility).toBeDefined(); // Architect analysis
-    expect(result.results).toBeDefined();  // Editor output
-    
+    expect(result.results).toBeDefined(); // Editor output
+
     // Planning and execution are clearly separated
   });
 });

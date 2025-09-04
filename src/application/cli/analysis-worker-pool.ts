@@ -11,7 +11,11 @@ interface PendingTask {
 export class AnalysisWorkerPool {
   private workers: Worker[] = [];
   private available: Worker[] = [];
-  private readonly queue: { task: unknown; resolve: (v: unknown) => void; reject: (r: unknown) => void }[] = [];
+  private readonly queue: {
+    task: unknown;
+    resolve: (v: unknown) => void;
+    reject: (r: unknown) => void;
+  }[] = [];
   private readonly callbacks = new Map<string, PendingTask>();
 
   public constructor(size = 2) {

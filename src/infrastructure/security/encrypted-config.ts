@@ -443,8 +443,8 @@ export class EncryptedConfig {
       try {
         await fs.access(configPath, fs.constants.F_OK);
       } catch {
-        logger.warn('Configuration file not found, skipping file loading', { 
-          configPath: this.options.configPath 
+        logger.warn('Configuration file not found, skipping file loading', {
+          configPath: this.options.configPath,
         });
         return;
       }
@@ -452,7 +452,7 @@ export class EncryptedConfig {
       // Read file content
       const fileContent = await fs.readFile(configPath, 'utf-8');
       const fileExtension = path.extname(configPath).toLowerCase();
-      
+
       let configData: Record<string, any> = {};
 
       // Parse based on file extension
@@ -470,16 +470,15 @@ export class EncryptedConfig {
 
       // Environment-specific configuration loading
       const environmentConfig = this.extractEnvironmentConfig(configData);
-      
+
       // Merge configuration data into current config
       this.mergeConfiguration(environmentConfig);
-      
+
       logger.info('Configuration loaded from file', {
         configPath: this.options.configPath,
         environment: this.environment,
         keysLoaded: Object.keys(environmentConfig).length,
       });
-
     } catch (error) {
       logger.error('Failed to load configuration from file', error as Error, {
         configPath: this.options.configPath,
@@ -506,23 +505,21 @@ export class EncryptedConfig {
     try {
       // Basic YAML parsing for simple key-value pairs and objects
       // This is a simplified YAML parser - for full YAML support, would use 'yaml' package
-      const lines = content.split('\n').filter(line => 
-        line.trim() && !line.trim().startsWith('#')
-      );
-      
+      const lines = content.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'));
+
       const result: Record<string, any> = {};
       let currentSection = '';
       let indent = 0;
-      
+
       for (const line of lines) {
         const trimmed = line.trim();
         const lineIndent = line.length - line.trimStart().length;
-        
+
         if (trimmed.includes(':')) {
           const [key, ...valueParts] = trimmed.split(':');
           const value = valueParts.join(':').trim();
           const cleanKey = key.trim();
-          
+
           if (lineIndent === 0) {
             // Top-level key
             currentSection = cleanKey;
@@ -540,7 +537,7 @@ export class EncryptedConfig {
           }
         }
       }
-      
+
       return result;
     } catch (error) {
       throw new Error(`Invalid YAML configuration: ${(error as Error).message}`);
@@ -552,26 +549,28 @@ export class EncryptedConfig {
    */
   private parseYamlValue(value: string): any {
     const trimmed = value.trim();
-    
+
     // Handle quoted strings
-    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-        (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    if (
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    ) {
       return trimmed.slice(1, -1);
     }
-    
+
     // Handle booleans
     if (trimmed.toLowerCase() === 'true') return true;
     if (trimmed.toLowerCase() === 'false') return false;
-    
+
     // Handle null/undefined
     if (trimmed.toLowerCase() === 'null' || trimmed === '~') return null;
     if (trimmed.toLowerCase() === 'undefined') return undefined;
-    
+
     // Handle numbers
     if (!isNaN(Number(trimmed))) {
       return Number(trimmed);
     }
-    
+
     // Return as string
     return trimmed;
   }
@@ -581,32 +580,32 @@ export class EncryptedConfig {
    */
   private extractEnvironmentConfig(configData: Record<string, any>): Record<string, any> {
     const result: Record<string, any> = {};
-    
+
     // First, add all non-environment-specific keys
     for (const [key, value] of Object.entries(configData)) {
       if (typeof value !== 'object' || Array.isArray(value)) {
         result[key] = value;
       }
     }
-    
+
     // Then, override with environment-specific configuration
     if (configData[this.environment] && typeof configData[this.environment] === 'object') {
       Object.assign(result, configData[this.environment]);
     }
-    
+
     // Handle common environment patterns
     const environmentAliases = [
       this.environment,
       this.environment.toLowerCase(),
       this.environment.toUpperCase(),
     ];
-    
+
     for (const env of environmentAliases) {
       if (configData[env] && typeof configData[env] === 'object') {
         Object.assign(result, configData[env]);
       }
     }
-    
+
     return result;
   }
 

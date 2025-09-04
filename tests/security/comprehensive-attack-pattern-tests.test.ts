@@ -8,17 +8,17 @@ import {
   EnterpriseSecurityFramework,
   AgentAction,
   SecurityContext,
-  SecurityConfiguration
+  SecurityConfiguration,
 } from '../../src/infrastructure/security/enterprise-security-framework.js';
 
 describe('Comprehensive Attack Pattern Detection - 2025 Security Standards', () => {
   let securityFramework: EnterpriseSecurityFramework;
   let testSecurityContext: SecurityContext;
-  let performanceMetrics: Array<{ 
-    operation: string; 
-    duration: number; 
-    confidence: number; 
-    riskScore: number; 
+  let performanceMetrics: Array<{
+    operation: string;
+    duration: number;
+    confidence: number;
+    riskScore: number;
     language: string;
   }>;
 
@@ -28,7 +28,7 @@ describe('Comprehensive Attack Pattern Detection - 2025 Security Standards', () 
       maxCodeSize: 10 * 1024 * 1024, // 10MB for tests
       maxMemoryUsage: 512, // 512MB
       enableHybridAnalysis: true,
-      confidenceThreshold: 75
+      confidenceThreshold: 75,
     };
 
     securityFramework = new EnterpriseSecurityFramework(config);
@@ -37,7 +37,7 @@ describe('Comprehensive Attack Pattern Detection - 2025 Security Standards', () 
       sessionId: `comprehensive-test-${Date.now()}`,
       permissions: ['code_generation', 'file_access', 'tool_usage'],
       environment: 'testing',
-      riskProfile: 'high'
+      riskProfile: 'high',
     };
     performanceMetrics = [];
   });
@@ -45,23 +45,33 @@ describe('Comprehensive Attack Pattern Detection - 2025 Security Standards', () 
   afterEach(() => {
     // Analyze performance metrics
     if (performanceMetrics.length > 0) {
-      const avgDuration = performanceMetrics.reduce((sum, m) => sum + m.duration, 0) / performanceMetrics.length;
-      const avgConfidence = performanceMetrics.reduce((sum, m) => sum + m.confidence, 0) / performanceMetrics.length;
-      const avgRiskScore = performanceMetrics.reduce((sum, m) => sum + m.riskScore, 0) / performanceMetrics.length;
-      
-      console.log(`Performance Summary - Avg Duration: ${avgDuration.toFixed(2)}ms, ` +
-                  `Avg Confidence: ${avgConfidence.toFixed(1)}%, Avg Risk: ${avgRiskScore.toFixed(1)}`);
-      
+      const avgDuration =
+        performanceMetrics.reduce((sum, m) => sum + m.duration, 0) / performanceMetrics.length;
+      const avgConfidence =
+        performanceMetrics.reduce((sum, m) => sum + m.confidence, 0) / performanceMetrics.length;
+      const avgRiskScore =
+        performanceMetrics.reduce((sum, m) => sum + m.riskScore, 0) / performanceMetrics.length;
+
+      console.log(
+        `Performance Summary - Avg Duration: ${avgDuration.toFixed(2)}ms, ` +
+          `Avg Confidence: ${avgConfidence.toFixed(1)}%, Avg Risk: ${avgRiskScore.toFixed(1)}`
+      );
+
       // Log language-specific metrics
-      const byLanguage = performanceMetrics.reduce((acc, m) => {
-        acc[m.language] = acc[m.language] || [];
-        acc[m.language].push(m);
-        return acc;
-      }, {} as Record<string, typeof performanceMetrics>);
-      
+      const byLanguage = performanceMetrics.reduce(
+        (acc, m) => {
+          acc[m.language] = acc[m.language] || [];
+          acc[m.language].push(m);
+          return acc;
+        },
+        {} as Record<string, typeof performanceMetrics>
+      );
+
       Object.entries(byLanguage).forEach(([lang, metrics]) => {
         const langAvgDuration = metrics.reduce((sum, m) => sum + m.duration, 0) / metrics.length;
-        console.log(`${lang.toUpperCase()} - Avg Duration: ${langAvgDuration.toFixed(2)}ms (${metrics.length} tests)`);
+        console.log(
+          `${lang.toUpperCase()} - Avg Duration: ${langAvgDuration.toFixed(2)}ms (${metrics.length} tests)`
+        );
       });
     }
   });
@@ -81,7 +91,7 @@ describe('Comprehensive Attack Pattern Detection - 2025 Security Standards', () 
       `;
 
       const result = await analyzeCode(maliciousCode, 'javascript', 'obfuscated_eval_test');
-      
+
       expect(result.allowed).toBe(false);
       expect(result.violations.length).toBeGreaterThan(0);
       expect(result.violations.some(v => v.severity === 'critical')).toBe(true);
@@ -111,7 +121,7 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(pythonAttack, 'python', 'python_execution_attacks');
-      
+
       expect(result.allowed).toBe(false);
       expect(result.violations.length).toBeGreaterThanOrEqual(5);
       expect(result.violations.filter(v => v.severity === 'critical').length).toBeGreaterThan(3);
@@ -134,7 +144,7 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(constructorAttacks, 'javascript', 'constructor_attacks');
-      
+
       expect(result.allowed).toBe(false);
       expect(result.violations.length).toBeGreaterThanOrEqual(2);
       expect(result.violations.some(v => v.type.includes('function_constructor'))).toBe(true);
@@ -161,7 +171,7 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(commandInjection, 'javascript', 'command_injection');
-      
+
       expect(result.allowed).toBe(false);
       expect(result.violations.some(v => v.type === 'child_process_execution')).toBe(true);
       expect(result.violations.filter(v => v.severity === 'critical').length).toBeGreaterThan(0);
@@ -188,7 +198,7 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(fsAttacks, 'javascript', 'filesystem_attacks');
-      
+
       expect(result.allowed).toBe(false);
       expect(result.violations.some(v => v.type === 'fs_dangerous_operation')).toBe(true);
       expect(result.violations.some(v => v.type === 'path_traversal_attempt')).toBe(true);
@@ -218,7 +228,7 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(sqlInjection, 'javascript', 'sql_injection');
-      
+
       expect(result.allowed).toBe(false);
       expect(result.violations.some(v => v.type === 'sql_injection_pattern')).toBe(true);
       expect(result.violations.filter(v => v.severity === 'critical').length).toBeGreaterThan(0);
@@ -243,7 +253,7 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(credentialExposure, 'javascript', 'credential_exposure');
-      
+
       expect(result.allowed).toBe(false);
       expect(result.violations.some(v => v.type === 'database_credential_exposure')).toBe(true);
       expect(result.violations.some(v => v.type === 'sensitive_env_access')).toBe(true);
@@ -269,7 +279,7 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(weakCrypto, 'javascript', 'weak_crypto');
-      
+
       expect(result.allowed).toBe(false);
       expect(result.violations.some(v => v.type === 'weak_cryptography')).toBe(true);
       expect(result.violations.filter(v => v.severity === 'high').length).toBeGreaterThan(0);
@@ -288,11 +298,13 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(hardcodedKeys, 'javascript', 'hardcoded_keys');
-      
+
       expect(result.allowed).toBe(false);
-      expect(result.violations.some(v => 
-        v.type === 'hardcoded_encryption_key' || v.type === 'hardcoded_jwt_secret'
-      )).toBe(true);
+      expect(
+        result.violations.some(
+          v => v.type === 'hardcoded_encryption_key' || v.type === 'hardcoded_jwt_secret'
+        )
+      ).toBe(true);
     });
   });
 
@@ -313,11 +325,13 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(suspiciousUrls, 'javascript', 'suspicious_urls');
-      
+
       expect(result.allowed).toBe(false);
-      expect(result.violations.some(v => 
-        v.type === 'suspicious_url_detected' || v.type === 'hardcoded_url'
-      )).toBe(true);
+      expect(
+        result.violations.some(
+          v => v.type === 'suspicious_url_detected' || v.type === 'hardcoded_url'
+        )
+      ).toBe(true);
     });
 
     it('should detect HTTP module imports', async () => {
@@ -334,7 +348,7 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(httpImports, 'javascript', 'http_imports');
-      
+
       expect(result.violations.some(v => v.type === 'http_module_import')).toBe(true);
       expect(result.violations.filter(v => v.severity === 'medium').length).toBeGreaterThan(0);
     });
@@ -359,10 +373,12 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(obfuscatedCode, 'javascript', 'obfuscation_detection');
-      
-      expect(result.violations.some(v => 
-        v.type === 'string_obfuscation' || v.type === 'base64_operation'
-      )).toBe(true);
+
+      expect(
+        result.violations.some(
+          v => v.type === 'string_obfuscation' || v.type === 'base64_operation'
+        )
+      ).toBe(true);
     });
 
     it('should detect authentication bypass patterns', async () => {
@@ -388,7 +404,7 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(authBypass, 'javascript', 'auth_bypass');
-      
+
       expect(result.violations.some(v => v.type === 'authentication_bypass')).toBe(true);
       expect(result.violations.filter(v => v.severity === 'critical').length).toBeGreaterThan(0);
     });
@@ -397,17 +413,21 @@ def write_file(filename, content):
   describe('Production Hardening & Performance', () => {
     it('should enforce timeout limits on large code analysis', async () => {
       // Create a very large code sample
-      const largeCode = Array(1000).fill(`
+      const largeCode = Array(1000)
+        .fill(
+          `
         function normalFunction${Math.random()}() {
           eval('test'); // This should be detected
           return 'test';
         }
-      `).join('\\n');
+      `
+        )
+        .join('\\n');
 
       const startTime = Date.now();
       const result = await analyzeCode(largeCode, 'javascript', 'large_code_timeout');
       const duration = Date.now() - startTime;
-      
+
       // Should complete within timeout (1 second for tests)
       expect(duration).toBeLessThan(1500); // Allow some buffer
       expect(result).toBeDefined();
@@ -426,7 +446,7 @@ def write_file(filename, content):
       `;
 
       const result = await analyzeCode(malformedCode, 'javascript', 'malformed_code');
-      
+
       // Should not crash and should fall back to string matching
       expect(result).toBeDefined();
       expect(result.violations.some(v => v.type.includes('malicious_pattern'))).toBe(true);
@@ -452,27 +472,29 @@ def write_file(filename, content):
 
       expect(result1.violations.length).toBe(result2.violations.length);
       expect(duration2).toBeLessThanOrEqual(duration1); // Cache should make it faster or same
-      
-      console.log(`Cache Performance: First: ${duration1}ms, Second: ${duration2}ms (${((1 - duration2/duration1) * 100).toFixed(1)}% improvement)`);
+
+      console.log(
+        `Cache Performance: First: ${duration1}ms, Second: ${duration2}ms (${((1 - duration2 / duration1) * 100).toFixed(1)}% improvement)`
+      );
     });
 
     it('should correctly score risk levels across attack types', async () => {
       const testCases = [
-        { 
-          code: 'console.log("safe code");', 
-          expectedRisk: 'low', 
-          name: 'safe_code' 
+        {
+          code: 'console.log("safe code");',
+          expectedRisk: 'low',
+          name: 'safe_code',
         },
-        { 
-          code: 'document.getElementById("test").innerHTML = userInput;', 
-          expectedRisk: 'medium', 
-          name: 'xss_vulnerability' 
+        {
+          code: 'document.getElementById("test").innerHTML = userInput;',
+          expectedRisk: 'medium',
+          name: 'xss_vulnerability',
         },
-        { 
-          code: 'eval(userInput); exec(command);', 
-          expectedRisk: 'critical', 
-          name: 'code_execution' 
-        }
+        {
+          code: 'eval(userInput); exec(command);',
+          expectedRisk: 'critical',
+          name: 'code_execution',
+        },
       ];
 
       const results = [];
@@ -484,7 +506,7 @@ def write_file(filename, content):
       // Verify risk scores are properly ordered
       expect(results[0].result.riskScore).toBeLessThan(results[1].result.riskScore);
       expect(results[1].result.riskScore).toBeLessThan(results[2].result.riskScore);
-      
+
       // Verify critical code has very high risk
       expect(results[2].result.riskScore).toBeGreaterThan(80);
     });
@@ -493,12 +515,12 @@ def write_file(filename, content):
   // Helper function
   async function analyzeCode(code: string, language: string, testName: string) {
     const startTime = Date.now();
-    
+
     const action: AgentAction = {
       type: 'code_generation',
       agentId: `test-${testName}`,
       payload: { code, language },
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     const result = await securityFramework.validateAgentAction(
@@ -508,16 +530,17 @@ def write_file(filename, content):
     );
 
     const duration = Date.now() - startTime;
-    const confidence = result.violations.length > 0 
-      ? Math.max(...result.violations.map(v => v.confidence || 0))
-      : 100;
+    const confidence =
+      result.violations.length > 0
+        ? Math.max(...result.violations.map(v => v.confidence || 0))
+        : 100;
 
     performanceMetrics.push({
       operation: testName,
       duration,
       confidence,
       riskScore: result.riskScore,
-      language
+      language,
     });
 
     return result;

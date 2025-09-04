@@ -32,7 +32,6 @@ async function copyAssets() {
     }
 
     console.log('🎉 Assets copied successfully!');
-
   } catch (error) {
     console.error('❌ Failed to copy assets:', error);
     process.exit(1);

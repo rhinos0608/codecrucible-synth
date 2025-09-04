@@ -90,8 +90,8 @@ export class EnhancedToolIntegration extends EventEmitter {
         autoDiscovery: true,
       },
     };
-  const mcpManager = new MCPServerManager(mcpConfig);
-  this.baseToolIntegration = new ToolIntegration(mcpManager, rustBackend);
+    const mcpManager = new MCPServerManager(mcpConfig);
+    this.baseToolIntegration = new ToolIntegration(mcpManager, rustBackend);
     this.orchestrator = new DomainAwareToolOrchestrator();
 
     this.setupCacheCleanup();

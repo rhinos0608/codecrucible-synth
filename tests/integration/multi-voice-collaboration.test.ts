@@ -5,7 +5,12 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import { AdvancedSynthesisEngine, SynthesisMode, ConflictResolutionStrategy, WeightingStrategy } from '../../src/core/advanced-synthesis-engine';
+import {
+  AdvancedSynthesisEngine,
+  SynthesisMode,
+  ConflictResolutionStrategy,
+  WeightingStrategy,
+} from '../../src/core/advanced-synthesis-engine';
 import { ResponseFactory, AgentResponse } from '../../src/core/response-types';
 import { EventEmitter } from 'events';
 
@@ -21,10 +26,10 @@ describe('Multi-Voice Collaboration Integration', () => {
       generateVoiceResponse: jest.fn().mockResolvedValue({
         content: 'Mock generated response',
         confidence: 0.8,
-        voiceId: 'mock-voice'
-      })
+        voiceId: 'mock-voice',
+      }),
     };
-    
+
     synthesisEngine = new AdvancedSynthesisEngine(mockModelClient);
   });
 
@@ -50,14 +55,14 @@ describe('Multi-Voice Collaboration Integration', () => {
         ResponseFactory.createAgentResponse(
           'For maintainability, ensure proper service boundaries based on domain-driven design. Implement comprehensive logging, distributed tracing, and automated testing for each service.',
           { confidence: 0.82, voiceId: 'maintainer', tokensUsed: 100 }
-        )
+        ),
       ];
 
       const config = {
         mode: SynthesisMode.COLLABORATIVE,
         qualityThreshold: 80,
         weightingStrategy: WeightingStrategy.EXPERTISE_BASED,
-        conflictResolution: ConflictResolutionStrategy.SYNTHESIS
+        conflictResolution: ConflictResolutionStrategy.SYNTHESIS,
       };
 
       const result = await synthesisEngine.synthesizeAdvanced(architecturalResponses, config);
@@ -68,10 +73,10 @@ describe('Multi-Voice Collaboration Integration', () => {
       expect(result.voicesUsed).toContain('security');
       expect(result.voicesUsed).toContain('optimizer');
       expect(result.voicesUsed).toContain('maintainer');
-      
+
       expect(result.qualityMetrics.overall).toBeGreaterThan(60);
       expect(result.conflictAnalysis.agreementLevel).toBeGreaterThan(0.1);
-      
+
       // Should contain insights from all perspectives
       expect(result.combinedContent).toContain('microservices');
       expect(result.combinedContent.length).toBeGreaterThan(300);
@@ -90,25 +95,25 @@ describe('Multi-Voice Collaboration Integration', () => {
         ResponseFactory.createAgentResponse(
           'A hybrid approach combining both paradigms would be most effective. Use functional programming for data transformations and business logic, while leveraging OOP for system architecture and UI components.',
           { confidence: 0.82, voiceId: 'pragmatist', tokensUsed: 90 }
-        )
+        ),
       ];
 
       const config = {
         mode: SynthesisMode.DIALECTICAL,
         qualityThreshold: 70,
-        conflictResolution: ConflictResolutionStrategy.DIALECTICAL
+        conflictResolution: ConflictResolutionStrategy.DIALECTICAL,
       };
 
       const result = await synthesisEngine.synthesizeAdvanced(paradigmConflictResponses, config);
 
       expect(result.success).toBe(true);
       expect(result.synthesisStrategy).toBe(SynthesisMode.DIALECTICAL);
-      
+
       // Should detect the programming paradigm conflict
       expect(result.conflictAnalysis.conflictingTopics).toContain('programming paradigm');
       expect(result.conflictAnalysis.conflicts).toHaveLength(1);
       expect(result.conflictAnalysis.conflicts[0].severity).toBe('medium');
-      
+
       // Dialectical synthesis should include structured analysis
       expect(result.combinedContent).toContain('Dialectical Synthesis');
       expect(result.combinedContent).toContain('Perspectives:');
@@ -127,25 +132,25 @@ describe('Multi-Voice Collaboration Integration', () => {
         ),
         ResponseFactory.createAgentResponse(
           'Excellent TypeScript implementation with strong typing and proper error boundaries. The code quality is high and follows our standards. Approved.',
-          { confidence: 0.90, voiceId: 'reviewer-3', tokensUsed: 60 }
-        )
+          { confidence: 0.9, voiceId: 'reviewer-3', tokensUsed: 60 }
+        ),
       ];
 
       const config = {
         mode: SynthesisMode.CONSENSUS,
         qualityThreshold: 85,
-        conflictResolution: ConflictResolutionStrategy.MAJORITY_RULE
+        conflictResolution: ConflictResolutionStrategy.MAJORITY_RULE,
       };
 
       const result = await synthesisEngine.synthesizeAdvanced(codeReviewResponses, config);
 
       expect(result.success).toBe(true);
       expect(result.synthesisStrategy).toBe(SynthesisMode.CONSENSUS);
-      
+
       // High agreement should be detected
       expect(result.conflictAnalysis.agreementLevel).toBeGreaterThan(0.7);
       expect(result.conflictAnalysis.conflicts).toHaveLength(0);
-      
+
       // Consensus should be clear
       expect(result.combinedContent).toContain('TypeScript');
       expect(result.qualityMetrics.overall).toBeGreaterThan(35);
@@ -162,17 +167,17 @@ describe('Multi-Voice Collaboration Integration', () => {
         ),
         ResponseFactory.createAgentResponse(
           'Maybe we could try some database stuff? I think indexes are important or something.',
-          { confidence: 0.40, voiceId: 'junior-developer', tokensUsed: 30 }
+          { confidence: 0.4, voiceId: 'junior-developer', tokensUsed: 30 }
         ),
         ResponseFactory.createAgentResponse(
           'From a security perspective, ensure database connections use TLS encryption and implement proper access controls.',
           { confidence: 0.88, voiceId: 'security-expert', tokensUsed: 45 }
-        )
+        ),
       ];
 
       const config = {
         weightingStrategy: WeightingStrategy.CONFIDENCE_BASED,
-        mode: SynthesisMode.HIERARCHICAL
+        mode: SynthesisMode.HIERARCHICAL,
       };
 
       const result = await synthesisEngine.synthesizeAdvanced(mixedExpertiseResponses, config);
@@ -183,39 +188,41 @@ describe('Multi-Voice Collaboration Integration', () => {
       // Database expert should have highest weight due to confidence
       const databaseExpertWeight = result.voiceWeights.find(w => w.voiceId === 'database-expert');
       const juniorDeveloperWeight = result.voiceWeights.find(w => w.voiceId === 'junior-developer');
-      
+
       expect(databaseExpertWeight?.weight).toBeGreaterThan(juniorDeveloperWeight?.weight || 0);
       expect(databaseExpertWeight?.reason).toContain('confidence');
     });
 
     test('should handle performance-based weighting efficiently', async () => {
       const performanceVariedResponses = [
-        ResponseFactory.createAgentResponse(
-          'Efficient solution with minimal overhead.',
-          { confidence: 0.80, voiceId: 'efficient-voice', tokensUsed: 25 }
-        ),
+        ResponseFactory.createAgentResponse('Efficient solution with minimal overhead.', {
+          confidence: 0.8,
+          voiceId: 'efficient-voice',
+          tokensUsed: 25,
+        }),
         ResponseFactory.createAgentResponse(
           'This is a very verbose solution that explains everything in great detail with lots of explanatory text that could be much more concise but provides comprehensive coverage of all aspects of the problem and potential solutions with extensive documentation and examples.',
-          { confidence: 0.80, voiceId: 'verbose-voice', tokensUsed: 150 }
+          { confidence: 0.8, voiceId: 'verbose-voice', tokensUsed: 150 }
         ),
-        ResponseFactory.createAgentResponse(
-          'Balanced approach with good explanations.',
-          { confidence: 0.80, voiceId: 'balanced-voice', tokensUsed: 50 }
-        )
+        ResponseFactory.createAgentResponse('Balanced approach with good explanations.', {
+          confidence: 0.8,
+          voiceId: 'balanced-voice',
+          tokensUsed: 50,
+        }),
       ];
 
       const config = {
         weightingStrategy: WeightingStrategy.PERFORMANCE_BASED,
-        mode: SynthesisMode.HIERARCHICAL
+        mode: SynthesisMode.HIERARCHICAL,
       };
 
       const result = await synthesisEngine.synthesizeAdvanced(performanceVariedResponses, config);
 
       expect(result.success).toBe(true);
-      
+
       const efficientWeight = result.voiceWeights.find(w => w.voiceId === 'efficient-voice');
       const verboseWeight = result.voiceWeights.find(w => w.voiceId === 'verbose-voice');
-      
+
       // More efficient voice should have higher weight
       expect(efficientWeight?.weight).toBeGreaterThan(verboseWeight?.weight || 0);
       expect(efficientWeight?.reason).toContain('Performance-based');
@@ -231,40 +238,44 @@ describe('Multi-Voice Collaboration Integration', () => {
         ),
         ResponseFactory.createAgentResponse(
           'Vue.js would be better for this project due to its simpler learning curve and excellent documentation.',
-          { confidence: 0.80, voiceId: 'vue-advocate', tokensUsed: 45 }
-        )
+          { confidence: 0.8, voiceId: 'vue-advocate', tokensUsed: 45 }
+        ),
       ];
 
       const config = {
         mode: SynthesisMode.ADAPTIVE, // Let the engine decide
-        qualityThreshold: 75
+        qualityThreshold: 75,
       };
 
       const result = await synthesisEngine.synthesizeAdvanced(conflictingResponses, config);
 
       expect(result.success).toBe(true);
-      
+
       // Should detect conflicts and choose dialectical or collaborative mode
-      expect([SynthesisMode.DIALECTICAL, SynthesisMode.COLLABORATIVE]).toContain(result.synthesisStrategy);
+      expect([SynthesisMode.DIALECTICAL, SynthesisMode.COLLABORATIVE]).toContain(
+        result.synthesisStrategy
+      );
       expect(result.conflictAnalysis.conflicts.length).toBeGreaterThanOrEqual(0);
     });
 
     test('should trigger adaptive refinement for low-quality synthesis', async () => {
       const lowQualityResponses = [
-        ResponseFactory.createAgentResponse(
-          'Bad code. Fix it.',
-          { confidence: 0.30, voiceId: 'unhelpful-voice', tokensUsed: 10 }
-        ),
-        ResponseFactory.createAgentResponse(
-          'Not sure what to do.',
-          { confidence: 0.20, voiceId: 'confused-voice', tokensUsed: 8 }
-        )
+        ResponseFactory.createAgentResponse('Bad code. Fix it.', {
+          confidence: 0.3,
+          voiceId: 'unhelpful-voice',
+          tokensUsed: 10,
+        }),
+        ResponseFactory.createAgentResponse('Not sure what to do.', {
+          confidence: 0.2,
+          voiceId: 'confused-voice',
+          tokensUsed: 8,
+        }),
       ];
 
       const config = {
         qualityThreshold: 90, // Very high threshold
         enableAdaptiveSynthesis: true,
-        maxIterations: 2
+        maxIterations: 2,
       };
 
       const result = await synthesisEngine.synthesizeAdvanced(lowQualityResponses, config);
@@ -272,23 +283,25 @@ describe('Multi-Voice Collaboration Integration', () => {
       expect(result.success).toBe(true);
       expect(result.adaptiveAdjustments).toBeDefined();
       expect(result.adaptiveAdjustments?.length).toBeGreaterThan(0);
-      
+
       // Should have attempted improvements
       if (result.adaptiveAdjustments) {
-        expect(result.adaptiveAdjustments.some(adj => adj.reasoning.includes('coherence'))).toBeTruthy();
+        expect(
+          result.adaptiveAdjustments.some(adj => adj.reasoning.includes('coherence'))
+        ).toBeTruthy();
       }
     });
   });
 
   describe('Performance and Scalability', () => {
     test('should handle large-scale multi-voice synthesis efficiently', async () => {
-      const manyVoices = Array.from({ length: 15 }, (_, i) => 
+      const manyVoices = Array.from({ length: 15 }, (_, i) =>
         ResponseFactory.createAgentResponse(
           `Voice ${i} perspective: This is a unique viewpoint from voice ${i} with specific insights and recommendations for the problem at hand.`,
-          { 
-            confidence: 0.7 + (Math.random() * 0.3), 
+          {
+            confidence: 0.7 + Math.random() * 0.3,
             voiceId: `voice-${i}`,
-            tokensUsed: 40 + Math.floor(Math.random() * 30)
+            tokensUsed: 40 + Math.floor(Math.random() * 30),
           }
         )
       );
@@ -301,7 +314,7 @@ describe('Multi-Voice Collaboration Integration', () => {
       expect(result.voicesUsed).toHaveLength(15);
       expect(result.voiceWeights).toHaveLength(15);
       expect(duration).toBeLessThan(3000); // Should complete within 3 seconds
-      
+
       // Quality should still be maintained
       expect(result.qualityMetrics.overall).toBeGreaterThan(40);
     });
@@ -315,19 +328,19 @@ describe('Multi-Voice Collaboration Integration', () => {
         ResponseFactory.createAgentResponse(
           'Add comprehensive unit tests to ensure code reliability and maintainability.',
           { confidence: 0.88, voiceId: 'tester', tokensUsed: 45 }
-        )
+        ),
       ];
 
       const config = {
         mode: SynthesisMode.COLLABORATIVE,
-        qualityThreshold: 75
+        qualityThreshold: 75,
       };
 
       // Run synthesis multiple times
       const results = await Promise.all([
         synthesisEngine.synthesizeAdvanced(consistentResponses, config),
         synthesisEngine.synthesizeAdvanced(consistentResponses, config),
-        synthesisEngine.synthesizeAdvanced(consistentResponses, config)
+        synthesisEngine.synthesizeAdvanced(consistentResponses, config),
       ]);
 
       // All runs should succeed
@@ -349,7 +362,7 @@ describe('Multi-Voice Collaboration Integration', () => {
     test('should maintain context across voice interactions', async () => {
       // This would test integration with voice memory systems
       // For now, we'll test that voice IDs are properly tracked and used
-      
+
       const contextualResponses = [
         ResponseFactory.createAgentResponse(
           'Based on our previous discussion about microservices, I recommend implementing circuit breakers for resilience.',
@@ -358,7 +371,7 @@ describe('Multi-Voice Collaboration Integration', () => {
         ResponseFactory.createAgentResponse(
           'Following up on the architecture discussion, ensure proper monitoring and observability are in place.',
           { confidence: 0.82, voiceId: 'maintainer', tokensUsed: 55 }
-        )
+        ),
       ];
 
       const result = await synthesisEngine.synthesizeAdvanced(contextualResponses);
@@ -366,7 +379,7 @@ describe('Multi-Voice Collaboration Integration', () => {
       expect(result.success).toBe(true);
       expect(result.voicesUsed).toContain('architect');
       expect(result.voicesUsed).toContain('maintainer');
-      
+
       // Content should reference the contextual nature
       expect(result.combinedContent).toContain('microservices');
       expect(result.combinedContent).toContain('architecture');
@@ -379,7 +392,7 @@ describe('Multi-Voice Collaboration Integration', () => {
         ResponseFactory.createAgentResponse(
           '', // Empty content
           { confidence: 0, voiceId: 'broken-voice', tokensUsed: 0 }
-        )
+        ),
       ];
 
       const result = await synthesisEngine.synthesizeAdvanced(problematicResponses);
@@ -393,25 +406,27 @@ describe('Multi-Voice Collaboration Integration', () => {
 
     test('should handle mixed valid and invalid responses', async () => {
       const mixedResponses = [
-        ResponseFactory.createAgentResponse(
-          'This is a valid response with good content.',
-          { confidence: 0.85, voiceId: 'good-voice', tokensUsed: 40 }
-        ),
+        ResponseFactory.createAgentResponse('This is a valid response with good content.', {
+          confidence: 0.85,
+          voiceId: 'good-voice',
+          tokensUsed: 40,
+        }),
         ResponseFactory.createAgentResponse(
           '', // Invalid empty response
           { confidence: 0, voiceId: 'bad-voice', tokensUsed: 0 }
         ),
-        ResponseFactory.createAgentResponse(
-          'Another valid response with useful information.',
-          { confidence: 0.80, voiceId: 'another-good-voice', tokensUsed: 45 }
-        )
+        ResponseFactory.createAgentResponse('Another valid response with useful information.', {
+          confidence: 0.8,
+          voiceId: 'another-good-voice',
+          tokensUsed: 45,
+        }),
       ];
 
       const result = await synthesisEngine.synthesizeAdvanced(mixedResponses);
 
       expect(result.success).toBe(true);
       expect(result.voicesUsed).toHaveLength(3);
-      
+
       // Should still produce reasonable quality despite bad input
       expect(result.qualityMetrics.overall).toBeGreaterThan(30);
     });

@@ -41,24 +41,12 @@
     "@node-rs/helper": "^1.3.0"
   },
   "packageManager": "yarn@1.22.19",
-  "files": [
-    "*.node"
-  ],
+  "files": ["*.node"],
   "engines": {
     "node": ">= 18.0.0"
   },
-  "os": [
-    "darwin",
-    "linux",
-    "win32",
-    "freebsd"
-  ],
-  "cpu": [
-    "x64",
-    "arm64",
-    "ia32",
-    "arm"
-  ],
+  "os": ["darwin", "linux", "win32", "freebsd"],
+  "cpu": ["x64", "arm64", "ia32", "arm"],
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"

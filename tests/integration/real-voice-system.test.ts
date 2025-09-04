@@ -29,7 +29,7 @@ describe('Real Voice Archetype System', () => {
     // Initialize real model client
     const configManager = new ConfigManager();
     const appConfig = await configManager.loadConfiguration();
-    
+
     const clientConfig: UnifiedClientConfig = {
       providers: [
         {
@@ -60,7 +60,7 @@ describe('Real Voice Archetype System', () => {
     };
 
     modelClient = new UnifiedModelClient(clientConfig);
-    
+
     try {
       await modelClient.initialize();
     } catch (error) {
@@ -80,9 +80,9 @@ describe('Real Voice Archetype System', () => {
   describe('Voice Archetype Management', () => {
     it('should have all expected voice archetypes available', () => {
       const voices = voiceSystem.getAvailableVoices();
-      
+
       expect(voices.length).toBeGreaterThan(5);
-      
+
       const expectedVoices = ['explorer', 'maintainer', 'security', 'architect', 'developer'];
       expectedVoices.forEach(voiceId => {
         const voice = voices.find(v => v.id === voiceId);
@@ -94,7 +94,7 @@ describe('Real Voice Archetype System', () => {
 
     it('should provide voice specializations and expertise areas', () => {
       const voices = voiceSystem.getAvailableVoices();
-      
+
       voices.forEach(voice => {
         expect(voice.id).toBeDefined();
         expect(voice.name).toBeDefined();
@@ -122,18 +122,18 @@ describe('Real Voice Archetype System', () => {
     it('should generate responses with different voice characteristics', async () => {
       const prompt = 'Explain the importance of error handling in Node.js';
       const voiceIds = ['developer', 'security', 'maintainer'];
-      
+
       const responses = [];
-      
+
       for (const voiceId of voiceIds) {
         try {
           const response = await voiceSystem.generateVoiceResponse(voiceId, prompt, {
-            timeout: 30000
+            timeout: 30000,
           });
-          
+
           if (response) {
             responses.push({ voiceId, response });
-            
+
             expect(response).toBeDefined();
             expect(typeof response).toBe('string');
             expect(response.length).toBeGreaterThan(20);
@@ -145,11 +145,11 @@ describe('Real Voice Archetype System', () => {
           }
         }
       }
-      
+
       // At least one voice should respond if providers are available
       if (responses.length > 0) {
         console.log(`Generated ${responses.length}/${voiceIds.length} voice responses`);
-        
+
         // Responses should vary by voice perspective
         const uniqueResponses = new Set(responses.map(r => r.response.substring(0, 100)));
         if (responses.length > 1) {
@@ -164,24 +164,32 @@ function calculateTotal(items) {
   return items.reduce((sum, item) => sum + item.price, 0);
 }
 `;
-      
+
       const analysisPrompt = `Analyze this code for quality and potential improvements: ${codeSnippet}`;
-      
+
       try {
-        const developerResponse = await voiceSystem.generateVoiceResponse('developer', analysisPrompt, {
-          timeout: 30000
-        });
-        
+        const developerResponse = await voiceSystem.generateVoiceResponse(
+          'developer',
+          analysisPrompt,
+          {
+            timeout: 30000,
+          }
+        );
+
         if (developerResponse) {
           expect(developerResponse).toBeDefined();
           expect(developerResponse).toMatch(/function|code|improve|quality/i);
           expect(developerResponse.length).toBeGreaterThan(50);
         }
-        
-        const securityResponse = await voiceSystem.generateVoiceResponse('security', analysisPrompt, {
-          timeout: 30000
-        });
-        
+
+        const securityResponse = await voiceSystem.generateVoiceResponse(
+          'security',
+          analysisPrompt,
+          {
+            timeout: 30000,
+          }
+        );
+
         if (securityResponse) {
           expect(securityResponse).toBeDefined();
           expect(securityResponse).toMatch(/security|validation|input|safe/i);
@@ -200,17 +208,17 @@ function calculateTotal(items) {
     it('should generate multiple voice responses in parallel', async () => {
       const prompt = 'What are the best practices for API design?';
       const voiceIds = ['architect', 'developer', 'security'];
-      
+
       try {
         const startTime = Date.now();
         const responses = await voiceSystem.generateMultiVoiceResponses(voiceIds, prompt, {
-          timeout: 45000
+          timeout: 45000,
         });
         const duration = Date.now() - startTime;
-        
+
         if (responses && Object.keys(responses).length > 0) {
           expect(typeof responses).toBe('object');
-          
+
           // Check that we got responses from requested voices
           voiceIds.forEach(voiceId => {
             if (responses[voiceId]) {
@@ -219,7 +227,7 @@ function calculateTotal(items) {
               expect(responses[voiceId]).toMatch(/api|design|practice/i);
             }
           });
-          
+
           // Parallel execution should be faster than sequential
           console.log(`Multi-voice responses generated in ${duration}ms`);
         }
@@ -234,16 +242,20 @@ function calculateTotal(items) {
 
     it('should provide voice consensus and synthesis', async () => {
       const prompt = 'How should we handle user authentication in a web application?';
-      
+
       try {
-        const synthesis = await voiceSystem.synthesizeVoicePerspectives(['security', 'developer', 'architect'], prompt, {
-          timeout: 60000
-        });
-        
+        const synthesis = await voiceSystem.synthesizeVoicePerspectives(
+          ['security', 'developer', 'architect'],
+          prompt,
+          {
+            timeout: 60000,
+          }
+        );
+
         if (synthesis) {
           expect(synthesis).toBeDefined();
           expect(typeof synthesis).toBe('object');
-          
+
           if (synthesis.perspectives) {
             expect(Array.isArray(synthesis.perspectives)).toBe(true);
             synthesis.perspectives.forEach(perspective => {
@@ -251,7 +263,7 @@ function calculateTotal(items) {
               expect(perspective.response).toBeDefined();
             });
           }
-          
+
           if (synthesis.consensus) {
             expect(typeof synthesis.consensus).toBe('string');
             expect(synthesis.consensus).toMatch(/authentication|security|user/i);
@@ -273,11 +285,11 @@ function calculateTotal(items) {
         `node "${CLI_PATH}" "Explain async/await with security considerations"`,
         { timeout: 50000 }
       );
-      
+
       // Should generate response using voice system
       expect(stdout.length).toBeGreaterThan(30);
       expect(stdout).toMatch(/async|await/i);
-      
+
       // Should not have critical errors
       expect(stderr).not.toMatch(/fatal.*error|voice.*system.*failed/i);
     }, 55000);
@@ -287,7 +299,7 @@ function calculateTotal(items) {
         `node "${CLI_PATH}" "From a security perspective, what are the main risks in JavaScript?"`,
         { timeout: 45000 }
       );
-      
+
       // Should respond appropriately to security-focused query
       expect(stdout.length).toBeGreaterThan(30);
       expect(stdout).toMatch(/security|risk|javascript/i);
@@ -299,20 +311,20 @@ function calculateTotal(items) {
       const prompts = [
         'Quick code review needed',
         'Security audit question',
-        'Architecture design help'
+        'Architecture design help',
       ];
-      
+
       const voices = ['developer', 'security', 'architect'];
-      
+
       const startTime = Date.now();
       let successCount = 0;
-      
+
       for (let i = 0; i < prompts.length; i++) {
         try {
           const response = await voiceSystem.generateVoiceResponse(voices[i], prompts[i], {
-            timeout: 20000
+            timeout: 20000,
           });
-          
+
           if (response) {
             successCount++;
             expect(response.length).toBeGreaterThan(10);
@@ -323,13 +335,15 @@ function calculateTotal(items) {
           }
         }
       }
-      
+
       const totalTime = Date.now() - startTime;
-      
+
       if (successCount > 0) {
         const avgTime = totalTime / successCount;
-        console.log(`Voice switching: ${successCount}/${prompts.length} succeeded, avg ${avgTime}ms per voice`);
-        
+        console.log(
+          `Voice switching: ${successCount}/${prompts.length} succeeded, avg ${avgTime}ms per voice`
+        );
+
         // Should complete voice switches efficiently
         expect(avgTime).toBeLessThan(30000);
       }
@@ -339,14 +353,15 @@ function calculateTotal(items) {
   describe('Voice System Error Handling', () => {
     it('should handle invalid voice IDs gracefully', () => {
       expect(() => voiceSystem.getVoice('nonexistent-voice')).not.toThrow();
-      
+
       const invalidVoice = voiceSystem.getVoice('nonexistent-voice');
       expect(invalidVoice).toBeUndefined();
     });
 
     it('should handle empty prompts appropriately', async () => {
-      await expect(voiceSystem.generateVoiceResponse('developer', '', { timeout: 10000 }))
-        .rejects.toThrow(/empty|invalid|required/i);
+      await expect(
+        voiceSystem.generateVoiceResponse('developer', '', { timeout: 10000 })
+      ).rejects.toThrow(/empty|invalid|required/i);
     });
 
     it('should handle provider failures gracefully', async () => {
@@ -357,7 +372,7 @@ function calculateTotal(items) {
         expect(error.message).toBeDefined();
         expect(typeof error.message).toBe('string');
       }
-      
+
       // Voice system should remain functional after errors
       const voices = voiceSystem.getAvailableVoices();
       expect(voices.length).toBeGreaterThan(0);
@@ -368,9 +383,9 @@ function calculateTotal(items) {
     it('should support voice configuration updates', () => {
       const voices = voiceSystem.getAvailableVoices();
       const originalCount = voices.length;
-      
+
       expect(originalCount).toBeGreaterThan(0);
-      
+
       // Voice system should be configurable
       voices.forEach(voice => {
         expect(voice.expertise).toBeDefined();

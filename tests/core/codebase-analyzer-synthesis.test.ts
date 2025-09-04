@@ -6,10 +6,10 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { CodebaseAnalyzer } from '../../src/core/analysis/codebase-analyzer.js';
-import { 
+import {
   SynthesisCoordinator,
   ApplicationRequest,
-  ApplicationResponse
+  ApplicationResponse,
 } from '../../src/core/application/synthesis-coordinator.js';
 import { DependencyContainer } from '../../src/core/di/dependency-container.js';
 import { UnifiedModelClient, createDefaultUnifiedClientConfig } from '../../src/core/client.js';
@@ -23,11 +23,11 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
   let synthesisCoordinator: SynthesisCoordinator;
   let dependencyContainer: DependencyContainer;
   let modelClient: UnifiedModelClient;
-  
+
   beforeAll(async () => {
     // Create isolated test workspace
     testWorkspace = await mkdtemp(join(tmpdir(), 'analyzer-synthesis-test-'));
-    
+
     // Initialize real system components
     const config = createDefaultUnifiedClientConfig({
       providers: [
@@ -50,7 +50,7 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
 
     modelClient = new UnifiedModelClient(config);
     dependencyContainer = new DependencyContainer();
-    
+
     // Initialize dependency container with real services
     await dependencyContainer.initialize({
       modelClient,
@@ -58,14 +58,14 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
       enableSecurity: true,
       enablePerformanceMonitoring: true,
     });
-    
+
     codebaseAnalyzer = new CodebaseAnalyzer(testWorkspace);
     synthesisCoordinator = new SynthesisCoordinator(dependencyContainer);
 
     // Initialize real systems
     await modelClient.initialize();
     await synthesisCoordinator.initialize();
-    
+
     console.log(`✅ Analyzer/Synthesis test workspace: ${testWorkspace}`);
   }, 120000);
 
@@ -94,31 +94,40 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
     it('should analyze project structure comprehensively', async () => {
       try {
         console.log('📊 Testing comprehensive project structure analysis...');
-        
+
         // Create realistic project structure
         await mkdir(join(testWorkspace, 'src'), { recursive: true });
         await mkdir(join(testWorkspace, 'tests'), { recursive: true });
         await mkdir(join(testWorkspace, 'config'), { recursive: true });
         await mkdir(join(testWorkspace, 'docs'), { recursive: true });
-        
+
         // Create sample files
-        await writeFile(join(testWorkspace, 'package.json'), JSON.stringify({
-          name: 'test-project',
-          version: '1.0.0',
-          description: 'Test project for analysis',
-          main: 'index.js',
-          scripts: {
-            test: 'jest',
-            build: 'tsc',
-            lint: 'eslint'
-          },
-          dependencies: {
-            'express': '^4.18.0',
-            'typescript': '^4.9.0'
-          }
-        }, null, 2));
-        
-        await writeFile(join(testWorkspace, 'src', 'index.ts'), `
+        await writeFile(
+          join(testWorkspace, 'package.json'),
+          JSON.stringify(
+            {
+              name: 'test-project',
+              version: '1.0.0',
+              description: 'Test project for analysis',
+              main: 'index.js',
+              scripts: {
+                test: 'jest',
+                build: 'tsc',
+                lint: 'eslint',
+              },
+              dependencies: {
+                express: '^4.18.0',
+                typescript: '^4.9.0',
+              },
+            },
+            null,
+            2
+          )
+        );
+
+        await writeFile(
+          join(testWorkspace, 'src', 'index.ts'),
+          `
           import express from 'express';
           
           const app = express();
@@ -135,9 +144,12 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
           app.listen(PORT, () => {
             console.log(\`Server running on port \${PORT}\`);
           });
-        `);
-        
-        await writeFile(join(testWorkspace, 'src', 'utils.ts'), `
+        `
+        );
+
+        await writeFile(
+          join(testWorkspace, 'src', 'utils.ts'),
+          `
           export const formatDate = (date: Date): string => {
             return date.toISOString().split('T')[0];
           };
@@ -150,9 +162,12 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
           export const generateId = (): string => {
             return Math.random().toString(36).substring(2, 15);
           };
-        `);
-        
-        await writeFile(join(testWorkspace, 'tests', 'utils.test.ts'), `
+        `
+        );
+
+        await writeFile(
+          join(testWorkspace, 'tests', 'utils.test.ts'),
+          `
           import { formatDate, validateEmail, generateId } from '../src/utils';
           
           describe('Utils', () => {
@@ -173,22 +188,32 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
               expect(id1.length).toBeGreaterThan(5);
             });
           });
-        `);
-        
-        await writeFile(join(testWorkspace, 'tsconfig.json'), JSON.stringify({
-          compilerOptions: {
-            target: 'ES2020',
-            module: 'CommonJS',
-            outDir: './dist',
-            rootDir: './src',
-            strict: true,
-            esModuleInterop: true
-          },
-          include: ['src/**/*'],
-          exclude: ['node_modules', 'dist', 'tests']
-        }, null, 2));
-        
-        await writeFile(join(testWorkspace, 'README.md'), `
+        `
+        );
+
+        await writeFile(
+          join(testWorkspace, 'tsconfig.json'),
+          JSON.stringify(
+            {
+              compilerOptions: {
+                target: 'ES2020',
+                module: 'CommonJS',
+                outDir: './dist',
+                rootDir: './src',
+                strict: true,
+                esModuleInterop: true,
+              },
+              include: ['src/**/*'],
+              exclude: ['node_modules', 'dist', 'tests'],
+            },
+            null,
+            2
+          )
+        );
+
+        await writeFile(
+          join(testWorkspace, 'README.md'),
+          `
           # Test Project
           
           This is a test project for codebase analysis testing.
@@ -208,15 +233,16 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
           \`\`\`bash
           npm start
           \`\`\`
-        `);
-        
+        `
+        );
+
         // Perform analysis
         const analysis = await codebaseAnalyzer.performAnalysis();
-        
+
         expect(analysis).toBeTruthy();
         expect(typeof analysis).toBe('string');
         expect(analysis.length).toBeGreaterThan(500);
-        
+
         // Verify analysis content
         const analysisLower = analysis.toLowerCase();
         expect(analysisLower).toContain('test-project');
@@ -224,16 +250,15 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
         expect(analysisLower).toContain('typescript');
         expect(analysisLower).toContain('total files');
         expect(analysisLower).toContain('total lines');
-        
+
         // Should identify project structure
         expect(
           analysisLower.includes('src') ||
-          analysisLower.includes('tests') ||
-          analysisLower.includes('config')
+            analysisLower.includes('tests') ||
+            analysisLower.includes('config')
         ).toBe(true);
-        
+
         console.log('✅ Comprehensive project analysis completed successfully');
-        
       } catch (error) {
         console.log(`⚠️ Project analysis failed: ${error}`);
         expect(error).toBeInstanceOf(Error);
@@ -243,9 +268,11 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
     it('should analyze code metrics and quality indicators', async () => {
       try {
         console.log('📈 Testing code metrics analysis...');
-        
+
         // Create complex code for metrics analysis
-        await writeFile(join(testWorkspace, 'src', 'complex.ts'), `
+        await writeFile(
+          join(testWorkspace, 'src', 'complex.ts'),
+          `
           /**
            * Complex class for testing code metrics
            * This class has various complexity patterns for analysis
@@ -351,23 +378,23 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
               return { ...item, processed: true, generic: true };
             }
           }
-        `);
-        
+        `
+        );
+
         // Perform analysis again to get updated metrics
         const analysis = await codebaseAnalyzer.performAnalysis();
-        
+
         expect(analysis).toBeTruthy();
-        
+
         // Should contain metrics information
         const analysisLower = analysis.toLowerCase();
         expect(
           analysisLower.includes('typescript files') ||
-          analysisLower.includes('code metrics') ||
-          analysisLower.includes('lines')
+            analysisLower.includes('code metrics') ||
+            analysisLower.includes('lines')
         ).toBe(true);
-        
+
         console.log('✅ Code metrics analysis completed successfully');
-        
       } catch (error) {
         console.log(`⚠️ Code metrics analysis failed: ${error}`);
         expect(error).toBeInstanceOf(Error);
@@ -377,9 +404,11 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
     it('should analyze dependencies and architecture components', async () => {
       try {
         console.log('🏗️ Testing dependency and architecture analysis...');
-        
+
         // Create files with dependencies
-        await writeFile(join(testWorkspace, 'src', 'database.ts'), `
+        await writeFile(
+          join(testWorkspace, 'src', 'database.ts'),
+          `
           import { EventEmitter } from 'events';
           
           export interface DatabaseConfig {
@@ -423,9 +452,12 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
               return this.connected;
             }
           }
-        `);
-        
-        await writeFile(join(testWorkspace, 'src', 'auth.ts'), `
+        `
+        );
+
+        await writeFile(
+          join(testWorkspace, 'src', 'auth.ts'),
+          `
           import { DatabaseManager } from './database';
           import { generateId } from './utils';
           
@@ -469,23 +501,23 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
               this.sessions.delete(token);
             }
           }
-        `);
-        
+        `
+        );
+
         // Perform analysis with dependencies
         const analysis = await codebaseAnalyzer.performAnalysis();
-        
+
         expect(analysis).toBeTruthy();
-        
+
         // Should identify architectural components and dependencies
         const analysisLower = analysis.toLowerCase();
         expect(
           analysisLower.includes('dependencies') ||
-          analysisLower.includes('architecture') ||
-          analysisLower.includes('components')
+            analysisLower.includes('architecture') ||
+            analysisLower.includes('components')
         ).toBe(true);
-        
+
         console.log('✅ Dependency and architecture analysis completed successfully');
-        
       } catch (error) {
         console.log(`⚠️ Dependency analysis failed: ${error}`);
         expect(error).toBeInstanceOf(Error);
@@ -497,7 +529,7 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
     it('should coordinate synthesis requests through DI container', async () => {
       try {
         console.log('🎭 Testing synthesis coordination with DI...');
-        
+
         const request: ApplicationRequest = {
           prompt: 'Generate a simple function to calculate factorial',
           voice: 'developer',
@@ -514,9 +546,9 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
             timestamp: Date.now(),
           },
         };
-        
+
         const response = await synthesisCoordinator.processRequest(request);
-        
+
         expect(response).toBeDefined();
         expect(response.id).toBeTruthy();
         expect(response.content).toBeTruthy();
@@ -525,19 +557,20 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
         expect(typeof response.synthesis.processingTime).toBe('number');
         expect(response.synthesis.processingTime).toBeGreaterThan(0);
         expect(response.metadata).toBeDefined();
-        
+
         // Should contain factorial-related content
         const content = response.content.toLowerCase();
         expect(
           content.includes('factorial') ||
-          content.includes('function') ||
-          content.includes('calculate')
+            content.includes('function') ||
+            content.includes('calculate')
         ).toBe(true);
-        
+
         console.log(`✅ Synthesis completed in ${response.synthesis.processingTime}ms`);
-        
       } catch (error) {
-        console.log(`⚠️ Synthesis coordination failed: ${error} - may indicate provider connectivity issues`);
+        console.log(
+          `⚠️ Synthesis coordination failed: ${error} - may indicate provider connectivity issues`
+        );
         expect(error).toBeInstanceOf(Error);
       }
     }, 90000);
@@ -545,7 +578,7 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
     it('should handle streaming synthesis requests', async () => {
       try {
         console.log('🌊 Testing streaming synthesis coordination...');
-        
+
         const request: ApplicationRequest = {
           prompt: 'Explain how async/await works in JavaScript',
           voice: 'educator',
@@ -557,29 +590,32 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
             includeExamples: true,
           },
         };
-        
+
         const streamChunks: string[] = [];
         const onStreamData = (chunk: string) => {
           streamChunks.push(chunk);
         };
-        
+
         const response = await synthesisCoordinator.processStreamingRequest(request, onStreamData);
-        
+
         expect(response).toBeDefined();
         expect(response.content).toBeTruthy();
         expect(response.synthesis.streamingEnabled).toBe(true);
-        
+
         // Should have received streaming chunks
         if (streamChunks.length > 0) {
           expect(streamChunks.length).toBeGreaterThan(0);
           const combinedChunks = streamChunks.join('');
           expect(combinedChunks.length).toBeGreaterThan(0);
-          
-          console.log(`✅ Streaming completed: ${streamChunks.length} chunks, ${response.synthesis.processingTime}ms`);
+
+          console.log(
+            `✅ Streaming completed: ${streamChunks.length} chunks, ${response.synthesis.processingTime}ms`
+          );
         } else {
-          console.log('✅ Streaming request processed (no chunks received - may indicate non-streaming provider)');
+          console.log(
+            '✅ Streaming request processed (no chunks received - may indicate non-streaming provider)'
+          );
         }
-        
       } catch (error) {
         console.log(`⚠️ Streaming synthesis failed: ${error}`);
         expect(error).toBeInstanceOf(Error);
@@ -589,7 +625,7 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
     it('should handle multi-voice synthesis coordination', async () => {
       try {
         console.log('🎼 Testing multi-voice synthesis coordination...');
-        
+
         const request: ApplicationRequest = {
           prompt: 'Design a secure user authentication system',
           voice: 'council', // Special voice that triggers multi-voice synthesis
@@ -604,28 +640,29 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
             multiVoice: true,
           },
         };
-        
+
         const response = await synthesisCoordinator.processRequest(request);
-        
+
         expect(response).toBeDefined();
         expect(response.content).toBeTruthy();
         expect(response.synthesis).toBeDefined();
-        
+
         // Multi-voice synthesis should take longer and produce comprehensive content
         expect(response.synthesis.processingTime).toBeGreaterThan(1000); // At least 1 second
         expect(response.content.length).toBeGreaterThan(500); // Comprehensive response
-        
+
         // Should contain authentication-related content
         const content = response.content.toLowerCase();
         expect(
           content.includes('authentication') ||
-          content.includes('security') ||
-          content.includes('user') ||
-          content.includes('system')
+            content.includes('security') ||
+            content.includes('user') ||
+            content.includes('system')
         ).toBe(true);
-        
-        console.log(`✅ Multi-voice synthesis completed: ${response.content.length} chars in ${response.synthesis.processingTime}ms`);
-        
+
+        console.log(
+          `✅ Multi-voice synthesis completed: ${response.content.length} chars in ${response.synthesis.processingTime}ms`
+        );
       } catch (error) {
         console.log(`⚠️ Multi-voice synthesis failed: ${error}`);
         expect(error).toBeInstanceOf(Error);
@@ -635,7 +672,7 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
     it('should handle tool-enabled synthesis requests', async () => {
       try {
         console.log('🔧 Testing tool-enabled synthesis coordination...');
-        
+
         const request: ApplicationRequest = {
           prompt: 'Analyze the current project structure and suggest improvements',
           voice: 'analyzer',
@@ -649,25 +686,26 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
             workingDirectory: testWorkspace,
           },
         };
-        
+
         const response = await synthesisCoordinator.processRequest(request);
-        
+
         expect(response).toBeDefined();
         expect(response.content).toBeTruthy();
         expect(response.synthesis.toolsUsed).toBe(true);
-        
+
         // Tool-enabled response should contain specific insights about the test project
         const content = response.content.toLowerCase();
         expect(
           content.includes('project') ||
-          content.includes('structure') ||
-          content.includes('analysis') ||
-          content.includes('file') ||
-          content.includes('directory')
+            content.includes('structure') ||
+            content.includes('analysis') ||
+            content.includes('file') ||
+            content.includes('directory')
         ).toBe(true);
-        
-        console.log(`✅ Tool-enabled synthesis completed: tools used = ${response.synthesis.toolsUsed}`);
-        
+
+        console.log(
+          `✅ Tool-enabled synthesis completed: tools used = ${response.synthesis.toolsUsed}`
+        );
       } catch (error) {
         console.log(`⚠️ Tool-enabled synthesis failed: ${error}`);
         expect(error).toBeInstanceOf(Error);
@@ -679,7 +717,7 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
     it('should handle concurrent synthesis requests efficiently', async () => {
       try {
         console.log('🔀 Testing concurrent synthesis coordination...');
-        
+
         const requests: ApplicationRequest[] = [
           {
             prompt: 'Create a simple REST API endpoint',
@@ -700,9 +738,9 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
             maxTokens: 1024,
           },
         ];
-        
+
         const startTime = Date.now();
-        const responsePromises = requests.map(request => 
+        const responsePromises = requests.map(request =>
           synthesisCoordinator.processRequest(request).catch(error => ({
             id: 'error',
             content: `Error: ${error.message}`,
@@ -714,27 +752,30 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
             metadata: {},
           }))
         );
-        
+
         const responses = await Promise.all(responsePromises);
         const endTime = Date.now();
-        
+
         expect(responses).toBeDefined();
         expect(responses.length).toBe(requests.length);
-        
+
         // Verify responses
         const successfulResponses = responses.filter(r => !r.synthesis.error);
-        
+
         if (successfulResponses.length > 0) {
           successfulResponses.forEach(response => {
             expect(response.content).toBeTruthy();
             expect(response.synthesis).toBeDefined();
           });
-          
-          console.log(`✅ Concurrent synthesis: ${successfulResponses.length}/${responses.length} successful in ${endTime - startTime}ms`);
+
+          console.log(
+            `✅ Concurrent synthesis: ${successfulResponses.length}/${responses.length} successful in ${endTime - startTime}ms`
+          );
         } else {
-          console.log('⚠️ Concurrent synthesis: All requests failed (expected if providers unavailable)');
+          console.log(
+            '⚠️ Concurrent synthesis: All requests failed (expected if providers unavailable)'
+          );
         }
-        
       } catch (error) {
         console.log(`⚠️ Concurrent synthesis test failed: ${error}`);
         expect(error).toBeInstanceOf(Error);
@@ -744,10 +785,10 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
     it('should maintain performance under load', async () => {
       try {
         console.log('📈 Testing synthesis performance under load...');
-        
+
         const performanceMetrics = await synthesisCoordinator.getPerformanceMetrics();
         const initialMetrics = { ...performanceMetrics };
-        
+
         // Execute multiple requests to generate load
         const loadRequests = Array.from({ length: 5 }, (_, i) => ({
           prompt: `Generate utility function ${i + 1}`,
@@ -755,10 +796,10 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
           temperature: 0.7,
           maxTokens: 512,
         }));
-        
+
         const startTime = Date.now();
         const results = [];
-        
+
         for (const request of loadRequests) {
           try {
             const response = await synthesisCoordinator.processRequest(request);
@@ -768,27 +809,30 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
             console.log(`Request failed: ${error}`);
           }
         }
-        
+
         const endTime = Date.now();
         const finalMetrics = await synthesisCoordinator.getPerformanceMetrics();
-        
+
         // Verify performance metrics
         expect(finalMetrics).toBeDefined();
         expect(typeof finalMetrics.totalRequests).toBe('number');
         expect(typeof finalMetrics.averageResponseTime).toBe('number');
         expect(typeof finalMetrics.successRate).toBe('number');
-        
+
         expect(finalMetrics.totalRequests).toBeGreaterThanOrEqual(initialMetrics.totalRequests);
-        
+
         if (results.length > 0) {
           expect(finalMetrics.averageResponseTime).toBeGreaterThan(0);
           expect(finalMetrics.successRate).toBeGreaterThan(0);
-          
-          console.log(`✅ Performance under load: ${results.length} requests, ${finalMetrics.averageResponseTime}ms avg, ${(finalMetrics.successRate * 100).toFixed(1)}% success`);
+
+          console.log(
+            `✅ Performance under load: ${results.length} requests, ${finalMetrics.averageResponseTime}ms avg, ${(finalMetrics.successRate * 100).toFixed(1)}% success`
+          );
         } else {
-          console.log('⚠️ Performance test completed with no successful requests (providers unavailable)');
+          console.log(
+            '⚠️ Performance test completed with no successful requests (providers unavailable)'
+          );
         }
-        
       } catch (error) {
         console.log(`⚠️ Performance test failed: ${error}`);
         expect(error).toBeInstanceOf(Error);
@@ -798,10 +842,10 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
     it('should handle cleanup and resource management', async () => {
       try {
         console.log('🧹 Testing resource cleanup...');
-        
+
         // Get initial resource state
         const initialResources = await synthesisCoordinator.getResourceMetrics();
-        
+
         // Perform operations that create resources
         const resourceIntensiveRequest: ApplicationRequest = {
           prompt: 'Generate comprehensive documentation for a complex API',
@@ -816,7 +860,7 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
             generateDiagrams: true,
           },
         };
-        
+
         try {
           const response = await synthesisCoordinator.processRequest(resourceIntensiveRequest);
           expect(response).toBeDefined();
@@ -824,22 +868,25 @@ describe('Codebase Analyzer and Synthesis Coordinator - Real Implementation Test
           // Expected if providers unavailable
           console.log(`Resource intensive request failed: ${error}`);
         }
-        
+
         // Trigger cleanup
         await synthesisCoordinator.cleanup();
-        
+
         const finalResources = await synthesisCoordinator.getResourceMetrics();
-        
+
         expect(finalResources).toBeDefined();
         expect(typeof finalResources.memoryUsage).toBe('number');
         expect(typeof finalResources.activeConnections).toBe('number');
         expect(typeof finalResources.cacheSize).toBe('number');
-        
+
         // Verify cleanup occurred
-        expect(finalResources.memoryUsage).toBeLessThanOrEqual((initialResources?.memoryUsage || Infinity) * 1.5);
-        
-        console.log(`✅ Resource cleanup: memory=${finalResources.memoryUsage}MB, connections=${finalResources.activeConnections}`);
-        
+        expect(finalResources.memoryUsage).toBeLessThanOrEqual(
+          (initialResources?.memoryUsage || Infinity) * 1.5
+        );
+
+        console.log(
+          `✅ Resource cleanup: memory=${finalResources.memoryUsage}MB, connections=${finalResources.activeConnections}`
+        );
       } catch (error) {
         console.log(`⚠️ Resource cleanup test failed: ${error}`);
         expect(error).toBeInstanceOf(Error);

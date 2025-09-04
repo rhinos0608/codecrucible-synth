@@ -189,9 +189,9 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
       try {
         if (typeof (this.rustBackend as any).initialize === 'function') {
           // Fire-and-forget initialization
-          (this.rustBackend as any).initialize().catch((err: any) =>
-            logger.warn('Injected rustBackend failed to initialize', err)
-          );
+          (this.rustBackend as any)
+            .initialize()
+            .catch((err: any) => logger.warn('Injected rustBackend failed to initialize', err));
         }
       } catch (err) {
         logger.warn('Error while initializing injected rustBackend', err);
@@ -207,6 +207,11 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   }
 
   private async initializeRustBackend(): Promise<void> {
+    if (!this.rustBackend) {
+      logger.warn('RequestExecutionManager: Rust backend not available');
+      return;
+    }
+
     try {
       const initialized = await this.rustBackend.initialize();
       if (initialized === true) {
@@ -898,8 +903,8 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
       activeRequests: this.activeRequests.size,
       queuedRequests: this.requestQueue.length,
       maxConcurrent: this.config.maxConcurrentRequests,
-      rustBackendAvailable: this.rustBackend.isAvailable(),
-      rustBackendStats: this.rustBackend.getPerformanceStats(),
+      rustBackendAvailable: this.rustBackend?.isAvailable() ?? false,
+      rustBackendStats: this.rustBackend?.getPerformanceStats() ?? null,
       config: this.config,
     };
   }
@@ -908,6 +913,9 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
    * Get the Rust execution backend instance
    */
   getRustBackend(): RustExecutionBackend {
+    if (!this.rustBackend) {
+      throw new Error('Rust execution backend is not available');
+    }
     return this.rustBackend;
   }
 }

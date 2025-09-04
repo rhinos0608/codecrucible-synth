@@ -31,9 +31,16 @@ interface UrlReadResponse {
 }
 
 interface MCPGlobal {
-  mcp__exa__web_search_exa?: (params: { query: string; numResults?: number }) => Promise<SearchResponse>;
-  mcp__ref_tools_ref_tools_mcp__ref_search_documentation?: (params: { query: string }) => Promise<SearchResponse>;
-  mcp__ref_tools_ref_tools_mcp__ref_read_url?: (params: { url: string }) => Promise<UrlReadResponse>;
+  mcp__exa__web_search_exa?: (params: {
+    query: string;
+    numResults?: number;
+  }) => Promise<SearchResponse>;
+  mcp__ref_tools_ref_tools_mcp__ref_search_documentation?: (params: {
+    query: string;
+  }) => Promise<SearchResponse>;
+  mcp__ref_tools_ref_tools_mcp__ref_read_url?: (params: {
+    url: string;
+  }) => Promise<UrlReadResponse>;
 }
 
 declare const global: typeof globalThis & MCPGlobal;
@@ -56,7 +63,10 @@ export class GoogleWebSearchTool extends BaseTool {
 
       // Try to use MCP Exa search if available
       try {
-        if (typeof global.mcp__exa__web_search_exa !== 'undefined' && global.mcp__exa__web_search_exa) {
+        if (
+          typeof global.mcp__exa__web_search_exa !== 'undefined' &&
+          global.mcp__exa__web_search_exa
+        ) {
           return await global.mcp__exa__web_search_exa({ query: params.query });
         }
       } catch (e) {
@@ -109,8 +119,8 @@ export class RefDocumentationTool extends BaseTool {
       // Try to use MCP ref search if available
       try {
         if (
-          typeof global.mcp__ref_tools_ref_tools_mcp__ref_search_documentation !==
-          'undefined' && global.mcp__ref_tools_ref_tools_mcp__ref_search_documentation
+          typeof global.mcp__ref_tools_ref_tools_mcp__ref_search_documentation !== 'undefined' &&
+          global.mcp__ref_tools_ref_tools_mcp__ref_search_documentation
         ) {
           return await global.mcp__ref_tools_ref_tools_mcp__ref_search_documentation({
             query: params.query,
@@ -165,7 +175,10 @@ export class RefReadUrlTool extends BaseTool {
 
       // Try to use MCP ref read if available
       try {
-        if (typeof global.mcp__ref_tools_ref_tools_mcp__ref_read_url !== 'undefined' && global.mcp__ref_tools_ref_tools_mcp__ref_read_url) {
+        if (
+          typeof global.mcp__ref_tools_ref_tools_mcp__ref_read_url !== 'undefined' &&
+          global.mcp__ref_tools_ref_tools_mcp__ref_read_url
+        ) {
           return await global.mcp__ref_tools_ref_tools_mcp__ref_read_url({
             url: params.url,
           });
@@ -232,7 +245,10 @@ export class ExaWebSearchTool extends BaseTool {
 
       // Try to use MCP Exa search if available
       try {
-        if (typeof global.mcp__exa__web_search_exa !== 'undefined' && global.mcp__exa__web_search_exa) {
+        if (
+          typeof global.mcp__exa__web_search_exa !== 'undefined' &&
+          global.mcp__exa__web_search_exa
+        ) {
           return await global.mcp__exa__web_search_exa({
             query: params.query,
             numResults: params.numResults,

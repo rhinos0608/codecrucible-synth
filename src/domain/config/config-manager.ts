@@ -21,7 +21,9 @@ export interface IUnifiedConfigurationManager {
     updates: Readonly<Partial<UnifiedConfiguration>>,
     source: Readonly<ConfigurationSource>
   ) => Promise<void>;
-  validateConfiguration: (config: Readonly<Partial<UnifiedConfiguration>>) => ConfigurationValidation;
+  validateConfiguration: (
+    config: Readonly<Partial<UnifiedConfiguration>>
+  ) => ConfigurationValidation;
   saveConfiguration: (filePath?: string) => Promise<void>;
   resetToDefaults: () => Promise<void>;
   watchForChanges: (enabled: boolean) => void;
@@ -163,8 +165,14 @@ export async function createUnifiedConfigurationManager(options?: {
   configFilePath?: string;
   eventBus?: IEventBus;
 }): Promise<UnifiedConfigurationManager> {
-  const logger = options?.logger || (await import('../interfaces/logger.js')).createConsoleLogger('UnifiedConfigurationManager');
-  const manager = new UnifiedConfigurationManager(logger, options?.configFilePath, options?.eventBus);
+  const logger =
+    options?.logger ||
+    (await import('../interfaces/logger.js')).createConsoleLogger('UnifiedConfigurationManager');
+  const manager = new UnifiedConfigurationManager(
+    logger,
+    options?.configFilePath,
+    options?.eventBus
+  );
   await manager.initialize();
   return manager;
 }

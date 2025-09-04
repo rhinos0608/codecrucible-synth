@@ -113,12 +113,14 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     voices: string[],
     prompt: string,
     options?: { files?: string[] }
-  ): Promise<Array<{
-    voice: string;
-    content: string;
-    confidence: number;
-    files: string[];
-  }>> {
+  ): Promise<
+    Array<{
+      voice: string;
+      content: string;
+      confidence: number;
+      files: string[];
+    }>
+  > {
     const result = await this.processPrompt(prompt, { requiredVoices: voices });
     // Convert single result to array format expected by callers
     return [
@@ -131,7 +133,10 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     ];
   }
 
-  public getVoicePerspective(voiceId: string, prompt: string): Promise<{
+  public getVoicePerspective(
+    voiceId: string,
+    prompt: string
+  ): Promise<{
     voiceId: string;
     position: string;
     confidence: number;
@@ -171,10 +176,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
       if (Array.isArray(context.requiredVoices)) {
         options.requiredVoices = context.requiredVoices;
       }
-      if (
-        typeof context.councilMode === 'string' ||
-        typeof context.councilMode === 'number'
-      ) {
+      if (typeof context.councilMode === 'string' || typeof context.councilMode === 'number') {
         options.councilMode = context.councilMode;
       }
     }

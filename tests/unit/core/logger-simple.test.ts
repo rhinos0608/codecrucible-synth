@@ -15,7 +15,7 @@ describe('Logger Enterprise System', () => {
       level: 'debug',
       toFile: false, // Disable file logging for tests
       toConsole: false, // Disable console logging for tests
-      logDirectory: testLogDir
+      logDirectory: testLogDir,
     });
   });
 
@@ -46,7 +46,7 @@ describe('Logger Enterprise System', () => {
       const testData = {
         userId: 'user123',
         sessionId: 'session456',
-        operation: 'file_analysis'
+        operation: 'file_analysis',
       };
 
       expect(() => {
@@ -71,7 +71,7 @@ describe('Logger Enterprise System', () => {
           userId: 'user123',
           ip: '192.168.1.1',
           userAgent: 'Mozilla/5.0',
-          status: 'success'
+          status: 'success',
         });
       }).not.toThrow();
     });
@@ -83,7 +83,7 @@ describe('Logger Enterprise System', () => {
           threatType: 'code_injection',
           userId: 'user123',
           ip: '192.168.1.1',
-          mitigated: true
+          mitigated: true,
         });
       }).not.toThrow();
     });
@@ -92,7 +92,7 @@ describe('Logger Enterprise System', () => {
       expect(() => {
         testLogger.metric('response_time', 150, 'ms', {
           endpoint: '/api/generate',
-          method: 'POST'
+          method: 'POST',
         });
       }).not.toThrow();
     });
@@ -102,7 +102,7 @@ describe('Logger Enterprise System', () => {
         testLogger.business('Code generation completed', {
           codeType: 'typescript',
           linesGenerated: 45,
-          modelUsed: 'gpt-4'
+          modelUsed: 'gpt-4',
         });
       }).not.toThrow();
     });
@@ -112,7 +112,7 @@ describe('Logger Enterprise System', () => {
     test('should support performance timing', () => {
       const timer = testLogger.time('test_operation');
       expect(typeof timer).toBe('function');
-      
+
       // Complete timing
       expect(() => timer()).not.toThrow();
     });
@@ -142,7 +142,7 @@ describe('Logger Enterprise System', () => {
     test('should handle error objects properly', () => {
       const testError = new Error('Test error message');
       testError.stack = 'Error: Test error\n    at test';
-      
+
       expect(() => {
         testLogger.error('Operation failed', testError);
       }).not.toThrow();
@@ -150,7 +150,7 @@ describe('Logger Enterprise System', () => {
 
     test('should handle mixed error parameters', () => {
       const testData = { operation: 'file_read', path: '/test/path' };
-      
+
       expect(() => {
         testLogger.error('File operation failed', testData);
       }).not.toThrow();
@@ -161,14 +161,14 @@ describe('Logger Enterprise System', () => {
     test('should maintain immutable config copies', () => {
       const config1 = testLogger.getConfig();
       const config2 = testLogger.getConfig();
-      
+
       config1.level = 'error';
       expect(config2.level).toBe('debug'); // Should not be modified
     });
 
     test('should handle various log levels', () => {
       const levels = ['debug', 'info', 'warn', 'error'] as const;
-      
+
       levels.forEach(level => {
         expect(() => {
           testLogger.updateConfig({ level });
@@ -198,7 +198,7 @@ describe('Logger Enterprise System', () => {
       const testData = {
         correlationId: 'corr-123',
         userId: 'user-456',
-        sessionId: 'sess-789'
+        sessionId: 'sess-789',
       };
 
       expect(() => {

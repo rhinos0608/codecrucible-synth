@@ -4,7 +4,11 @@
  * infrastructure implementations (e.g. Rust execution backend).
  */
 
-import type { ToolExecutionRequest, ToolExecutionResult, IToolExecutor } from '../interfaces/tool-system.js';
+import type {
+  ToolExecutionRequest,
+  ToolExecutionResult,
+  IToolExecutor,
+} from '../interfaces/tool-system.js';
 
 // Use the domain tool system request/result shapes so backends can accept and
 // return the exact types used by the domain executor. This keeps types consistent

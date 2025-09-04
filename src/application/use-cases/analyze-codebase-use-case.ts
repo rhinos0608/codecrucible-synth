@@ -63,9 +63,7 @@ export interface CodebaseMetrics {
  * Orchestrates domain services for comprehensive code analysis
  */
 export class AnalyzeCodebaseUseCase {
-  constructor(
-    private modelSelectionService: IModelSelectionService
-  ) {}
+  constructor(private modelSelectionService: IModelSelectionService) {}
 
   async execute(input: CodebaseAnalysisInput): Promise<CodebaseAnalysisOutput> {
     const startTime = Date.now();
@@ -285,7 +283,7 @@ ${JSON.stringify(codebaseInfo, null, 2)}`;
   private extractSummary(content: string): string {
     // Extract first paragraph as summary (simplified extraction)
     const lines = content.split('\n').filter(line => line.trim());
-    return `${lines.slice(0, 3).join(' ').substring(0, 300)  }...`;
+    return `${lines.slice(0, 3).join(' ').substring(0, 300)}...`;
   }
 
   private extractFindings(content: string): AnalysisFinding[] {

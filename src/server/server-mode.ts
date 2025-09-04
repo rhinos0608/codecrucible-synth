@@ -33,7 +33,10 @@ export interface ServerOptions {
 }
 
 export interface ServerModeInterface {
-  startServerMode: (context: Readonly<CLIContext>, options: Readonly<ServerOptions>) => Promise<void>;
+  startServerMode: (
+    context: Readonly<CLIContext>,
+    options: Readonly<ServerOptions>
+  ) => Promise<void>;
 }
 
 /**
@@ -113,11 +116,21 @@ export class ServerMode implements ServerModeInterface {
 
       // Create a logger for the server system
       const serverLogger = {
-        info: (msg: string): void => { console.log(`[ServerSystem] ${msg}`); },
-        error: (msg: string, error?: unknown): void => { console.error(`[ServerSystem] ${msg}`, error); },
-        warn: (msg: string): void => { console.warn(`[ServerSystem] ${msg}`); },
-        debug: (msg: string): void => { console.debug(`[ServerSystem] ${msg}`); },
-        trace: (msg: string): void => { console.trace(`[ServerSystem] ${msg}`); },
+        info: (msg: string): void => {
+          console.log(`[ServerSystem] ${msg}`);
+        },
+        error: (msg: string, error?: unknown): void => {
+          console.error(`[ServerSystem] ${msg}`, error);
+        },
+        warn: (msg: string): void => {
+          console.warn(`[ServerSystem] ${msg}`);
+        },
+        debug: (msg: string): void => {
+          console.debug(`[ServerSystem] ${msg}`);
+        },
+        trace: (msg: string): void => {
+          console.trace(`[ServerSystem] ${msg}`);
+        },
       };
 
       // Create unified server system

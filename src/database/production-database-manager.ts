@@ -702,16 +702,17 @@ export class ProductionDatabaseManager {
     excludeTables?: string[];
     chunkSize?: number; // reserved for future streaming implementation
   }): Promise<string>;
-  async backup(optionsOrPath?:
-    | string
-    | {
-        outputDir?: string;
-        format?: 'json';
-        includeSchemas?: string[];
-        includeTables?: string[];
-        excludeTables?: string[];
-        chunkSize?: number;
-      }
+  async backup(
+    optionsOrPath?:
+      | string
+      | {
+          outputDir?: string;
+          format?: 'json';
+          includeSchemas?: string[];
+          includeTables?: string[];
+          excludeTables?: string[];
+          chunkSize?: number;
+        }
   ): Promise<string> {
     const start = Date.now();
     if (!this.knexInstance) {
@@ -746,7 +747,11 @@ export class ProductionDatabaseManager {
           const key = t.schema ? `${t.schema}.${t.name}` : t.name;
           dump[key] = rows;
         } catch (error: any) {
-          logger.warn('Failed to back up table', { table: t.name, schema: t.schema, error: error?.message });
+          logger.warn('Failed to back up table', {
+            table: t.name,
+            schema: t.schema,
+            error: error?.message,
+          });
         }
       }
 
@@ -776,14 +781,16 @@ export class ProductionDatabaseManager {
       return destFile;
     }
 
-    const opts = optionsOrPath as {
-      outputDir?: string;
-      format?: 'json';
-      includeSchemas?: string[];
-      includeTables?: string[];
-      excludeTables?: string[];
-      chunkSize?: number;
-    } | undefined;
+    const opts = optionsOrPath as
+      | {
+          outputDir?: string;
+          format?: 'json';
+          includeSchemas?: string[];
+          includeTables?: string[];
+          excludeTables?: string[];
+          chunkSize?: number;
+        }
+      | undefined;
 
     const outRoot = opts?.outputDir || 'backups';
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -825,7 +832,7 @@ export class ProductionDatabaseManager {
             }
             return await this.knex.select('*').from(t.name);
           }
-        
+
           // mysql
           return await this.knex.select('*').from(t.name);
         })();
@@ -847,7 +854,11 @@ export class ProductionDatabaseManager {
         manifest.tables.push({ schema: t.schema, name: t.name, rows: rows.length, file: filename });
         logger.debug('Backed up table', { table: t.name, schema: t.schema, rows: rows.length });
       } catch (error: any) {
-        logger.warn('Failed to back up table', { table: t.name, schema: t.schema, error: error?.message });
+        logger.warn('Failed to back up table', {
+          table: t.name,
+          schema: t.schema,
+          error: error?.message,
+        });
       }
     }
 
@@ -903,7 +914,10 @@ export class ProductionDatabaseManager {
     let tables = rawTables.map(r => ({ schema: r.table_schema, name: r.table_name }));
 
     if (includeSchemas && includeSchemas.length) {
-      tables = tables.filter(t => (t.schema || '').toLowerCase() && includeSchemas.includes((t.schema || '').toLowerCase()));
+      tables = tables.filter(
+        t =>
+          (t.schema || '').toLowerCase() && includeSchemas.includes((t.schema || '').toLowerCase())
+      );
     }
     if (includeTables && includeTables.length) {
       tables = tables.filter(t => includeTables.includes(t.name.toLowerCase()));

@@ -9,7 +9,11 @@ export class CLIParser {
   /**
    * Parse slash commands for role switching
    */
-  public static parseSlashCommand(input: string): { command: string; role?: string; content: string } {
+  public static parseSlashCommand(input: string): {
+    command: string;
+    role?: string;
+    content: string;
+  } {
     const slashCommandRegex = /^\/(\w+)(?:\s+(.*))?$/;
     const match = input.match(slashCommandRegex);
 
@@ -60,7 +64,14 @@ export class CLIParser {
             break;
           case 'mode':
             if (nextArg && !nextArg.startsWith('--')) {
-              options.mode = nextArg as 'agentic' | 'iterative' | 'competitive' | 'collaborative' | 'consensus' | 'comprehensive' | 'analysis';
+              options.mode = nextArg as
+                | 'agentic'
+                | 'iterative'
+                | 'competitive'
+                | 'collaborative'
+                | 'consensus'
+                | 'comprehensive'
+                | 'analysis';
               i++;
             }
             break;
@@ -109,7 +120,14 @@ export class CLIParser {
 
           case 'backend':
             if (nextArg && !nextArg.startsWith('--')) {
-              options.backend = nextArg as 'auto' | 'docker' | 'e2b' | 'local_e2b' | 'local_process' | 'firecracker' | 'podman';
+              options.backend = nextArg as
+                | 'auto'
+                | 'docker'
+                | 'e2b'
+                | 'local_e2b'
+                | 'local_process'
+                | 'firecracker'
+                | 'podman';
               i++;
             }
             break;
@@ -321,7 +339,10 @@ export class CLIParser {
   /**
    * Extract the main command from arguments
    */
-  public static extractCommand(args: readonly string[]): { command: string; remainingArgs: string[] } {
+  public static extractCommand(args: readonly string[]): {
+    command: string;
+    remainingArgs: string[];
+  } {
     const commands = ['analyze', 'generate', 'status', 'models', 'configure', 'help'];
 
     for (let i = 0; i < args.length; i++) {
@@ -393,8 +414,4 @@ export class CLIParser {
   }
 }
 
-
-
 // Removed duplicate extractCommand function to resolve conflicts.
-
-

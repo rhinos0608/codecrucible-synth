@@ -118,7 +118,7 @@ export class FilesystemTools {
 
         const result = await this.rustBackend.execute(request);
         if (result.success && result.result) {
-          return result.result;
+          return typeof result.result === 'string' ? result.result : String(result.result);
         }
 
         logger.warn('Rust filesystem read failed, falling back to MCP', {

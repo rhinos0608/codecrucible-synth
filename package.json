@@ -10,8 +10,8 @@
     "codecrucible": "./dist/bin/crucible.js"
   },
   "scripts": {
-    "build": "npm run build:rust && tsc && npm run copy-assets",
-    "build:all": "npm run build:rust && tsc && npm run copy-assets",
+    "build": "npm run lint && npm run build:rust && tsc && npm run copy-assets",
+    "build:all": "npm run lint && npm run build:rust && tsc && npm run copy-assets",
     "build:rust": "cd rust-executor && napi build --release",
     "build:rust:dev": "cd rust-executor && napi build",
     "build:cross-platform": "cd rust-executor && napi build --release --target x86_64-pc-windows-msvc && napi build --release --target x86_64-apple-darwin && napi build --release --target x86_64-unknown-linux-gnu",
@@ -49,7 +49,7 @@
     "test-install": "node scripts/install-and-test.js",
     "package:bundle": "ncc build dist/index.js -o build/bundled",
     "package:win": "npm run package:bundle && npm run desktop:package:win",
-    "package:mac": "npm run package:bundle && npm run desktop:package:mac", 
+    "package:mac": "npm run package:bundle && npm run desktop:package:mac",
     "package:linux": "npm run package:bundle && npm run desktop:package:linux",
     "package:all": "npm run package:win && npm run package:mac && npm run package:linux",
     "desktop:package": "electron-builder",
@@ -239,11 +239,7 @@
     "directories": {
       "output": "build/desktop"
     },
-    "files": [
-      "dist/**/*",
-      "config/**/*",
-      "node_modules/**/*"
-    ],
+    "files": ["dist/**/*", "config/**/*", "node_modules/**/*"],
     "mac": {
       "category": "public.app-category.developer-tools"
     },

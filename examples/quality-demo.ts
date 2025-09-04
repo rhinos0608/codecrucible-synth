@@ -15,9 +15,9 @@ async function demonstrateQualityMetrics() {
   const qualityAnalyzer = new CodeQualityAnalyzer({
     weights: {
       cyclomaticComplexity: 0.25,
-      maintainabilityIndex: 0.20,
-      lintingScore: 0.20,
-      formattingScore: 0.10,
+      maintainabilityIndex: 0.2,
+      lintingScore: 0.2,
+      formattingScore: 0.1,
       typeCoverage: 0.15,
       documentation: 0.05,
       duplication: 0.03,
@@ -28,7 +28,7 @@ async function demonstrateQualityMetrics() {
   // Example 1: High-quality code
   console.log('📈 Example 1: High-Quality Code Analysis');
   console.log('-'.repeat(50));
-  
+
   const highQualityCode = `
     /**
      * Utility class for mathematical operations
@@ -95,7 +95,9 @@ async function demonstrateQualityMetrics() {
 
     console.log(`✅ Overall Score: ${highQualityMetrics.overallScore}/100`);
     console.log(`📊 Cyclomatic Complexity: ${highQualityMetrics.complexity.cyclomaticComplexity}`);
-    console.log(`🔧 Maintainability Index: ${highQualityMetrics.complexity.maintainabilityIndex}/100`);
+    console.log(
+      `🔧 Maintainability Index: ${highQualityMetrics.complexity.maintainabilityIndex}/100`
+    );
     console.log(`📝 Comment Ratio: ${highQualityMetrics.complexity.commentRatio.toFixed(1)}%`);
     console.log(`🎯 Quality Recommendations: ${highQualityMetrics.recommendations.length}`);
 
@@ -128,7 +130,9 @@ async function demonstrateQualityMetrics() {
 
     console.log(`❌ Overall Score: ${lowQualityMetrics.overallScore}/100`);
     console.log(`📊 Cyclomatic Complexity: ${lowQualityMetrics.complexity.cyclomaticComplexity}`);
-    console.log(`🔧 Maintainability Index: ${lowQualityMetrics.complexity.maintainabilityIndex}/100`);
+    console.log(
+      `🔧 Maintainability Index: ${lowQualityMetrics.complexity.maintainabilityIndex}/100`
+    );
     console.log(`📝 Comment Ratio: ${lowQualityMetrics.complexity.commentRatio.toFixed(1)}%`);
     console.log(`🚨 Quality Recommendations: ${lowQualityMetrics.recommendations.length}`);
     console.log(`💸 Technical Debt Ratio: ${lowQualityMetrics.technicalDebtRatio}%`);
@@ -139,7 +143,9 @@ async function demonstrateQualityMetrics() {
         .filter(r => r.priority === 'critical' || r.priority === 'high')
         .slice(0, 5)
         .forEach((rec, i) => {
-          console.log(`   ${i + 1}. [${rec.priority.toUpperCase()}] ${rec.category}: ${rec.description}`);
+          console.log(
+            `   ${i + 1}. [${rec.priority.toUpperCase()}] ${rec.category}: ${rec.description}`
+          );
           console.log(`      💡 ${rec.suggestion}`);
         });
     }
@@ -163,8 +169,12 @@ async function demonstrateQualityMetrics() {
   // Show configuration options
   const config = qualityAnalyzer.getConfiguration();
   console.log('\n📋 Quality Configuration:');
-  console.log(`   • Complexity Thresholds: ${config.cyclomaticComplexity.lowThreshold}/${config.cyclomaticComplexity.mediumThreshold}/${config.cyclomaticComplexity.highThreshold}`);
-  console.log(`   • Maintainability Thresholds: ${config.maintainabilityIndex.lowThreshold}/${config.maintainabilityIndex.mediumThreshold}/${config.maintainabilityIndex.highThreshold}`);
+  console.log(
+    `   • Complexity Thresholds: ${config.cyclomaticComplexity.lowThreshold}/${config.cyclomaticComplexity.mediumThreshold}/${config.cyclomaticComplexity.highThreshold}`
+  );
+  console.log(
+    `   • Maintainability Thresholds: ${config.maintainabilityIndex.lowThreshold}/${config.maintainabilityIndex.mediumThreshold}/${config.maintainabilityIndex.highThreshold}`
+  );
   console.log('   • Weighted Scoring:');
   Object.entries(config.weights).forEach(([key, weight]) => {
     console.log(`     - ${key}: ${(weight * 100).toFixed(0)}%`);

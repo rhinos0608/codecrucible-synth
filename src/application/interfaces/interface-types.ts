@@ -18,9 +18,11 @@ export interface ModelClient {
 
 // Response Validator (placeholder)
 export const ResponseValidator = {
-  validate: (_response: Readonly<Record<string, unknown>>): { isValid: boolean; errors: string[] } => ({ 
-    isValid: true, 
-    errors: [] 
+  validate: (
+    _response: Readonly<Record<string, unknown>>
+  ): { isValid: boolean; errors: string[] } => ({
+    isValid: true,
+    errors: [],
   }),
 };
 

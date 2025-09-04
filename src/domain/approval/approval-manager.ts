@@ -105,7 +105,7 @@ export class ApprovalManager {
     const startTime = Date.now();
     const sessionHistory = this.approvalHistory.get(context.sessionId) || [];
 
-  this.logger.info(`Approval request: ${operation.type} on ${operation.target}`, {
+    this.logger.info(`Approval request: ${operation.type} on ${operation.target}`, {
       sandboxMode: context.sandboxMode,
       userIntent: context.userIntent,
     });
@@ -129,7 +129,7 @@ export class ApprovalManager {
 
       const duration = Date.now() - startTime;
 
-  this.logger.info(`Approval ${result.status}: ${operation.type} (${duration}ms)`, {
+      this.logger.info(`Approval ${result.status}: ${operation.type} (${duration}ms)`, {
         riskLevel: riskAssessment.level,
         riskScore: riskAssessment.score,
         autoApproved: result.autoApproved,
@@ -137,7 +137,7 @@ export class ApprovalManager {
 
       return result;
     } catch (error) {
-  this.logger.error(`Approval request failed for ${operation.type}:`, error);
+      this.logger.error(`Approval request failed for ${operation.type}:`, error);
 
       return {
         status: 'denied',
@@ -252,7 +252,7 @@ export class ApprovalManager {
           }
         }
       } catch (error) {
-    this.logger.warn(`Failed to evaluate rule ${rule.id}:`, error);
+        this.logger.warn(`Failed to evaluate rule ${rule.id}:`, error);
       }
     }
 
@@ -686,7 +686,7 @@ export class ApprovalManager {
       const func = new Function('data', `with(data) { return ${condition}; }`);
       return func(data);
     } catch (error) {
-  this.logger.warn(`Failed to evaluate condition: ${condition}`, error);
+      this.logger.warn(`Failed to evaluate condition: ${condition}`, error);
       return false;
     }
   }
@@ -776,7 +776,7 @@ export class ApprovalManager {
    */
   setMode(mode: ApprovalMode): void {
     // Implementation for setting approval mode
-  this.logger.info(`Approval mode set to: ${mode}`);
+    this.logger.info(`Approval mode set to: ${mode}`);
   }
 
   /**
@@ -792,6 +792,6 @@ export class ApprovalManager {
   dispose(): void {
     this.userInterface.close();
     this.approvalHistory.clear();
-  this.logger.info('Approval manager disposed');
+    this.logger.info('Approval manager disposed');
   }
 }

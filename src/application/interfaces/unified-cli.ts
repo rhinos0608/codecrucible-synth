@@ -110,7 +110,6 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
    */
   public async initialize(orchestrator: Readonly<IWorkflowOrchestrator>): Promise<UnifiedCLI> {
     try {
-
       // Initialize the coordinator
       await this.coordinator.initialize({
         orchestrator,

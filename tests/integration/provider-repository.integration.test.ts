@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
-import { ProviderRepository, ProviderConfig, ProviderType } from '../../src/core/providers/provider-repository.js';
+import {
+  ProviderRepository,
+  ProviderConfig,
+  ProviderType,
+} from '../../src/core/providers/provider-repository.js';
 import { OllamaProvider } from '../../src/providers/ollama.js';
 import { LMStudioProvider } from '../../src/providers/lm-studio.js';
 import { join } from 'path';
@@ -29,7 +33,7 @@ describe('ProviderRepository Real Integration Tests', () => {
 
   beforeEach(async () => {
     repository = new ProviderRepository();
-    
+
     // Real provider configurations for testing
     testConfigs = [
       {
@@ -58,9 +62,9 @@ describe('ProviderRepository Real Integration Tests', () => {
   describe('Real Provider Initialization', () => {
     it('should initialize with available providers only', async () => {
       let initializationResult: any;
-      
-      const initPromise = new Promise((resolve) => {
-        repository.on('initialized', (result) => {
+
+      const initPromise = new Promise(resolve => {
+        repository.on('initialized', result => {
           initializationResult = result;
           resolve(result);
         });
@@ -72,9 +76,11 @@ describe('ProviderRepository Real Integration Tests', () => {
       expect(initializationResult).toBeDefined();
       expect(initializationResult.successCount).toBeGreaterThanOrEqual(0);
       expect(initializationResult.failureCount).toBeGreaterThanOrEqual(0);
-      
+
       // Total should equal number of configs
-      expect(initializationResult.successCount + initializationResult.failureCount).toBe(testConfigs.length);
+      expect(initializationResult.successCount + initializationResult.failureCount).toBe(
+        testConfigs.length
+      );
     }, 60000); // Extended timeout for real network operations
 
     it('should handle unavailable providers gracefully', async () => {
@@ -86,9 +92,9 @@ describe('ProviderRepository Real Integration Tests', () => {
       };
 
       let initializationResult: any;
-      
-      const initPromise = new Promise((resolve) => {
-        repository.on('initialized', (result) => {
+
+      const initPromise = new Promise(resolve => {
+        repository.on('initialized', result => {
           initializationResult = result;
           resolve(result);
         });
@@ -103,10 +109,10 @@ describe('ProviderRepository Real Integration Tests', () => {
 
     it('should prevent duplicate initialization', async () => {
       await repository.initialize(testConfigs);
-      
+
       // Second initialization should be ignored
       await repository.initialize(testConfigs);
-      
+
       // Should only have providers from first initialization
       const providers = repository.getAllProviders();
       expect(providers.length).toBeLessThanOrEqual(testConfigs.length);
@@ -120,11 +126,11 @@ describe('ProviderRepository Real Integration Tests', () => {
 
     it('should perform actual health checks on available providers', async () => {
       const providers = repository.getAllProviders();
-      
+
       for (const providerType of providers) {
         const isHealthy = await repository.checkProviderHealth(providerType);
         expect(typeof isHealthy).toBe('boolean');
-        
+
         // If provider is available, it should be healthy
         const status = repository.getProviderStatus(providerType);
         if (status?.isInitialized) {
@@ -141,7 +147,7 @@ describe('ProviderRepository Real Integration Tests', () => {
 
     it('should track provider status correctly', () => {
       const statuses = repository.getAllProviderStatuses();
-      
+
       for (const [providerType, status] of statuses) {
         expect(status).toBeDefined();
         expect(status.type).toBe(providerType);
@@ -158,11 +164,11 @@ describe('ProviderRepository Real Integration Tests', () => {
 
     it('should retrieve actual available models', async () => {
       const providers = repository.getAvailableProviders();
-      
+
       for (const providerType of providers) {
         const models = await repository.getAvailableModels(providerType);
         expect(Array.isArray(models)).toBe(true);
-        
+
         // If provider is available, it might have models
         if (models.length > 0) {
           models.forEach(model => {
@@ -176,7 +182,7 @@ describe('ProviderRepository Real Integration Tests', () => {
     it('should aggregate models from all providers', async () => {
       const allModels = await repository.getAvailableModels();
       expect(Array.isArray(allModels)).toBe(true);
-      
+
       // Each model should be prefixed with provider type
       allModels.forEach(model => {
         expect(model).toMatch(/^(ollama|lm-studio):/);
@@ -185,15 +191,15 @@ describe('ProviderRepository Real Integration Tests', () => {
 
     it('should handle model switching on supporting providers', async () => {
       const availableProviders = repository.getAvailableProviders();
-      
+
       for (const providerType of availableProviders) {
         const models = await repository.getAvailableModels(providerType);
-        
+
         if (models.length > 0) {
           let modelSwitched = false;
-          
-          const switchPromise = new Promise((resolve) => {
-            repository.on('model-switched', (event) => {
+
+          const switchPromise = new Promise(resolve => {
+            repository.on('model-switched', event => {
               if (event.providerType === providerType) {
                 modelSwitched = true;
                 resolve(event);
@@ -221,20 +227,20 @@ describe('ProviderRepository Real Integration Tests', () => {
 
     it('should enable and disable providers correctly', async () => {
       const availableProviders = Array.from(repository.getAvailableProviders());
-      
+
       if (availableProviders.length > 0) {
         const testProvider = availableProviders[0];
-        
+
         // Disable provider
         await repository.disableProvider(testProvider);
         expect(repository.getProvider(testProvider)).toBeUndefined();
-        
-        // Re-enable provider  
+
+        // Re-enable provider
         await repository.enableProvider(testProvider);
-        
+
         // Give it time to reinitialize
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         // Provider should be available again (if the service is running)
         const reenabledProvider = repository.getProvider(testProvider);
         if (reenabledProvider) {
@@ -245,12 +251,12 @@ describe('ProviderRepository Real Integration Tests', () => {
 
     it('should switch between available providers', async () => {
       const availableProviders = Array.from(repository.getAvailableProviders());
-      
+
       if (availableProviders.length >= 2) {
         let switchEventFired = false;
-        
-        const switchPromise = new Promise((resolve) => {
-          repository.on('provider-switched', (event) => {
+
+        const switchPromise = new Promise(resolve => {
+          repository.on('provider-switched', event => {
             switchEventFired = true;
             expect(event.from).toBe(availableProviders[0]);
             expect(event.to).toBe(availableProviders[1]);
@@ -260,7 +266,7 @@ describe('ProviderRepository Real Integration Tests', () => {
 
         await repository.switchProvider(availableProviders[0], availableProviders[1]);
         await switchPromise;
-        
+
         expect(switchEventFired).toBe(true);
       } else {
         // Skip test if less than 2 providers available
@@ -270,7 +276,7 @@ describe('ProviderRepository Real Integration Tests', () => {
 
     it('should handle switching to unavailable provider', async () => {
       const availableProviders = Array.from(repository.getAvailableProviders());
-      
+
       if (availableProviders.length > 0) {
         await expect(
           repository.switchProvider(availableProviders[0], 'nonexistent' as ProviderType)
@@ -286,12 +292,12 @@ describe('ProviderRepository Real Integration Tests', () => {
 
     it('should update provider configuration', async () => {
       const availableProviders = Array.from(repository.getAvailableProviders());
-      
+
       if (availableProviders.length > 0) {
         const testProvider = availableProviders[0];
         let configUpdated = false;
-        
-        const configPromise = new Promise((resolve) => {
+
+        const configPromise = new Promise(resolve => {
           repository.on('config-updated', (providerType, config) => {
             if (providerType === testProvider) {
               configUpdated = true;
@@ -302,10 +308,10 @@ describe('ProviderRepository Real Integration Tests', () => {
 
         const newConfig = { timeout: 45000 };
         await repository.updateProviderConfig(testProvider, newConfig);
-        
+
         await configPromise;
         expect(configUpdated).toBe(true);
-        
+
         const updatedConfig = repository.getProviderConfig(testProvider);
         expect(updatedConfig?.timeout).toBe(45000);
       }
@@ -313,11 +319,11 @@ describe('ProviderRepository Real Integration Tests', () => {
 
     it('should retrieve provider configuration', () => {
       const availableProviders = Array.from(repository.getAvailableProviders());
-      
+
       if (availableProviders.length > 0) {
         const testProvider = availableProviders[0];
         const config = repository.getProviderConfig(testProvider);
-        
+
         expect(config).toBeDefined();
         expect(config?.type).toBe(testProvider);
       }
@@ -333,10 +339,10 @@ describe('ProviderRepository Real Integration Tests', () => {
   describe('Real Shutdown and Cleanup', () => {
     it('should shutdown all providers gracefully', async () => {
       await repository.initialize(testConfigs);
-      
+
       let shutdownEventFired = false;
-      
-      const shutdownPromise = new Promise((resolve) => {
+
+      const shutdownPromise = new Promise(resolve => {
         repository.on('shutdown', () => {
           shutdownEventFired = true;
           resolve(true);
@@ -345,7 +351,7 @@ describe('ProviderRepository Real Integration Tests', () => {
 
       await repository.shutdown();
       await shutdownPromise;
-      
+
       expect(shutdownEventFired).toBe(true);
       expect(repository.getAllProviders()).toHaveLength(0);
     });
@@ -354,9 +360,9 @@ describe('ProviderRepository Real Integration Tests', () => {
   describe('Real Event System', () => {
     it('should emit real provider lifecycle events', async () => {
       const events: string[] = [];
-      
+
       repository.on('initialized', () => events.push('initialized'));
-      repository.on('provider-initialized', (type) => events.push(`provider-initialized:${type}`));
+      repository.on('provider-initialized', type => events.push(`provider-initialized:${type}`));
       repository.on('shutdown', () => events.push('shutdown'));
 
       await repository.initialize(testConfigs);
@@ -364,7 +370,7 @@ describe('ProviderRepository Real Integration Tests', () => {
 
       expect(events).toContain('initialized');
       expect(events).toContain('shutdown');
-      
+
       // Should have provider-initialized events for each successful initialization
       const initEvents = events.filter(e => e.startsWith('provider-initialized:'));
       expect(initEvents.length).toBeGreaterThanOrEqual(0);

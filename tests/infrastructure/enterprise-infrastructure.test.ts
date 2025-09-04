@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import {
   EnterpriseDeploymentSystem,
-  DeploymentConfig
+  DeploymentConfig,
 } from '../../src/infrastructure/enterprise-deployment-system.js';
 import { BackupManager } from '../../src/infrastructure/backup/backup-manager.js';
 import { HealthCheck } from '../../src/infrastructure/health/health-check.js';
@@ -29,19 +29,19 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         targetCPUUtilization: 70,
         targetMemoryUtilization: 80,
         scaleUpCooldown: 30000,
-        scaleDownCooldown: 60000
+        scaleDownCooldown: 60000,
       },
       healthCheck: {
         enabled: true,
         endpoint: '/health',
         interval: 5000,
         timeout: 2000,
-        retries: 3
+        retries: 3,
       },
       loadBalancing: {
         strategy: 'round-robin',
         healthCheckPath: '/health',
-        sessionAffinity: false
+        sessionAffinity: false,
       },
       security: {
         enforceHTTPS: true,
@@ -50,17 +50,17 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         rateLimiting: {
           enabled: true,
           windowMs: 60000,
-          maxRequests: 100
-        }
+          maxRequests: 100,
+        },
       },
       monitoring: {
         enabled: true,
         metricsEndpoint: '/metrics',
         alerting: {
           enabled: true,
-          webhookUrl: 'https://test-alerts.example.com'
-        }
-      }
+          webhookUrl: 'https://test-alerts.example.com',
+        },
+      },
     };
 
     deploymentSystem = new EnterpriseDeploymentSystem(testConfig);
@@ -68,14 +68,14 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       backupLocation: './test-backups',
       retentionPeriod: 7, // 7 days
       compressionEnabled: true,
-      encryptionEnabled: true
+      encryptionEnabled: true,
     });
-    
+
     healthCheck = new HealthCheck({
       checkInterval: 1000,
       components: ['database', 'redis', 'external-api'],
       criticalThreshold: 2000,
-      warningThreshold: 1000
+      warningThreshold: 1000,
     });
 
     infraMetrics = [];
@@ -91,14 +91,14 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
   describe('Enterprise Deployment System', () => {
     it('should handle production deployment with zero downtime', async () => {
       const deploymentStartTime = Date.now();
-      
+
       // Test production deployment process
       const deploymentResult = await deploymentSystem.deploy({
         version: '4.0.0-test',
         strategy: 'blue-green',
         healthCheckEnabled: true,
         rollbackOnFailure: true,
-        maxDeploymentTime: 300000 // 5 minutes
+        maxDeploymentTime: 300000, // 5 minutes
       });
 
       const deploymentDuration = Date.now() - deploymentStartTime;
@@ -106,7 +106,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(deploymentResult.success).toBe(true);
       expect(deploymentResult.downtime).toBe(0); // Zero downtime requirement
       expect(deploymentDuration).toBeLessThan(300000); // <5 minutes
-      
+
       // Verify deployment metadata
       expect(deploymentResult.deploymentId).toBeDefined();
       expect(deploymentResult.version).toBe('4.0.0-test');
@@ -117,16 +117,18 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         component: 'deployment',
         metric: 'deployment_time',
         value: deploymentDuration,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
 
-      console.log(`Zero-downtime deployment: ${deploymentDuration}ms, version ${deploymentResult.version}`);
+      console.log(
+        `Zero-downtime deployment: ${deploymentDuration}ms, version ${deploymentResult.version}`
+      );
     });
 
     it('should automatically scale based on resource utilization', async () => {
       // Start with minimum instances
       await deploymentSystem.setTargetInstances(1);
-      
+
       const initialInstances = await deploymentSystem.getCurrentInstances();
       expect(initialInstances).toBe(1);
 
@@ -135,14 +137,14 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         cpuUtilization: 85, // Above 70% threshold
         memoryUtilization: 90, // Above 80% threshold
         requestsPerSecond: 500,
-        duration: 10000 // 10 seconds
+        duration: 10000, // 10 seconds
       });
 
       expect(loadSimulation.triggerScaling).toBe(true);
 
       // Wait for scaling to occur
       await new Promise(resolve => setTimeout(resolve, 35000)); // Wait for cooldown
-      
+
       const scaledInstances = await deploymentSystem.getCurrentInstances();
       expect(scaledInstances).toBeGreaterThan(initialInstances);
       expect(scaledInstances).toBeLessThanOrEqual(5); // Max instances limit
@@ -152,7 +154,9 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(scalingMetrics.scaleUpEvents).toBeGreaterThan(0);
       expect(scalingMetrics.totalScalingTime).toBeLessThan(60000); // <60s scaling time
 
-      console.log(`Auto-scaling: ${initialInstances} → ${scaledInstances} instances in ${scalingMetrics.totalScalingTime}ms`);
+      console.log(
+        `Auto-scaling: ${initialInstances} → ${scaledInstances} instances in ${scalingMetrics.totalScalingTime}ms`
+      );
     });
 
     it('should implement load balancing with health-aware routing', async () => {
@@ -171,9 +175,9 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         const result = await deploymentSystem.routeRequest({
           path: '/test',
           method: 'GET',
-          loadBalancingStrategy: 'round-robin'
+          loadBalancingStrategy: 'round-robin',
         });
-        
+
         requestResults.push(result);
         expect(result.instanceId).toBeDefined();
         expect(result.responseTime).toBeLessThan(5000); // <5s response time
@@ -207,7 +211,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       // Simulate instance failure
       const failedInstance = initialInstances[0];
       const failureResult = await deploymentSystem.simulateInstanceFailure(failedInstance.id);
-      
+
       expect(failureResult.instanceFailed).toBe(true);
       expect(failureResult.failureDetected).toBe(true);
 
@@ -215,7 +219,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 10000));
 
       const recoveredInstances = await deploymentSystem.getActiveInstances();
-      
+
       // Should maintain target instance count through replacement
       expect(recoveredInstances.length).toBe(3);
       expect(recoveredInstances.some(i => i.id === failedInstance.id)).toBe(false);
@@ -225,20 +229,22 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(recoveryMetrics.failureDetectionTime).toBeLessThan(30000); // <30s detection
       expect(recoveryMetrics.instanceReplacementTime).toBeLessThan(120000); // <2min replacement
 
-      console.log(`Instance recovery: ${recoveryMetrics.failureDetectionTime}ms detection, ${recoveryMetrics.instanceReplacementTime}ms replacement`);
+      console.log(
+        `Instance recovery: ${recoveryMetrics.failureDetectionTime}ms detection, ${recoveryMetrics.instanceReplacementTime}ms replacement`
+      );
     });
   });
 
   describe('Enterprise Backup System', () => {
     it('should perform comprehensive system backups', async () => {
       const backupStartTime = Date.now();
-      
+
       // Create test data to backup
       const testData = {
         configurations: { setting1: 'value1', setting2: 'value2' },
         userProfiles: Array.from({ length: 100 }, (_, i) => ({ id: i, name: `user${i}` })),
         systemState: { version: '4.0.0', lastUpdate: new Date() },
-        auditLogs: Array.from({ length: 50 }, (_, i) => ({ logId: i, event: `event${i}` }))
+        auditLogs: Array.from({ length: 50 }, (_, i) => ({ logId: i, event: `event${i}` })),
       };
 
       const backupResult = await backupManager.createBackup({
@@ -247,7 +253,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         includeUserData: true,
         includeAuditLogs: true,
         includeSystemState: true,
-        data: testData
+        data: testData,
       });
 
       const backupDuration = Date.now() - backupStartTime;
@@ -267,17 +273,19 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         component: 'backup',
         metric: 'backup_duration',
         value: backupDuration,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
 
-      console.log(`System backup: ${backupDuration}ms, ${(backupResult.backupSize / 1024).toFixed(2)}KB`);
+      console.log(
+        `System backup: ${backupDuration}ms, ${(backupResult.backupSize / 1024).toFixed(2)}KB`
+      );
     });
 
     it('should perform incremental backups efficiently', async () => {
       // Create initial full backup
       const fullBackup = await backupManager.createBackup({
         backupType: 'full',
-        data: { initialData: 'baseline' }
+        data: { initialData: 'baseline' },
       });
 
       expect(fullBackup.success).toBe(true);
@@ -289,11 +297,11 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       const incrementalBackup = await backupManager.createBackup({
         backupType: 'incremental',
         basedOn: fullBackup.backupId,
-        data: { 
+        data: {
           updatedData: 'changed',
           newData: 'additional',
-          timestamp: new Date()
-        }
+          timestamp: new Date(),
+        },
       });
 
       const incrementalDuration = Date.now() - incrementalStartTime;
@@ -308,7 +316,9 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(backupChain[0].type).toBe('full');
       expect(backupChain[1].type).toBe('incremental');
 
-      console.log(`Incremental backup: ${incrementalDuration}ms, ${(incrementalBackup.backupSize / 1024).toFixed(2)}KB`);
+      console.log(
+        `Incremental backup: ${incrementalDuration}ms, ${(incrementalBackup.backupSize / 1024).toFixed(2)}KB`
+      );
     });
 
     it('should restore from backups with data integrity validation', async () => {
@@ -316,12 +326,12 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       const originalData = {
         criticalSettings: { apiKey: 'test-key', environment: 'production' },
         userDatabase: Array.from({ length: 50 }, (_, i) => ({ id: i, active: true })),
-        systemMetrics: { uptime: 86400, errors: 0 }
+        systemMetrics: { uptime: 86400, errors: 0 },
       };
 
       const backup = await backupManager.createBackup({
         backupType: 'full',
-        data: originalData
+        data: originalData,
       });
 
       expect(backup.success).toBe(true);
@@ -331,7 +341,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       const restoreResult = await backupManager.restoreFromBackup({
         backupId: backup.backupId,
         validateIntegrity: true,
-        performanceMode: 'safe' // Prioritize integrity over speed
+        performanceMode: 'safe', // Prioritize integrity over speed
       });
 
       const restoreDuration = Date.now() - restoreStartTime;
@@ -343,26 +353,28 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(restoreResult.restoredData).toEqual(originalData);
       expect(restoreResult.integrityValidation.passed).toBe(true);
       expect(restoreResult.integrityValidation.checksumMatch).toBe(true);
-      
+
       // Verify no data loss
       expect(restoreResult.dataLossDetected).toBe(false);
       expect(restoreResult.restoredRecords).toBe(51); // 50 users + 1 settings + 1 metrics
 
-      console.log(`Data restoration: ${restoreDuration}ms, ${restoreResult.restoredRecords} records`);
+      console.log(
+        `Data restoration: ${restoreDuration}ms, ${restoreResult.restoredRecords} records`
+      );
     });
 
     it('should implement automated backup retention and cleanup', async () => {
       // Create multiple backups over time
       const backupIds = [];
-      
+
       for (let i = 0; i < 10; i++) {
         const backup = await backupManager.createBackup({
           backupType: i === 0 ? 'full' : 'incremental',
-          data: { iteration: i, timestamp: new Date() }
+          data: { iteration: i, timestamp: new Date() },
         });
-        
+
         backupIds.push(backup.backupId);
-        
+
         // Simulate time passing
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -371,7 +383,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       await backupManager.setRetentionPolicy({
         maxBackups: 5,
         maxAge: 86400000, // 24 hours
-        retainFullBackups: true
+        retainFullBackups: true,
       });
 
       // Trigger cleanup
@@ -385,7 +397,9 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       const remainingBackups = await backupManager.listBackups();
       expect(remainingBackups.some(b => b.type === 'full')).toBe(true);
 
-      console.log(`Backup cleanup: ${cleanupResult.deletedBackups.length} deleted, ${cleanupResult.retainedBackups.length} retained`);
+      console.log(
+        `Backup cleanup: ${cleanupResult.deletedBackups.length} deleted, ${cleanupResult.retainedBackups.length} retained`
+      );
     });
   });
 
@@ -410,7 +424,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
           status: expect.stringMatching(/^(healthy|degraded|unhealthy)$/),
           responseTime: expect.any(Number),
           lastCheck: expect.any(Date),
-          details: expect.any(Object)
+          details: expect.any(Object),
         });
 
         if (status.status === 'healthy') {
@@ -418,14 +432,16 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         }
       });
 
-      console.log(`Health monitoring: ${healthStatus.overall} overall, ${Object.keys(healthStatus.components).length} components`);
+      console.log(
+        `Health monitoring: ${healthStatus.overall} overall, ${Object.keys(healthStatus.components).length} components`
+      );
     });
 
     it('should detect and alert on component failures', async () => {
       const alerts = [];
-      
+
       // Register alert handler
-      healthCheck.on('health-alert', (alert) => {
+      healthCheck.on('health-alert', alert => {
         alerts.push(alert);
       });
 
@@ -434,7 +450,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       // Simulate component failure
       const failureResult = await healthCheck.simulateComponentFailure('database', {
         failureType: 'timeout',
-        duration: 5000 // 5 second failure
+        duration: 5000, // 5 second failure
       });
 
       expect(failureResult.failureSimulated).toBe(true);
@@ -444,8 +460,10 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
 
       // Verify alert generation
       expect(alerts.length).toBeGreaterThan(0);
-      
-      const failureAlert = alerts.find(a => a.component === 'database' && a.severity === 'critical');
+
+      const failureAlert = alerts.find(
+        a => a.component === 'database' && a.severity === 'critical'
+      );
       expect(failureAlert).toBeDefined();
       expect(failureAlert.message).toContain('timeout');
       expect(failureAlert.timestamp).toBeInstanceOf(Date);
@@ -455,7 +473,9 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(healthStatus.overall).toMatch(/^(degraded|unhealthy)$/);
       expect(healthStatus.components.database.status).toBe('unhealthy');
 
-      console.log(`Failure detection: ${alerts.length} alerts generated, system status: ${healthStatus.overall}`);
+      console.log(
+        `Failure detection: ${alerts.length} alerts generated, system status: ${healthStatus.overall}`
+      );
     });
 
     it('should provide health metrics and trends', async () => {
@@ -474,22 +494,22 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(healthMetrics).toMatchObject({
         period: expect.objectContaining({
           start: expect.any(Date),
-          end: expect.any(Date)
+          end: expect.any(Date),
         }),
         availability: expect.objectContaining({
           overall: expect.any(Number),
-          components: expect.any(Object)
+          components: expect.any(Object),
         }),
         performance: expect.objectContaining({
           averageResponseTime: expect.any(Number),
           p95ResponseTime: expect.any(Number),
-          componentPerformance: expect.any(Object)
+          componentPerformance: expect.any(Object),
         }),
         reliability: expect.objectContaining({
           uptime: expect.any(Number),
           failureRate: expect.any(Number),
-          mttr: expect.any(Number) // Mean Time To Recovery
-        })
+          mttr: expect.any(Number), // Mean Time To Recovery
+        }),
       });
 
       // Verify metrics are reasonable
@@ -498,7 +518,9 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(healthMetrics.performance.averageResponseTime).toBeGreaterThan(0);
       expect(healthMetrics.reliability.uptime).toBeGreaterThan(0);
 
-      console.log(`Health metrics: ${healthMetrics.availability.overall.toFixed(1)}% availability, ${healthMetrics.performance.averageResponseTime.toFixed(2)}ms avg response`);
+      console.log(
+        `Health metrics: ${healthMetrics.availability.overall.toFixed(1)}% availability, ${healthMetrics.performance.averageResponseTime.toFixed(2)}ms avg response`
+      );
     });
 
     it('should implement predictive health analysis', async () => {
@@ -506,13 +528,13 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
 
       // Simulate degrading performance over time
       const degradationPattern = [100, 90, 80, 70, 60, 50]; // Response times increasing
-      
+
       for (const responseTime of degradationPattern) {
         await healthCheck.simulateComponentPerformance('external-api', {
           responseTime,
-          successRate: Math.max(95 - (100 - responseTime), 70) // Decreasing success rate
+          successRate: Math.max(95 - (100 - responseTime), 70), // Decreasing success rate
         });
-        
+
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
@@ -522,20 +544,20 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         trends: expect.objectContaining({
           performanceTrend: expect.any(String), // 'improving' | 'stable' | 'degrading'
           availabilityTrend: expect.any(String),
-          riskScore: expect.any(Number)
+          riskScore: expect.any(Number),
         }),
         predictions: expect.objectContaining({
           timeToFailure: expect.any(Number), // Estimated minutes
           failureProbability: expect.any(Number), // Percentage
-          recommendedActions: expect.any(Array)
+          recommendedActions: expect.any(Array),
         }),
         recommendations: expect.arrayContaining([
           expect.objectContaining({
             priority: expect.any(String),
             action: expect.any(String),
-            rationale: expect.any(String)
-          })
-        ])
+            rationale: expect.any(String),
+          }),
+        ]),
       });
 
       // Based on degrading pattern, should detect negative trend
@@ -543,7 +565,9 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(predictiveAnalysis.trends.riskScore).toBeGreaterThan(50); // High risk due to degradation
       expect(predictiveAnalysis.predictions.failureProbability).toBeGreaterThan(30);
 
-      console.log(`Predictive analysis: ${predictiveAnalysis.trends.performanceTrend} trend, ${predictiveAnalysis.predictions.failureProbability.toFixed(1)}% failure probability`);
+      console.log(
+        `Predictive analysis: ${predictiveAnalysis.trends.performanceTrend} trend, ${predictiveAnalysis.predictions.failureProbability.toFixed(1)}% failure probability`
+      );
     });
   });
 
@@ -554,7 +578,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         () => backupManager.listBackups(),
         () => healthCheck.getOverallHealth(),
         () => deploymentSystem.getScalingMetrics(),
-        () => backupManager.getBackupStatus()
+        () => backupManager.getBackupStatus(),
       ];
 
       const concurrencyLevel = 10;
@@ -564,14 +588,14 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       // Run concurrent infrastructure operations
       for (let i = 0; i < iterations; i++) {
         const startTime = Date.now();
-        
+
         const promises = Array.from({ length: concurrencyLevel }, () => {
           const randomOp = infrastructureOps[Math.floor(Math.random() * infrastructureOps.length)];
           return randomOp();
         });
 
         await Promise.all(promises);
-        
+
         const latency = Date.now() - startTime;
         latencies.push(latency);
       }
@@ -585,13 +609,15 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(maxLatency).toBeLessThan(5000); // <5s maximum
       expect(p95Latency).toBeLessThan(2000); // <2s 95th percentile
 
-      console.log(`Infrastructure performance: ${avgLatency.toFixed(2)}ms avg, ${maxLatency}ms max, ${p95Latency}ms p95`);
+      console.log(
+        `Infrastructure performance: ${avgLatency.toFixed(2)}ms avg, ${maxLatency}ms max, ${p95Latency}ms p95`
+      );
     });
 
     it('should demonstrate enterprise reliability standards', async () => {
       const reliabilityTest = {
         duration: 30000, // 30 seconds
-        targetAvailability: 99.9 // 99.9%
+        targetAvailability: 99.9, // 99.9%
       };
 
       const startTime = Date.now();
@@ -605,9 +631,9 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
           await Promise.all([
             deploymentSystem.getSystemStatus(),
             healthCheck.checkComponent('database'),
-            backupManager.getBackupStatus()
+            backupManager.getBackupStatus(),
           ]);
-          
+
           successfulOps++;
         } catch (error) {
           failedOps++;
@@ -622,7 +648,9 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(availability).toBeGreaterThanOrEqual(reliabilityTest.targetAvailability);
       expect(failedOps).toBeLessThan(totalOps * 0.001); // <0.1% failure rate
 
-      console.log(`Infrastructure reliability: ${availability.toFixed(3)}% availability, ${successfulOps}/${totalOps} operations successful`);
+      console.log(
+        `Infrastructure reliability: ${availability.toFixed(3)}% availability, ${successfulOps}/${totalOps} operations successful`
+      );
     });
   });
 
@@ -637,7 +665,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         period: '24h',
         includeMetrics: true,
         includeAlerts: true,
-        includeRecommendations: true
+        includeRecommendations: true,
       });
 
       expect(infrastructureReport).toMatchObject({
@@ -645,28 +673,28 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
           systemAvailability: expect.any(Number),
           performanceScore: expect.any(Number),
           securityPosture: expect.any(String),
-          costOptimization: expect.any(Number)
+          costOptimization: expect.any(Number),
         }),
         infrastructure: expect.objectContaining({
           deploymentHealth: expect.any(String),
           scalingEfficiency: expect.any(Number),
           backupStatus: expect.any(String),
-          healthMonitoring: expect.any(Object)
+          healthMonitoring: expect.any(Object),
         }),
         recommendations: expect.arrayContaining([
           expect.objectContaining({
             category: expect.any(String),
             priority: expect.any(String),
             description: expect.any(String),
-            businessImpact: expect.any(String)
-          })
+            businessImpact: expect.any(String),
+          }),
         ]),
         compliance: expect.objectContaining({
           availabilityTarget: expect.any(Number),
           actualAvailability: expect.any(Number),
           backupCompliance: expect.any(Boolean),
-          securityCompliance: expect.any(Boolean)
-        })
+          securityCompliance: expect.any(Boolean),
+        }),
       });
 
       // Verify enterprise standards
@@ -674,7 +702,9 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       expect(infrastructureReport.compliance.backupCompliance).toBe(true);
       expect(infrastructureReport.compliance.securityCompliance).toBe(true);
 
-      console.log(`Infrastructure Report: ${infrastructureReport.executiveSummary.systemAvailability}% availability, ${infrastructureReport.recommendations.length} recommendations`);
+      console.log(
+        `Infrastructure Report: ${infrastructureReport.executiveSummary.systemAvailability}% availability, ${infrastructureReport.recommendations.length} recommendations`
+      );
     });
 
     it('should validate disaster recovery capabilities', async () => {
@@ -683,7 +713,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
         backupType: 'full',
         includeConfiguration: true,
         includeUserData: true,
-        includeSystemState: true
+        includeSystemState: true,
       });
 
       expect(preDisasterBackup.success).toBe(true);
@@ -692,7 +722,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       const disasterSimulation = await deploymentSystem.simulateDisaster({
         scenarioType: 'infrastructure_failure',
         affectedComponents: ['primary_database', 'cache_cluster'],
-        recoveryMode: 'automated'
+        recoveryMode: 'automated',
       });
 
       expect(disasterSimulation.disasterSimulated).toBe(true);
@@ -702,7 +732,7 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       const recoveryResult = await deploymentSystem.executeDisasterRecovery({
         backupId: preDisasterBackup.backupId,
         recoveryStrategy: 'failover_with_restore',
-        maxRecoveryTime: 300000 // 5 minutes RTO
+        maxRecoveryTime: 300000, // 5 minutes RTO
       });
 
       expect(recoveryResult.success).toBe(true);
@@ -713,7 +743,9 @@ describe('Enterprise Infrastructure - Comprehensive Real Tests', () => {
       const postRecoveryHealth = await healthCheck.getOverallHealth();
       expect(postRecoveryHealth.overall).toBe('healthy');
 
-      console.log(`Disaster recovery: ${recoveryResult.recoveryTime}ms RTO, ${recoveryResult.dataLoss} RPO, system ${postRecoveryHealth.overall}`);
+      console.log(
+        `Disaster recovery: ${recoveryResult.recoveryTime}ms RTO, ${recoveryResult.dataLoss} RPO, system ${postRecoveryHealth.overall}`
+      );
     });
   });
 });

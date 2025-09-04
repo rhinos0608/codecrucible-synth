@@ -251,7 +251,9 @@ export class E2BService {
         output: result.text || (result.logs ? result.logs.stdout.join('\n') : ''),
         error: result.error?.name || (result.logs ? result.logs.stderr.join('\n') : undefined),
         executionTime,
-        files: result.results?.map((r) => r.filename).filter((filename): filename is string => Boolean(filename)),
+        files: result.results
+          ?.map(r => r.filename)
+          .filter((filename): filename is string => Boolean(filename)),
       };
 
       logger.info(
@@ -278,7 +280,11 @@ export class E2BService {
   /**
    * Execute code based on language type
    */
-  private async executeByLanguage(sandbox: Sandbox, code: string, language: string): Promise<{
+  private async executeByLanguage(
+    sandbox: Sandbox,
+    code: string,
+    language: string
+  ): Promise<{
     text?: string;
     error?: { name: string };
     logs?: { stdout: string[]; stderr: string[] };
@@ -292,8 +298,8 @@ export class E2BService {
           text: execution.text,
           error: execution.error,
           logs: execution.logs,
-          results: execution.results?.map(result => ({ 
-            filename: this.extractFilename(result)
+          results: execution.results?.map(result => ({
+            filename: this.extractFilename(result),
           })),
         };
       }
@@ -307,8 +313,8 @@ export class E2BService {
           text: execution.text,
           error: execution.error,
           logs: execution.logs,
-          results: execution.results?.map(result => ({ 
-            filename: this.extractFilename(result)
+          results: execution.results?.map(result => ({
+            filename: this.extractFilename(result),
           })),
         };
       }
@@ -336,8 +342,8 @@ except subprocess.TimeoutExpired:
           text: execution.text,
           error: execution.error,
           logs: execution.logs,
-          results: execution.results?.map(result => ({ 
-            filename: this.extractFilename(result)
+          results: execution.results?.map(result => ({
+            filename: this.extractFilename(result),
           })),
         };
       }
@@ -611,10 +617,13 @@ except Exception as e:
   public getStats(): E2BServiceStats {
     const totalSessionsCreated = this.sandboxPool.size;
     const now = Date.now();
-    const averageSessionAge = this.sandboxPool.size > 0 
-      ? Array.from(this.sandboxPool.values())
-          .reduce((sum, sandbox) => sum + (now - sandbox.createdAt.getTime()), 0) / this.sandboxPool.size
-      : 0;
+    const averageSessionAge =
+      this.sandboxPool.size > 0
+        ? Array.from(this.sandboxPool.values()).reduce(
+            (sum, sandbox) => sum + (now - sandbox.createdAt.getTime()),
+            0
+          ) / this.sandboxPool.size
+        : 0;
 
     return {
       isInitialized: this.isInitialized,

@@ -22,7 +22,6 @@ import {
   ToolParameterSchema,
 } from '../interfaces/tool-system.js';
 
-
 // ============================================================================
 // FILE OPERATION STRATEGIES - Different ways to handle files
 // ============================================================================
@@ -158,7 +157,11 @@ export class BatchFileStrategy extends BasicFileStrategy {
     );
   }
 
-  override async execute(operation: string, args: any, context: ToolExecutionContext): Promise<any> {
+  override async execute(
+    operation: string,
+    args: any,
+    context: ToolExecutionContext
+  ): Promise<any> {
     const paths = await this.resolvePaths(args, context);
     const maxFiles = args.maxFiles || 20;
 
@@ -240,7 +243,11 @@ export class SmartFileStrategy extends BatchFileStrategy {
     return super.supports(operation, args) && args.includeMetadata !== false;
   }
 
-  override async execute(operation: string, args: any, context: ToolExecutionContext): Promise<any> {
+  override async execute(
+    operation: string,
+    args: any,
+    context: ToolExecutionContext
+  ): Promise<any> {
     const baseResult = await super.execute(operation, args, context);
 
     if (operation === 'read') {

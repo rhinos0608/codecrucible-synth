@@ -567,7 +567,7 @@ export class FileSystemClient extends EventEmitter {
     try {
       // Verify the path exists before watching
       await fs.access(absolutePath);
-      
+
       const watcher = fsSync.watch(absolutePath, { recursive });
       watcher.addListener('change', (eventType: string, filename: string | null) => {
         if (filename) {

@@ -155,7 +155,9 @@ export class CLIParser implements CLIParserInterface {
     }
 
     const allCommands = Array.from(this.commands.entries())
-      .map(([cmd, info]: readonly [string, { description: string }]) => `  ${cmd}  ${info.description}`)
+      .map(
+        ([cmd, info]: readonly [string, { description: string }]) => `  ${cmd}  ${info.description}`
+      )
       .join('\n');
 
     return `Available commands:\n${allCommands}`;

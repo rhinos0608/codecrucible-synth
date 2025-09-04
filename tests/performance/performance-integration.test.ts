@@ -17,7 +17,7 @@ describe('Performance Integration Tests', () => {
   afterAll(async () => {
     // Cleanup performance systems
     requestBatcher.shutdown();
-    adaptiveTuner.shutdown(); 
+    adaptiveTuner.shutdown();
     responseCache.shutdown();
     modelPreloader.shutdown();
   });
@@ -54,7 +54,7 @@ describe('Performance Integration Tests', () => {
       // Record some test metrics
       adaptiveTuner.recordMetrics(1000, 5, 0.1);
       adaptiveTuner.recordMetrics(800, 3, 0.05);
-      
+
       const stats = adaptiveTuner.getTuningStats();
       expect(stats).toHaveProperty('totalOptimizations');
       expect(stats).toHaveProperty('recentMetrics');
@@ -83,17 +83,17 @@ describe('Performance Integration Tests', () => {
       const prompt = 'test prompt for caching';
       const model = 'test-model';
       const provider = 'test-provider';
-      
+
       // Should return null for non-existent cache entry
       const result = responseCache.get(prompt, model, provider);
       expect(result).toBeNull();
-      
+
       // Should store cache entry
       responseCache.set(prompt, model, provider, {
         content: 'test response',
-        usage: { totalTokens: 100 }
+        usage: { totalTokens: 100 },
       });
-      
+
       // Should retrieve cached entry
       const cached = responseCache.get(prompt, model, provider);
       expect(cached).not.toBeNull();
@@ -113,7 +113,7 @@ describe('Performance Integration Tests', () => {
     it('should record model usage properly', () => {
       modelPreloader.recordModelUsage('test-model', 'test-provider', 1500, true);
       modelPreloader.recordModelUsage('test-model-2', 'test-provider', 2000, false);
-      
+
       const stats = modelPreloader.getWarmupStats();
       expect(stats.totalModels).toBeGreaterThan(0);
     });
@@ -135,7 +135,7 @@ describe('Performance Integration Tests', () => {
     it('should have all performance systems connected', () => {
       // Verify all singleton instances exist
       expect(requestBatcher).toBeDefined();
-      expect(adaptiveTuner).toBeDefined(); 
+      expect(adaptiveTuner).toBeDefined();
       expect(responseCache).toBeDefined();
       expect(modelPreloader).toBeDefined();
     });
@@ -144,13 +144,13 @@ describe('Performance Integration Tests', () => {
       // Record activity across systems
       adaptiveTuner.recordMetrics(1200, 2, 0.0);
       modelPreloader.recordModelUsage('integrated-test', 'test-provider', 1200, true);
-      
+
       // Check that data flows between systems
       const tunerStats = adaptiveTuner.getTuningStats();
       const preloaderStats = modelPreloader.getWarmupStats();
       const cacheStats = responseCache.getStats();
       const batchStats = requestBatcher.getBatchingStats();
-      
+
       expect(tunerStats.totalOptimizations).toBeGreaterThanOrEqual(0);
       expect(preloaderStats.totalModels).toBeGreaterThanOrEqual(1);
       expect(cacheStats.totalEntries).toBeGreaterThanOrEqual(0);

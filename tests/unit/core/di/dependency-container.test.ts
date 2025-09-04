@@ -60,7 +60,7 @@ class TestService implements ITestService {
 class DatabaseService implements IDatabaseService {
   public connected = false;
   public queries: string[] = [];
-  
+
   constructor(private connectionString: string = 'test://localhost') {}
 
   async query(sql: string): Promise<any[]> {
@@ -82,7 +82,7 @@ class DatabaseService implements IDatabaseService {
 
 class CacheService implements ICacheService {
   private cache = new Map<string, any>();
-  
+
   constructor(private databaseService: IDatabaseService) {}
 
   get(key: string): any {
@@ -149,9 +149,9 @@ describe('DependencyContainer - Comprehensive Tests', () => {
   describe('Service Registration', () => {
     it('should register services with factory functions', () => {
       const factory: ServiceFactory<ITestService> = () => new TestService('Factory Service');
-      
+
       container.register('testService', factory);
-      
+
       const service = container.resolve<ITestService>('testService');
       expect(service).toBeInstanceOf(TestService);
       expect(service.getName()).toBe('Factory Service');
@@ -159,9 +159,9 @@ describe('DependencyContainer - Comprehensive Tests', () => {
 
     it('should register services with typed tokens', () => {
       const factory: ServiceFactory<ITestService> = () => new TestService('Token Service');
-      
+
       container.register(TEST_SERVICE_TOKEN, factory);
-      
+
       const service = container.resolve(TEST_SERVICE_TOKEN);
       expect(service).toBeInstanceOf(TestService);
       expect(service.getName()).toBe('Token Service');
@@ -170,11 +170,14 @@ describe('DependencyContainer - Comprehensive Tests', () => {
     it('should register class-based services with dependency injection', () => {
       // Register dependencies first
       container.registerValue('connectionString', 'test://database');
-      container.register('databaseService', (c) => new DatabaseService(c.resolve<string>('connectionString')));
-      
+      container.register(
+        'databaseService',
+        c => new DatabaseService(c.resolve<string>('connectionString'))
+      );
+
       // Register class with dependencies
       container.registerClass('cacheService', CacheService, ['databaseService']);
-      
+
       const cacheService = container.resolve<CacheService>('cacheService');
       expect(cacheService).toBeInstanceOf(CacheService);
       expect(cacheService.getDatabaseService()).toBeInstanceOf(DatabaseService);
@@ -182,9 +185,9 @@ describe('DependencyContainer - Comprehensive Tests', () => {
 
     it('should register value services', () => {
       const testValue = { config: 'test-config', version: '1.0.0' };
-      
+
       container.registerValue('config', testValue);
-      
+
       const resolvedValue = container.resolve<typeof testValue>('config');
       expect(resolvedValue).toBe(testValue);
       expect(resolvedValue.config).toBe('test-config');
@@ -199,36 +202,40 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       };
 
       container.register('databaseService', () => new DatabaseService());
-      container.register('customService', (c) => new CacheService(c.resolve('databaseService')), options);
-      
+      container.register(
+        'customService',
+        c => new CacheService(c.resolve('databaseService')),
+        options
+      );
+
       const service1 = container.resolve('customService');
       const service2 = container.resolve('customService');
-      
+
       // Transient services should be different instances
       expect(service1).not.toBe(service2);
     });
 
     it('should warn when replacing existing service registration', () => {
       const logSpy = jest.spyOn(console, 'warn').mockImplementation();
-      
+
       container.register('testService', () => new TestService('First'));
       container.register('testService', () => new TestService('Second'));
-      
+
       // Should warn about replacement (assuming logger uses console.warn)
       // Note: This test might need adjustment based on actual logger implementation
-      
+
       const service = container.resolve<ITestService>('testService');
       expect(service.getName()).toBe('Second');
-      
+
       logSpy.mockRestore();
     });
 
     it('should emit serviceRegistered events', () => {
       const eventHandler = jest.fn();
       container.on('serviceRegistered', eventHandler);
-      
+
       container.register('testService', () => new TestService());
-      
+
       expect(eventHandler).toHaveBeenCalledWith({
         token: 'testService',
         options: expect.objectContaining({
@@ -240,7 +247,7 @@ describe('DependencyContainer - Comprehensive Tests', () => {
 
     it('should prevent registration on disposed container', () => {
       container.dispose();
-      
+
       expect(() => {
         container.register('testService', () => new TestService());
       }).toThrow('Cannot register services on disposed container');
@@ -252,10 +259,10 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       container.register('singletonService', () => new TestService('Singleton'), {
         lifecycle: 'singleton',
       });
-      
+
       const service1 = container.resolve<ITestService>('singletonService');
       const service2 = container.resolve<ITestService>('singletonService');
-      
+
       expect(service1).toBe(service2);
       expect(service1.getName()).toBe('Singleton');
     });
@@ -264,10 +271,10 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       container.register('transientService', () => new TestService('Transient'), {
         lifecycle: 'transient',
       });
-      
+
       const service1 = container.resolve<ITestService>('transientService');
       const service2 = container.resolve<ITestService>('transientService');
-      
+
       expect(service1).not.toBe(service2);
       expect(service1.getName()).toBe('Transient');
       expect(service2.getName()).toBe('Transient');
@@ -277,19 +284,19 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       container.register('scopedService', () => new TestService('Scoped'), {
         lifecycle: 'scoped',
       });
-      
+
       const scope1 = container.createScope();
       const scope2 = container.createScope();
-      
+
       const service1a = scope1.resolve<ITestService>('scopedService');
       const service1b = scope1.resolve<ITestService>('scopedService');
       const service2a = scope2.resolve<ITestService>('scopedService');
-      
+
       // Same instance within scope
       expect(service1a).toBe(service1b);
       // Different instances across scopes
       expect(service1a).not.toBe(service2a);
-      
+
       scope1.dispose();
       scope2.dispose();
     });
@@ -299,9 +306,9 @@ describe('DependencyContainer - Comprehensive Tests', () => {
         await new Promise(resolve => setTimeout(resolve, 10));
         return new TestService('Async Service');
       };
-      
+
       container.register('asyncService', asyncFactory);
-      
+
       const service = await container.resolveAsync<ITestService>('asyncService');
       expect(service).toBeInstanceOf(TestService);
       expect(service.getName()).toBe('Async Service');
@@ -316,7 +323,7 @@ describe('DependencyContainer - Comprehensive Tests', () => {
     it('should prevent resolution on disposed container', () => {
       container.register('testService', () => new TestService());
       container.dispose();
-      
+
       expect(() => {
         container.resolve('testService');
       }).toThrow('Cannot resolve services from disposed container');
@@ -325,19 +332,26 @@ describe('DependencyContainer - Comprehensive Tests', () => {
     it('should handle complex dependency chains', () => {
       // Register services with dependencies
       container.registerValue('connectionString', 'complex://test');
-      container.register('databaseService', (c) => new DatabaseService(c.resolve('connectionString')));
-      container.register('cacheService', (c) => new CacheService(c.resolve('databaseService')));
+      container.register(
+        'databaseService',
+        c => new DatabaseService(c.resolve('connectionString'))
+      );
+      container.register('cacheService', c => new CacheService(c.resolve('databaseService')));
       container.register('testService', () => new TestService('Complex'));
-      
-      container.register('complexService', (c) => new ComplexService(
-        c.resolve('testService'),
-        c.resolve('databaseService'),
-        c.resolve('cacheService')
-      ));
-      
+
+      container.register(
+        'complexService',
+        c =>
+          new ComplexService(
+            c.resolve('testService'),
+            c.resolve('databaseService'),
+            c.resolve('cacheService')
+          )
+      );
+
       const complex = container.resolve<ComplexService>('complexService');
       const deps = complex.getDependencies();
-      
+
       expect(deps.testService).toBeInstanceOf(TestService);
       expect(deps.databaseService).toBeInstanceOf(DatabaseService);
       expect(deps.cacheService).toBeInstanceOf(CacheService);
@@ -346,27 +360,27 @@ describe('DependencyContainer - Comprehensive Tests', () => {
 
   describe('Circular Dependency Detection', () => {
     it('should detect direct circular dependencies', () => {
-      container.register('serviceA', (c) => ({ serviceB: c.resolve('serviceB') }));
-      container.register('serviceB', (c) => ({ serviceA: c.resolve('serviceA') }));
-      
+      container.register('serviceA', c => ({ serviceB: c.resolve('serviceB') }));
+      container.register('serviceB', c => ({ serviceA: c.resolve('serviceA') }));
+
       expect(() => {
         container.resolve('serviceA');
       }).toThrow(/Circular dependency detected: serviceA → serviceB → serviceA/);
     });
 
     it('should detect indirect circular dependencies', () => {
-      container.register('serviceA', (c) => ({ serviceB: c.resolve('serviceB') }));
-      container.register('serviceB', (c) => ({ serviceC: c.resolve('serviceC') }));
-      container.register('serviceC', (c) => ({ serviceA: c.resolve('serviceA') }));
-      
+      container.register('serviceA', c => ({ serviceB: c.resolve('serviceB') }));
+      container.register('serviceB', c => ({ serviceC: c.resolve('serviceC') }));
+      container.register('serviceC', c => ({ serviceA: c.resolve('serviceA') }));
+
       expect(() => {
         container.resolve('serviceA');
       }).toThrow(/Circular dependency detected: serviceA → serviceB → serviceC → serviceA/);
     });
 
     it('should detect self-referencing circular dependencies', () => {
-      container.register('selfService', (c) => ({ self: c.resolve('selfService') }));
-      
+      container.register('selfService', c => ({ self: c.resolve('selfService') }));
+
       expect(() => {
         container.resolve('selfService');
       }).toThrow(/Circular dependency detected: selfService → selfService/);
@@ -374,14 +388,14 @@ describe('DependencyContainer - Comprehensive Tests', () => {
 
     it('should handle complex circular dependency scenarios', () => {
       // Create a more complex circular dependency chain
-      container.register('serviceA', (c) => ({ 
+      container.register('serviceA', c => ({
         b: c.resolve('serviceB'),
-        d: c.resolve('serviceD')
+        d: c.resolve('serviceD'),
       }));
-      container.register('serviceB', (c) => ({ c: c.resolve('serviceC') }));
-      container.register('serviceC', (c) => ({ a: c.resolve('serviceA') }));
+      container.register('serviceB', c => ({ c: c.resolve('serviceC') }));
+      container.register('serviceC', c => ({ a: c.resolve('serviceA') }));
       container.register('serviceD', () => ({ name: 'D' }));
-      
+
       expect(() => {
         container.resolve('serviceA');
       }).toThrow(/Circular dependency detected/);
@@ -391,7 +405,7 @@ describe('DependencyContainer - Comprehensive Tests', () => {
   describe('Dependency Scope Management', () => {
     it('should create and manage dependency scopes', () => {
       const scope = container.createScope();
-      
+
       expect(scope).toBeInstanceOf(DependencyScope);
       expect(scope).toBeDefined();
     });
@@ -400,11 +414,11 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       container.register('scopedService', () => new TestService('Scoped'), {
         lifecycle: 'scoped',
       });
-      
+
       const scope = container.createScope();
       const service1 = scope.resolve<ITestService>('scopedService');
       const service2 = scope.resolve<ITestService>('scopedService');
-      
+
       expect(service1).toBe(service2);
       scope.dispose();
     });
@@ -414,12 +428,12 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       container.register('disposableService', () => disposableService, {
         lifecycle: 'scoped',
       });
-      
+
       const scope = container.createScope();
       scope.resolve('disposableService');
-      
+
       scope.dispose();
-      
+
       expect(disposableService.disposeCalled).toBe(true);
     });
 
@@ -429,14 +443,14 @@ describe('DependencyContainer - Comprehensive Tests', () => {
           throw new Error('Disposal error');
         }),
       };
-      
+
       container.register('faultyService', () => faultyService, {
         lifecycle: 'scoped',
       });
-      
+
       const scope = container.createScope();
       scope.resolve('faultyService');
-      
+
       // Should not throw error
       expect(() => scope.dispose()).not.toThrow();
       expect(faultyService.dispose).toHaveBeenCalled();
@@ -447,20 +461,20 @@ describe('DependencyContainer - Comprehensive Tests', () => {
         shutdown: jest.fn(),
         destroy: jest.fn(),
       };
-      
+
       const serviceWithDestroy = {
         destroy: jest.fn(),
       };
-      
+
       container.register('shutdownService', () => serviceWithShutdown, { lifecycle: 'scoped' });
       container.register('destroyService', () => serviceWithDestroy, { lifecycle: 'scoped' });
-      
+
       const scope = container.createScope();
       scope.resolve('shutdownService');
       scope.resolve('destroyService');
-      
+
       scope.dispose();
-      
+
       expect(serviceWithShutdown.shutdown).toHaveBeenCalled();
       expect(serviceWithShutdown.destroy).not.toHaveBeenCalled();
       expect(serviceWithDestroy.destroy).toHaveBeenCalled();
@@ -471,25 +485,25 @@ describe('DependencyContainer - Comprehensive Tests', () => {
     it('should initialize services with initialize method', async () => {
       const service = new TestService('Initializable');
       container.registerValue('initService', service);
-      
+
       await container.initializeServices();
-      
+
       expect(service.initializeCalled).toBe(true);
     });
 
     it('should dispose services on container disposal', () => {
       const service1 = new TestService('Service1');
       const service2 = new TestService('Service2');
-      
+
       container.registerValue('service1', service1);
       container.registerValue('service2', service2);
-      
+
       // Resolve services to instantiate them
       container.resolve('service1');
       container.resolve('service2');
-      
+
       container.dispose();
-      
+
       expect(service1.disposeCalled).toBe(true);
       expect(service2.disposeCalled).toBe(true);
     });
@@ -498,9 +512,9 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       const faultyService = {
         initialize: jest.fn().mockRejectedValue(new Error('Init failed')),
       };
-      
+
       container.registerValue('faultyService', faultyService);
-      
+
       // Should not throw but should log error
       await expect(container.initializeServices()).resolves.not.toThrow();
       expect(faultyService.initialize).toHaveBeenCalled();
@@ -509,12 +523,12 @@ describe('DependencyContainer - Comprehensive Tests', () => {
     it('should track initialization order', async () => {
       const service1 = new TestService('First');
       const service2 = new TestService('Second');
-      
+
       container.registerValue('service1', service1);
       container.registerValue('service2', service2);
-      
+
       await container.initializeServices();
-      
+
       const order = container.getInitializationOrder();
       expect(order).toContain('service1');
       expect(order).toContain('service2');
@@ -526,17 +540,17 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       container.register('testService', () => new TestService('Performance'), {
         lifecycle: 'transient',
       });
-      
+
       const startTime = Date.now();
       const services: ITestService[] = [];
-      
+
       // Resolve many services
       for (let i = 0; i < 1000; i++) {
         services.push(container.resolve<ITestService>('testService'));
       }
-      
+
       const endTime = Date.now();
-      
+
       expect(services).toHaveLength(1000);
       expect(services.every(s => s instanceof TestService)).toBe(true);
       expect(endTime - startTime).toBeLessThan(1000); // Should complete within 1 second
@@ -546,32 +560,36 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       container.register('singletonService', () => new TestService('Singleton'), {
         lifecycle: 'singleton',
       });
-      
+
       const services: ITestService[] = [];
-      
+
       // Resolve same singleton many times
       for (let i = 0; i < 1000; i++) {
         services.push(container.resolve<ITestService>('singletonService'));
       }
-      
+
       // All should be same instance
       expect(services.every(s => s === services[0])).toBe(true);
     });
 
     it('should handle concurrent service resolution', async () => {
       let instanceCount = 0;
-      container.register('concurrentService', () => {
-        instanceCount++;
-        return new TestService(`Concurrent-${instanceCount}`);
-      }, { lifecycle: 'singleton' });
-      
+      container.register(
+        'concurrentService',
+        () => {
+          instanceCount++;
+          return new TestService(`Concurrent-${instanceCount}`);
+        },
+        { lifecycle: 'singleton' }
+      );
+
       // Resolve concurrently
       const promises = Array.from({ length: 100 }, () =>
         Promise.resolve(container.resolve<ITestService>('concurrentService'))
       );
-      
+
       const services = await Promise.all(promises);
-      
+
       // All should be same instance for singleton
       expect(services.every(s => s === services[0])).toBe(true);
       expect(instanceCount).toBe(1); // Only one instance should be created
@@ -579,35 +597,35 @@ describe('DependencyContainer - Comprehensive Tests', () => {
 
     it('should cleanup resources efficiently', () => {
       const services: TestService[] = [];
-      
+
       // Create many services
       for (let i = 0; i < 100; i++) {
         const service = new TestService(`Service-${i}`);
         services.push(service);
         container.registerValue(`service${i}`, service);
       }
-      
+
       // Resolve all services
       services.forEach((_, i) => container.resolve(`service${i}`));
-      
+
       container.dispose();
-      
+
       // All services should be disposed
       expect(services.every(s => s.disposeCalled)).toBe(true);
     });
 
     it('should prevent memory leaks from event listeners', () => {
       const initialListenerCount = container.listenerCount('serviceRegistered');
-      
+
       // Add many listeners
       for (let i = 0; i < 50; i++) {
         container.on('serviceRegistered', () => {});
       }
-      
+
       expect(container.listenerCount('serviceRegistered')).toBe(initialListenerCount + 50);
-      
+
       container.dispose();
-      
+
       // Listeners should be cleaned up
       expect(container.listenerCount('serviceRegistered')).toBe(0);
     });
@@ -620,11 +638,11 @@ describe('DependencyContainer - Comprehensive Tests', () => {
         tags: ['database', 'cache'],
         config: { timeout: 5000, retries: 3 },
       };
-      
+
       container.register('metadataService', () => new TestService('Metadata'), {
         metadata,
       });
-      
+
       const registration = container.getServiceRegistration('metadataService');
       expect(registration?.options.metadata).toEqual(metadata);
     });
@@ -632,21 +650,29 @@ describe('DependencyContainer - Comprehensive Tests', () => {
     it('should support lazy vs eager initialization', async () => {
       let lazyInitialized = false;
       let eagerInitialized = false;
-      
-      container.register('lazyService', () => {
-        lazyInitialized = true;
-        return new TestService('Lazy');
-      }, { lazy: true });
-      
-      container.register('eagerService', () => {
-        eagerInitialized = true;
-        return new TestService('Eager');
-      }, { lazy: false });
-      
+
+      container.register(
+        'lazyService',
+        () => {
+          lazyInitialized = true;
+          return new TestService('Lazy');
+        },
+        { lazy: true }
+      );
+
+      container.register(
+        'eagerService',
+        () => {
+          eagerInitialized = true;
+          return new TestService('Eager');
+        },
+        { lazy: false }
+      );
+
       // Neither should be initialized yet for lazy: true
       expect(lazyInitialized).toBe(false);
       // Eager services are still lazy by default in this implementation
-      
+
       container.resolve('lazyService');
       expect(lazyInitialized).toBe(true);
     });
@@ -656,12 +682,12 @@ describe('DependencyContainer - Comprehensive Tests', () => {
         await new Promise(resolve => setTimeout(resolve, 10));
         return new DatabaseService('async://connection');
       });
-      
-      container.register('serviceWithAsyncDep', async (c) => {
+
+      container.register('serviceWithAsyncDep', async c => {
         const dep = await c.resolveAsync<IDatabaseService>('asyncDep');
         return new CacheService(dep);
       });
-      
+
       const service = await container.resolveAsync<CacheService>('serviceWithAsyncDep');
       expect(service).toBeInstanceOf(CacheService);
       expect(service.getDatabaseService()).toBeInstanceOf(DatabaseService);
@@ -669,15 +695,15 @@ describe('DependencyContainer - Comprehensive Tests', () => {
 
     it('should support service replacement and hot-swapping', () => {
       container.register('replaceableService', () => new TestService('Original'));
-      
+
       const original = container.resolve<ITestService>('replaceableService');
       expect(original.getName()).toBe('Original');
-      
+
       // Replace service registration
       container.register('replaceableService', () => new TestService('Replaced'), {
         lifecycle: 'transient',
       });
-      
+
       const replaced = container.resolve<ITestService>('replaceableService');
       expect(replaced.getName()).toBe('Replaced');
       expect(replaced).not.toBe(original);
@@ -687,7 +713,7 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       container.register('contextService', (container, context) => {
         return new TestService(context?.contextData || 'Default');
       });
-      
+
       // This test assumes the container supports context passing
       // Implementation may need adjustment based on actual API
       const service = container.resolve<ITestService>('contextService');
@@ -696,13 +722,13 @@ describe('DependencyContainer - Comprehensive Tests', () => {
 
     it('should support conditional service registration', () => {
       const condition = true;
-      
+
       if (condition) {
         container.register('conditionalService', () => new TestService('Conditional True'));
       } else {
         container.register('conditionalService', () => new TestService('Conditional False'));
       }
-      
+
       const service = container.resolve<ITestService>('conditionalService');
       expect(service.getName()).toBe('Conditional True');
     });
@@ -710,29 +736,29 @@ describe('DependencyContainer - Comprehensive Tests', () => {
     it('should handle deeply nested dependency graphs', () => {
       // Create a deep dependency chain
       container.registerValue('level0', 'root');
-      
+
       for (let i = 1; i <= 10; i++) {
         const prevLevel = `level${i - 1}`;
         const currentLevel = `level${i}`;
-        
-        container.register(currentLevel, (c) => ({
+
+        container.register(currentLevel, c => ({
           level: i,
           dependency: c.resolve(prevLevel),
         }));
       }
-      
+
       const deepService = container.resolve<any>('level10');
-      
+
       expect(deepService.level).toBe(10);
       expect(deepService.dependency.level).toBe(9);
-      
+
       // Traverse to root
       let current = deepService;
       for (let i = 10; i >= 1; i--) {
         expect(current.level).toBe(i);
         current = current.dependency;
       }
-      
+
       expect(current).toBe('root');
     });
   });
@@ -743,21 +769,21 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       interface ILogger {
         log(message: string): void;
       }
-      
+
       class ConsoleLogger implements ILogger {
         log(message: string): void {
           // Mock implementation
         }
       }
-      
+
       container.registerClass('logger', ConsoleLogger);
-      container.register('serviceWithLogger', (c) => ({
+      container.register('serviceWithLogger', c => ({
         logger: c.resolve<ILogger>('logger'),
-        doWork: function() {
+        doWork: function () {
           this.logger.log('Working...');
         },
       }));
-      
+
       const service = container.resolve<any>('serviceWithLogger');
       expect(service.logger).toBeInstanceOf(ConsoleLogger);
       expect(typeof service.doWork).toBe('function');
@@ -765,16 +791,16 @@ describe('DependencyContainer - Comprehensive Tests', () => {
 
     it('should emit comprehensive lifecycle events', () => {
       const events: string[] = [];
-      
+
       container.on('serviceRegistered', () => events.push('registered'));
       container.on('serviceResolved', () => events.push('resolved'));
       container.on('serviceInitialized', () => events.push('initialized'));
       container.on('serviceDisposed', () => events.push('disposed'));
-      
+
       container.register('eventService', () => new TestService('Events'));
       container.resolve('eventService');
       container.dispose();
-      
+
       expect(events).toContain('registered');
       // Note: Other events depend on container implementation
     });
@@ -783,10 +809,10 @@ describe('DependencyContainer - Comprehensive Tests', () => {
       container.register('inspectableService', () => new TestService('Inspectable'), {
         metadata: { category: 'test' },
       });
-      
+
       const allServices = container.getRegisteredServices();
       expect(allServices).toContain('inspectableService');
-      
+
       const registration = container.getServiceRegistration('inspectableService');
       expect(registration?.options.metadata?.category).toBe('test');
     });

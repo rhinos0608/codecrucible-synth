@@ -83,7 +83,7 @@ export class ActiveProcessManager extends EventEmitter {
    * Register a new active process for monitoring
    */
   public registerProcess(
-    process: Readonly<Omit<ActiveProcess, 'id' | 'startTime' | 'abortController'>>,
+    process: Readonly<Omit<ActiveProcess, 'id' | 'startTime' | 'abortController'>>
   ): ActiveProcess {
     const id = this.generateProcessId();
     const abortController = new AbortController();
@@ -528,9 +528,9 @@ export class ActiveProcessManager extends EventEmitter {
    * Setup event listeners for model selector
    */
   private setupModelSelectorEvents(): void {
-    this.hardwareSelector.on('modelSwitch', (_event) => {
+    this.hardwareSelector.on('modelSwitch', _event => {
       // Fire and forget: don't return a Promise to the event handler
-      this.terminateAllProcesses('model_switch').catch((err) => {
+      this.terminateAllProcesses('model_switch').catch(err => {
         this.logger.error('Failed to terminate all processes on model switch:', err);
       });
     });
@@ -642,7 +642,9 @@ export class ActiveProcessManager extends EventEmitter {
   }
 }
 
-function _getProcessStats(manager: ActiveProcessManager): ReturnType<ActiveProcessManager['getProcessStats']> {
+function _getProcessStats(
+  manager: ActiveProcessManager
+): ReturnType<ActiveProcessManager['getProcessStats']> {
   return manager.getProcessStats();
 }
 

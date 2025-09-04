@@ -1,7 +1,7 @@
 /**
  * Critical Security Tests - JWT Authenticator
  * Following Living Spiral Methodology - Security Guardian Perspective
- * 
+ *
  * Test Coverage Areas:
  * - Token validation and signature verification
  * - Expiration handling and clock tolerance
@@ -47,7 +47,7 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
     };
 
     authenticator = new JWTAuthenticator(config);
-    
+
     // Clear all timers to prevent test interference
     jest.clearAllTimers();
   });
@@ -55,7 +55,7 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
   afterEach(() => {
     // Cleanup any intervals created by the authenticator
     if (authenticator) {
-      (authenticator as any).cleanupIntervalId && 
+      (authenticator as any).cleanupIntervalId &&
         clearInterval((authenticator as any).cleanupIntervalId);
     }
     jest.clearAllTimers();
@@ -63,11 +63,7 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
 
   describe('Token Generation Security', () => {
     it('should generate secure JWT tokens with proper structure', async () => {
-      const result = await authenticator.generateTokens(
-        testUser,
-        '127.0.0.1',
-        'test-agent'
-      );
+      const result = await authenticator.generateTokens(testUser, '127.0.0.1', 'test-agent');
 
       expect(result.success).toBe(true);
       expect(result.accessToken).toBeDefined();
@@ -93,23 +89,19 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
 
       const sessionIds = results.map(r => r.sessionId);
       const uniqueIds = new Set(sessionIds);
-      
+
       expect(uniqueIds.size).toBe(3);
       expect(sessionIds.every(id => id && id.length > 0)).toBe(true);
     });
 
     it('should enforce session limits to prevent resource exhaustion', async () => {
       const promises = [];
-      
+
       // Generate max allowed sessions
       for (let i = 0; i < config.maxConcurrentSessions!; i++) {
-        promises.push(authenticator.generateTokens(
-          testUser, 
-          `127.0.0.${i}`, 
-          `agent${i}`
-        ));
+        promises.push(authenticator.generateTokens(testUser, `127.0.0.${i}`, `agent${i}`));
       }
-      
+
       const results = await Promise.all(promises);
       expect(results.every(r => r.success)).toBe(true);
 
@@ -130,11 +122,7 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
     let sessionId: string;
 
     beforeEach(async () => {
-      const result = await authenticator.generateTokens(
-        testUser,
-        '127.0.0.1',
-        'test-agent'
-      );
+      const result = await authenticator.generateTokens(testUser, '127.0.0.1', 'test-agent');
       validToken = result.accessToken!;
       sessionId = result.sessionId!;
     });
@@ -151,7 +139,7 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
     it('should reject tokens with invalid signatures', async () => {
       // Tamper with token signature
       const tamperedToken = validToken.slice(0, -5) + 'XXXXX';
-      
+
       const validation = await authenticator.validateToken(tamperedToken);
 
       expect(validation.valid).toBe(false);
@@ -179,7 +167,7 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
 
     it('should respect clock tolerance for near-expired tokens', async () => {
       const tolerance = config.clockTolerance!;
-      
+
       // Create token expiring within tolerance window
       const nearExpiredPayload = {
         sub: testUser.id,
@@ -234,11 +222,7 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
     let refreshToken: string;
 
     beforeEach(async () => {
-      const result = await authenticator.generateTokens(
-        testUser,
-        '127.0.0.1',
-        'test-agent'
-      );
+      const result = await authenticator.generateTokens(testUser, '127.0.0.1', 'test-agent');
       accessToken = result.accessToken!;
       refreshToken = result.refreshToken!;
     });
@@ -249,7 +233,7 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
       expect(refreshResult.success).toBe(true);
       expect(refreshResult.accessToken).toBeDefined();
       expect(refreshResult.refreshToken).toBeDefined();
-      
+
       // New tokens should be different from original
       expect(refreshResult.accessToken).not.toBe(accessToken);
       expect(refreshResult.refreshToken).not.toBe(refreshToken);
@@ -299,15 +283,11 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
 
   describe('Session Management Security', () => {
     it('should track and manage user sessions', async () => {
-      const session1 = await authenticator.generateTokens(
-        testUser, '127.0.0.1', 'agent1'
-      );
-      const session2 = await authenticator.generateTokens(
-        testUser, '127.0.0.2', 'agent2'  
-      );
+      const session1 = await authenticator.generateTokens(testUser, '127.0.0.1', 'agent1');
+      const session2 = await authenticator.generateTokens(testUser, '127.0.0.2', 'agent2');
 
       const sessions = await authenticator.getUserSessions(testUser.id);
-      
+
       expect(sessions.length).toBe(2);
       expect(sessions.map(s => s.id)).toContain(session1.sessionId);
       expect(sessions.map(s => s.id)).toContain(session2.sessionId);
@@ -319,13 +299,13 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
       const shortLivedAuth = new JWTAuthenticator(shortLivedConfig);
 
       await shortLivedAuth.generateTokens(testUser, '127.0.0.1', 'test');
-      
+
       // Wait for expiration
       await new Promise(resolve => setTimeout(resolve, 1100));
-      
+
       // Trigger cleanup
       await (shortLivedAuth as any).cleanupExpiredSessions();
-      
+
       const sessions = await shortLivedAuth.getUserSessions(testUser.id);
       expect(sessions.length).toBe(0);
     });
@@ -348,9 +328,8 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
 
   describe('Security Attack Prevention', () => {
     it('should prevent timing attacks on token validation', async () => {
-      const validToken = (await authenticator.generateTokens(
-        testUser, '127.0.0.1', 'test'
-      )).accessToken!;
+      const validToken = (await authenticator.generateTokens(testUser, '127.0.0.1', 'test'))
+        .accessToken!;
 
       const invalidTokens = [
         'completely-invalid-token',
@@ -360,7 +339,7 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
 
       // Measure timing for valid vs invalid tokens
       const times: number[] = [];
-      
+
       for (let i = 0; i < 10; i++) {
         const start = process.hrtime.bigint();
         await authenticator.validateToken(i % 2 === 0 ? validToken : invalidTokens[i % 3]);
@@ -372,27 +351,24 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
       // This is a basic timing attack prevention check
       const avgTime = times.reduce((a, b) => a + b) / times.length;
       const maxVariation = Math.max(...times.map(t => Math.abs(t - avgTime)));
-      
+
       expect(maxVariation).toBeLessThan(avgTime * 0.5); // Less than 50% variation
     });
 
     it('should handle high-frequency validation attempts gracefully', async () => {
-      const validToken = (await authenticator.generateTokens(
-        testUser, '127.0.0.1', 'test'
-      )).accessToken!;
+      const validToken = (await authenticator.generateTokens(testUser, '127.0.0.1', 'test'))
+        .accessToken!;
 
       // Simulate rapid validation attempts
-      const promises = Array(100).fill(null).map(() => 
-        authenticator.validateToken(validToken)
-      );
+      const promises = Array(100)
+        .fill(null)
+        .map(() => authenticator.validateToken(validToken));
 
       const results = await Promise.allSettled(promises);
-      
+
       // All should complete without throwing errors
       expect(results.every(r => r.status === 'fulfilled')).toBe(true);
-      expect(results.every(r => 
-        r.status === 'fulfilled' && (r.value as any).valid
-      )).toBe(true);
+      expect(results.every(r => r.status === 'fulfilled' && (r.value as any).valid)).toBe(true);
     });
 
     it('should prevent JWT algorithm confusion attacks', async () => {
@@ -400,7 +376,7 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
       const noneAlgPayload = {
         sub: testUser.id,
         exp: Math.floor(Date.now() / 1000) + 3600,
-        alg: 'none'
+        alg: 'none',
       };
 
       const noneAlgToken = jwt.sign(noneAlgPayload, '', { algorithm: 'none' });
@@ -431,7 +407,7 @@ describe('JWTAuthenticator - Critical Security Tests', () => {
       };
 
       const restrictedAuth = new JWTAuthenticator(restrictedConfig);
-      
+
       // Create token with different algorithm
       const rsaToken = jwt.sign(
         { sub: testUser.id, exp: Math.floor(Date.now() / 1000) + 3600 },

@@ -489,7 +489,7 @@ class SecureE2BCodeExecutionTool implements BaseTool {
           sessionId: this.agentContext.sessionId,
           executionId,
         },
-        metadata: { error: (error as Error).message }
+        metadata: { error: (error as Error).message },
       });
 
       logger.error('Secure code execution failed', error as Error, { executionId });
@@ -544,7 +544,7 @@ class SecureE2BTerminalTool implements BaseTool {
             sessionId: this.agentContext.sessionId,
             executionId,
             command: args.command,
-            reason: (commandValidation as any).error.message
+            reason: (commandValidation as any).error.message,
           }
         );
 
@@ -601,7 +601,7 @@ class SecureE2BTerminalTool implements BaseTool {
             userId: this.agentContext.userId,
             sessionId: this.agentContext.sessionId,
             executionId,
-            command: args.command
+            command: args.command,
           }
         );
 
@@ -638,7 +638,7 @@ class SecureE2BTerminalTool implements BaseTool {
           command: args.command,
           executionTime: Date.now() - startTime,
           exitCode: result.success ? 0 : 1,
-        }
+        },
       });
 
       return {
@@ -664,7 +664,7 @@ class SecureE2BTerminalTool implements BaseTool {
           sessionId: this.agentContext.sessionId,
           executionId,
         },
-        metadata: { command: args.command, error: (error as Error).message }
+        metadata: { command: args.command, error: (error as Error).message },
       });
 
       logger.error('Secure terminal execution failed', error as Error, { executionId });

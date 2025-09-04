@@ -238,7 +238,8 @@ export class UnifiedCacheCoordinator extends EventEmitter {
 
       // Try systems in priority order
       const systemsByPriority = Array.from(this.registeredSystems.entries()).sort(
-        ([, a], [, b]) => (this.systemPriorities.get(b.name) ?? 0) - (this.systemPriorities.get(a.name) ?? 0)
+        ([, a], [, b]) =>
+          (this.systemPriorities.get(b.name) ?? 0) - (this.systemPriorities.get(a.name) ?? 0)
       );
 
       for (const [systemName, _] of systemsByPriority) {
@@ -482,11 +483,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
         const result: unknown = await system.instance.get(key);
 
         // If result is an object with a 'value' property, return that
-        if (
-          result !== null &&
-          typeof result === 'object' &&
-          'value' in result
-        ) {
+        if (result !== null && typeof result === 'object' && 'value' in result) {
           return (result as { value: unknown }).value;
         }
 
@@ -887,13 +884,15 @@ export class UnifiedCacheCoordinator extends EventEmitter {
       clear: async () => this.unifiedCache.clear(),
       getStats: async () => this.unifiedCache.getStats(),
       cleanup: async () => {
-        const unifiedCacheWithCleanup = this.unifiedCache as UnifiedCacheSystem & { cleanup?: () => Promise<void> };
+        const unifiedCacheWithCleanup = this.unifiedCache as UnifiedCacheSystem & {
+          cleanup?: () => Promise<void>;
+        };
         if (typeof unifiedCacheWithCleanup.cleanup === 'function') {
           await unifiedCacheWithCleanup.cleanup();
         }
       },
     };
-    
+
     this.registerCacheSystem('unified-cache', 'unified', unifiedCacheAdapter);
   }
 

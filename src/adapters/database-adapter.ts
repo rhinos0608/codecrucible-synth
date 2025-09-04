@@ -255,9 +255,7 @@ export class DatabaseAdapter extends EventEmitter {
         confidence: row['confidence'],
         tokensUsed: row['tokens_used'],
         createdAt: row['created_at'],
-        responseTime: typeof row['response_time'] === 'number'
-          ? row['response_time']
-          : undefined,
+        responseTime: typeof row['response_time'] === 'number' ? row['response_time'] : undefined,
       }));
 
       const analytics = this.analyticsService.analyzeVoiceInteractions(analyticsData);

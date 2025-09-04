@@ -113,7 +113,9 @@ export class RateLimitManager {
         const remainingTime = bucket.blockExpiry - Date.now();
 
         return ErrorHandler.createErrorResponse(
-          new Error(`Rate limit exceeded for ${identifier}. Wait ${Math.ceil(remainingTime / 1000)} seconds before retrying`)
+          new Error(
+            `Rate limit exceeded for ${identifier}. Wait ${Math.ceil(remainingTime / 1000)} seconds before retrying`
+          )
         );
       }
 
@@ -132,7 +134,9 @@ export class RateLimitManager {
         });
 
         return ErrorHandler.createErrorResponse(
-          new Error(`Rate limit bucket exhausted for ${identifier}. Reduce request frequency and wait before retrying`)
+          new Error(
+            `Rate limit bucket exhausted for ${identifier}. Reduce request frequency and wait before retrying`
+          )
         );
       }
 
@@ -327,7 +331,9 @@ export class TimeoutRetryManager {
 
     // All retries exhausted
     return ErrorHandler.createErrorResponse(
-      new Error(`Request failed after ${attempt} attempts: ${lastError?.message || 'Unknown error'}`)
+      new Error(
+        `Request failed after ${attempt} attempts: ${lastError?.message || 'Unknown error'}`
+      )
     );
   }
 
@@ -338,9 +344,7 @@ export class TimeoutRetryManager {
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       const timeoutHandle = setTimeout(() => {
-        reject(
-          new Error(`Request timeout after ${config.totalTimeout}ms`)
-        );
+        reject(new Error(`Request timeout after ${config.totalTimeout}ms`));
       }, config.totalTimeout);
 
       requestFn()

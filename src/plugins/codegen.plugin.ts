@@ -7,7 +7,7 @@ export default function createCodegenPlugin(): IPlugin {
       version: '1.0.0',
       description: 'Provides code generation commands',
       lifecycle: 'both',
-      tags: ['codegen']
+      tags: ['codegen'],
     },
     async initialize(ctx: PluginContext) {
       if (ctx.registerCommand) {
@@ -18,4 +18,3 @@ export default function createCodegenPlugin(): IPlugin {
     },
   };
 }
-

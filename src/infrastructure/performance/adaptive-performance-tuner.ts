@@ -251,7 +251,12 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     logger.info('Increased retry delays due to high error rate');
   }
 
-  private recordAdjustment(metric: string, oldValue: unknown, newValue: unknown, reason: string): void {
+  private recordAdjustment(
+    metric: string,
+    oldValue: unknown,
+    newValue: unknown,
+    reason: string
+  ): void {
     this.adjustmentHistory.push({
       timestamp: Date.now(),
       metric,

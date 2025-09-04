@@ -54,7 +54,7 @@ class MockLLMProviderAdapter extends EventEmitter implements ILLMProviderAdapter
 
   async testConnection(): Promise<boolean> {
     this.lastHealthCheck = new Date();
-    
+
     if (this.consecutiveFailures >= 3) {
       this.consecutiveFailures++;
       return false;
@@ -73,7 +73,7 @@ class MockLLMProviderAdapter extends EventEmitter implements ILLMProviderAdapter
 
   async getStatus(): Promise<ProviderStatus> {
     const isHealthy = await this.testConnection();
-    
+
     return {
       available: isHealthy && this.isInitialized,
       modelCount: this.availableModels.length,
@@ -250,14 +250,18 @@ class MockLLMProviderAdapter extends EventEmitter implements ILLMProviderAdapter
     await new Promise(resolve => setTimeout(resolve, 40));
 
     const lastMessage = request.messages[request.messages.length - 1];
-    
+
     const response: GenerationResponse = {
       content: `Chat response to: "${lastMessage.content.substring(0, 50)}..."`,
       finishReason: 'completed',
       tokenUsage: {
-        promptTokens: request.messages.reduce((sum, msg) => sum + Math.floor(msg.content.length / 4), 0),
+        promptTokens: request.messages.reduce(
+          (sum, msg) => sum + Math.floor(msg.content.length / 4),
+          0
+        ),
         completionTokens: 80,
-        totalTokens: request.messages.reduce((sum, msg) => sum + Math.floor(msg.content.length / 4), 0) + 80,
+        totalTokens:
+          request.messages.reduce((sum, msg) => sum + Math.floor(msg.content.length / 4), 0) + 80,
       },
       latencyMs: Date.now() - startTime,
       modelUsed: modelName,
@@ -418,9 +422,7 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
 
       adapter.updateConfiguration(updates);
 
-      expect(eventHandler).toHaveBeenCalledWith(
-        expect.objectContaining(updates)
-      );
+      expect(eventHandler).toHaveBeenCalledWith(expect.objectContaining(updates));
     });
 
     it('should close provider and cleanup resources', async () => {
@@ -490,9 +492,7 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
     it('should prevent loading already loaded models', async () => {
       await adapter.loadModel('model-1');
 
-      await expect(adapter.loadModel('model-1')).rejects.toThrow(
-        'Model already loaded: model-1'
-      );
+      await expect(adapter.loadModel('model-1')).rejects.toThrow('Model already loaded: model-1');
     });
 
     it('should prevent loading unavailable models', async () => {
@@ -503,7 +503,7 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
 
     it('should unload models successfully', async () => {
       await adapter.loadModel('model-1');
-      
+
       const eventHandler = jest.fn();
       adapter.on('modelUnloaded', eventHandler);
 
@@ -515,15 +515,11 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
     });
 
     it('should prevent unloading non-loaded models', async () => {
-      await expect(adapter.unloadModel('model-1')).rejects.toThrow(
-        'Model not loaded: model-1'
-      );
+      await expect(adapter.unloadModel('model-1')).rejects.toThrow('Model not loaded: model-1');
     });
 
     it('should load multiple models concurrently', async () => {
-      const loadPromises = ['model-1', 'model-2', 'model-3'].map(model =>
-        adapter.loadModel(model)
-      );
+      const loadPromises = ['model-1', 'model-2', 'model-3'].map(model => adapter.loadModel(model));
 
       await Promise.all(loadPromises);
 
@@ -670,9 +666,7 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
     it('should prevent chat completion with unsupported model', async () => {
       await adapter.loadModel('model-3'); // Model without chat support
 
-      const messages: ChatMessage[] = [
-        { role: 'user', content: 'Hello' },
-      ];
+      const messages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
 
       const request: ChatRequest = { messages };
 
@@ -682,9 +676,7 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
     });
 
     it('should support streaming chat completion', async () => {
-      const messages: ChatMessage[] = [
-        { role: 'user', content: 'Explain quantum computing' },
-      ];
+      const messages: ChatMessage[] = [{ role: 'user', content: 'Explain quantum computing' }];
 
       const request: ChatRequest = {
         messages,
@@ -712,9 +704,7 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
     it('should handle streaming with unsupported model', async () => {
       await adapter.loadModel('model-3'); // Model without streaming support
 
-      const messages: ChatMessage[] = [
-        { role: 'user', content: 'Test message' },
-      ];
+      const messages: ChatMessage[] = [{ role: 'user', content: 'Test message' }];
 
       const request: ChatRequest = { messages };
 
@@ -810,12 +800,12 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
 
       // Load and unload the same model concurrently
       const loadPromise = adapter.loadModel('model-1');
-      
+
       await loadPromise;
-      
+
       const unloadPromise = adapter.unloadModel('model-1');
       const reloadPromise = adapter.loadModel('model-1');
-      
+
       await unloadPromise;
       await reloadPromise;
 
@@ -829,7 +819,7 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
       await adapter.loadModel('model-2');
 
       const listenerCount = adapter.listenerCount('modelLoaded');
-      
+
       await adapter.close();
 
       // Verify cleanup
@@ -882,9 +872,7 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
       }));
 
       const startTime = Date.now();
-      const promises = requests.map(request =>
-        adapter.generateText('model-1', request)
-      );
+      const promises = requests.map(request => adapter.generateText('model-1', request));
 
       const responses = await Promise.all(promises);
       const endTime = Date.now();
@@ -953,7 +941,7 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
   describe('Event Emission and Monitoring', () => {
     it('should emit all lifecycle events', async () => {
       const events: string[] = [];
-      
+
       adapter.on('initialized', () => events.push('initialized'));
       adapter.on('connectionSuccess', () => events.push('connectionSuccess'));
       adapter.on('modelLoaded', () => events.push('modelLoaded'));
@@ -964,10 +952,10 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
       await adapter.initialize();
       await adapter.testConnection();
       await adapter.loadModel('model-1');
-      
+
       const request: GenerationRequest = { prompt: 'Test', maxTokens: 50 };
       await adapter.generateText('model-1', request);
-      
+
       await adapter.unloadModel('model-1');
       await adapter.close();
 
@@ -986,9 +974,7 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
       const updates = { timeout: 45000 };
       adapter.updateConfiguration(updates);
 
-      expect(eventHandler).toHaveBeenCalledWith(
-        expect.objectContaining(updates)
-      );
+      expect(eventHandler).toHaveBeenCalledWith(expect.objectContaining(updates));
     });
 
     it('should emit streaming events', async () => {
@@ -1013,7 +999,7 @@ describe('LLM Provider Adapter - Comprehensive Tests', () => {
       // Add multiple listeners
       const listener1 = jest.fn();
       const listener2 = jest.fn();
-      
+
       adapter.on('modelLoaded', listener1);
       adapter.on('modelLoaded', listener2);
 

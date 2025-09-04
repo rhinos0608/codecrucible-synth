@@ -28,8 +28,8 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     config: {},
     session: {
       id: 'test-session',
-      startTime: Date.now()
-    }
+      startTime: Date.now(),
+    },
   });
 
   // Test files for CLI search testing
@@ -58,7 +58,7 @@ describe('CLI Search Integration - End-to-End Tests', () => {
         );
       };
     `,
-    
+
     'src/services/ApiService.ts': `
       import axios from 'axios';
       
@@ -88,7 +88,7 @@ describe('CLI Search Integration - End-to-End Tests', () => {
       // FIXME: Add error handling
       // TODO: Add caching mechanism
     `,
-    
+
     'src/utils/helpers.js': `
       // Utility functions
       export function formatDate(date) {
@@ -108,7 +108,7 @@ describe('CLI Search Integration - End-to-End Tests', () => {
         };
       }
     `,
-    
+
     'tests/components/UserComponent.test.tsx': `
       import { render, screen } from '@testing-library/react';
       import { UserComponent } from '../../src/components/UserComponent';
@@ -137,7 +137,7 @@ describe('CLI Search Integration - End-to-End Tests', () => {
         });
       });
     `,
-    
+
     'package.json': `{
       "name": "cli-search-test",
       "dependencies": {
@@ -149,7 +149,7 @@ describe('CLI Search Integration - End-to-End Tests', () => {
         "jest": "^29.0.0"
       }
     }`,
-    
+
     'tsconfig.json': `{
       "compilerOptions": {
         "target": "ES2022",
@@ -159,13 +159,13 @@ describe('CLI Search Integration - End-to-End Tests', () => {
         "moduleResolution": "node",
         "allowSyntheticDefaultImports": true
       }
-    }`
+    }`,
   };
 
   beforeAll(async () => {
     // Create isolated test workspace
     testWorkspace = await mkdtemp(join(tmpdir(), 'cli-search-test-'));
-    
+
     // Create test file structure
     for (const [filePath, content] of Object.entries(testFiles)) {
       const fullPath = join(testWorkspace, filePath);
@@ -173,7 +173,7 @@ describe('CLI Search Integration - End-to-End Tests', () => {
       await mkdir(dir, { recursive: true });
       await writeFile(fullPath, content);
     }
-    
+
     // Initialize components
     mockCLIContext = createMockCLIContext();
     searchCommands = new SearchCLICommands(testWorkspace);
@@ -188,10 +188,10 @@ describe('CLI Search Integration - End-to-End Tests', () => {
   describe('Slash Command Registration', () => {
     it('should register all search slash commands', () => {
       const commands = cliIntegration.registerSlashCommands();
-      
+
       expect(commands).toBeInstanceOf(Map);
       expect(commands.size).toBeGreaterThan(5);
-      
+
       // Verify specific commands exist
       const expectedCommands = [
         'search',
@@ -200,9 +200,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
         'find-import',
         'find-file',
         'cache',
-        'search-help'
+        'search-help',
       ];
-      
+
       for (const cmd of expectedCommands) {
         expect(commands.has(cmd)).toBe(true);
         expect(typeof commands.get(cmd)).toBe('function');
@@ -211,7 +211,7 @@ describe('CLI Search Integration - End-to-End Tests', () => {
 
     it('should provide search system status', () => {
       const status = cliIntegration.getSearchStatus();
-      
+
       expect(status).toBeDefined();
       expect(typeof status).toBe('string');
       expect(status).toContain('Search System:');
@@ -223,11 +223,11 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should execute basic search queries', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
-      
+
       expect(searchCommand).toBeDefined();
-      
+
       const result = await searchCommand!('UserComponent');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
       expect(result).toContain('Search completed') || expect(result).toContain('UserComponent');
@@ -236,9 +236,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should handle search with type filters', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
-      
+
       const result = await searchCommand!('User --type function --lang typescript');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
     });
@@ -246,9 +246,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should handle search with language filters', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
-      
+
       const result = await searchCommand!('function --lang javascript');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
     });
@@ -256,9 +256,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should provide usage help for invalid syntax', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
-      
+
       const result = await searchCommand!('');
-      
+
       expect(result).toContain('❌ Usage:');
       expect(result).toContain('/search <query>');
     });
@@ -268,22 +268,23 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should find function definitions', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findFnCommand = commands.get('find-fn');
-      
+
       expect(findFnCommand).toBeDefined();
-      
+
       const result = await findFnCommand!('fetchUser');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
-      expect(result).toContain('Function search completed') || expect(result).toContain('fetchUser');
+      expect(result).toContain('Function search completed') ||
+        expect(result).toContain('fetchUser');
     });
 
     it('should find JavaScript functions', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findFnCommand = commands.get('find-fn');
-      
+
       const result = await findFnCommand!('formatDate --lang javascript');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
     });
@@ -291,9 +292,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should find TypeScript functions', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findFnCommand = commands.get('find-fn');
-      
+
       const result = await findFnCommand!('updateUser --lang typescript');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
     });
@@ -301,9 +302,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should provide usage help for empty queries', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findFnCommand = commands.get('find-fn');
-      
+
       const result = await findFnCommand!('');
-      
+
       expect(result).toContain('❌ Usage:');
       expect(result).toContain('/find-fn <function-name>');
     });
@@ -313,11 +314,11 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should find class definitions', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findClassCommand = commands.get('find-class');
-      
+
       expect(findClassCommand).toBeDefined();
-      
+
       const result = await findClassCommand!('ApiService');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
       expect(result).toContain('Class search completed') || expect(result).toContain('ApiService');
@@ -326,9 +327,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should find React components', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findClassCommand = commands.get('find-class');
-      
+
       const result = await findClassCommand!('UserComponent --lang typescript');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
     });
@@ -336,9 +337,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should provide usage help for empty queries', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findClassCommand = commands.get('find-class');
-      
+
       const result = await findClassCommand!('');
-      
+
       expect(result).toContain('❌ Usage:');
       expect(result).toContain('/find-class <class-name>');
     });
@@ -348,11 +349,11 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should find import statements', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findImportCommand = commands.get('find-import');
-      
+
       expect(findImportCommand).toBeDefined();
-      
+
       const result = await findImportCommand!('axios');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
       expect(result).toContain('Import search completed') || expect(result).toContain('axios');
@@ -361,9 +362,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should find React imports', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findImportCommand = commands.get('find-import');
-      
+
       const result = await findImportCommand!('react');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
     });
@@ -371,9 +372,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should find local imports', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findImportCommand = commands.get('find-import');
-      
+
       const result = await findImportCommand!('../types/User');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
     });
@@ -381,9 +382,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should provide usage help for empty queries', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findImportCommand = commands.get('find-import');
-      
+
       const result = await findImportCommand!('');
-      
+
       expect(result).toContain('❌ Usage:');
       expect(result).toContain('/find-import <module-name>');
     });
@@ -393,22 +394,23 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should find files by pattern', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findFileCommand = commands.get('find-file');
-      
+
       expect(findFileCommand).toBeDefined();
-      
+
       const result = await findFileCommand!('UserComponent');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
-      expect(result).toContain('File search completed') || expect(result).toContain('UserComponent');
+      expect(result).toContain('File search completed') ||
+        expect(result).toContain('UserComponent');
     });
 
     it('should find configuration files', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findFileCommand = commands.get('find-file');
-      
+
       const result = await findFileCommand!('package.json');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
     });
@@ -416,9 +418,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should find test files', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findFileCommand = commands.get('find-file');
-      
+
       const result = await findFileCommand!('*.test.*');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toContain('❌');
     });
@@ -426,9 +428,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should provide usage help for empty queries', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const findFileCommand = commands.get('find-file');
-      
+
       const result = await findFileCommand!('');
-      
+
       expect(result).toContain('❌ Usage:');
       expect(result).toContain('/find-file <file-pattern>');
     });
@@ -438,31 +440,33 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should show cache statistics', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const cacheCommand = commands.get('cache');
-      
+
       expect(cacheCommand).toBeDefined();
-      
+
       const result = await cacheCommand!('stats');
-      
+
       expect(typeof result).toBe('string');
-      expect(result).toContain('Cache Statistics:') || expect(result).toContain('No hybrid coordinator');
+      expect(result).toContain('Cache Statistics:') ||
+        expect(result).toContain('No hybrid coordinator');
     });
 
     it('should show cache statistics with no arguments', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const cacheCommand = commands.get('cache');
-      
+
       const result = await cacheCommand!('');
-      
+
       expect(typeof result).toBe('string');
-      expect(result).toContain('Cache Statistics:') || expect(result).toContain('No hybrid coordinator');
+      expect(result).toContain('Cache Statistics:') ||
+        expect(result).toContain('No hybrid coordinator');
     });
 
     it('should clear cache', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const cacheCommand = commands.get('cache');
-      
+
       const result = await cacheCommand!('clear');
-      
+
       expect(typeof result).toBe('string');
       expect(result).toContain('cleared') || expect(result).toContain('No hybrid coordinator');
     });
@@ -470,9 +474,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should provide usage help for invalid commands', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const cacheCommand = commands.get('cache');
-      
+
       const result = await cacheCommand!('invalid');
-      
+
       expect(result).toContain('❌ Usage:');
       expect(result).toContain('/cache [stats|clear]');
     });
@@ -482,11 +486,11 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should provide comprehensive help information', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const helpCommand = commands.get('search-help');
-      
+
       expect(helpCommand).toBeDefined();
-      
+
       const result = await helpCommand!();
-      
+
       expect(typeof result).toBe('string');
       expect(result).toContain('Search System Commands:');
       expect(result).toContain('Slash Commands');
@@ -498,9 +502,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should include all slash commands in help', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const helpCommand = commands.get('search-help');
-      
+
       const result = await helpCommand!();
-      
+
       // Check that help includes documentation for all commands
       expect(result).toContain('/search');
       expect(result).toContain('/find-fn');
@@ -513,9 +517,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should include CLI command documentation', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const helpCommand = commands.get('search-help');
-      
+
       const result = await helpCommand!();
-      
+
       expect(result).toContain('crucible search');
       expect(result).toContain('crucible find-functions');
       expect(result).toContain('crucible find-classes');
@@ -524,9 +528,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should include practical examples', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const helpCommand = commands.get('search-help');
-      
+
       const result = await helpCommand!();
-      
+
       expect(result).toContain('/search "handleRequest"');
       expect(result).toContain('/find-class "UserService"');
       expect(result).toContain('/find-import "express"');
@@ -537,10 +541,10 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should handle search failures gracefully', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
-      
+
       // Test with potentially problematic pattern
       const result = await searchCommand!('\\invalid\\regex\\pattern');
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toThrow;
       // Should either complete successfully or show a clear error message
@@ -552,16 +556,16 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should handle concurrent command execution', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
-      
+
       // Execute multiple searches concurrently
       const promises = [
         searchCommand!('UserComponent'),
         searchCommand!('ApiService'),
-        searchCommand!('formatDate')
+        searchCommand!('formatDate'),
       ];
-      
+
       const results = await Promise.all(promises);
-      
+
       results.forEach(result => {
         expect(typeof result).toBe('string');
         expect(result).not.toThrow;
@@ -571,10 +575,10 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should handle very long search queries', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
-      
+
       const longQuery = 'a'.repeat(1000); // Very long query
       const result = await searchCommand!(longQuery);
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toThrow;
     });
@@ -582,10 +586,10 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should handle special characters in queries', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
-      
+
       const specialQuery = 'user@example.com $#@!%^&*()[]{}';
       const result = await searchCommand!(specialQuery);
-      
+
       expect(typeof result).toBe('string');
       expect(result).not.toThrow;
     });
@@ -596,14 +600,14 @@ describe('CLI Search Integration - End-to-End Tests', () => {
       // Test direct CLI commands for comparison
       const directResult = await searchCommands.handleSearchCommand('UserComponent', {
         type: 'general',
-        maxResults: '10'
+        maxResults: '10',
       });
-      
+
       // Test slash command integration
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
       const slashResult = await searchCommand!('UserComponent');
-      
+
       // Both should complete without errors
       expect(typeof slashResult).toBe('string');
       expect(slashResult).not.toContain('❌');
@@ -611,12 +615,12 @@ describe('CLI Search Integration - End-to-End Tests', () => {
 
     it('should handle different output formats', async () => {
       const commands = cliIntegration.registerSlashCommands();
-      
+
       // Test different command types
       const searchResult = await commands.get('search')!('UserComponent');
       const functionResult = await commands.get('find-fn')!('fetchUser');
       const classResult = await commands.get('find-class')!('ApiService');
-      
+
       // All should return formatted strings
       [searchResult, functionResult, classResult].forEach(result => {
         expect(typeof result).toBe('string');
@@ -629,11 +633,11 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should complete searches within reasonable time', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
-      
+
       const startTime = Date.now();
       const result = await searchCommand!('function');
       const duration = Date.now() - startTime;
-      
+
       expect(typeof result).toBe('string');
       expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
     });
@@ -641,22 +645,20 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should handle multiple rapid searches', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
-      
+
       const startTime = Date.now();
-      
+
       // Execute 5 rapid searches
-      const promises = Array.from({ length: 5 }, (_, i) => 
-        searchCommand!(`search${i}`)
-      );
-      
+      const promises = Array.from({ length: 5 }, (_, i) => searchCommand!(`search${i}`));
+
       const results = await Promise.all(promises);
       const duration = Date.now() - startTime;
-      
+
       expect(results).toHaveLength(5);
       results.forEach(result => {
         expect(typeof result).toBe('string');
       });
-      
+
       // Should handle rapid searches efficiently
       expect(duration).toBeLessThan(10000); // All searches within 10 seconds
     });
@@ -667,15 +669,15 @@ describe('CLI Search Integration - End-to-End Tests', () => {
       const contextVariations = [
         { ...mockCLIContext, verbose: true },
         { ...mockCLIContext, debug: true },
-        { ...mockCLIContext, outputFormat: 'json' }
+        { ...mockCLIContext, outputFormat: 'json' },
       ];
-      
+
       for (const context of contextVariations) {
         const integration = new CLISearchIntegration(context, testWorkspace);
         const commands = integration.registerSlashCommands();
-        
+
         const result = await commands.get('search')!('test');
-        
+
         expect(typeof result).toBe('string');
         await integration.shutdown();
       }
@@ -684,9 +686,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
     it('should respect working directory context', async () => {
       const commands = cliIntegration.registerSlashCommands();
       const searchCommand = commands.get('search');
-      
+
       const result = await searchCommand!('UserComponent');
-      
+
       expect(typeof result).toBe('string');
       // Should find files in the test workspace
       expect(result).not.toContain('❌') || expect(result).toContain('completed');

@@ -5,60 +5,60 @@ console.log('🧪 Testing MCP Tool Call Parsing and Execution...\n');
 // Test with a simple request that should generate a tool call
 const child = spawn('node', ['dist/index.js', 'List the contents of the current directory'], {
   cwd: process.cwd(),
-  timeout: 20000
+  timeout: 20000,
 });
 
 let output = '';
 let toolCallDetected = false;
 let toolExecuted = false;
 
-child.stdout.on('data', (data) => {
+child.stdout.on('data', data => {
   const text = data.toString();
   output += text;
-  
+
   // Check for tool call generation
   if (text.includes('"name":') && text.includes('"arguments":')) {
     console.log('✅ TOOL CALL GENERATED:', text.trim());
     toolCallDetected = true;
   }
-  
+
   // Check for tool execution logs
   if (text.includes('Tool execution: Parsed local LLM')) {
     console.log('✅ TOOL CALL PARSED FROM CONTENT');
     toolExecuted = true;
   }
-  
+
   if (text.includes('Tool execution: Found tool calls')) {
     console.log('✅ TOOL EXECUTION STARTED');
   }
-  
+
   if (text.includes('Executing tool')) {
     console.log('✅ TOOL BEING EXECUTED');
   }
 });
 
-child.stderr.on('data', (data) => {
+child.stderr.on('data', data => {
   const text = data.toString();
   output += text;
-  
+
   // Same checks for stderr
   if (text.includes('"name":') && text.includes('"arguments":')) {
     console.log('✅ TOOL CALL GENERATED (stderr):', text.trim());
     toolCallDetected = true;
   }
-  
+
   if (text.includes('Tool execution: Parsed local LLM')) {
     console.log('✅ TOOL CALL PARSED FROM CONTENT (stderr)');
     toolExecuted = true;
   }
 });
 
-child.on('close', (code) => {
+child.on('close', code => {
   console.log('\n📊 TEST RESULTS:');
   console.log(`- Tool Call Generated: ${toolCallDetected ? '✅ YES' : '❌ NO'}`);
   console.log(`- Tool Call Parsed: ${toolExecuted ? '✅ YES' : '❌ NO'}`);
   console.log(`- Exit Code: ${code}`);
-  
+
   if (toolCallDetected && !toolExecuted) {
     console.log('\n🔍 DIAGNOSIS: Tool calls are generated but not being parsed/executed');
     console.log('   This suggests the JSON parsing logic may need adjustment');
@@ -69,7 +69,7 @@ child.on('close', (code) => {
   }
 });
 
-child.on('error', (error) => {
+child.on('error', error => {
   console.log('❌ Error:', error.message);
 });
 

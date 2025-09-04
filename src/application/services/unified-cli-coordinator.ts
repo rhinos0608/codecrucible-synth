@@ -35,9 +35,7 @@ import { CodebaseAnalysisResult } from '../context/context-window-manager.js';
 import { naturalLanguageInterface, ParsedCommand } from '../cli/natural-language-interface.js';
 import { agenticWorkflowDisplay } from '../workflow/agentic-workflow-display.js';
 import { streamingWorkflowIntegration } from '../workflow/streaming-workflow-integration.js';
-import {
-  EnterpriseSecurityFramework,
-} from '../../infrastructure/security/enterprise-security-framework.js';
+import { EnterpriseSecurityFramework } from '../../infrastructure/security/enterprise-security-framework.js';
 import {
   ObservabilitySystem,
   TraceSpan,
@@ -874,8 +872,6 @@ export class UnifiedCLICoordinator extends EventEmitter {
       `📊 Operation ${operationId} metrics: ${processingTime.toFixed(2)}ms, Success: ${success}, Memory: ${memoryUsage.toFixed(2)}MB`
     );
   }
-
-
 
   /**
    * Determine if an operation should use streaming display

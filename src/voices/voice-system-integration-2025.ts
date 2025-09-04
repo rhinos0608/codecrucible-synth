@@ -5,6 +5,7 @@
 
 import { VoiceArchetypeSystem } from './voice-archetype-system.js';
 import { logger } from '../infrastructure/logging/logger.js';
+import { CouncilMode } from './collaboration/council-decision-engine.js';
 
 export interface VoiceSystemConfig {
   useOptimizedSystem?: boolean;
@@ -15,11 +16,11 @@ export interface VoiceSystemConfig {
 }
 
 export class VoiceSystemIntegration2025 {
-  private voiceArchetypeSystem: VoiceArchetypeSystem;
-  private config: VoiceSystemConfig;
+  private readonly voiceArchetypeSystem: VoiceArchetypeSystem;
+  private readonly config: VoiceSystemConfig;
   private initialized: boolean = false;
 
-  constructor(modelClient: any = null, config: VoiceSystemConfig = {}) {
+  public constructor(modelClient: unknown = null, config: Readonly<VoiceSystemConfig> = {}) {
     this.config = {
       useOptimizedSystem: true,
       fallbackToLegacy: true,
@@ -31,33 +32,44 @@ export class VoiceSystemIntegration2025 {
 
     // Create a simple logger
     const simpleLogger = {
-      info: (msg: string) => console.log(`[VoiceSystem] ${msg}`),
-      error: (msg: string, error?: any) => console.error(`[VoiceSystem] ${msg}`, error),
-      warn: (msg: string) => console.warn(`[VoiceSystem] ${msg}`),
-      debug: (msg: string) => console.debug(`[VoiceSystem] ${msg}`),
-      trace: (msg: string) => console.trace(`[VoiceSystem] ${msg}`),
+      info: (msg: string): void => {
+        console.log(`[VoiceSystem] ${msg}`);
+      },
+      error: (msg: string, error?: unknown): void => {
+        console.error(`[VoiceSystem] ${msg}`, error);
+      },
+      warn: (msg: string): void => {
+        console.warn(`[VoiceSystem] ${msg}`);
+      },
+      debug: (msg: string): void => {
+        console.debug(`[VoiceSystem] ${msg}`);
+      },
+      trace: (msg: string): void => {
+        console.trace(`[VoiceSystem] ${msg}`);
+      },
     };
 
     // Initialize with the actual voice archetype system
-    const _voiceConfig = {
-      voices: {
-        default: ['architect', 'developer', 'analyzer'],
-        available: this.getAvailableVoices(),
-        parallel: true,
-        maxConcurrent: this.config.maxConcurrentVoices || 3,
-      },
-    };
+    // Removed unused _voiceConfig declaration
 
     this.voiceArchetypeSystem = new VoiceArchetypeSystem(modelClient, simpleLogger);
   }
 
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     try {
       logger.info('Initializing Voice System Integration 2025');
 
       // Initialize the underlying voice system if it has an initialize method
-      if (this.voiceArchetypeSystem.initialize) {
-        await this.voiceArchetypeSystem.initialize();
+      const initializeMethod =
+        typeof this.voiceArchetypeSystem.initialize === 'function'
+          ? this.voiceArchetypeSystem.initialize.bind(this.voiceArchetypeSystem)
+          : undefined;
+      if (initializeMethod) {
+        const initResult: unknown = initializeMethod();
+        // Await only if the result is a Promise to avoid awaiting a void/non-promise
+        if (initResult && typeof initResult === 'object' && 'then' in initResult) {
+          await (initResult as Promise<unknown>);
+        }
       }
 
       this.initialized = true;
@@ -68,19 +80,20 @@ export class VoiceSystemIntegration2025 {
     }
   }
 
-  async synthesizeVoices(request: string, context: any = {}): Promise<any> {
+  public async synthesizeVoices(
+    request: string,
+    context: Readonly<{ requiredVoices?: string[]; councilMode?: CouncilMode }> = {}
+  ): Promise<Record<string, unknown>> {
     if (!this.initialized) {
       await this.initialize();
     }
 
     try {
       // Use the underlying voice system for synthesis
-      if (this.voiceArchetypeSystem.synthesizeMultipleVoices) {
-        return await this.voiceArchetypeSystem.synthesizeMultipleVoices(request, context);
-      }
+      const result = await this.voiceArchetypeSystem.synthesizeMultipleVoices(request, context);
 
-      // Fallback to basic voice processing
-      return await this.basicVoiceSynthesis(request, context);
+      // Convert SynthesisResult to Record<string, unknown>
+      return result as unknown as Record<string, unknown>;
     } catch (error) {
       logger.error('Voice synthesis failed:', error);
 
@@ -93,9 +106,9 @@ export class VoiceSystemIntegration2025 {
     }
   }
 
-  async selectVoices(criteria: any = {}): Promise<string[]> {
+  public async selectVoices(criteria: Record<string, unknown> = {}): Promise<string[]> {
     const availableVoices = this.getAvailableVoices();
-    const maxVoices = Math.min(this.config.maxConcurrentVoices || 3, availableVoices.length);
+    const maxVoices = Math.min(this.config.maxConcurrentVoices ?? 3, availableVoices.length);
 
     switch (this.config.voiceSelectionStrategy) {
       case 'random':
@@ -104,11 +117,11 @@ export class VoiceSystemIntegration2025 {
         return this.selectRoundRobinVoices(availableVoices, maxVoices);
       case 'adaptive':
       default:
-        return this.selectAdaptiveVoices(availableVoices, maxVoices, criteria);
+        return Promise.resolve(this.selectAdaptiveVoices(availableVoices, maxVoices, criteria));
     }
   }
 
-  getAvailableVoices(): string[] {
+  public getAvailableVoices(): string[] {
     // Default voice archetypes based on the system
     return [
       'architect',
@@ -124,7 +137,12 @@ export class VoiceSystemIntegration2025 {
     ];
   }
 
-  getSystemStatus(): any {
+  public getSystemStatus(): {
+    initialized: boolean;
+    config: VoiceSystemConfig;
+    availableVoices: number;
+    performance: Record<string, unknown>;
+  } {
     return {
       initialized: this.initialized,
       config: this.config,
@@ -134,7 +152,10 @@ export class VoiceSystemIntegration2025 {
   }
 
   // Private methods
-  private async basicVoiceSynthesis(request: string, context: any): Promise<any> {
+  private async basicVoiceSynthesis(
+    request: string,
+    context: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
     const selectedVoices = await this.selectVoices(context);
 
     return {
@@ -160,7 +181,11 @@ export class VoiceSystemIntegration2025 {
     return selected;
   }
 
-  private selectAdaptiveVoices(voices: string[], count: number, criteria: any): string[] {
+  private selectAdaptiveVoices(
+    voices: string[],
+    count: number,
+    criteria: Record<string, unknown>
+  ): string[] {
     // Adaptive selection based on criteria
     const priorities = this.calculateVoicePriorities(voices, criteria);
     return priorities
@@ -171,7 +196,7 @@ export class VoiceSystemIntegration2025 {
 
   private calculateVoicePriorities(
     voices: string[],
-    criteria: any
+    criteria: Record<string, unknown>
   ): Array<{ voice: string; priority: number }> {
     return voices.map(voice => ({
       voice,
@@ -179,7 +204,7 @@ export class VoiceSystemIntegration2025 {
     }));
   }
 
-  private calculateVoicePriority(voice: string, criteria: any): number {
+  private calculateVoicePriority(voice: string, criteria: Record<string, unknown>): number {
     let priority = 0.5; // Base priority
 
     // Simple priority calculation based on voice type and criteria
@@ -202,7 +227,7 @@ export class VoiceSystemIntegration2025 {
     return Math.min(priority, 1.0);
   }
 
-  private getPerformanceMetrics(): any {
+  private getPerformanceMetrics(): Record<string, unknown> {
     if (!this.config.enablePerformanceMonitoring) {
       return { enabled: false };
     }
@@ -221,11 +246,38 @@ export class VoiceSystemIntegration2025 {
   /**
    * Get system analytics data
    */
-  getSystemAnalytics(): any {
+  public getSystemAnalytics(): {
+    systemStatus: {
+      initialized: boolean;
+      config: VoiceSystemConfig;
+      availableVoices: number;
+      performance: Record<string, unknown>;
+    };
+    performanceMetrics: Record<string, unknown>;
+    voiceUsageStats: {
+      totalSyntheses: number;
+      voiceDistribution: Record<string, unknown>;
+      averageVoicesPerRequest: number;
+      mostUsedVoice: string;
+      leastUsedVoice: string;
+    };
+    healthMetrics: {
+      initialized: boolean;
+      errorRate: number;
+      uptime: number;
+      lastError: unknown;
+    };
+  } {
     return {
       systemStatus: this.getSystemStatus(),
       performanceMetrics: this.getPerformanceMetrics(),
-      voiceUsageStats: this.getVoiceUsageStats(),
+      voiceUsageStats: this.getVoiceUsageStats() as {
+        totalSyntheses: number;
+        voiceDistribution: Record<string, unknown>;
+        averageVoicesPerRequest: number;
+        mostUsedVoice: string;
+        leastUsedVoice: string;
+      },
       healthMetrics: {
         initialized: this.initialized,
         errorRate: 0, // Would track actual errors
@@ -248,9 +300,8 @@ export class VoiceSystemIntegration2025 {
     });
 
     const result = await this.synthesizeVoices(request, {
-      voices: selectedVoices,
-      routing,
-      timestamp: Date.now(),
+      requiredVoices: selectedVoices,
+      // timestamp and routing removed to match expected type
     });
 
     return {
@@ -288,13 +339,16 @@ export class VoiceSystemIntegration2025 {
       results,
       synthesisType: 'multiple',
       timestamp: Date.now(),
-      success: results.length > 0,
     };
   }
 
-  // === Helper Methods ===
-
-  private getVoiceUsageStats(): any {
+  private getVoiceUsageStats(): {
+    totalSyntheses: number;
+    voiceDistribution: Record<string, unknown>;
+    averageVoicesPerRequest: number;
+    mostUsedVoice: string;
+    leastUsedVoice: string;
+  } {
     return {
       totalSyntheses: 0, // Would track actual usage
       voiceDistribution: {},
@@ -463,7 +517,7 @@ export class VoiceSystemIntegration2025 {
     return [
       'Consider increasing concurrent voice limit for better throughput',
       'Use adaptive voice selection for complex requests',
-      'Enable caching for frequently used voice combinations'
+      'Enable caching for frequently used voice combinations',
     ];
   }
 
@@ -478,21 +532,29 @@ export class VoiceSystemIntegration2025 {
   /**
    * Generate a response using a single voice
    */
-  async generateSingleVoiceResponse(voice: string, prompt: string, options: any = {}): Promise<any> {
+  async generateSingleVoiceResponse(
+    voice: string,
+    prompt: string,
+    options: any = {}
+  ): Promise<any> {
     return this.synthesizeSingleVoice(voice, prompt, options);
   }
 
   /**
    * Generate solutions using multiple voices
    */
-  async generateMultiVoiceSolutions(voices: string[], prompt: string, options: any = {}): Promise<any> {
+  async generateMultiVoiceSolutions(
+    voices: string[],
+    prompt: string,
+    options: any = {}
+  ): Promise<any> {
     const results = await Promise.all(
       voices.map(voice => this.synthesizeSingleVoice(voice, prompt, options))
     );
     return {
       voices,
       results,
-      synthesis: 'multi-voice analysis complete'
+      synthesis: 'multi-voice analysis complete',
     };
   }
 
@@ -505,7 +567,7 @@ export class VoiceSystemIntegration2025 {
       strategy,
       voices,
       synthesis: `Synthesized using ${strategy} strategy`,
-      results: results.results
+      results: results.results,
     };
   }
 }

@@ -15,7 +15,7 @@ describe('UnifiedModelClient Real Integration', () => {
     // Use real configuration
     const configManager = new ConfigManager();
     const appConfig = await configManager.loadConfiguration();
-    
+
     config = {
       providers: [
         {
@@ -46,7 +46,7 @@ describe('UnifiedModelClient Real Integration', () => {
     };
 
     client = new UnifiedModelClient(config);
-    
+
     // Initialize and wait for providers to come online
     try {
       await client.initialize();
@@ -64,7 +64,7 @@ describe('UnifiedModelClient Real Integration', () => {
   describe('Real Provider Integration', () => {
     it('should initialize with real providers', async () => {
       expect(client).toBeDefined();
-      
+
       // Check if any providers are actually available
       const health = await client.checkHealth();
       expect(health).toBeDefined();
@@ -74,7 +74,7 @@ describe('UnifiedModelClient Real Integration', () => {
     it('should generate real text responses', async () => {
       try {
         const response = await client.generateText('What is 2+2?', { timeout: 30000 });
-        
+
         expect(response).toBeDefined();
         expect(typeof response).toBe('string');
         expect(response.length).toBeGreaterThan(0);
@@ -94,7 +94,7 @@ describe('UnifiedModelClient Real Integration', () => {
           'Write a simple JavaScript function that adds two numbers',
           { timeout: 45000 }
         );
-        
+
         expect(response).toBeDefined();
         expect(typeof response).toBe('string');
         expect(response).toMatch(/function|const|=>/i);
@@ -110,7 +110,7 @@ describe('UnifiedModelClient Real Integration', () => {
 
     it('should respect timeout parameters', async () => {
       const startTime = Date.now();
-      
+
       try {
         await client.generateText('Very short answer please', { timeout: 5000 });
         const duration = Date.now() - startTime;
@@ -133,11 +133,11 @@ describe('UnifiedModelClient Real Integration', () => {
   describe('Real Health Monitoring', () => {
     it('should provide real health status', async () => {
       const health = await client.checkHealth();
-      
+
       expect(health).toBeDefined();
       expect(health.status).toMatch(/healthy|degraded|unavailable/i);
       expect(Array.isArray(health.providers)).toBe(true);
-      
+
       // Should have information about actual providers
       health.providers.forEach(provider => {
         expect(provider.name).toMatch(/ollama|lm-studio/);
@@ -149,9 +149,9 @@ describe('UnifiedModelClient Real Integration', () => {
     it('should detect available models', async () => {
       try {
         const models = await client.getAvailableModels();
-        
+
         expect(Array.isArray(models)).toBe(true);
-        
+
         if (models.length > 0) {
           models.forEach(model => {
             expect(typeof model).toBe('string');
@@ -166,15 +166,17 @@ describe('UnifiedModelClient Real Integration', () => {
 
   describe('Real Error Handling', () => {
     it('should handle invalid prompts gracefully', async () => {
-      await expect(client.generateText('', { timeout: 10000 }))
-        .rejects.toThrow(/empty|invalid|required/i);
+      await expect(client.generateText('', { timeout: 10000 })).rejects.toThrow(
+        /empty|invalid|required/i
+      );
     });
 
     it('should handle very long inputs according to security settings', async () => {
       const longPrompt = 'a'.repeat(config.security.maxInputLength + 1000);
-      
-      await expect(client.generateText(longPrompt, { timeout: 10000 }))
-        .rejects.toThrow(/too long|exceeded|limit/i);
+
+      await expect(client.generateText(longPrompt, { timeout: 10000 })).rejects.toThrow(
+        /too long|exceeded|limit/i
+      );
     });
 
     it('should handle network unavailability gracefully', async () => {
@@ -187,17 +189,18 @@ describe('UnifiedModelClient Real Integration', () => {
             endpoint: 'http://localhost:99999',
             model: null,
             timeout: 5000,
-          }
-        ]
+          },
+        ],
       };
-      
+
       const badClient = new UnifiedModelClient(badConfig);
-      
+
       try {
         await badClient.initialize();
-        
-        await expect(badClient.generateText('test', { timeout: 10000 }))
-          .rejects.toThrow(/No providers available|connection|failed/i);
+
+        await expect(badClient.generateText('test', { timeout: 10000 })).rejects.toThrow(
+          /No providers available|connection|failed/i
+        );
       } finally {
         await badClient.destroy();
       }
@@ -207,14 +210,14 @@ describe('UnifiedModelClient Real Integration', () => {
   describe('Real Performance Characteristics', () => {
     it('should complete simple requests within reasonable time', async () => {
       const startTime = Date.now();
-      
+
       try {
         await client.generateText('Hello', { timeout: 30000 });
         const duration = Date.now() - startTime;
-        
+
         // Should complete within 30 seconds for simple requests
         expect(duration).toBeLessThan(30000);
-        
+
         // Log performance for analysis
         console.log(`Simple request completed in ${duration}ms`);
       } catch (error) {
@@ -225,27 +228,23 @@ describe('UnifiedModelClient Real Integration', () => {
     }, 35000);
 
     it('should handle concurrent requests', async () => {
-      const requests = [
-        'What is 1+1?',
-        'What is 2+2?',
-        'What is 3+3?'
-      ];
-      
+      const requests = ['What is 1+1?', 'What is 2+2?', 'What is 3+3?'];
+
       const startTime = Date.now();
-      
+
       try {
-        const promises = requests.map(prompt => 
-          client.generateText(prompt, { timeout: 20000 })
-        );
-        
+        const promises = requests.map(prompt => client.generateText(prompt, { timeout: 20000 }));
+
         const responses = await Promise.allSettled(promises);
         const duration = Date.now() - startTime;
-        
+
         // At least some should succeed
         const successful = responses.filter(r => r.status === 'fulfilled');
         expect(successful.length).toBeGreaterThan(0);
-        
-        console.log(`Concurrent requests: ${successful.length}/${requests.length} succeeded in ${duration}ms`);
+
+        console.log(
+          `Concurrent requests: ${successful.length}/${requests.length} succeeded in ${duration}ms`
+        );
       } catch (error) {
         console.warn('Concurrent request test failed, providers may be limited');
       }
@@ -261,7 +260,7 @@ describe('UnifiedModelClient Real Integration', () => {
             endpoint: 'http://localhost:11434',
             model: null,
             timeout: 30000,
-          }
+          },
         ],
         executionMode: 'auto',
         fallbackChain: ['ollama'],
@@ -278,7 +277,7 @@ describe('UnifiedModelClient Real Integration', () => {
       };
 
       const minimalClient = new UnifiedModelClient(minimalConfig);
-      
+
       try {
         await minimalClient.initialize();
         const health = await minimalClient.checkHealth();
@@ -292,10 +291,10 @@ describe('UnifiedModelClient Real Integration', () => {
   describe('Real Security Features', () => {
     it('should sanitize inputs in real scenarios', async () => {
       const maliciousInput = '<script>alert("test")</script>Generate a function';
-      
+
       try {
         const response = await client.generateText(maliciousInput, { timeout: 20000 });
-        
+
         // Response should be generated but script tags should not be executed
         expect(response).toBeDefined();
         expect(typeof response).toBe('string');

@@ -9,8 +9,8 @@
  */
 export var CLIExitCode;
 (function (CLIExitCode) {
-    CLIExitCode[CLIExitCode["SUCCESS"] = 0] = "SUCCESS";
-    CLIExitCode[CLIExitCode["ERROR"] = 1] = "ERROR";
-    CLIExitCode[CLIExitCode["INVALID_ARGS"] = 2] = "INVALID_ARGS";
-    CLIExitCode[CLIExitCode["NOT_FOUND"] = 3] = "NOT_FOUND";
+  CLIExitCode[(CLIExitCode['SUCCESS'] = 0)] = 'SUCCESS';
+  CLIExitCode[(CLIExitCode['ERROR'] = 1)] = 'ERROR';
+  CLIExitCode[(CLIExitCode['INVALID_ARGS'] = 2)] = 'INVALID_ARGS';
+  CLIExitCode[(CLIExitCode['NOT_FOUND'] = 3)] = 'NOT_FOUND';
 })(CLIExitCode || (CLIExitCode = {}));

@@ -1,10 +1,10 @@
 /**
  * MCP Server Lifecycle Manager
- * 
+ *
  * Orchestrates server initialization, health monitoring, and graceful shutdown
  * Uses dependency injection pattern to avoid tight coupling
  * Implements circuit breaker pattern for resilience
- * 
+ *
  * Memory-efficient design with lazy loading and cleanup
  */
 
@@ -42,14 +42,14 @@ export class MCPServerLifecycle extends EventEmitter {
 
   constructor(config: Partial<LifecycleConfig> = {}) {
     super();
-    
+
     this.config = {
       maxStartupTime: 30000, // 30 seconds
-      maxShutdownTime: 10000, // 10 seconds  
+      maxShutdownTime: 10000, // 10 seconds
       healthCheckInterval: 30000, // 30 seconds
       circuitBreakerThreshold: 5,
       circuitBreakerTimeout: 60000, // 1 minute
-      ...config
+      ...config,
     };
 
     this.setMaxListeners(100); // Higher limit for lifecycle events
@@ -78,18 +78,17 @@ export class MCPServerLifecycle extends EventEmitter {
 
       // Start servers in priority order
       const startupPromise = this.startServersInOrder();
-      
+
       await Promise.race([startupPromise, timeoutPromise]);
-      
+
       this.startupCompleted = true;
       const duration = Date.now() - startTime;
-      
+
       logger.info(`✅ MCP lifecycle startup completed (${duration}ms)`);
       this.emit('startupComplete', { duration });
-      
+
       // Begin health monitoring
       this.startHealthMonitoring();
-      
     } catch (error) {
       logger.error('❌ MCP lifecycle startup failed:', error);
       this.emit('startupFailed', error);
@@ -102,7 +101,7 @@ export class MCPServerLifecycle extends EventEmitter {
    */
   private async startServersInOrder(): Promise<void> {
     const serverIds = mcpServerRegistry.getRegisteredServerIds();
-    
+
     // Sort by priority (higher priority first)
     const sortedIds = serverIds.sort((a, b) => {
       const regA = mcpServerRegistry['registrations'].get(a);
@@ -120,7 +119,7 @@ export class MCPServerLifecycle extends EventEmitter {
           lastCheck: new Date(),
           consecutiveFailures: 0,
           avgResponseTime: 0,
-          errorRate: 0
+          errorRate: 0,
         });
       }
     }
@@ -140,15 +139,14 @@ export class MCPServerLifecycle extends EventEmitter {
     try {
       // Get server instance (triggers lazy initialization)
       const server = await mcpServerRegistry.getServer(serverId);
-      
+
       // Initialize if server has init method
       if (server && typeof server.initialize === 'function') {
         await server.initialize();
       }
-      
+
       logger.info(`✅ Server ${serverId} started successfully`);
       this.emit('serverStarted', serverId);
-      
     } catch (error) {
       logger.error(`❌ Failed to start server ${serverId}:`, error);
       this.updateHealthStatus(serverId, 'unhealthy', error);
@@ -167,7 +165,7 @@ export class MCPServerLifecycle extends EventEmitter {
         () => this.performHealthCheck(serverId),
         this.config.healthCheckInterval
       );
-      
+
       this.healthCheckIntervals.set(serverId, interval);
     }
 
@@ -194,33 +192,37 @@ export class MCPServerLifecycle extends EventEmitter {
     }
 
     const startTime = Date.now();
-    
+
     try {
       // Get server instance
       const server = await mcpServerRegistry.getServer(serverId);
-      
+
       // Perform health check if server supports it
       let isHealthy = true;
       if (server && typeof server.healthCheck === 'function') {
         const healthResult = await Promise.race([
           server.healthCheck(),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Health check timeout')), 5000)
-          )
+          ),
         ]);
         isHealthy = healthResult === true || (healthResult && healthResult.status === 'healthy');
       }
 
       const responseTime = Date.now() - startTime;
-      
+
       if (isHealthy) {
         this.updateHealthStatus(serverId, 'healthy', null, responseTime);
         this.resetCircuitBreaker(serverId);
       } else {
-        this.updateHealthStatus(serverId, 'degraded', new Error('Health check failed'), responseTime);
+        this.updateHealthStatus(
+          serverId,
+          'degraded',
+          new Error('Health check failed'),
+          responseTime
+        );
         this.incrementCircuitBreaker(serverId);
       }
-
     } catch (error) {
       const responseTime = Date.now() - startTime;
       this.updateHealthStatus(serverId, 'unhealthy', error, responseTime);
@@ -232,7 +234,7 @@ export class MCPServerLifecycle extends EventEmitter {
    * Update health status with metrics
    */
   private updateHealthStatus(
-    serverId: string, 
+    serverId: string,
     status: ServerHealthStatus['status'],
     error?: any,
     responseTime?: number
@@ -241,10 +243,10 @@ export class MCPServerLifecycle extends EventEmitter {
     if (!healthStatus) return;
 
     const wasHealthy = healthStatus.status === 'healthy';
-    
+
     healthStatus.status = status;
     healthStatus.lastCheck = new Date();
-    
+
     if (status === 'healthy') {
       healthStatus.consecutiveFailures = 0;
     } else {
@@ -253,14 +255,22 @@ export class MCPServerLifecycle extends EventEmitter {
 
     if (responseTime !== undefined) {
       // Calculate rolling average response time
-      healthStatus.avgResponseTime = healthStatus.avgResponseTime === 0 
-        ? responseTime 
-        : (healthStatus.avgResponseTime * 0.8) + (responseTime * 0.2);
+      healthStatus.avgResponseTime =
+        healthStatus.avgResponseTime === 0
+          ? responseTime
+          : healthStatus.avgResponseTime * 0.8 + responseTime * 0.2;
     }
 
     // Calculate error rate (simplified)
-    const totalChecks = Math.max(1, Math.ceil((Date.now() - (this.startupCompleted ? (Date.now() - 300000) : 0)) / this.config.healthCheckInterval));
-    healthStatus.errorRate = healthStatus.consecutiveFailures / Math.max(1, Math.min(totalChecks, 10));
+    const totalChecks = Math.max(
+      1,
+      Math.ceil(
+        (Date.now() - (this.startupCompleted ? Date.now() - 300000 : 0)) /
+          this.config.healthCheckInterval
+      )
+    );
+    healthStatus.errorRate =
+      healthStatus.consecutiveFailures / Math.max(1, Math.min(totalChecks, 10));
 
     // Emit status change events
     if (wasHealthy && status !== 'healthy') {
@@ -285,7 +295,10 @@ export class MCPServerLifecycle extends EventEmitter {
     circuitState.failures++;
     circuitState.lastFailure = Date.now();
 
-    if (circuitState.failures >= this.config.circuitBreakerThreshold && circuitState.state !== 'open') {
+    if (
+      circuitState.failures >= this.config.circuitBreakerThreshold &&
+      circuitState.state !== 'open'
+    ) {
       circuitState.state = 'open';
       this.updateHealthStatus(serverId, 'circuit_open');
       logger.warn(`🚫 Circuit breaker opened for ${serverId} (${circuitState.failures} failures)`);
@@ -332,10 +345,10 @@ export class MCPServerLifecycle extends EventEmitter {
     try {
       // Stop health monitoring
       this.stopHealthMonitoring();
-      
+
       // Shutdown servers with timeout
       const shutdownPromise = this.shutdownAllServers();
-      const timeoutPromise = new Promise<void>((resolve) => {
+      const timeoutPromise = new Promise<void>(resolve => {
         setTimeout(() => {
           logger.warn(`⚠️ Shutdown timeout after ${this.config.maxShutdownTime}ms, forcing exit`);
           resolve();
@@ -343,10 +356,9 @@ export class MCPServerLifecycle extends EventEmitter {
       });
 
       await Promise.race([shutdownPromise, timeoutPromise]);
-      
+
       logger.info('✅ MCP server lifecycle shutdown completed');
       this.emit('shutdownComplete');
-      
     } catch (error) {
       logger.error('❌ Error during shutdown:', error);
       this.emit('shutdownError', error);
@@ -360,7 +372,7 @@ export class MCPServerLifecycle extends EventEmitter {
    */
   private async shutdownAllServers(): Promise<void> {
     const serverIds = Array.from(this.healthStatuses.keys());
-    
+
     // Shutdown in reverse priority order
     const shutdownPromises = serverIds.map(async serverId => {
       try {

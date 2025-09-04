@@ -63,4 +63,3 @@ export class CommandRegistry {
     return entry.handler(...args);
   }
 }
-

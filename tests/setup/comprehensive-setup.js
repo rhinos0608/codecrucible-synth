@@ -17,24 +17,24 @@ global.testConfig = {
   ai: {
     timeout: 120000,
     maxTokens: 500,
-    retries: 3
+    retries: 3,
   },
   performance: {
     maxMemoryGrowth: 200 * 1024 * 1024, // 200MB
     maxResponseTime: 60000, // 60 seconds
-    concurrentRequests: 5
+    concurrentRequests: 5,
   },
   environment: {
     hasOllama: !!process.env.OLLAMA_ENDPOINT,
     hasSmithery: !!process.env.SMITHERY_API_KEY,
-    hasE2B: !!process.env.E2B_API_KEY
-  }
+    hasE2B: !!process.env.E2B_API_KEY,
+  },
 };
 
 // Global setup
 beforeAll(async () => {
   console.log('🔧 Setting up comprehensive test environment...');
-  
+
   // Verify build exists
   try {
     await import('../../dist/index.js');
@@ -43,7 +43,7 @@ beforeAll(async () => {
     console.error('❌ Built application not found. Run "npm run build" first.');
     throw error;
   }
-  
+
   // Verify AI models available
   if (!global.testConfig.environment.hasOllama && !global.testConfig.environment.hasSmithery) {
     console.warn('⚠️ No AI providers configured. Some tests may be skipped.');
@@ -53,7 +53,7 @@ beforeAll(async () => {
 // Global cleanup
 afterAll(() => {
   console.log('🧹 Cleaning up test environment...');
-  
+
   // Force garbage collection if available
   if (global.gc) {
     global.gc();

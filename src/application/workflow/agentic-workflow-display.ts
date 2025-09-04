@@ -80,7 +80,10 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   /**
    * Start a new agentic workflow session
    */
-  public startSession(userQuery: string, complexity: 'simple' | 'medium' | 'complex' = 'medium'): string {
+  public startSession(
+    userQuery: string,
+    complexity: 'simple' | 'medium' | 'complex' = 'medium'
+  ): string {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const session: WorkflowSession = {
@@ -192,11 +195,7 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   /**
    * Mark step as completed
    */
-  public completeStep(
-    sessionId: string,
-    stepId: string,
-    metadata?: Record<string, unknown>
-  ): void {
+  public completeStep(sessionId: string, stepId: string, metadata?: Record<string, unknown>): void {
     const session = this.activeSessions.get(sessionId);
     if (!session) return;
 
@@ -223,11 +222,7 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   /**
    * Mark step as failed
    */
-  public failStep(
-    sessionId: string,
-    stepId: string,
-    error: string
-  ): void {
+  public failStep(sessionId: string, stepId: string, error: string): void {
     const session = this.activeSessions.get(sessionId);
     if (!session) return;
 
@@ -248,10 +243,7 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   /**
    * Complete the entire session
    */
-  public completeSession(
-    sessionId: string,
-    results?: Record<string, unknown>
-  ): void {
+  public completeSession(sessionId: string, results?: Record<string, unknown>): void {
     const session = this.activeSessions.get(sessionId);
     if (!session) return;
 
@@ -282,7 +274,10 @@ export class AgenticWorkflowDisplay extends EventEmitter {
    * Get current session status
    */
   public getSession(sessionId: string): WorkflowSession | undefined {
-    return this.activeSessions.get(sessionId) ?? this.sessionHistory.find((s: Readonly<WorkflowSession>) => s.id === sessionId);
+    return (
+      this.activeSessions.get(sessionId) ??
+      this.sessionHistory.find((s: Readonly<WorkflowSession>) => s.id === sessionId)
+    );
   }
 
   /**

@@ -39,6 +39,6 @@ export class CommandBus {
       const next = pipeline;
       pipeline = async (): Promise<unknown> => mw(command, next);
     }
-    return await pipeline() as T;
+    return (await pipeline()) as T;
   }
 }

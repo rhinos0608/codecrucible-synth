@@ -66,14 +66,22 @@ export class ConfigCommands {
       if (options.verbose) {
         console.log('\n📋 Configuration Sources:');
         // Access private configSources for debugging (type assertion for development only)
-        interface ConfigSourceInfo { source: string; priority: number }
-        const sources: Map<string, ConfigSourceInfo> = (this.configManager as unknown as { configSources: Map<string, ConfigSourceInfo> }).configSources;
+        interface ConfigSourceInfo {
+          source: string;
+          priority: number;
+        }
+        const sources: Map<string, ConfigSourceInfo> = (
+          this.configManager as unknown as { configSources: Map<string, ConfigSourceInfo> }
+        ).configSources;
         for (const [key, info] of sources.entries()) {
           console.log(`   ${key}: ${info.source} (precedence: ${info.priority})`);
         }
       }
     } catch (error) {
-      console.error('❌ Failed to load configuration:', error instanceof Error ? error.message : String(error));
+      console.error(
+        '❌ Failed to load configuration:',
+        error instanceof Error ? error.message : String(error)
+      );
       process.exit(1);
     }
   }
@@ -97,19 +105,23 @@ export class ConfigCommands {
 
       if (validation.errors.length > 0) {
         console.log('\n🚨 Errors:');
-        validation.errors.forEach((error: Readonly<typeof validation.errors[number]>, i: Readonly<number>) => {
-          console.log(`  ${i + 1}. ${error.field}: ${error.message}`);
-        });
+        validation.errors.forEach(
+          (error: Readonly<(typeof validation.errors)[number]>, i: Readonly<number>) => {
+            console.log(`  ${i + 1}. ${error.field}: ${error.message}`);
+          }
+        );
       }
 
       if (validation.warnings.length > 0) {
         console.log('\n⚠️  Warnings:');
-        validation.warnings.forEach((warning: Readonly<typeof validation.warnings[number]>, i: Readonly<number>) => {
-          console.log(`  ${i + 1}. ${warning.field}: ${warning.message}`);
-          if (warning.suggestion) {
-            console.log(`     Suggestion: ${warning.suggestion}`);
+        validation.warnings.forEach(
+          (warning: Readonly<(typeof validation.warnings)[number]>, i: Readonly<number>) => {
+            console.log(`  ${i + 1}. ${warning.field}: ${warning.message}`);
+            if (warning.suggestion) {
+              console.log(`     Suggestion: ${warning.suggestion}`);
+            }
           }
-        });
+        );
       }
 
       console.log(
@@ -120,7 +132,10 @@ export class ConfigCommands {
         process.exit(1);
       }
     } catch (error) {
-      console.error('❌ Validation failed:', error instanceof Error ? error.message : String(error));
+      console.error(
+        '❌ Validation failed:',
+        error instanceof Error ? error.message : String(error)
+      );
       process.exit(1);
     }
   }
@@ -225,10 +240,10 @@ export class ConfigCommands {
         console.log('\n🔍 Dry run results:');
         console.log(`   - Would process ${analysis.legacyFiles.length} files`);
         console.log(
-          `   - Would resolve ${analysis.conflicts.filter((c: Readonly<typeof analysis.conflicts[number]>) => c.resolution === 'auto').length} conflicts automatically`
+          `   - Would resolve ${analysis.conflicts.filter((c: Readonly<(typeof analysis.conflicts)[number]>) => c.resolution === 'auto').length} conflicts automatically`
         );
         console.log(
-          `   - Would require ${analysis.conflicts.filter((c: Readonly<typeof analysis.conflicts[number]>) => c.resolution === 'manual').length} manual interventions`
+          `   - Would require ${analysis.conflicts.filter((c: Readonly<(typeof analysis.conflicts)[number]>) => c.resolution === 'manual').length} manual interventions`
         );
         console.log(`   - Estimated effort: ${analysis.estimatedEffort}`);
         return;
@@ -252,7 +267,9 @@ export class ConfigCommands {
         if (result.warnings.length > 0) {
           console.log(`\n⚠️  Warnings: ${result.warnings.length}`);
           if (options.verbose) {
-            result.warnings.forEach((warning) => { console.log(`   - ${warning}`); });
+            result.warnings.forEach(warning => {
+              console.log(`   - ${warning}`);
+            });
           }
         }
 
@@ -267,7 +284,9 @@ export class ConfigCommands {
 
         if (result.errors.length > 0) {
           console.log('🚨 Errors:');
-          result.errors.forEach((error) => { console.log(`   - ${error}`); });
+          result.errors.forEach(error => {
+            console.log(`   - ${error}`);
+          });
         }
 
         console.log(`\n📋 Files have been backed up to: ${result.migrationReport.backupLocation}`);

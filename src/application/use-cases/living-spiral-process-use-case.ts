@@ -115,7 +115,7 @@ export class LivingSpiralProcessUseCase {
 
   private async collapsePhase(input: string): Promise<{ output: string; voices: string[] }> {
     const prompt = this.buildCollapsePrompt(input);
-    
+
     try {
       const response = await this.modelClient.generate(prompt);
       return {
@@ -156,7 +156,9 @@ export class LivingSpiralProcessUseCase {
     const responses = [];
     for (const voice of allVoices) {
       try {
-        const response = await this.modelClient.generate(`${voice.id} perspective: ${request.prompt}`);
+        const response = await this.modelClient.generate(
+          `${voice.id} perspective: ${request.prompt}`
+        );
         responses.push({
           voiceId: voice.id,
           content: response,
@@ -241,7 +243,7 @@ export class LivingSpiralProcessUseCase {
     } catch (error) {
       console.warn('Reflection phase failed, using fallback:', error);
       const fallbackReflection = `Guardian quality assessment would appear here after model integration.\n\n1. Quality assessment: Requires AI analysis\n2. Gaps identification: Pending model connection\n3. Lessons learned: To be analyzed\n4. Improvement recommendations: Awaiting AI insights\n5. Deployment readiness: Needs evaluation`;
-      
+
       const enhancedOutput = `${rebirth.output}\n\n---\n\n## REFLECTION INSIGHTS:\n${fallbackReflection}`;
 
       return {

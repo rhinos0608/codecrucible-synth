@@ -1,10 +1,10 @@
 /**
  * MCP Server Security Manager
- * 
+ *
  * Centralized security validation and authorization for MCP operations
  * Implements defense-in-depth with input sanitization and path traversal protection
  * Follows Coding Grimoire security principles with fail-safe defaults
- * 
+ *
  * Memory-efficient with caching and lazy validation patterns
  */
 
@@ -60,9 +60,27 @@ export class MCPServerSecurity {
       maxFileSize: 100 * 1024 * 1024, // 100MB default
       maxPathDepth: 10,
       allowedExtensions: [
-        '.js', '.ts', '.jsx', '.tsx', '.json', '.yaml', '.yml',
-        '.md', '.txt', '.log', '.csv', '.xml', '.html', '.css',
-        '.py', '.rs', '.go', '.java', '.c', '.cpp', '.h'
+        '.js',
+        '.ts',
+        '.jsx',
+        '.tsx',
+        '.json',
+        '.yaml',
+        '.yml',
+        '.md',
+        '.txt',
+        '.log',
+        '.csv',
+        '.xml',
+        '.html',
+        '.css',
+        '.py',
+        '.rs',
+        '.go',
+        '.java',
+        '.c',
+        '.cpp',
+        '.h',
       ],
       blockedPaths: [
         'node_modules',
@@ -73,17 +91,17 @@ export class MCPServerSecurity {
         'target',
         '__pycache__',
         '.vscode',
-        '.idea'
+        '.idea',
       ],
       sanitizeInputs: true,
       enablePathTraversal: true,
       maxConcurrentOperations: 10,
-      ...config
+      ...config,
     };
 
     // Compile blocked path patterns for performance
-    this.blockedPathPatterns = this.config.blockedPaths.map(pattern => 
-      new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+    this.blockedPathPatterns = this.config.blockedPaths.map(
+      pattern => new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
     );
   }
 
@@ -116,7 +134,8 @@ export class MCPServerSecurity {
     // Check cache first for performance
     const cacheKey = `${filePath}:${context.operation}`;
     const cached = this.pathCache.get(cacheKey);
-    if (cached && Date.now() - (cached as any).timestamp < 30000) { // 30s cache
+    if (cached && Date.now() - (cached as any).timestamp < 30000) {
+      // 30s cache
       return cached;
     }
 
@@ -129,21 +148,21 @@ export class MCPServerSecurity {
         riskAssessment: {
           level: 'medium',
           factors: ['Rate limiting triggered'],
-          score: 60
-        }
+          score: 60,
+        },
       };
     }
 
     this.concurrentOperations++;
-    
+
     try {
       const result = await this.performSecurityValidation(filePath, context);
-      
+
       // Cache successful validations
       if (result.allowed) {
         (result as any).timestamp = Date.now();
         this.pathCache.set(cacheKey, result);
-        
+
         // Limit cache size
         if (this.pathCache.size > 1000) {
           const firstKey = this.pathCache.keys().next().value;
@@ -152,9 +171,8 @@ export class MCPServerSecurity {
           }
         }
       }
-      
+
       return result;
-      
     } finally {
       this.concurrentOperations--;
     }
@@ -193,11 +211,11 @@ export class MCPServerSecurity {
           riskAssessment: {
             level: 'critical',
             factors: ['Path traversal attempt'],
-            score: 100
-          }
+            score: 100,
+          },
         };
       }
-      
+
       if (traversalResult.suspicious) {
         warnings.push('Suspicious path pattern detected');
         riskFactors.push('Unusual path structure');
@@ -215,8 +233,8 @@ export class MCPServerSecurity {
         riskAssessment: {
           level: 'medium',
           factors: ['Excessive path depth'],
-          score: 50
-        }
+          score: 50,
+        },
       };
     }
 
@@ -230,8 +248,8 @@ export class MCPServerSecurity {
           riskAssessment: {
             level: 'high',
             factors: ['Blocked path accessed'],
-            score: 80
-          }
+            score: 80,
+          },
         };
       }
     }
@@ -256,18 +274,17 @@ export class MCPServerSecurity {
             riskAssessment: {
               level: 'medium',
               factors: ['Oversized file'],
-              score: 50
-            }
+              score: 50,
+            },
           };
         }
-        
+
         // Large files are risky for memory
         if (stats.size > outputConfig.getConfig().maxBufferSize) {
           warnings.push('Large file - streaming recommended');
           riskFactors.push('Large file size');
           riskScore += 10;
         }
-        
       } catch (error) {
         // File doesn't exist - might be for write operation
         if (context.operation === 'read') {
@@ -278,8 +295,8 @@ export class MCPServerSecurity {
             riskAssessment: {
               level: 'low',
               factors: ['File not found'],
-              score: 10
-            }
+              score: 10,
+            },
           };
         }
       }
@@ -293,16 +310,16 @@ export class MCPServerSecurity {
 
     // 8. Calculate final risk level
     const riskLevel = this.calculateRiskLevel(riskScore);
-    
+
     // 9. Make final authorization decision
     const allowed = this.isOperationAllowed(riskLevel, context);
-    
+
     if (!allowed) {
       logger.warn('Security validation failed', {
         path: sanitizedPath,
         context,
         riskScore,
-        riskLevel
+        riskLevel,
       });
     }
 
@@ -314,14 +331,14 @@ export class MCPServerSecurity {
       riskAssessment: {
         level: riskLevel,
         factors: riskFactors,
-        score: riskScore
-      }
+        score: riskScore,
+      },
     };
 
     // Cache result for performance
     const cacheKey = `${sanitizedPath}:${context.operation}`;
     this.pathCache.set(cacheKey, result);
-    
+
     // Track security statistics
     return this.trackSecurityResult(result);
   }
@@ -332,16 +349,16 @@ export class MCPServerSecurity {
   private sanitizePath(filePath: string): string {
     // Remove null bytes and control characters
     let sanitized = filePath.replace(/[\x00-\x1f\x7f]/g, '');
-    
+
     // Normalize path separators
     sanitized = path.normalize(sanitized);
-    
+
     // Remove consecutive dots (but allow single . and ..)
     sanitized = sanitized.replace(/\.{3,}/g, '..');
-    
+
     // Remove trailing spaces and dots
     sanitized = sanitized.trim().replace(/[. ]+$/, '');
-    
+
     return sanitized;
   }
 
@@ -351,11 +368,11 @@ export class MCPServerSecurity {
   private checkPathTraversal(filePath: string): { safe: boolean; suspicious: boolean } {
     const normalizedPath = path.resolve(filePath);
     const suspicious = filePath.includes('..') || /[\/\\]{2,}/.test(filePath);
-    
+
     // Check if path tries to escape current working directory
     const cwd = process.cwd();
     const safe = normalizedPath.startsWith(cwd);
-    
+
     return { safe, suspicious };
   }
 
@@ -380,13 +397,13 @@ export class MCPServerSecurity {
     if (riskLevel === 'critical') {
       return false;
     }
-    
+
     // High-risk operations require approval (not implemented yet)
     if (riskLevel === 'high') {
       logger.warn('High-risk operation detected - manual approval required', context);
       return false; // Conservative default
     }
-    
+
     // Medium and low risk operations are allowed
     return true;
   }
@@ -405,11 +422,23 @@ export class MCPServerSecurity {
 
     // Check for dangerous commands
     const dangerousCommands = [
-      'rm', 'del', 'format', 'fdisk', 'mkfs',
-      'dd', 'sudo', 'su', 'chmod', 'chown',
-      'curl', 'wget', 'nc', 'netcat', 'telnet'
+      'rm',
+      'del',
+      'format',
+      'fdisk',
+      'mkfs',
+      'dd',
+      'sudo',
+      'su',
+      'chmod',
+      'chown',
+      'curl',
+      'wget',
+      'nc',
+      'netcat',
+      'telnet',
     ];
-    
+
     if (dangerousCommands.includes(command.toLowerCase())) {
       riskScore += 50;
       riskFactors.push('Dangerous command detected');
@@ -417,11 +446,11 @@ export class MCPServerSecurity {
 
     // Check for shell injection patterns
     const shellPatterns = [
-      /[;&|`$()]/,  // Shell metacharacters
+      /[;&|`$()]/, // Shell metacharacters
       /\$\([^)]*\)/, // Command substitution
-      /`[^`]*`/,     // Backtick execution
+      /`[^`]*`/, // Backtick execution
     ];
-    
+
     const fullCommand = [command, ...args].join(' ');
     for (const pattern of shellPatterns) {
       if (pattern.test(fullCommand)) {
@@ -441,11 +470,11 @@ export class MCPServerSecurity {
       riskAssessment: {
         level: riskLevel,
         factors: riskFactors,
-        score: riskScore
-      }
+        score: riskScore,
+      },
     };
 
-    // Track security statistics  
+    // Track security statistics
     return this.trackSecurityResult(result);
   }
 
@@ -466,8 +495,8 @@ export class MCPServerSecurity {
         low: this.riskLevelCounts.low,
         medium: this.riskLevelCounts.medium,
         high: this.riskLevelCounts.high,
-        critical: this.riskLevelCounts.critical
-      }
+        critical: this.riskLevelCounts.critical,
+      },
     };
   }
 

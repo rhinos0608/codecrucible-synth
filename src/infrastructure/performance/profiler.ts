@@ -119,7 +119,7 @@ export class PerformanceProfiler extends EventEmitter {
       timestamp: new Date(),
       tags: {},
       unit: 'count',
-      type: 'gauge'
+      type: 'gauge',
     });
 
     if (this.config.enableDetailedLogging) {
@@ -198,7 +198,7 @@ export class PerformanceProfiler extends EventEmitter {
           timestamp: new Date(),
           tags: labels || {},
           unit: 'seconds',
-          type: 'histogram'
+          type: 'histogram',
         });
         break;
       case 'tool_execution':
@@ -208,7 +208,7 @@ export class PerformanceProfiler extends EventEmitter {
           timestamp: new Date(),
           tags: labels || {},
           unit: 'seconds',
-          type: 'histogram'
+          type: 'histogram',
         });
         break;
       case 'prompt_preparation':
@@ -218,7 +218,7 @@ export class PerformanceProfiler extends EventEmitter {
           timestamp: new Date(),
           tags: labels || {},
           unit: 'seconds',
-          type: 'histogram'
+          type: 'histogram',
         });
         break;
       case 'event_bus':
@@ -228,7 +228,7 @@ export class PerformanceProfiler extends EventEmitter {
           timestamp: new Date(),
           tags: labels || {},
           unit: 'seconds',
-          type: 'histogram'
+          type: 'histogram',
         });
         break;
     }
@@ -244,7 +244,7 @@ export class PerformanceProfiler extends EventEmitter {
           threshold: this.config.slowOperationThresholdMs.toString(),
         },
         unit: 'count',
-        type: 'counter'
+        type: 'counter',
       });
 
       logger.warn(`Slow operation detected: ${operation.name} took ${duration.toFixed(3)}s`);
@@ -302,7 +302,7 @@ export class PerformanceProfiler extends EventEmitter {
       timestamp: new Date(),
       tags: {},
       unit: 'count',
-      type: 'gauge'
+      type: 'gauge',
     });
 
     if (this.config.enableDetailedLogging) {
@@ -477,7 +477,7 @@ export class PerformanceProfiler extends EventEmitter {
       timestamp: new Date(),
       tags: {},
       unit: 'count',
-      type: 'gauge'
+      type: 'gauge',
     });
   }
 

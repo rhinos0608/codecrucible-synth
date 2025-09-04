@@ -1,61 +1,83 @@
 // Real-Time Collaboration Database Schema - AI_INSTRUCTIONS.md Security Patterns
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uuid, varchar } from "drizzle-orm/pg-core";
-import { users } from "./schema";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+import {
+  pgTable,
+  text,
+  serial,
+  integer,
+  boolean,
+  timestamp,
+  jsonb,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
+import { users } from './schema';
+import { createInsertSchema } from 'drizzle-zod';
+import { z } from 'zod';
 
 // Collaborative sessions table
-export const collaborativeSessions = pgTable("collaborative_sessions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 200 }).notNull(),
-  creatorId: text("creator_id").references(() => users.id).notNull(),
-  teamId: text("team_id"),
-  shareableLink: varchar("shareable_link", { length: 100 }).unique().notNull(),
-  accessType: varchar("access_type", { length: 20 }).default("team_only"), // public, team_only, invite_only
-  prompt: text("prompt"),
-  selectedVoices: jsonb("selected_voices").default([]),
-  voiceOutputs: jsonb("voice_outputs").default({}),
-  synthesis: jsonb("synthesis"),
-  status: varchar("status", { length: 20 }).default("active"), // active, paused, completed
-  createdAt: timestamp("created_at").defaultNow(),
-  expiresAt: timestamp("expires_at"),
-  lastActivity: timestamp("last_activity").defaultNow()
+export const collaborativeSessions = pgTable('collaborative_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 200 }).notNull(),
+  creatorId: text('creator_id')
+    .references(() => users.id)
+    .notNull(),
+  teamId: text('team_id'),
+  shareableLink: varchar('shareable_link', { length: 100 }).unique().notNull(),
+  accessType: varchar('access_type', { length: 20 }).default('team_only'), // public, team_only, invite_only
+  prompt: text('prompt'),
+  selectedVoices: jsonb('selected_voices').default([]),
+  voiceOutputs: jsonb('voice_outputs').default({}),
+  synthesis: jsonb('synthesis'),
+  status: varchar('status', { length: 20 }).default('active'), // active, paused, completed
+  createdAt: timestamp('created_at').defaultNow(),
+  expiresAt: timestamp('expires_at'),
+  lastActivity: timestamp('last_activity').defaultNow(),
 });
 
 // Session participants table (real-time tracking)
-export const sessionParticipants = pgTable("session_participants", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  sessionId: uuid("session_id").references(() => collaborativeSessions.id, { onDelete: "cascade" }).notNull(),
-  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  role: varchar("role", { length: 20 }).default("collaborator"), // creator, collaborator, observer
-  assignedVoices: jsonb("assigned_voices").default([]),
-  isActive: boolean("is_active").default(true),
-  joinedAt: timestamp("joined_at").defaultNow(),
-  lastSeenAt: timestamp("last_seen_at").defaultNow(),
-  cursorData: jsonb("cursor_data")
+export const sessionParticipants = pgTable('session_participants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sessionId: uuid('session_id')
+    .references(() => collaborativeSessions.id, { onDelete: 'cascade' })
+    .notNull(),
+  userId: text('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  role: varchar('role', { length: 20 }).default('collaborator'), // creator, collaborator, observer
+  assignedVoices: jsonb('assigned_voices').default([]),
+  isActive: boolean('is_active').default(true),
+  joinedAt: timestamp('joined_at').defaultNow(),
+  lastSeenAt: timestamp('last_seen_at').defaultNow(),
+  cursorData: jsonb('cursor_data'),
 });
 
 // Chat messages table
-export const sessionChat = pgTable("session_chat", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  sessionId: uuid("session_id").references(() => collaborativeSessions.id, { onDelete: "cascade" }).notNull(),
-  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  message: text("message").notNull(),
-  messageType: varchar("message_type", { length: 20 }).default("text"), // text, voice_assignment, system
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at").defaultNow()
+export const sessionChat = pgTable('session_chat', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sessionId: uuid('session_id')
+    .references(() => collaborativeSessions.id, { onDelete: 'cascade' })
+    .notNull(),
+  userId: text('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  message: text('message').notNull(),
+  messageType: varchar('message_type', { length: 20 }).default('text'), // text, voice_assignment, system
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').defaultNow(),
 });
 
 // Voice assignments tracking table
-export const voiceAssignments = pgTable("voice_assignments", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  sessionId: uuid("session_id").references(() => collaborativeSessions.id, { onDelete: "cascade" }).notNull(),
-  voiceType: varchar("voice_type", { length: 50 }).notNull(),
-  assignedTo: text("assigned_to").references(() => users.id, { onDelete: "set null" }),
-  status: varchar("status", { length: 20 }).default("available"), // available, assigned, generating, completed
-  output: jsonb("output"),
-  assignedAt: timestamp("assigned_at"),
-  completedAt: timestamp("completed_at")
+export const voiceAssignments = pgTable('voice_assignments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sessionId: uuid('session_id')
+    .references(() => collaborativeSessions.id, { onDelete: 'cascade' })
+    .notNull(),
+  voiceType: varchar('voice_type', { length: 50 }).notNull(),
+  assignedTo: text('assigned_to').references(() => users.id, { onDelete: 'set null' }),
+  status: varchar('status', { length: 20 }).default('available'), // available, assigned, generating, completed
+  output: jsonb('output'),
+  assignedAt: timestamp('assigned_at'),
+  completedAt: timestamp('completed_at'),
 });
 
 // Create Zod schemas for type safety
@@ -79,7 +101,7 @@ export type InsertVoiceAssignment = z.infer<typeof insertVoiceAssignmentSchema>;
 export const collaborationMessageSchema = z.object({
   type: z.enum([
     'update_prompt',
-    'voice_assignment', 
+    'voice_assignment',
     'voice_generation_start',
     'voice_output',
     'chat_message',
@@ -89,12 +111,12 @@ export const collaborationMessageSchema = z.object({
     'participant_left',
     'session_state',
     'ping',
-    'pong'
+    'pong',
   ]),
   sessionId: z.string().uuid(),
   userId: z.string(),
   data: z.any(),
-  timestamp: z.date().optional()
+  timestamp: z.date().optional(),
 });
 
 export type CollaborationMessage = z.infer<typeof collaborationMessageSchema>;

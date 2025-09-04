@@ -59,9 +59,7 @@ export class CouncilDecisionEngine extends EventEmitter {
   private readonly voiceSystem: VoiceArchetypeSystemInterface;
   private readonly logger = createLogger('CouncilDecision');
 
-  public constructor(
-    voiceSystem: Readonly<VoiceArchetypeSystem>
-  ) {
+  public constructor(voiceSystem: Readonly<VoiceArchetypeSystem>) {
     super();
     this.voiceSystem = voiceSystem;
   }
@@ -82,7 +80,10 @@ export class CouncilDecisionEngine extends EventEmitter {
     // Collect perspectives from each voice
     for (const voiceId of voices) {
       try {
-        const perspective = await this.voiceSystem.getVoicePerspective(voiceId, prompt) as VoicePerspective;
+        const perspective = (await this.voiceSystem.getVoicePerspective(
+          voiceId,
+          prompt
+        )) as VoicePerspective;
         perspectives.push(perspective);
       } catch (error) {
         this.logger.warn(`Failed to get perspective from voice ${voiceId}:`, error);

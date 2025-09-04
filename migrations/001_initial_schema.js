@@ -3,7 +3,7 @@
  * Creates all necessary tables with proper indexes and constraints
  */
 
-exports.up = async function(knex) {
+exports.up = async function (knex) {
   // Users table for authentication
   await knex.schema.createTable('users', table => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
@@ -19,7 +19,7 @@ exports.up = async function(knex) {
     table.timestamp('lockout_expires');
     table.json('metadata').defaultTo('{}');
     table.timestamps(true, true);
-    
+
     // Indexes
     table.index('username');
     table.index('email');
@@ -37,7 +37,7 @@ exports.up = async function(knex) {
     table.timestamp('last_analyzed');
     table.json('metadata').defaultTo('{}');
     table.timestamps(true, true);
-    
+
     // Indexes
     table.index('name');
     table.index('project_type');
@@ -57,7 +57,7 @@ exports.up = async function(knex) {
     table.json('permissions').defaultTo('[]');
     table.json('roles').defaultTo('[]');
     table.timestamps(true, true);
-    
+
     // Indexes
     table.index('user_id');
     table.index('session_token');
@@ -78,7 +78,7 @@ exports.up = async function(knex) {
     table.string('model_used', 100);
     table.json('metadata').defaultTo('{}');
     table.timestamp('created_at').defaultTo(knex.fn.now());
-    
+
     // Indexes
     table.index('session_id');
     table.index('voice_name');
@@ -97,7 +97,7 @@ exports.up = async function(knex) {
     table.decimal('execution_time_ms', 10, 3);
     table.string('analyzer_version', 50);
     table.timestamp('created_at').defaultTo(knex.fn.now());
-    
+
     // Indexes
     table.index('project_id');
     table.index('analysis_type');
@@ -115,7 +115,7 @@ exports.up = async function(knex) {
     table.boolean('encrypted').defaultTo(false);
     table.string('category', 100).defaultTo('general');
     table.timestamp('updated_at').defaultTo(knex.fn.now());
-    
+
     // Indexes
     table.index('category');
     table.index('updated_at');
@@ -136,7 +136,7 @@ exports.up = async function(knex) {
     table.json('metadata').defaultTo('{}');
     table.timestamp('created_at').defaultTo(knex.fn.now());
     table.timestamp('expires_at');
-    
+
     // Indexes
     table.index('type');
     table.index('created_at');
@@ -149,11 +149,18 @@ exports.up = async function(knex) {
     table.increments('id').primary();
     table.uuid('user_id').references('id').inTable('users').onDelete('SET NULL');
     table.uuid('session_id').references('id').inTable('user_sessions').onDelete('SET NULL');
-    table.enum('event_type', [
-      'login_success', 'login_failure', 'logout', 
-      'permission_denied', 'data_access', 'data_modification',
-      'system_event', 'security_violation'
-    ]).notNullable();
+    table
+      .enum('event_type', [
+        'login_success',
+        'login_failure',
+        'logout',
+        'permission_denied',
+        'data_access',
+        'data_modification',
+        'system_event',
+        'security_violation',
+      ])
+      .notNullable();
     table.enum('severity', ['low', 'medium', 'high', 'critical']).notNullable();
     table.enum('outcome', ['success', 'failure', 'blocked']).notNullable();
     table.string('source_ip', 45);
@@ -162,7 +169,7 @@ exports.up = async function(knex) {
     table.text('description').notNullable();
     table.jsonb('details').defaultTo('{}');
     table.timestamp('created_at').defaultTo(knex.fn.now());
-    
+
     // Indexes
     table.index('user_id');
     table.index('event_type');
@@ -180,7 +187,7 @@ exports.up = async function(knex) {
     table.string('unit', 50).notNullable();
     table.json('tags').defaultTo('{}');
     table.timestamp('timestamp').defaultTo(knex.fn.now());
-    
+
     // Indexes
     table.index('metric_name');
     table.index('component');
@@ -198,7 +205,7 @@ exports.up = async function(knex) {
     table.jsonb('constraints').defaultTo('{}');
     table.boolean('is_system').defaultTo(false);
     table.timestamps(true, true);
-    
+
     // Indexes
     table.index('name');
     table.index(['resource', 'action']);
@@ -213,7 +220,7 @@ exports.up = async function(knex) {
     table.json('inherited_role_ids').defaultTo('[]');
     table.boolean('is_system').defaultTo(false);
     table.timestamps(true, true);
-    
+
     // Indexes
     table.index('name');
     table.index('is_system');
@@ -232,7 +239,7 @@ exports.up = async function(knex) {
     table.boolean('resolved').defaultTo(false);
     table.timestamp('created_at').defaultTo(knex.fn.now());
     table.timestamp('resolved_at');
-    
+
     // Indexes
     table.index('error_type');
     table.index('component');
@@ -244,11 +251,11 @@ exports.up = async function(knex) {
   console.log('✅ Initial schema created successfully');
 };
 
-exports.down = async function(knex) {
+exports.down = async function (knex) {
   // Drop tables in reverse order to handle foreign key constraints
   const tables = [
     'error_log',
-    'roles', 
+    'roles',
     'permissions',
     'performance_metrics',
     'security_audit_log',
@@ -258,7 +265,7 @@ exports.down = async function(knex) {
     'voice_interactions',
     'user_sessions',
     'projects',
-    'users'
+    'users',
   ];
 
   for (const table of tables) {

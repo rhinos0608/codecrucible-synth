@@ -14,7 +14,6 @@ import type {
   ToolExecutionContext,
 } from '../../domain/interfaces/tool-system.js';
 
-
 export interface RustToolDefinition extends ToolDefinition {
   rustImplementation: string;
   nativeOptimizations: string[];
@@ -214,7 +213,6 @@ export abstract class RustTool<Args extends Record<string, unknown>> implements 
   // Abstract methods to be implemented by concrete tools
 
   protected abstract executeRust(
-
     args: Readonly<Args>,
     context: Readonly<ToolExecutionContext>
   ): Promise<RustToolExecutionResult>;
@@ -291,7 +289,7 @@ export class RustFileAnalyzer extends RustTool<FileAnalyzerArgs> {
       };
     }
 
-    const result = await this.providerClient.execute(request) as ProviderExecutionResult;
+    const result = (await this.providerClient.execute(request)) as ProviderExecutionResult;
 
     return {
       success: true,

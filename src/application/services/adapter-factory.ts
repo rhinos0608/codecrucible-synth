@@ -11,7 +11,9 @@ export type ProviderConfig = {
   timeout?: number;
 };
 
-export function createAdaptersFromProviders(providers: Readonly<ProviderConfig[]>): ProviderAdapter[] {
+export function createAdaptersFromProviders(
+  providers: Readonly<ProviderConfig[]>
+): ProviderAdapter[] {
   const adapters: ProviderAdapter[] = [];
   for (const p of providers) {
     const defaultModel = p.defaultModel || (p.models && p.models[0]) || '';
@@ -24,4 +26,3 @@ export function createAdaptersFromProviders(providers: Readonly<ProviderConfig[]
   }
   return adapters;
 }
-

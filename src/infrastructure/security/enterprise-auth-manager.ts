@@ -611,13 +611,13 @@ export class EnterpriseAuthManager {
       for (let i = -tolerance; i <= tolerance; i++) {
         const timeStep = Math.floor((currentTime + i * timeWindow) / timeWindow);
         const expectedCode = this.generateTOTP(mfaSecret, timeStep);
-        
+
         if (expectedCode === mfaCode) {
           // Mark this code as used to prevent replay attacks
           await this.secretsManager.storeSecret(replayKey, 'used', {
             description: `MFA code replay protection for ${userId}`,
-            ttl: timeWindow * 2, // Store for 2 time windows
-            tags: ['mfa', 'replay-protection']
+            expiresAt: new Date(Date.now() + timeWindow * 2 * 1000),
+            tags: ['mfa', 'replay-protection'],
           });
 
           logger.info('MFA validation successful', { userId });
@@ -634,7 +634,6 @@ export class EnterpriseAuthManager {
 
       logger.warn('MFA validation failed', { userId });
       return false;
-
     } catch (error) {
       logger.error('MFA validation error', error as Error, { userId });
       return false;
@@ -648,32 +647,31 @@ export class EnterpriseAuthManager {
     try {
       // Decode base32 secret (simplified - in production use a proper base32 library)
       const secretBuffer = Buffer.from(secret, 'base64');
-      
+
       // Convert time step to 8-byte buffer (big-endian)
       const timeBuffer = Buffer.alloc(8);
       timeBuffer.writeUInt32BE(0, 0);
       timeBuffer.writeUInt32BE(timeStep, 4);
-      
+
       // Generate HMAC-SHA1
       const hmac = crypto.createHmac('sha1', secretBuffer);
       hmac.update(timeBuffer);
       const hash = hmac.digest();
-      
+
       // Dynamic truncation per RFC 4226
       const offset = hash[hash.length - 1] & 0x0f;
       const truncatedHash = hash.slice(offset, offset + 4);
-      
+
       // Convert to number and apply modulo
-      const code = (
-        ((truncatedHash[0] & 0x7f) << 24) |
-        (truncatedHash[1] << 16) |
-        (truncatedHash[2] << 8) |
-        truncatedHash[3]
-      ) % 1000000;
-      
+      const code =
+        (((truncatedHash[0] & 0x7f) << 24) |
+          (truncatedHash[1] << 16) |
+          (truncatedHash[2] << 8) |
+          truncatedHash[3]) %
+        1000000;
+
       // Pad with zeros to ensure 6 digits
       return code.toString().padStart(6, '0');
-      
     } catch (error) {
       logger.error('TOTP generation failed', error as Error);
       throw error;
@@ -687,34 +685,33 @@ export class EnterpriseAuthManager {
     try {
       const backupCodesKey = `backup_codes_${userId}`;
       const backupCodesData = await this.secretsManager.getSecret(backupCodesKey);
-      
+
       if (!backupCodesData) {
         return false;
       }
-      
+
       const backupCodes: string[] = JSON.parse(backupCodesData);
       const codeIndex = backupCodes.indexOf(code);
-      
+
       if (codeIndex === -1) {
         return false;
       }
-      
+
       // Remove used backup code
       backupCodes.splice(codeIndex, 1);
-      
+
       // Update remaining backup codes
       await this.secretsManager.storeSecret(backupCodesKey, JSON.stringify(backupCodes), {
         description: `Backup codes for user ${userId}`,
-        tags: ['mfa', 'backup-codes']
+        tags: ['mfa', 'backup-codes'],
       });
-      
-      logger.info('Backup code used successfully', { 
-        userId, 
-        remainingCodes: backupCodes.length 
+
+      logger.info('Backup code used successfully', {
+        userId,
+        remainingCodes: backupCodes.length,
       });
-      
+
       return true;
-      
     } catch (error) {
       logger.error('Backup code validation failed', error as Error, { userId });
       return false;
@@ -724,38 +721,39 @@ export class EnterpriseAuthManager {
   /**
    * Generate MFA secret for new user enrollment
    */
-  async generateMFASecret(userId: string): Promise<{ secret: string; qrCode: string; backupCodes: string[] }> {
+  async generateMFASecret(
+    userId: string
+  ): Promise<{ secret: string; qrCode: string; backupCodes: string[] }> {
     try {
       // Generate cryptographically secure secret (160 bits = 20 bytes)
       const secretBytes = crypto.randomBytes(20);
       const secret = secretBytes.toString('base64');
-      
+
       // Store secret securely
       await this.secretsManager.storeSecret(`mfa_secret_${userId}`, secret, {
         description: `MFA secret for user ${userId}`,
-        tags: ['mfa', 'secret']
+        tags: ['mfa', 'secret'],
       });
-      
+
       // Generate backup codes
       const backupCodes = this.generateBackupCodes();
       await this.secretsManager.storeSecret(`backup_codes_${userId}`, JSON.stringify(backupCodes), {
         description: `Backup codes for user ${userId}`,
-        tags: ['mfa', 'backup-codes']
+        tags: ['mfa', 'backup-codes'],
       });
-      
+
       // Generate QR code data (TOTP URI format)
       const serviceName = 'CodeCrucible Synth';
       const secretBase32 = this.base64ToBase32(secret); // Convert for QR code compatibility
       const qrCode = `otpauth://totp/${serviceName}:${userId}?secret=${secretBase32}&issuer=${serviceName}&algorithm=SHA1&digits=6&period=30`;
-      
+
       logger.info('MFA secret generated for user', { userId });
-      
+
       return {
         secret: secretBase32, // Return base32 for user display
         qrCode,
-        backupCodes
+        backupCodes,
       };
-      
     } catch (error) {
       logger.error('MFA secret generation failed', error as Error, { userId });
       throw error;
@@ -785,21 +783,21 @@ export class EnterpriseAuthManager {
     let result = '';
     let bits = 0;
     let value = 0;
-    
+
     for (const byte of buffer) {
       value = (value << 8) | byte;
       bits += 8;
-      
+
       while (bits >= 5) {
         result += alphabet[(value >>> (bits - 5)) & 31];
         bits -= 5;
       }
     }
-    
+
     if (bits > 0) {
       result += alphabet[(value << (5 - bits)) & 31];
     }
-    
+
     return result;
   }
 

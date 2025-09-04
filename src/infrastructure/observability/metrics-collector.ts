@@ -64,7 +64,9 @@ export class MetricsCollector {
   public initialize(): void {
     if (this.config.exportInterval > 0) {
       setInterval(() => {
-        this.exportMetrics().catch(err => { this.logger.error('Error exporting metrics:', err); });
+        this.exportMetrics().catch(err => {
+          this.logger.error('Error exporting metrics:', err);
+        });
       }, this.config.exportInterval);
     }
   }
@@ -157,11 +159,11 @@ export class MetricsCollector {
     }
 
     const metricsToExport = [...this.metrics];
-    
+
     for (const exporter of this.config.exporters) {
       try {
         this.logger.debug(`Exporting ${metricsToExport.length} metrics to ${exporter.type}`);
-        
+
         switch (exporter.type) {
           case 'prometheus':
             await this.exportToPrometheus(metricsToExport, exporter);
@@ -178,8 +180,10 @@ export class MetricsCollector {
           default:
             this.logger.warn(`Unsupported exporter type: ${exporter.type}`);
         }
-        
-        this.logger.info(`Successfully exported ${metricsToExport.length} metrics to ${exporter.type}`);
+
+        this.logger.info(
+          `Successfully exported ${metricsToExport.length} metrics to ${exporter.type}`
+        );
       } catch (error) {
         this.logger.error(`Failed to export to ${exporter.type}:`, error);
       }
@@ -189,9 +193,12 @@ export class MetricsCollector {
   /**
    * Export metrics to Prometheus format
    */
-  private async exportToPrometheus(metrics: MetricPoint[], exporter: MetricExporter): Promise<void> {
+  private async exportToPrometheus(
+    metrics: MetricPoint[],
+    exporter: MetricExporter
+  ): Promise<void> {
     const prometheusFormat = this.convertToPrometheusFormat(metrics);
-    
+
     if (exporter.endpoint) {
       // Push to Prometheus Push Gateway
       const response = await fetch(`${exporter.endpoint}/metrics/job/codecrucible-synth`, {
@@ -222,14 +229,14 @@ export class MetricsCollector {
 
     const { createSocket } = await import('dgram');
     const client = createSocket('udp4');
-    
+
     try {
       for (const metric of metrics) {
         const statsdFormat = this.convertToStatsDFormat(metric);
         const [host, port] = exporter.endpoint.split(':');
-        
+
         await new Promise<void>((resolve, reject) => {
-          client.send(statsdFormat, parseInt(port) || 8125, host || 'localhost', (error) => {
+          client.send(statsdFormat, parseInt(port) || 8125, host || 'localhost', error => {
             if (error) reject(error);
             else resolve();
           });
@@ -243,13 +250,16 @@ export class MetricsCollector {
   /**
    * Export metrics to OpenTelemetry
    */
-  private async exportToOpenTelemetry(metrics: MetricPoint[], exporter: MetricExporter): Promise<void> {
+  private async exportToOpenTelemetry(
+    metrics: MetricPoint[],
+    exporter: MetricExporter
+  ): Promise<void> {
     if (!exporter.endpoint) {
       throw new Error('OpenTelemetry endpoint is required');
     }
 
     const otlpPayload = this.convertToOTLPFormat(metrics);
-    
+
     const response = await fetch(`${exporter.endpoint}/v1/metrics`, {
       method: 'POST',
       headers: {
@@ -270,10 +280,10 @@ export class MetricsCollector {
   private async exportToFile(metrics: MetricPoint[], exporter: MetricExporter): Promise<void> {
     const { writeFile, mkdir } = await import('fs/promises');
     const { dirname } = await import('path');
-    
+
     const filePath = exporter.endpoint || `./metrics/metrics-${Date.now()}.json`;
     await mkdir(dirname(filePath), { recursive: true });
-    
+
     const data = {
       timestamp: new Date().toISOString(),
       metrics,
@@ -302,7 +312,7 @@ export class MetricsCollector {
     // Convert each metric group
     for (const [name, metricGroup] of groupedMetrics) {
       const sanitizedName = name.replace(/[^a-zA-Z0-9_]/g, '_');
-      
+
       // Add help comment
       lines.push(`# HELP ${sanitizedName} ${name} metric`);
       lines.push(`# TYPE ${sanitizedName} ${metricGroup[0].type}`);
@@ -311,7 +321,7 @@ export class MetricsCollector {
         const tagsStr = Object.entries(metric.tags)
           .map(([key, value]) => `${key}="${value}"`)
           .join(',');
-        
+
         const labelsStr = tagsStr ? `{${tagsStr}}` : '';
         lines.push(`${sanitizedName}${labelsStr} ${metric.value} ${metric.timestamp.getTime()}`);
       }
@@ -327,9 +337,9 @@ export class MetricsCollector {
     const tags = Object.entries(metric.tags)
       .map(([key, value]) => `${key}:${value}`)
       .join(',');
-    
+
     const tagsSuffix = tags ? `|#${tags}` : '';
-    
+
     switch (metric.type) {
       case 'counter':
         return `${metric.name}:${metric.value}|c${tagsSuffix}`;

@@ -12,9 +12,9 @@ import type {
   ToolExecutionRequest,
   ToolExecutionResult,
   IToolExecutor,
-} from '../../../domain/interfaces/tool-system.js';
-import { ModelRequest, ModelResponse } from '../../../domain/interfaces/model-client.js';
-import { ProjectContext } from '../../../domain/types/unified-types.js';
+} from '@/domain/interfaces/tool-system.js';
+import { ModelRequest, ModelResponse } from '@/domain/interfaces/model-client.js';
+import { ProjectContext } from '@/domain/types/unified-types.js';
 
 // Type definitions for complete Rust integration
 export interface RustExecutorOptions {

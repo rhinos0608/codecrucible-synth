@@ -267,7 +267,7 @@ export class LMStudioProvider {
       for (const modelName of defaultModels) {
         try {
           // Test if we can access this model (this will throw if not available)
-          const model = await this.client.llm.model(modelName);
+          const _model = await this.client.llm.model(modelName);
           logger.info(`LMStudioProvider selected model: ${modelName}`);
           return modelName;
         } catch (modelError) {

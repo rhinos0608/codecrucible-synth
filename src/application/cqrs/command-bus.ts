@@ -17,8 +17,8 @@ export class CommandBus {
   private readonly handlers = new Map<string, CommandHandler>();
   private readonly middleware: CommandMiddleware[] = [];
 
-  public register(handler: Readonly<CommandHandler>): void {
-    this.handlers.set(handler.type, handler);
+  public register(handler: Readonly<CommandHandler<unknown, unknown>>): void {
+    this.handlers.set(handler.type, handler as CommandHandler);
   }
 
   public use(mw: CommandMiddleware): void {

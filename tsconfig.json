@@ -24,7 +24,7 @@
     "noPropertyAccessFromIndexSignature": false, // Temporarily disabled - 301 errors
 
     // Additional Checks - 2025 Standards (Gradual Migration)
-    "noUnusedLocals": false, // Temporarily disabled - 416 errors
+    "noUnusedLocals": true, // Re-enabled - will fix unused variables systematically
     "noUnusedParameters": false, // Temporarily disabled
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,

@@ -42,7 +42,7 @@ export class MCPServerRegistry extends EventEmitter {
   // Memory management
   private maxConcurrentInit = 3; // Limit concurrent initializations
   private currentInitializations = 0;
-  private initialized = false;
+  private _initialized = false;
 
   constructor() {
     super();

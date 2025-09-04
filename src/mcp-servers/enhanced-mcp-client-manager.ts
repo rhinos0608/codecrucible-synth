@@ -32,7 +32,7 @@ export interface MCPServerConfig {
 export class EnhancedMCPClientManager extends EventEmitter {
   private baseManager: MCPServerManager;
   private config: ClientConfig;
-  private connectionPool: Map<string, any> = new Map();
+  private _connectionPool: Map<string, any> = new Map();
   private healthCheckInterval: NodeJS.Timeout | null = null;
 
   constructor(config?: Partial<ClientConfig>) {

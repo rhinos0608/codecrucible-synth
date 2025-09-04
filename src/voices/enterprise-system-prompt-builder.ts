@@ -612,7 +612,7 @@ You are Guardian Voice, a specialized enterprise CLI agent focused on quality ga
    * This method is currently unused.
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private static getCodingGrimoireSection(_context: Readonly<RuntimeContext>): string {
+  private static _getCodingGrimoireSection(_context: Readonly<RuntimeContext>): string {
     return `# CODING GRIMOIRE - LIVING SPIRAL METHODOLOGY
 
 ## Prime Directives for Code Creation

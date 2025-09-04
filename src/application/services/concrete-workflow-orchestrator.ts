@@ -18,10 +18,7 @@ import {
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { IModelClient, ModelRequest, ModelTool } from '../../domain/interfaces/model-client.js';
-import { UnifiedConfigurationManager } from '../../domain/config/config-manager.js';
-import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
-import { RuntimeContext } from '../runtime/runtime-context.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import { randomUUID } from 'crypto';
 
@@ -41,10 +38,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   private eventBus!: IEventBus;
   private modelClient?: IModelClient;
   private mcpManager?: any;
-  private securityValidator?: UnifiedSecurityValidator;
-  private configManager?: UnifiedConfigurationManager;
   private isInitialized = false;
-  private runtimeContext?: RuntimeContext;
 
   // Request tracking
   private activeRequests: Map<
@@ -76,16 +70,9 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     try {
       // Prefer runtimeContext if provided (incremental migration)
       if (dependencies.runtimeContext) {
-        this.runtimeContext = dependencies.runtimeContext;
         this.eventBus = dependencies.runtimeContext.eventBus;
-        this.securityValidator =
-          dependencies.runtimeContext.securityValidator ?? dependencies.securityValidator;
-        this.configManager =
-          dependencies.runtimeContext.configManager ?? dependencies.configManager;
       } else {
         this.eventBus = dependencies.eventBus;
-        this.securityValidator = dependencies.securityValidator;
-        this.configManager = dependencies.configManager;
       }
       this.userInteraction = dependencies.userInteraction;
       this.modelClient = dependencies.modelClient;

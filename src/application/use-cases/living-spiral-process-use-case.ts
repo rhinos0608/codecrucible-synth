@@ -7,7 +7,6 @@
  */
 
 import { IVoiceOrchestrationService } from '../../domain/services/voice-orchestration-service.js';
-import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
 import { ProcessingRequest } from '../../domain/entities/request.js';
 import { IModelClient } from '../../domain/interfaces/model-client.js';
 
@@ -44,7 +43,6 @@ export interface SpiralIteration {
 export class LivingSpiralProcessUseCase {
   constructor(
     private voiceOrchestrationService: IVoiceOrchestrationService,
-    private modelSelectionService: IModelSelectionService,
     private modelClient: IModelClient
   ) {}
 
@@ -152,7 +150,6 @@ export class LivingSpiralProcessUseCase {
       synthesisMode: 'COLLABORATIVE' as any,
     });
 
-    const model = await this.modelSelectionService.selectOptimalModel(request);
     const allVoices = [voiceSelection.primaryVoice, ...voiceSelection.supportingVoices];
 
     // Generate responses from multiple voices
@@ -233,14 +230,6 @@ export class LivingSpiralProcessUseCase {
     output: string;
     voices: string[];
   }): Promise<{ output: string; voices: string[] }> {
-    const request = ProcessingRequest.create(
-      this.buildReflectionPrompt(rebirth.output),
-      'quality-assessment' as any,
-      'medium',
-      {},
-      { mustIncludeVoices: ['guardian'] }
-    );
-
     try {
       const response = await this.modelClient.generate(this.buildReflectionPrompt(rebirth.output));
       const enhancedOutput = `${rebirth.output}\n\n---\n\n## REFLECTION INSIGHTS:\n${response}`;

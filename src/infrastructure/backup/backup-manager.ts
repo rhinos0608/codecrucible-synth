@@ -9,7 +9,6 @@ import { join, dirname } from 'path';
 import { promises as fs, existsSync } from 'fs';
 import { createReadStream, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
-import { createGzip, createGunzip } from 'zlib';
 import { performance } from 'perf_hooks';
 import * as crypto from 'crypto';
 import * as AWS from '@aws-sdk/client-s3';

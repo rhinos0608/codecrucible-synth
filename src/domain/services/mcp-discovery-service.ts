@@ -262,7 +262,6 @@ export interface ScalingPlan {
 export class MCPDiscoveryService {
   private serverRegistry: Map<string, MCPServerProfile> = new Map();
   private discoveryStrategies: DiscoveryStrategy[] = [];
-  private selectionStrategies: SelectionStrategy[] = [];
 
   constructor() {
     // Initialize default strategies
@@ -471,13 +470,7 @@ export class MCPDiscoveryService {
       DiscoveryStrategy.CONFIGURATION_BASED,
     ];
 
-    // Initialize selection strategies
-    this.selectionStrategies = [
-      SelectionStrategy.PERFORMANCE_OPTIMIZED,
-      SelectionStrategy.RELIABILITY_FOCUSED,
-      SelectionStrategy.COST_MINIMIZED,
-      SelectionStrategy.CAPABILITY_SPECIALIZED,
-    ];
+    // TODO: Initialize selection strategies when implemented
   }
 
   private async applyDiscoveryStrategy(

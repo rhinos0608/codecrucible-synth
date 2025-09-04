@@ -515,7 +515,6 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
 
     for (const [name, times] of this.operationTimes) {
       const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
-      const maxTime = Math.max(...times);
 
       if (avgTime > 1000) {
         // Operations taking more than 1 second on average
@@ -608,7 +607,6 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
 
     for (const [operation, durations] of operationDurations) {
       const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
-      const maxDuration = Math.max(...durations);
 
       if (avgDuration > 100) {
         // Operations over 100ms average

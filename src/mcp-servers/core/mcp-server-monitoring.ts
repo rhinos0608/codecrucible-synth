@@ -95,7 +95,7 @@ export interface SystemResourceMetrics {
  * Replaces placeholder implementations with actual system metrics
  */
 class SystemMonitoringUtils {
-  private static cpuStartTimes: number[] = [];
+  private static _cpuStartTimes: number[] = [];
   private static eventLoopLagHistory: number[] = [];
   private static performanceObserver: PerformanceObserver | null = null;
   private static activeConnections = 0;
@@ -236,7 +236,7 @@ export class MCPServerMonitoring extends EventEmitter {
 
   // Performance tracking
   private metricsCollectionTime = 0;
-  private lastCleanup = Date.now();
+  private _lastCleanup = Date.now();
   private rustMetrics: { available: boolean; module: any | null } = { available: false, module: null };
 
   constructor(config: Partial<MetricsConfig> = {}) {
@@ -716,7 +716,7 @@ export class MCPServerMonitoring extends EventEmitter {
     const now = Date.now();
     
     // Clean up old metrics based on retention policy
-    for (const [serverId, serverMetric] of this.serverMetrics) {
+    for (const [_serverId, serverMetric] of this.serverMetrics) {
       const cutoffTime = now - this.config.metricsRetentionMs;
       
       // Remove old activities
@@ -736,7 +736,7 @@ export class MCPServerMonitoring extends EventEmitter {
       metric => metric.timestamp.getTime() > systemCutoff
     );
 
-    this.lastCleanup = now;
+    this._lastCleanup = now;
     logger.debug('🧹 Monitoring cleanup completed');
   }
 

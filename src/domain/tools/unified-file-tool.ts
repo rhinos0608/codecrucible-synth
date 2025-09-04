@@ -12,20 +12,16 @@
  * Uses Strategy and Decorator patterns for configurable behavior.
  */
 
-import { promises as fs, existsSync, statSync } from 'fs';
-import { join, relative, isAbsolute, dirname, extname, basename, resolve, sep } from 'path';
+import { promises as fs, existsSync } from 'fs';
+import { relative, isAbsolute, dirname, extname, basename, resolve, sep } from 'path';
 import { glob } from 'glob';
-import { promisify } from 'util';
-import { exec } from 'child_process';
 import { BaseTool } from './unified-tool-system.js';
 import {
-  ToolDefinition,
   ToolExecutionContext,
   ToolExecutionResult,
   ToolParameterSchema,
 } from '../interfaces/tool-system.js';
 
-const execAsync = promisify(exec);
 
 // ============================================================================
 // FILE OPERATION STRATEGIES - Different ways to handle files

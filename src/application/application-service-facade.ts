@@ -53,12 +53,16 @@ export class ApplicationServiceFacade {
     modelSelectionService: ModelSelectionService,
     modelClient?: UnifiedModelClient
   ) {
+    // Validate required dependencies - fail fast if critical services are missing
+    if (!modelClient) {
+      throw new Error('UnifiedModelClient is required for ApplicationServiceFacade. Please ensure the model client is properly initialized.');
+    }
+
     // Initialize use cases with domain services (no infrastructure dependencies)
-    // TODO: Properly inject UnifiedModelClient when DI system is complete
     this.processAIRequestUseCase = new ProcessAIRequestUseCase(
       modelSelectionService,
       voiceOrchestrationService,
-      modelClient || {} as UnifiedModelClient
+      modelClient
     );
 
     this.multiVoiceSynthesisUseCase = new MultiVoiceSynthesisUseCase(
@@ -68,13 +72,11 @@ export class ApplicationServiceFacade {
 
     this.livingSpiralProcessUseCase = new LivingSpiralProcessUseCase(
       voiceOrchestrationService,
-      modelSelectionService,
-      modelClient || {} as UnifiedModelClient
+      modelClient
     );
 
     this.analyzeCodebaseUseCase = new AnalyzeCodebaseUseCase(
-      modelSelectionService,
-      voiceOrchestrationService
+      modelSelectionService
     );
 
     this.simplifiedLivingSpiralCoordinator = new SimplifiedLivingSpiralCoordinator(

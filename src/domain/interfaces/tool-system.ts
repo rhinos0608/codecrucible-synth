@@ -24,8 +24,8 @@ export interface ToolParameterSchema {
 export interface ToolParameter {
   type: 'string' | 'number' | 'boolean' | 'array' | 'object';
   description: string;
-  enum?: any[];
-  default?: any;
+  enum?: unknown[];
+  default?: unknown;
   minimum?: number;
   maximum?: number;
   validation?: string; // regex pattern or validation rule
@@ -48,25 +48,25 @@ export interface ToolExecutionContext {
   permissions: ToolPermission[];
   environment: Record<string, string>;
   timeoutMs?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ToolExecutionRequest {
   toolId: string;
-  arguments: Record<string, any>;
+  arguments: Record<string, unknown>;
   context: ToolExecutionContext;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ToolExecutionResult {
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   executionTimeMs: number;
 }
 
@@ -79,17 +79,27 @@ export interface ITool {
   /**
    * Execute the tool with given arguments and context
    */
-  execute(args: Record<string, any>, context: ToolExecutionContext): Promise<ToolExecutionResult>;
+  execute: (
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
+  ) => Promise<ToolExecutionResult>;
 
   /**
    * Validate arguments against the tool's parameter schema
    */
-  validateArguments(args: Record<string, any>): { valid: boolean; errors?: string[] };
+  validateArguments: (
+    args: Readonly<Record<string, unknown>>
+  ) => { valid: boolean; errors?: string[] };
 
   /**
    * Check if the tool can be executed in the given context
    */
-  canExecute(context: ToolExecutionContext): boolean;
+  canExecute: (context: Readonly<ToolExecutionContext>) => boolean;
+
+  /**
+   * Optionally add a decorator to the tool (may be a no-op for some implementations)
+   */
+  addDecorator?: (decorator: unknown) => ITool;
 }
 
 /**
@@ -99,27 +109,27 @@ export interface IToolRegistry {
   /**
    * Register a tool
    */
-  register(tool: ITool): void;
+  register: (tool: Readonly<ITool>) => void;
 
   /**
    * Get a tool by ID
    */
-  getTool(id: string): ITool | undefined;
+  getTool: (id: string) => ITool | undefined;
 
   /**
    * Get all registered tools
    */
-  getAllTools(): ITool[];
+  getAllTools: () => ITool[];
 
   /**
    * Get tools by category
    */
-  getToolsByCategory(category: string): ITool[];
+  getToolsByCategory: (category: string) => ITool[];
 
   /**
    * Search tools by name or description
    */
-  searchTools(query: string): ITool[];
+  searchTools: (query: string) => ITool[];
 }
 
 /**
@@ -129,17 +139,17 @@ export interface IToolExecutor {
   /**
    * Execute a tool
    */
-  execute(request: ToolExecutionRequest): Promise<ToolExecutionResult>;
+  execute: (request: Readonly<ToolExecutionRequest>) => Promise<ToolExecutionResult>;
 
   /**
    * Execute multiple tools in sequence
    */
-  executeSequence(requests: ToolExecutionRequest[]): Promise<ToolExecutionResult[]>;
+  executeSequence: (requests: ReadonlyArray<Readonly<ToolExecutionRequest>>) => Promise<ToolExecutionResult[]>;
 
   /**
    * Execute multiple tools in parallel
    */
-  executeParallel(requests: ToolExecutionRequest[]): Promise<ToolExecutionResult[]>;
+  executeParallel: (requests: ReadonlyArray<Readonly<ToolExecutionRequest>>) => Promise<ToolExecutionResult[]>;
 }
 
 /**
@@ -149,27 +159,27 @@ export interface IMCPManager {
   /**
    * Get available MCP servers
    */
-  getAvailableServers(): Promise<MCPServerInfo[]>;
+  getAvailableServers: () => Promise<MCPServerInfo[]>;
 
   /**
    * Start MCP servers
    */
-  startServers(): Promise<void>;
+  startServers: () => Promise<void>;
 
   /**
    * Stop MCP servers
    */
-  stopServers(): Promise<void>;
+  stopServers: () => Promise<void>;
 
   /**
    * Get server status
    */
-  getServerStatus(serverId?: string): Promise<Record<string, MCPServerStatus>>;
+  getServerStatus: (serverId?: string) => Promise<Record<string, MCPServerStatus>>;
 
   /**
    * Execute a tool through MCP
    */
-  executeMCPTool(serverId: string, toolName: string, args: any): Promise<any>;
+  executeMCPTool: (serverId: string, toolName: string, args: unknown) => Promise<unknown>;
 }
 
 export interface MCPServerInfo {

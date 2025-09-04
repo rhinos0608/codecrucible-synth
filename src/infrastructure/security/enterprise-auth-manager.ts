@@ -578,16 +578,229 @@ export class EnterpriseAuthManager {
   }
 
   /**
-   * Validate MFA code (placeholder implementation)
+   * Validate MFA code using TOTP (Time-based One-Time Password)
    */
   private async validateMFA(userId: string, mfaCode: string): Promise<boolean> {
-    // This is a placeholder - in a real implementation, you would:
-    // 1. Get user's MFA secret from secure storage
-    // 2. Validate TOTP code using a library like 'otplib'
-    // 3. Check for replay attacks
+    try {
+      // Input validation
+      if (!mfaCode || !/^\d{6}$/.test(mfaCode)) {
+        logger.warn('Invalid MFA code format', { userId });
+        return false;
+      }
 
-    // For now, accept any 6-digit code
-    return /^\d{6}$/.test(mfaCode);
+      // Get user's MFA secret from secure storage
+      const mfaSecret = await this.secretsManager.getSecret(`mfa_secret_${userId}`);
+      if (!mfaSecret) {
+        logger.warn('MFA secret not found for user', { userId });
+        return false;
+      }
+
+      // Check for recent code reuse (replay attack protection)
+      const replayKey = `mfa_replay_${userId}_${mfaCode}`;
+      const recentlyUsed = await this.secretsManager.getSecret(replayKey);
+      if (recentlyUsed) {
+        logger.warn('MFA code replay attempt detected', { userId, code: mfaCode });
+        return false;
+      }
+
+      // Generate TOTP codes for current time window and adjacent windows (±30s)
+      const currentTime = Math.floor(Date.now() / 1000);
+      const timeWindow = 30; // TOTP window in seconds
+      const tolerance = 1; // Allow ±1 time window for clock skew
+
+      for (let i = -tolerance; i <= tolerance; i++) {
+        const timeStep = Math.floor((currentTime + i * timeWindow) / timeWindow);
+        const expectedCode = this.generateTOTP(mfaSecret, timeStep);
+        
+        if (expectedCode === mfaCode) {
+          // Mark this code as used to prevent replay attacks
+          await this.secretsManager.storeSecret(replayKey, 'used', {
+            description: `MFA code replay protection for ${userId}`,
+            ttl: timeWindow * 2, // Store for 2 time windows
+            tags: ['mfa', 'replay-protection']
+          });
+
+          logger.info('MFA validation successful', { userId });
+          return true;
+        }
+      }
+
+      // Check backup codes as fallback
+      const backupCodesValid = await this.validateBackupCode(userId, mfaCode);
+      if (backupCodesValid) {
+        logger.info('MFA validation successful using backup code', { userId });
+        return true;
+      }
+
+      logger.warn('MFA validation failed', { userId });
+      return false;
+
+    } catch (error) {
+      logger.error('MFA validation error', error as Error, { userId });
+      return false;
+    }
+  }
+
+  /**
+   * Generate TOTP code using RFC 6238 algorithm
+   */
+  private generateTOTP(secret: string, timeStep: number): string {
+    try {
+      // Decode base32 secret (simplified - in production use a proper base32 library)
+      const secretBuffer = Buffer.from(secret, 'base64');
+      
+      // Convert time step to 8-byte buffer (big-endian)
+      const timeBuffer = Buffer.alloc(8);
+      timeBuffer.writeUInt32BE(0, 0);
+      timeBuffer.writeUInt32BE(timeStep, 4);
+      
+      // Generate HMAC-SHA1
+      const hmac = crypto.createHmac('sha1', secretBuffer);
+      hmac.update(timeBuffer);
+      const hash = hmac.digest();
+      
+      // Dynamic truncation per RFC 4226
+      const offset = hash[hash.length - 1] & 0x0f;
+      const truncatedHash = hash.slice(offset, offset + 4);
+      
+      // Convert to number and apply modulo
+      const code = (
+        ((truncatedHash[0] & 0x7f) << 24) |
+        (truncatedHash[1] << 16) |
+        (truncatedHash[2] << 8) |
+        truncatedHash[3]
+      ) % 1000000;
+      
+      // Pad with zeros to ensure 6 digits
+      return code.toString().padStart(6, '0');
+      
+    } catch (error) {
+      logger.error('TOTP generation failed', error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate backup recovery codes
+   */
+  private async validateBackupCode(userId: string, code: string): Promise<boolean> {
+    try {
+      const backupCodesKey = `backup_codes_${userId}`;
+      const backupCodesData = await this.secretsManager.getSecret(backupCodesKey);
+      
+      if (!backupCodesData) {
+        return false;
+      }
+      
+      const backupCodes: string[] = JSON.parse(backupCodesData);
+      const codeIndex = backupCodes.indexOf(code);
+      
+      if (codeIndex === -1) {
+        return false;
+      }
+      
+      // Remove used backup code
+      backupCodes.splice(codeIndex, 1);
+      
+      // Update remaining backup codes
+      await this.secretsManager.storeSecret(backupCodesKey, JSON.stringify(backupCodes), {
+        description: `Backup codes for user ${userId}`,
+        tags: ['mfa', 'backup-codes']
+      });
+      
+      logger.info('Backup code used successfully', { 
+        userId, 
+        remainingCodes: backupCodes.length 
+      });
+      
+      return true;
+      
+    } catch (error) {
+      logger.error('Backup code validation failed', error as Error, { userId });
+      return false;
+    }
+  }
+
+  /**
+   * Generate MFA secret for new user enrollment
+   */
+  async generateMFASecret(userId: string): Promise<{ secret: string; qrCode: string; backupCodes: string[] }> {
+    try {
+      // Generate cryptographically secure secret (160 bits = 20 bytes)
+      const secretBytes = crypto.randomBytes(20);
+      const secret = secretBytes.toString('base64');
+      
+      // Store secret securely
+      await this.secretsManager.storeSecret(`mfa_secret_${userId}`, secret, {
+        description: `MFA secret for user ${userId}`,
+        tags: ['mfa', 'secret']
+      });
+      
+      // Generate backup codes
+      const backupCodes = this.generateBackupCodes();
+      await this.secretsManager.storeSecret(`backup_codes_${userId}`, JSON.stringify(backupCodes), {
+        description: `Backup codes for user ${userId}`,
+        tags: ['mfa', 'backup-codes']
+      });
+      
+      // Generate QR code data (TOTP URI format)
+      const serviceName = 'CodeCrucible Synth';
+      const secretBase32 = this.base64ToBase32(secret); // Convert for QR code compatibility
+      const qrCode = `otpauth://totp/${serviceName}:${userId}?secret=${secretBase32}&issuer=${serviceName}&algorithm=SHA1&digits=6&period=30`;
+      
+      logger.info('MFA secret generated for user', { userId });
+      
+      return {
+        secret: secretBase32, // Return base32 for user display
+        qrCode,
+        backupCodes
+      };
+      
+    } catch (error) {
+      logger.error('MFA secret generation failed', error as Error, { userId });
+      throw error;
+    }
+  }
+
+  /**
+   * Generate backup recovery codes
+   */
+  private generateBackupCodes(): string[] {
+    const codes: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      // Generate 8-character alphanumeric codes
+      const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+      codes.push(code);
+    }
+    return codes;
+  }
+
+  /**
+   * Convert base64 to base32 for TOTP compatibility
+   */
+  private base64ToBase32(base64: string): string {
+    // Simplified base32 encoding - in production use a proper base32 library
+    const buffer = Buffer.from(base64, 'base64');
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let result = '';
+    let bits = 0;
+    let value = 0;
+    
+    for (const byte of buffer) {
+      value = (value << 8) | byte;
+      bits += 8;
+      
+      while (bits >= 5) {
+        result += alphabet[(value >>> (bits - 5)) & 31];
+        bits -= 5;
+      }
+    }
+    
+    if (bits > 0) {
+      result += alphabet[(value << (5 - bits)) & 31];
+    }
+    
+    return result;
   }
 
   /**

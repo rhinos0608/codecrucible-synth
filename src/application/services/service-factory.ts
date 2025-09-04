@@ -5,11 +5,17 @@
  */
 
 import {
-  RuntimeContext,
+  RuntimeContext as BaseRuntimeContext,
   createRuntimeContext,
   disposeRuntimeContext,
   setConfigManager,
 } from '../runtime/runtime-context.js';
+
+import { RustExecutionBackend } from '../../infrastructure/execution/rust-executor/index.js';
+
+interface RuntimeContext extends BaseRuntimeContext {
+  rustBackend?: RustExecutionBackend;
+}
 import {
   UnifiedOrchestrationService,
   createUnifiedOrchestrationServiceWithContext,
@@ -26,6 +32,9 @@ import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 import type { ILogger } from '../../domain/interfaces/logger.js';
 import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-user-interaction.js';
 import { EventBus } from '../../infrastructure/messaging/event-bus.js';
+/* (removed duplicate import of RustExecutionBackend) */
+import { unifiedToolRegistry } from '../../infrastructure/tools/unified-tool-registry.js';
+import { setGlobalToolIntegrationRustBackend } from '../../infrastructure/tools/tool-integration.js';
 
 export interface ServiceFactoryConfig {
   correlationId?: string;
@@ -47,22 +56,26 @@ export class ServiceFactory {
   private configManager?: UnifiedConfigurationManager;
   private resourceCoordinator?: ConfigurableResourceCoordinator;
 
-  constructor(
+  public constructor(
     private config: ServiceFactoryConfig = {},
     private logger: ILogger = createLogger('ServiceFactory')
   ) {
     this.runtimeContext = createRuntimeContext({
       eventBus: new EventBus(),
     });
+    // Initialize Rust execution backend asynchronously and attach to runtime context
+    this.ensureRustBackend().catch(err => {
+      this.logger.warn('Error initializing RustExecutionBackend in constructor', err);
+    });
   }
 
   /**
    * Create a properly configured UnifiedOrchestrationService
    */
-  async createOrchestrationService(): Promise<UnifiedOrchestrationService> {
+  public async createOrchestrationService(): Promise<UnifiedOrchestrationService> {
     // Ensure dependencies are created
     await this.ensureConfigManager();
-    await this.ensureResourceCoordinator();
+    this.ensureResourceCoordinator();
 
     const userInteraction = new CLIUserInteraction();
 
@@ -83,9 +96,9 @@ export class ServiceFactory {
   /**
    * Create a configuration manager with dependency injection
    */
-  async createConfigurationManager(): Promise<UnifiedConfigurationManager> {
+  public async createConfigurationManager(): Promise<UnifiedConfigurationManager> {
     if (!this.configManager) {
-      const eventBus = this.runtimeContext.eventBus;
+      const { eventBus } = this.runtimeContext;
 
       this.configManager = await createUnifiedConfigurationManager({
         logger: this.logger,
@@ -100,7 +113,7 @@ export class ServiceFactory {
   /**
    * Create a resource coordinator with dependency injection
    */
-  async createResourceCoordinator(): Promise<ConfigurableResourceCoordinator> {
+  public createResourceCoordinator(): ConfigurableResourceCoordinator {
     if (!this.resourceCoordinator) {
       this.resourceCoordinator = ResourceCoordinatorFactory.createHighPerformance();
 
@@ -145,9 +158,35 @@ export class ServiceFactory {
     }
   }
 
-  private async ensureResourceCoordinator(): Promise<void> {
+  private ensureResourceCoordinator(): void {
     if (!this.resourceCoordinator) {
-      await this.createResourceCoordinator();
+      this.createResourceCoordinator();
+    }
+  }
+
+  private async ensureRustBackend(): Promise<void> {
+    try {
+      // Attempt to create and initialize the RustExecutionBackend
+      const rustBackend = new RustExecutionBackend();
+      if (typeof rustBackend.initialize === 'function') {
+        await rustBackend.initialize();
+      }
+
+      this.runtimeContext.rustBackend = rustBackend;
+
+      // Also expose the backend to the unified tool registry so tool handlers can use it
+      try {
+        unifiedToolRegistry.setRustBackend(rustBackend);
+  // Also set the backend on the global ToolIntegration if present
+  setGlobalToolIntegrationRustBackend(rustBackend);
+      } catch (e) {
+        this.logger?.warn('Failed to set rustBackend on unifiedToolRegistry', e);
+      }
+
+      this.logger?.info('RustExecutionBackend initialized and attached to RuntimeContext');
+    } catch (err) {
+      this.logger?.warn('Failed to create or initialize RustExecutionBackend', err);
+      this.logger?.info('RustExecutionBackend not available; TypeScript fallback will be used');
     }
   }
 }

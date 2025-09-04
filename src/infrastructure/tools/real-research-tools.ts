@@ -39,7 +39,7 @@ interface MCPGlobal {
 declare const global: typeof globalThis & MCPGlobal;
 
 export class GoogleWebSearchTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     super({
       name: 'googleWebSearch',
       description: 'Search the web using Google search capabilities.',
@@ -91,7 +91,7 @@ export class GoogleWebSearchTool extends BaseTool {
 }
 
 export class RefDocumentationTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     super({
       name: 'refDocumentationSearch',
       description: 'Search programming documentation and API references using Ref-Search.',
@@ -148,7 +148,7 @@ export class RefDocumentationTool extends BaseTool {
 }
 
 export class RefReadUrlTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     super({
       name: 'refReadUrl',
       description: 'Read the content of a URL returned from a Ref-Search result.',
@@ -214,7 +214,7 @@ export class RefReadUrlTool extends BaseTool {
 }
 
 export class ExaWebSearchTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     super({
       name: 'exaWebSearch',
       description: 'Perform advanced web search using Exa AI.',

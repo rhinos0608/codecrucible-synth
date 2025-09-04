@@ -7,7 +7,6 @@
  */
 
 import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
-import { IVoiceOrchestrationService } from '../../domain/services/voice-orchestration-service.js';
 import { ProcessingRequest } from '../../domain/entities/request.js';
 
 export interface CodebaseAnalysisInput {
@@ -65,8 +64,7 @@ export interface CodebaseMetrics {
  */
 export class AnalyzeCodebaseUseCase {
   constructor(
-    private modelSelectionService: IModelSelectionService,
-    private voiceOrchestrationService: IVoiceOrchestrationService
+    private modelSelectionService: IModelSelectionService
   ) {}
 
   async execute(input: CodebaseAnalysisInput): Promise<CodebaseAnalysisOutput> {
@@ -200,14 +198,6 @@ export class AnalyzeCodebaseUseCase {
       .map(r => `## ${r.voiceId.toUpperCase()} ANALYSIS:\n${r.content}`)
       .join('\n\n');
 
-    const synthesisRequest = ProcessingRequest.create(
-      this.buildSynthesisPrompt(synthesisContent),
-      'analysis-synthesis' as any,
-      'medium',
-      {},
-      { mustIncludeVoices: ['architect'] }
-    );
-
     // For now, return a combined analysis (in full implementation, would synthesize)
     return {
       voiceId: 'synthesis',
@@ -252,19 +242,6 @@ As the ${voiceId} voice, ${focus}.
 
 Codebase Information:
 ${JSON.stringify(codebaseInfo, null, 2)}`;
-  }
-
-  private buildSynthesisPrompt(analysisContent: string): string {
-    return `Synthesize the following multi-voice codebase analysis into a unified, comprehensive report:
-
-${analysisContent}
-
-Create a cohesive analysis that:
-1. Consolidates key findings
-2. Resolves any conflicting recommendations
-3. Prioritizes issues and opportunities
-4. Provides clear next steps
-5. Maintains insights from all perspectives`;
   }
 
   private getVoiceAnalysisType(voiceId: string): string {

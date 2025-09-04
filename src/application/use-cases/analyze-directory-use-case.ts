@@ -482,7 +482,6 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
 
   private estimateClasses(structure: DirectoryStructure): number {
     // Rough estimation based on file types and extensions
-    const sourceFiles = structure.filesByType.source || 0;
     const javaFiles = structure.filesByExtension['.java'] || 0;
     const tsFiles = structure.filesByExtension['.ts'] || 0;
     const jsFiles = structure.filesByExtension['.js'] || 0;
@@ -493,7 +492,6 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
   private estimateFunctions(structure: DirectoryStructure): number {
     // Rough estimation based on lines of code and file types
     const sourceLines = structure.totalLines;
-    const sourceFiles = structure.filesByType.source || 0;
 
     // Estimate ~1 function per 20 lines of source code
     return Math.round((sourceLines * 0.8) / 20);
@@ -519,8 +517,6 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
     text: string,
     structure: DirectoryStructure
   ): AnalysisResponse['analysis']['codeQuality'] | undefined {
-    const qualitySection = this.extractSection(text, 'Code Quality');
-
     // Calculate a basic quality score based on project metrics
     let score = 70; // Base score
 

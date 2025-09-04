@@ -137,11 +137,21 @@ export function resetConfig(): void {
  * Validate that required environment variables are set
  */
 export function validateRequiredConfig(): { valid: boolean; missing: string[] } {
-  const _config = getConfig();
+  const config = getConfig();
   const missing: string[] = [];
 
-  // Add validation for required fields based on your needs
-  // For now, we'll just check that critical endpoints are accessible
+  // Check for critical configuration fields
+  const requiredFields: (keyof EnvironmentConfig)[] = [
+    'ollamaEndpoint',
+    'lmStudioEndpoint',
+    'requestTimeout'
+  ];
+
+  for (const field of requiredFields) {
+    if (!config[field]) {
+      missing.push(field);
+    }
+  }
 
   return {
     valid: missing.length === 0,

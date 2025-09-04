@@ -43,7 +43,7 @@ export class SpiralPhaseExecutor {
   private councilCoordinator: SimpleCouncilCoordinator;
 
   constructor(
-    private voiceOrchestrationService: IVoiceOrchestrationService,
+    voiceOrchestrationService: IVoiceOrchestrationService,
     private modelSelectionService: IModelSelectionService
   ) {
     this.councilCoordinator = new SimpleCouncilCoordinator(
@@ -284,7 +284,6 @@ Be honest about quality and provide specific guidance for next steps.`;
    * This ensures the system continues to function gracefully with meaningful output
    */
   private async generateFallbackResponse(phase: SpiralPhase, prompt: string, originalContent: string): Promise<string> {
-    const timestamp = new Date().toISOString();
     
     switch (phase) {
       case 'collapse':

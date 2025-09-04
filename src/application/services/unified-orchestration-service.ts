@@ -14,7 +14,7 @@ import {
   UnifiedConfigurationManager,
   getUnifiedConfigurationManager,
 } from '../../domain/config/config-manager.js';
-import { UnifiedAgentSystem } from '../../domain/services/unified-agent-system.js';
+import { UnifiedAgentSystem, ProjectContext } from '../../domain/services/unified-agent-system.js';
 import { UnifiedServerSystem } from '../../domain/services/unified-server-system.js';
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { UnifiedPerformanceSystem } from '../../domain/services/unified-performance-system.js';
@@ -27,10 +27,23 @@ import { discoverPlugins } from '../../infrastructure/plugins/plugin-loader.js';
 import { CommandRegistry } from './command-registry.js';
 import { RuntimeContext } from '../runtime/runtime-context.js';
 
+// Interface for runtime context with optional Rust backend
+interface RuntimeContextWithBackend extends RuntimeContext {
+  rustBackend?: {
+    isAvailable(): boolean;
+    execute(request: unknown): Promise<unknown>;
+  };
+}
+
+// Interface for systems that can accept Rust backend injection
+interface BackendCapableSystem {
+  rustBackend?: unknown;
+}
+
 export interface OrchestrationRequest {
-  id: string;
-  type: 'analyze' | 'generate' | 'refactor' | 'test' | 'document' | 'debug' | 'optimize' | 'serve';
-  input: string | object;
+  readonly id: string;
+  readonly type: 'analyze' | 'generate' | 'refactor' | 'test' | 'document' | 'debug' | 'optimize' | 'serve';
+  readonly input: string | object;
   options?: {
     mode?: 'fast' | 'balanced' | 'thorough';
     priority?: 'low' | 'medium' | 'high' | 'critical';
@@ -49,7 +62,7 @@ export interface OrchestrationRequest {
 export interface OrchestrationResponse {
   id: string;
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: string;
   metadata: {
     processingTime: number;
@@ -68,13 +81,13 @@ export interface OrchestrationResponse {
  */
 export class UnifiedOrchestrationService extends EventEmitter {
   private config!: UnifiedConfiguration;
-  private eventBus: IEventBus;
-  private userInteraction: IUserInteraction;
-  private logger = createLogger('UnifiedOrchestrationService');
-  private runtimeContext?: RuntimeContext;
+  private readonly eventBus: IEventBus;
+  private readonly userInteraction: IUserInteraction;
+  private readonly logger = createLogger('UnifiedOrchestrationService');
+  private readonly runtimeContext?: RuntimeContext;
 
   // Domain services
-  private configManager: UnifiedConfigurationManager;
+  private readonly configManager: UnifiedConfigurationManager;
   private agentSystem!: UnifiedAgentSystem;
   private serverSystem!: UnifiedServerSystem;
   private securityValidator!: UnifiedSecurityValidator;
@@ -84,14 +97,14 @@ export class UnifiedOrchestrationService extends EventEmitter {
   private commandRegistry?: CommandRegistry;
 
   private initialized = false;
-  private activeRequests = new Map<string, OrchestrationRequest>();
-  private cleanupHandlers: Array<() => Promise<void> | void> = [];
+  private readonly activeRequests = new Map<string, OrchestrationRequest>();
+  private readonly cleanupHandlers: Array<() => Promise<void> | void> = [];
 
-  registerCleanup(handler: () => Promise<void> | void): void {
+  public registerCleanup(handler: () => Promise<void> | void): void {
     this.cleanupHandlers.push(handler);
   }
 
-  constructor(
+  public constructor(
     configManager: UnifiedConfigurationManager,
     eventBus: IEventBus,
     userInteraction: IUserInteraction,
@@ -112,7 +125,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
    * Get singleton instance
    * @deprecated Use createUnifiedOrchestrationServiceWithContext instead
    */
-  static async getInstance(options?: {
+  public static async getInstance(options?: {
     configManager?: UnifiedConfigurationManager;
     eventBus?: IEventBus;
     userInteraction?: IUserInteraction;
@@ -126,15 +139,15 @@ export class UnifiedOrchestrationService extends EventEmitter {
       '../../infrastructure/user-interaction/cli-user-interaction.js'
     );
 
-    const eventBus = options?.eventBus || new EventBus();
-    const userInteraction = options?.userInteraction || new CLIUserInteraction();
+    const eventBus = options?.eventBus ?? new EventBus();
+    const userInteraction = options?.userInteraction ?? new CLIUserInteraction();
 
     const service = new UnifiedOrchestrationService(configManager, eventBus, userInteraction);
     await service.initialize();
     return service;
   }
 
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     if (this.initialized) {
       return;
     }
@@ -152,7 +165,9 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
       this.securityValidator = new UnifiedSecurityValidator(securityLogger);
       this.performanceSystem = new UnifiedPerformanceSystem(performanceLogger, this.eventBus);
-      this.registerCleanup(() => this.performanceSystem.shutdown());
+      this.registerCleanup(async (): Promise<void> => {
+        await this.performanceSystem.shutdown();
+      });
 
       // Initialize agent system
       this.agentSystem = new UnifiedAgentSystem(
@@ -163,7 +178,23 @@ export class UnifiedOrchestrationService extends EventEmitter {
         this.performanceSystem
       );
       await this.agentSystem.initialize();
-      this.registerCleanup(() => this.agentSystem.shutdown());
+      this.registerCleanup((): void => {
+        void this.agentSystem.shutdown();
+      });
+
+      // Inject concrete runtime dependencies (from application layer) into domain instances
+      // Inject Rust backend if available via RuntimeContext
+      try {
+        const runtimeContext = this.runtimeContext as RuntimeContextWithBackend;
+        const rustBackend = runtimeContext?.rustBackend;
+        if (rustBackend) {
+          // Attach to domain systems so they can pick it up when constructing executors
+          (this.agentSystem as BackendCapableSystem).rustBackend = rustBackend;
+        }
+      } catch (e) {
+        // Non-fatal: if injection fails, domain systems will use TypeScript fallbacks
+        this.logger.warn('Failed to inject rustBackend into agentSystem', e);
+      }
 
       // Initialize server system
       const serverLogger = createLogger('UnifiedServerSystem');
@@ -175,7 +206,20 @@ export class UnifiedOrchestrationService extends EventEmitter {
         this.securityValidator,
         this.performanceSystem
       );
-      this.registerCleanup(() => this.serverSystem.stopAllServers());
+      this.registerCleanup(async (): Promise<void> => {
+        await this.serverSystem.stopAllServers();
+      });
+
+      // Also inject rust backend into server system if available
+      try {
+        const runtimeContext = this.runtimeContext as RuntimeContextWithBackend;
+        const rustBackend = runtimeContext?.rustBackend;
+        if (rustBackend) {
+          (this.serverSystem as BackendCapableSystem).rustBackend = rustBackend;
+        }
+      } catch (e) {
+        this.logger.warn('Failed to inject rustBackend into serverSystem', e);
+      }
 
       // Initialize CQRS: command bus and register agent operation handlers
       this.commandBus = new CommandBus();
@@ -193,23 +237,25 @@ export class UnifiedOrchestrationService extends EventEmitter {
       ];
       for (const op of agentOps) {
         this.commandBus.register(
-          new AgentOperationHandler(`agent:${op}`, req => this.processAgentRequest(req)) as any
+          new AgentOperationHandler(`agent:${op}`, async (req): Promise<unknown> => this.processAgentRequest(req)) as any
         );
       }
 
       // Initialize Plugin System
       this.pluginManager = new PluginManager({
         registerCommand: (name: string, handler: Function) => {
-          this.commandRegistry?.register(name, handler as any, { plugin: 'plugin' });
+          this.commandRegistry?.register(name, handler as (...args: any[]) => any, { plugin: 'plugin' });
           this.eventBus.emit('plugin:command_registered', { name });
         },
       });
 
+      // Use project root resolution to avoid deep relative paths
+      const projectRoot = new URL('../../..', import.meta.url).pathname;
       const pluginDirs = [
         // runtime compiled plugins
-        new URL('../../../dist/plugins', import.meta.url).pathname,
+        `${projectRoot}/dist/plugins`,
         // source plugins for dev mode
-        new URL('../../../src/plugins', import.meta.url).pathname,
+        `${projectRoot}/src/plugins`,
       ];
       const factories = await discoverPlugins(pluginDirs);
       await this.pluginManager.loadFromFactories(factories);
@@ -240,7 +286,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
       await this.validateRequest(request);
 
       // Route to appropriate service
-      let result: any;
+      let result: unknown;
       const componentsUsed: string[] = [];
 
       switch (request.type) {
@@ -307,10 +353,22 @@ export class UnifiedOrchestrationService extends EventEmitter {
     }
   }
 
-  private async processAgentRequest(request: OrchestrationRequest): Promise<any> {
+  private async processAgentRequest(request: OrchestrationRequest): Promise<unknown> {
+    // Map OrchestrationRequest types to AgentRequest types
+    const typeMapping: Record<OrchestrationRequest['type'], string> = {
+      'analyze': 'analyze',
+      'generate': 'generate', 
+      'refactor': 'refactor',
+      'test': 'test',
+      'document': 'document',
+      'debug': 'debug',
+      'optimize': 'optimize',
+      'serve': 'file-operation' // Map serve to file-operation since serve isn't supported by AgentRequest
+    };
+
     const agentRequest = {
       id: request.id,
-      type: request.type as any,
+      type: typeMapping[request.type] as 'analyze' | 'generate' | 'refactor' | 'test' | 'document' | 'debug' | 'optimize' | 'research' | 'git-operation' | 'file-operation' | 'collaborate',
       input: typeof request.input === 'string' ? request.input : JSON.stringify(request.input),
       priority: request.options?.priority || 'medium',
       constraints: {
@@ -359,8 +417,23 @@ export class UnifiedOrchestrationService extends EventEmitter {
     return response.result;
   }
 
-  private async processServerRequest(request: OrchestrationRequest): Promise<any> {
-    const serverOptions = request.input as any;
+  private async processServerRequest(request: OrchestrationRequest): Promise<{
+    message: string;
+    config: unknown;
+    status: unknown;
+  }> {
+    const serverOptions = request.input as {
+      port?: number;
+      host?: string;
+      cors?: boolean;
+      corsOrigins?: string[];
+      auth?: {
+        enabled?: boolean;
+        tokens?: string[];
+      };
+      maxConnections?: number;
+      timeout?: number;
+    };
 
     const serverConfig = {
       port: serverOptions.port || 3002,
@@ -437,7 +510,11 @@ export class UnifiedOrchestrationService extends EventEmitter {
     }
   }
 
-  private createProjectContext(context?: any): any {
+  private createProjectContext(context?: {
+    workingDirectory?: string;
+    language?: string[];
+    frameworks?: string[];
+  }): ProjectContext {
     // Create a minimal ProjectContext with defaults for missing properties
     return {
       rootPath: context?.workingDirectory || process.cwd(),
@@ -452,15 +529,16 @@ export class UnifiedOrchestrationService extends EventEmitter {
         configFiles: [],
       },
       documentation: {
-        files: new Map(),
-        apiDocs: new Map(),
-        readmeFiles: [],
-        changelogFiles: [],
+        readme: [],
+        guides: [],
+        api: [],
+        examples: [],
+        changelog: [],
       },
     };
   }
 
-  private async getResourceUsage(): Promise<{ memory: number; cpu: number }> {
+  private getResourceUsage(): { memory: number; cpu: number } {
     const memUsage = process.memoryUsage();
     return {
       memory: memUsage.heapUsed / 1024 / 1024, // MB
@@ -469,7 +547,9 @@ export class UnifiedOrchestrationService extends EventEmitter {
   }
 
   private setupEventHandlers(): void {
-    this.eventBus.on('system:shutdown', async () => this.shutdown());
+    this.eventBus.on('system:shutdown', (): void => {
+      void this.shutdown();
+    });
 
     // Forward important events
     this.eventBus.on('agent:request', data => this.emit('agent-request', data));
@@ -479,7 +559,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
   }
 
   // Service management methods
-  async startServer(port: number = 3002, options?: any): Promise<any> {
+  async startServer(port: number = 3002, options?: Record<string, unknown>): Promise<unknown> {
     const serverRequest: OrchestrationRequest = {
       id: `server-${Date.now()}`,
       type: 'serve',
@@ -496,7 +576,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
     }
   }
 
-  async processAnalysis(input: string, options?: any): Promise<any> {
+  async processAnalysis(input: string, options?: Record<string, unknown>): Promise<unknown> {
     const analysisRequest: OrchestrationRequest = {
       id: `analysis-${Date.now()}`,
       type: 'analyze',
@@ -508,7 +588,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
     return response.result;
   }
 
-  async processGeneration(input: string, options?: any): Promise<any> {
+  async processGeneration(input: string, options?: Record<string, unknown>): Promise<unknown> {
     const generationRequest: OrchestrationRequest = {
       id: `generation-${Date.now()}`,
       type: 'generate',
@@ -525,10 +605,10 @@ export class UnifiedOrchestrationService extends EventEmitter {
     initialized: boolean;
     activeRequests: number;
     components: {
-      agentSystem: any;
-      serverSystem: any;
+      agentSystem: unknown;
+      serverSystem: unknown;
       securityValidator: boolean;
-      performanceSystem: any;
+      performanceSystem: unknown;
     };
   } {
     return {
@@ -557,8 +637,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
       this.activeRequests.clear();
 
       // Cleanup handlers
-      const cleanupHandlers: (() => Promise<void>)[] = [];
-      for (const handler of cleanupHandlers) {
+      for (const handler of this.cleanupHandlers) {
         try {
           await handler();
         } catch (err) {
@@ -582,7 +661,20 @@ export class UnifiedOrchestrationService extends EventEmitter {
   /**
    * Get performance statistics for the orchestration service
    */
-  getPerformanceStats(): any {
+  getPerformanceStats(): {
+    orchestrationMetrics: {
+      activeRequests: number;
+      totalProcessed: number;
+      averageResponseTime: number;
+      successRate: number;
+    };
+    systemStatus: {
+      initialized: boolean;
+      uptime: number;
+      memoryUsage: NodeJS.MemoryUsage;
+      timestamp: number;
+    };
+  } & Record<string, unknown> {
     this.logger.debug('Getting performance stats');
 
     const performanceStats = this.performanceSystem
@@ -609,7 +701,14 @@ export class UnifiedOrchestrationService extends EventEmitter {
   /**
    * Synthesize integrated result from multiple components
    */
-  async synthesizeIntegratedResult(results: any[], options: any = {}): Promise<any> {
+  synthesizeIntegratedResult(results: unknown[], options: Record<string, unknown> = {}): {
+    success: boolean;
+    content?: string;
+    confidence?: number;
+    error?: string;
+    synthesis?: unknown;
+    timestamp: number;
+  } & Record<string, unknown> {
     this.logger.info('Synthesizing integrated result from components');
 
     if (!results || results.length === 0) {
@@ -617,13 +716,14 @@ export class UnifiedOrchestrationService extends EventEmitter {
         success: false,
         error: 'No results to synthesize',
         synthesis: null,
+        timestamp: Date.now(),
       };
     }
 
     try {
       // Aggregate successful results
-      const successfulResults = results.filter(r => r && r.success !== false);
-      const failedResults = results.filter(r => !r || r.success === false);
+      const successfulResults = results.filter(r => r && (r as any)?.success !== false);
+      const failedResults = results.filter(r => !r || (r as any)?.success === false);
 
       // Calculate confidence based on success rate
       const confidence = successfulResults.length / results.length;
@@ -669,7 +769,15 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
   // === Helper Methods for Interface Implementation ===
 
-  private getBasicPerformanceStats(): any {
+  private getBasicPerformanceStats(): {
+    enabled: boolean;
+    message: string;
+    basicStats: {
+      memoryUsage: NodeJS.MemoryUsage;
+      uptime: number;
+      timestamp: number;
+    };
+  } {
     return {
       enabled: false,
       message: 'Performance system not available',
@@ -700,10 +808,10 @@ export class UnifiedOrchestrationService extends EventEmitter {
     return process.uptime() * 1000; // Convert to milliseconds
   }
 
-  private combineResults(results: any[], options: any): string {
+  private combineResults(results: unknown[], options: Record<string, unknown>): string {
     // Simple combination strategy - in a real implementation this would be more sophisticated
     const contents = results
-      .map(r => r.content || r.result || r.response || JSON.stringify(r))
+      .map(r => (r as any)?.content || (r as any)?.result || (r as any)?.response || JSON.stringify(r))
       .filter(c => c && typeof c === 'string');
 
     if (options.synthesisStrategy === 'concatenate') {
@@ -714,16 +822,25 @@ export class UnifiedOrchestrationService extends EventEmitter {
     return `Integrated analysis based on ${results.length} components:\n\n${contents.join('\n\n')}`;
   }
 
-  private extractMetadata(results: any[]): any {
+  private extractMetadata(results: unknown[]): {
+    componentsUsed: string[];
+    totalProcessingTime: number;
+  } {
     const componentsUsed: string[] = [];
     let totalProcessingTime = 0;
 
-    results.forEach(result => {
-      if (result.metadata?.componentsUsed) {
-        componentsUsed.push(...result.metadata.componentsUsed);
+    results.forEach((result: unknown) => {
+      const r = result as {
+        metadata?: {
+          componentsUsed?: string[];
+          processingTime?: number;
+        };
+      };
+      if (r.metadata?.componentsUsed) {
+        componentsUsed.push(...r.metadata.componentsUsed);
       }
-      if (result.metadata?.processingTime) {
-        totalProcessingTime += result.metadata.processingTime;
+      if (r.metadata?.processingTime) {
+        totalProcessingTime += r.metadata.processingTime;
       }
     });
 
@@ -733,23 +850,35 @@ export class UnifiedOrchestrationService extends EventEmitter {
     };
   }
 
-  private calculateCompleteness(results: any[]): number {
+  private calculateCompleteness(results: unknown[]): number {
     // Simple heuristic - percentage of results that have substantial content
     const substantialResults = results.filter(
-      r =>
-        (r.content && r.content.length > 100) || (r.result && JSON.stringify(r.result).length > 100)
+      (r: unknown) => {
+        const result = r as {
+          content?: string;
+          result?: unknown;
+        };
+        return (result.content && result.content.length > 100) || 
+               (result.result && JSON.stringify(result.result).length > 100);
+      }
     );
     return results.length > 0 ? substantialResults.length / results.length : 0;
   }
 
-  private calculateConsistency(results: any[]): number {
+  private calculateConsistency(_results: unknown[]): number {
     return 0.8;
   }
 
-  private calculateAverageConfidence(results: any[]): number {
+  private calculateAverageConfidence(results: unknown[]): number {
     const confidenceValues = results
-      .map((r: any) => r.confidence || r.score || 0.5)
-      .filter((c: any) => typeof c === 'number');
+      .map((r: unknown) => {
+        const result = r as {
+          confidence?: number;
+          score?: number;
+        };
+        return result.confidence || result.score || 0.5;
+      })
+      .filter((c: unknown): c is number => typeof c === 'number');
     return confidenceValues.length > 0
       ? confidenceValues.reduce((sum: number, c: number) => sum + c, 0) / confidenceValues.length
       : 0.5;
@@ -758,18 +887,28 @@ export class UnifiedOrchestrationService extends EventEmitter {
   listPluginCommands() {
     if (!this.commandRegistry) return [];
     try {
-      return this.commandRegistry.list().map((c: any) => ({
-        name: c.name,
-        description: c.meta?.description,
-        plugin: c.meta?.plugin,
-        version: c.meta?.version,
-      }));
+      return this.commandRegistry.list().map((c: unknown) => {
+        const command = c as {
+          name: string;
+          meta?: {
+            description?: string;
+            plugin?: string;
+            version?: string;
+          };
+        };
+        return {
+          name: command.name,
+          description: command.meta?.description,
+          plugin: command.meta?.plugin,
+          version: command.meta?.version,
+        };
+      });
     } catch {
       return [];
     }
   }
 
-  async executePluginCommand(name: string, ...args: any[]): Promise<any> {
+  async executePluginCommand(name: string, ...args: unknown[]): Promise<unknown> {
     if (!this.commandRegistry) throw new Error('Command registry not initialized');
     return this.commandRegistry.execute(name, ...args);
   }

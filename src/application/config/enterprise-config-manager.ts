@@ -75,6 +75,8 @@ export class EnterpriseConfigManager {
 
   private async loadConfig(): Promise<void> {
     try {
+      // TODO: Implement actual config loading from this.configPath
+      logger.debug(`Loading enterprise config from: ${this.configPath}`);
       // Simulate an asynchronous operation, e.g., reading a file
       await new Promise((resolve) => setTimeout(resolve, 100)); // Simulated delay
       logger.info('Enterprise configuration loaded successfully');

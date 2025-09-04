@@ -39,7 +39,7 @@ export class VoiceSystemIntegration2025 {
     };
 
     // Initialize with the actual voice archetype system
-    const voiceConfig = {
+    const _voiceConfig = {
       voices: {
         default: ['architect', 'developer', 'analyzer'],
         available: this.getAvailableVoices(),

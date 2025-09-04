@@ -16,8 +16,8 @@ export interface ToolDefinition {
   description: string;
   category: 'filesystem' | 'git' | 'terminal' | 'network' | 'package' | 'external' | 'system';
   aliases: string[];
-  inputSchema: any;
-  handler: (args: any, context?: ToolExecutionContext) => Promise<any>;
+  inputSchema: Record<string, unknown>;
+  handler: (args: Readonly<Record<string, unknown>>, context?: ToolExecutionContext) => Promise<unknown>;
   security: {
     requiresApproval: boolean;
     riskLevel: 'low' | 'medium' | 'high' | 'critical';
@@ -41,7 +41,7 @@ export interface ToolExecutionContext {
 
 export interface ToolExecutionResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
   metadata: {
     executionTime: number;
@@ -60,8 +60,18 @@ export class UnifiedToolRegistry {
   private aliases: Map<string, string> = new Map(); // alias -> canonical ID
   private categories: Map<string, Set<string>> = new Map();
   private metrics: Map<string, ToolMetrics> = new Map();
+  // Optional runtime-provided execution backend (injected by application layer)
+  private rustBackend?: unknown;
 
-  constructor() {
+  /**
+   * Allow application layer to attach a concrete execution backend (e.g. Rust).
+   * This keeps domain code decoupled while enabling infra handlers to access the backend via context.
+   */
+  public setRustBackend(backend: unknown): void {
+    this.rustBackend = backend;
+  }
+
+  public constructor() {
     this.initializeCategories();
   }
 
@@ -73,7 +83,7 @@ export class UnifiedToolRegistry {
   /**
    * Register a tool with intelligent alias generation
    */
-  registerTool(tool: ToolDefinition): void {
+  public registerTool(tool: Readonly<ToolDefinition>): void {
     // Store primary tool
     this.tools.set(tool.id, tool);
     this.categories.get(tool.category)?.add(tool.id);
@@ -128,12 +138,15 @@ export class UnifiedToolRegistry {
   /**
    * Resolve tool name to canonical ID with intelligent fallback
    */
-  resolveToolId(toolName: string): string | null {
+  public resolveToolId(toolName: string): string | null {
     // Direct lookup
     if (this.tools.has(toolName)) return toolName;
     
     // Alias lookup
-    if (this.aliases.has(toolName)) return this.aliases.get(toolName)!;
+    if (this.aliases.has(toolName)) {
+      const aliasId = this.aliases.get(toolName);
+      return aliasId !== undefined ? aliasId : null;
+    }
     
     // Fuzzy matching for common typos
     return this.fuzzyResolve(toolName);
@@ -173,7 +186,7 @@ export class UnifiedToolRegistry {
   }
 
   private levenshteinDistance(str1: string, str2: string): number {
-    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    const matrix: number[][] = Array.from({ length: str2.length + 1 }, () => Array(str1.length + 1).fill(0) as number[]);
     
     for (let i = 0; i <= str1.length; i += 1) {
       matrix[0][i] = i;
@@ -200,10 +213,10 @@ export class UnifiedToolRegistry {
   /**
    * Execute tool with unified error handling and metrics
    */
-  async executeTool(
+  public async executeTool(
     toolName: string, 
-    args: any, 
-    context: ToolExecutionContext = {}
+    args: Readonly<Record<string, unknown>>, 
+    context: Readonly<ToolExecutionContext> = {}
   ): Promise<ToolExecutionResult> {
     const startTime = Date.now();
     const toolId = this.resolveToolId(toolName);
@@ -222,8 +235,21 @@ export class UnifiedToolRegistry {
       };
     }
 
-    const tool = this.tools.get(toolId)!;
-    const metrics = this.metrics.get(toolId)!;
+    const tool = this.tools.get(toolId);
+    const metrics = this.metrics.get(toolId);
+
+    if (!tool || !metrics) {
+      logger.error(`Tool or metrics not found for toolId: ${toolId}`);
+      return {
+        success: false,
+        error: `Tool or metrics not found for toolId: ${toolId}`,
+        metadata: {
+          executionTime: Date.now() - startTime,
+          toolId,
+          timestamp: new Date()
+        }
+      };
+    }
 
     try {
       // Pre-execution hooks
@@ -231,8 +257,11 @@ export class UnifiedToolRegistry {
       
       // Execute with timeout
       const timeoutMs = context.timeoutMs || this.getDefaultTimeout(tool);
-      const result = await Promise.race([
-        tool.handler(args, context),
+      // If application attached a rust backend, expose it to the handler via context
+  const contextWithBackend = { ...context, rustBackend: this.rustBackend };
+
+      const result: unknown = await Promise.race([
+        tool.handler(args, contextWithBackend),
         this.createTimeoutPromise(timeoutMs, toolId)
       ]);
 
@@ -290,9 +319,12 @@ export class UnifiedToolRegistry {
     }
   }
 
-  private validateArguments(args: any, schema: any): void {
+  private validateArguments(
+    args: Record<string, unknown>,
+    schema: { required?: string[] }
+  ): void {
     // Basic validation - could integrate with AJV or similar
-    if (schema.required) {
+    if (Array.isArray(schema.required)) {
       for (const requiredField of schema.required) {
         if (!(requiredField in args)) {
           throw new Error(`Missing required argument: ${requiredField}`);
@@ -301,11 +333,11 @@ export class UnifiedToolRegistry {
     }
   }
 
-  private async requestApproval(
-    tool: ToolDefinition, 
-    args: any, 
-    context: ToolExecutionContext
-  ): Promise<void> {
+  private requestApproval(
+    tool: Readonly<ToolDefinition>, 
+    args: Readonly<Record<string, unknown>>, 
+    context: Readonly<ToolExecutionContext>
+  ): void {
     // Integration point with existing approval system
     // For now, allow all but log for audit
     logger.info(`Approval requested for ${tool.id}`, { args, context, riskLevel: tool.security.riskLevel });
@@ -329,7 +361,7 @@ export class UnifiedToolRegistry {
     });
   }
 
-  private async postProcessResult(result: any, tool: ToolDefinition, context: ToolExecutionContext): Promise<any> {
+  private async postProcessResult(result: unknown, tool: ToolDefinition, context: ToolExecutionContext): Promise<unknown> {
     // Apply output truncation if needed
     if (typeof result === 'string' && result.length > 100000) {
       const truncated = outputConfig.truncateForContext(result, tool.category);

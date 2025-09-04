@@ -26,7 +26,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
   private council: CouncilOrchestrator;
 
   public constructor(
-    private readonly modelClient?: unknown,
+    private readonly _modelClient?: unknown,
     logger?: ILogger
   ) {
     this.logger = logger ?? createLogger('VoiceSystem');

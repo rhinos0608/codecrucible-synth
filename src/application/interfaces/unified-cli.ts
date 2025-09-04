@@ -56,7 +56,6 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   private readonly userInteraction: IUserInteraction;
   private readonly eventBus: IEventBus;
   private readonly logger: ILogger;
-  private readonly orchestrator?: IWorkflowOrchestrator;
 
   private readonly context: CLIContext;
   private currentSession: CLISession | null = null;
@@ -111,7 +110,6 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
    */
   public async initialize(orchestrator: Readonly<IWorkflowOrchestrator>): Promise<UnifiedCLI> {
     try {
-      (this as any).orchestrator = orchestrator;
 
       // Initialize the coordinator
       await this.coordinator.initialize({

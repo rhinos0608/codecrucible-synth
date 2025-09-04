@@ -54,7 +54,7 @@ export type { CLIOptions, CLIContext } from './application/interfaces/unified-cl
 const program = new Command();
 
 // Get package version
-async function getPackageVersion(): Promise<string> {
+async function _getPackageVersion(): Promise<string> {
   try {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
@@ -229,8 +229,6 @@ export async function initialize(
       selectedModelInfo = await quickSelectModel();
     }
 
-    // Import adapter classes
-    const { OllamaAdapter, LMStudioAdapter } = await import('./application/services/provider-adapters.js');
     
     // Create model client configuration based on selected model
     const endpoint = selectedModelInfo.provider === 'ollama'

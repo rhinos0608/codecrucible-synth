@@ -7,7 +7,7 @@
 
 import { performance } from 'perf_hooks';
 import { writeFileSync, existsSync, mkdirSync } from 'fs';
-import { dirname, extname, join } from 'path';
+import { dirname } from 'path';
 import {
   IGenerateCodeUseCase,
   GenerationRequest,
@@ -311,48 +311,6 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
     );
 
     return files;
-  }
-
-  private inferFileExtension(content: string, request: GenerationRequest): string {
-    // Check context language first
-    if (request.context?.language) {
-      const langMap: Record<string, string> = {
-        typescript: '.ts',
-        javascript: '.js',
-        python: '.py',
-        java: '.java',
-        cpp: '.cpp',
-        c: '.c',
-        csharp: '.cs',
-        go: '.go',
-        rust: '.rs',
-        ruby: '.rb',
-        php: '.php',
-      };
-
-      const ext = langMap[request.context.language.toLowerCase()];
-      if (ext) return ext;
-    }
-
-    // Analyze content for language hints
-    if (
-      content.includes('interface ') ||
-      content.includes('type ') ||
-      content.includes('import ')
-    ) {
-      return '.ts';
-    }
-    if (content.includes('function ') || content.includes('const ') || content.includes('let ')) {
-      return '.js';
-    }
-    if (content.includes('def ') || content.includes('import ')) {
-      return '.py';
-    }
-    if (content.includes('public class ') || content.includes('package ')) {
-      return '.java';
-    }
-
-    return '.txt';
   }
 
   private determineFileType(

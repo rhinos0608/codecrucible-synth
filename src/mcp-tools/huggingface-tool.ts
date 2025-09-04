@@ -462,7 +462,7 @@ export class HuggingFaceTool {
     return models.filter(model => {
       // Size constraint
       if (constraints.maxSize) {
-        const hasSize = model.tags.some(tag => tag.includes('size') || tag.includes('param'));
+        const _hasSize = model.tags.some(tag => tag.includes('size') || tag.includes('param'));
         // This is a simplified check - in practice, you'd parse size information
       }
 

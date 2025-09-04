@@ -194,7 +194,7 @@ export class SmitheryRegistryIntegration {
   private registry: SmitheryRegistry;
 
   /** Configuration for API authentication and retry behavior */
-  private config: SmitheryConfig;
+  private _config: SmitheryConfig;
 
   /**
    * Intelligent cache for server metadata to reduce API calls
@@ -238,7 +238,7 @@ export class SmitheryRegistryIntegration {
    * ```
    */
   constructor(config: SmitheryConfig) {
-    this.config = config;
+    this._config = config;
 
     // Initialize Smithery registry with bearer authentication
     this.registry = new SmitheryRegistry({

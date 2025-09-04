@@ -282,7 +282,6 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
     this.status = 'collaborating';
     this.emit('collaboration-started', { agents, task });
 
-    const startTime = Date.now();
     const contributions = new Map<string, ExecutionResult>();
 
     try {
@@ -659,8 +658,6 @@ export class ExplorerAgent extends BaseAgent {
   async process(request: AgentRequest): Promise<AgentResponse> {
     await this.validateRequest(request);
     this.status = 'processing';
-
-    const startTime = Date.now();
 
     try {
       // Route to appropriate capability

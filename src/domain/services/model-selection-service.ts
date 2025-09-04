@@ -62,7 +62,6 @@ export class ModelSelectionService implements IModelSelectionService {
 
     const requiredCapabilities = request.requiresCapabilities();
     const complexity = request.calculateComplexity();
-    const estimatedTime = request.estimateProcessingTime();
 
     // Filter models by hard constraints
     let candidateModels = this.filterModelsByConstraints(availableModels, request, preferences);
@@ -115,7 +114,6 @@ export class ModelSelectionService implements IModelSelectionService {
     preferences?: HybridSelectionPreferences
   ): Promise<HybridModelSelection> {
     const availableModels = await this.modelRepository.findAvailableModels();
-    const requiredCapabilities = request.requiresCapabilities();
 
     // Separate models by performance characteristics
     const fastModels = availableModels.filter(

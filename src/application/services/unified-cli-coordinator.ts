@@ -19,7 +19,6 @@ import { randomUUID } from 'crypto';
 import {
   IWorkflowOrchestrator,
   WorkflowRequest,
-  WorkflowResponse,
   WorkflowContext,
 } from '../../domain/interfaces/workflow-orchestrator.js';
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
@@ -32,23 +31,15 @@ import {
   projectConfigurationLoader,
   CombinedProjectConfig,
 } from '../config/project-config-loader.js';
-import { contextWindowManager, CodebaseAnalysisResult } from '../context/context-window-manager.js';
+import { CodebaseAnalysisResult } from '../context/context-window-manager.js';
 import { naturalLanguageInterface, ParsedCommand } from '../cli/natural-language-interface.js';
-import { agenticWorkflowDisplay, WorkflowPhase } from '../workflow/agentic-workflow-display.js';
+import { agenticWorkflowDisplay } from '../workflow/agentic-workflow-display.js';
 import { streamingWorkflowIntegration } from '../workflow/streaming-workflow-integration.js';
 import {
   EnterpriseSecurityFramework,
-  SecurityContext,
-  SecurityValidationResult,
 } from '../../infrastructure/security/enterprise-security-framework.js';
 import {
-  AdaptivePerformanceTuner,
-  PerformanceMetrics,
-  TuningConfiguration,
-} from '../../infrastructure/performance/adaptive-performance-tuner.js';
-import {
   ObservabilitySystem,
-  MetricPoint,
   TraceSpan,
 } from '../../infrastructure/observability/observability-system.js';
 
@@ -102,7 +93,6 @@ interface SmartSuggestion {
 import {
   ResilientCLIWrapper,
   ResilientOptions,
-  OperationResult,
 } from '../../infrastructure/resilience/resilient-cli-wrapper.js';
 
 // Session and Performance Types
@@ -174,7 +164,6 @@ export class UnifiedCLICoordinator extends EventEmitter {
   private securityFramework: EnterpriseSecurityFramework;
 
   // Performance & Observability Systems
-  private performanceTuner: AdaptivePerformanceTuner;
   private observabilitySystem: ObservabilitySystem;
 
   // Specialized CLI Components (legacy components disabled)
@@ -189,7 +178,6 @@ export class UnifiedCLICoordinator extends EventEmitter {
 
   // Performance Tracking
   private operationCount = 0;
-  private startTime = Date.now(); // For calculating request rates
   private globalMetrics: CLISessionMetrics = {
     commandsExecuted: 0,
     contextEnhancements: 0,
@@ -204,7 +192,6 @@ export class UnifiedCLICoordinator extends EventEmitter {
     this.securityFramework = new EnterpriseSecurityFramework();
 
     // Initialize Performance & Observability Systems
-    this.performanceTuner = new AdaptivePerformanceTuner();
     this.observabilitySystem = new ObservabilitySystem({
       metrics: { enabled: true, retentionDays: 7, exportInterval: 60000, exporters: [] },
       tracing: { enabled: true, samplingRate: 1.0, maxSpansPerTrace: 100, exporters: [] },
@@ -888,35 +875,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
     );
   }
 
-  /**
-   * Calculate current request rate
-   */
-  private calculateRequestRate(): number {
-    const now = Date.now();
-    const windowMs = 60000; // 1 minute window
 
-    // Simple request rate calculation (operations per minute)
-    return this.operationCount / ((now - this.startTime) / windowMs) || 0;
-  }
-
-  /**
-   * Create security context for operation validation
-   */
-  private createSecurityContext(request: CLIOperationRequest): SecurityContext {
-    return {
-      sessionId: request.session?.id || 'anonymous',
-      permissions: ['read', 'write', 'analyze'], // Basic permissions
-      isolation: {
-        level: 'medium',
-        allowedResources: ['filesystem', 'memory'],
-        maxExecutionTime: 60000, // 1 minute
-      },
-      audit: {
-        trackActions: true,
-        logLevel: 'basic',
-      },
-    };
-  }
 
   /**
    * Determine if an operation should use streaming display

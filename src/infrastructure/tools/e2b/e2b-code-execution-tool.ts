@@ -6,7 +6,7 @@
 import { RustExecutionBackend } from '../../execution/rust-executor/rust-execution-backend.js';
 import { SecurityValidator } from './security-validator.js';
 import { createLogger } from '../../logging/logger-adapter.js';
-import { TerminalMCPServer } from '../../../mcp-servers/terminal-server.js';
+import { TerminalMCPServer } from '@/mcp-servers/terminal-server.js';
 
 export interface CodeExecutionRequest {
   code: string;
@@ -61,19 +61,14 @@ export class E2BCodeExecutionTool {
     'php',
   ];
 
-  private rustBackend: RustExecutionBackend;
+  private rustBackend: RustExecutionBackend | null;
   private securityValidator: SecurityValidator;
   private terminalServer: TerminalMCPServer;
   private environments: Map<string, ExecutionEnvironment> = new Map();
   private environmentCounter = 0;
 
-  constructor(workingDirectory: string = process.cwd()) {
-    this.rustBackend = new RustExecutionBackend({
-      enableProfiling: true,
-      maxConcurrency: 4,
-      timeoutMs: 60000,
-      logLevel: 'info',
-    });
+  constructor(workingDirectory: string = process.cwd(), rustBackend?: RustExecutionBackend | null) {
+    this.rustBackend = rustBackend ?? null;
 
     this.securityValidator = new SecurityValidator();
 
@@ -84,6 +79,10 @@ export class E2BCodeExecutionTool {
     });
 
     logger.info('E2BCodeExecutionTool initialized with production backend');
+  }
+
+  setRustBackend(backend: RustExecutionBackend): void {
+    this.rustBackend = backend;
   }
 
   async initialize(): Promise<void> {
@@ -137,7 +136,13 @@ export class E2BCodeExecutionTool {
       let result: CodeExecutionResult;
 
       if (this.canUseRustBackend(language)) {
-        result = await this.executeViaRustBackend(request, environment);
+        // Guard in case rustBackend was not injected or failed to initialize
+        if (!this.rustBackend) {
+          logger.warn('Rust backend not available for E2B execution, falling back to terminal');
+          result = await this.executeViaTerminalServer(request, environment);
+        } else {
+          result = await this.executeViaRustBackend(request, environment);
+        }
       } else {
         result = await this.executeViaTerminalServer(request, environment);
       }

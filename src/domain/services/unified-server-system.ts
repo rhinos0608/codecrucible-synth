@@ -153,9 +153,9 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
   private connections: Set<string> = new Set();
 
   constructor(
-    private eventBus: IEventBus,
-    private securityValidator: UnifiedSecurityValidator,
-    private performanceSystem: UnifiedPerformanceSystem,
+    private _eventBus: IEventBus,
+    private _securityValidator: UnifiedSecurityValidator,
+    private _performanceSystem: UnifiedPerformanceSystem,
     private logger: ILogger
   ) {
     super();
@@ -260,7 +260,7 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
 
     try {
       // Validate request
-      await this.securityValidator.validateInput(JSON.stringify(request), {
+      await this._securityValidator.validateInput(JSON.stringify(request), {
         userId: 'system',
         sessionId: `server-${Date.now()}`,
         requestId: request.id,
@@ -394,7 +394,7 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
         const { input, type } = req.body;
 
         // Validate input
-        await this.securityValidator.validateInput(input, {
+        await this._securityValidator.validateInput(input, {
           userId: req.user?.id || 'anonymous',
           sessionId: req.session?.id || `session-${Date.now()}`,
           requestId: (req.headers['x-request-id'] as string) || Date.now().toString(),
@@ -405,7 +405,7 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
         } as SecurityValidationContext);
 
         // Process via event bus
-        this.eventBus.emit('api:analyze', { input, type, requestId: req.headers['x-request-id'] });
+        this._eventBus.emit('api:analyze', { input, type, requestId: req.headers['x-request-id'] });
 
         res.json({
           message: 'Analysis request received',
@@ -424,7 +424,7 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
         const { prompt, options } = req.body;
 
         // Validate input
-        await this.securityValidator.validateInput(prompt, {
+        await this._securityValidator.validateInput(prompt, {
           userId: req.user?.id || 'anonymous',
           sessionId: req.session?.id || `session-${Date.now()}`,
           requestId: (req.headers['x-request-id'] as string) || Date.now().toString(),
@@ -435,7 +435,7 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
         } as SecurityValidationContext);
 
         // Process via event bus
-        this.eventBus.emit('api:generate', {
+        this._eventBus.emit('api:generate', {
           prompt,
           options,
           requestId: req.headers['x-request-id'],
@@ -479,9 +479,9 @@ export class WebSocketServerStrategy extends EventEmitter implements IServerStra
   private errorCount = 0;
 
   constructor(
-    private eventBus: IEventBus,
-    private securityValidator: UnifiedSecurityValidator,
-    private performanceSystem: UnifiedPerformanceSystem,
+    private _eventBus: IEventBus,
+    private _securityValidator: UnifiedSecurityValidator,
+    private _performanceSystem: UnifiedPerformanceSystem,
     private logger: ILogger
   ) {
     super();
@@ -687,7 +687,7 @@ export class WebSocketServerStrategy extends EventEmitter implements IServerStra
       }
 
       // Validate input
-      await this.securityValidator.validateInput(JSON.stringify(data), {
+      await this._securityValidator.validateInput(JSON.stringify(data), {
         sessionId: connection.id,
         requestId: `socket-${type}-${Date.now()}`,
         userAgent: 'WebSocket-Client',
@@ -705,7 +705,7 @@ export class WebSocketServerStrategy extends EventEmitter implements IServerStra
       this.messageCount++;
 
       // Process via event bus
-      this.eventBus.emit(`socket:${type}`, {
+      this._eventBus.emit(`socket:${type}`, {
         ...data,
         connectionId: connection.id,
         userId: connection.userId,
@@ -765,9 +765,9 @@ export class MCPServerStrategy extends EventEmitter implements IServerStrategy {
   private mcpServers: Map<string, MCPServerInfo> = new Map();
 
   constructor(
-    private eventBus: IEventBus,
-    private securityValidator: UnifiedSecurityValidator,
-    private performanceSystem: UnifiedPerformanceSystem,
+    private _eventBus: IEventBus,
+    private _securityValidator: UnifiedSecurityValidator,
+    private _performanceSystem: UnifiedPerformanceSystem,
     private logger: ILogger
   ) {
     super();
@@ -839,9 +839,9 @@ export class MCPServerStrategy extends EventEmitter implements IServerStrategy {
 export class UnifiedServerSystem extends EventEmitter {
   private strategies: Map<ServerType, IServerStrategy> = new Map();
   private activeServers: Set<ServerType> = new Set();
-  private config: UnifiedConfiguration;
-  private eventBus: IEventBus;
-  private performanceSystem: UnifiedPerformanceSystem;
+  private _config: UnifiedConfiguration;
+  private _eventBus: IEventBus;
+  private _performanceSystem: UnifiedPerformanceSystem;
 
   constructor(
     private logger: ILogger,
@@ -852,10 +852,10 @@ export class UnifiedServerSystem extends EventEmitter {
     performanceSystem: UnifiedPerformanceSystem
   ) {
     super();
-    this.config = config;
+    this._config = config;
     this.logger.info('UnifiedServerSystem initialized');
-    this.eventBus = eventBus;
-    this.performanceSystem = performanceSystem;
+    this._eventBus = eventBus;
+    this._performanceSystem = performanceSystem;
 
     // Initialize strategies
     this.strategies.set(
@@ -894,7 +894,7 @@ export class UnifiedServerSystem extends EventEmitter {
     this.activeServers.add(type);
 
     this.emit('server-started', { type, config });
-    this.performanceSystem.trackResourceUsage('server-start', 1);
+    this._performanceSystem.trackResourceUsage('server-start', 1);
   }
 
   async stopServer(type: ServerType): Promise<void> {
@@ -984,15 +984,15 @@ export class UnifiedServerSystem extends EventEmitter {
     }
 
     // System shutdown handler
-    this.eventBus.on('system:shutdown', async () => this.stopAllServers());
+    this._eventBus.on('system:shutdown', async () => this.stopAllServers());
 
     // Handle API requests via event bus
-    this.eventBus.on('api:analyze', async data => {
+    this._eventBus.on('api:analyze', async data => {
       // Process analysis request
       this.emit('analysis-request', data);
     });
 
-    this.eventBus.on('api:generate', async data => {
+    this._eventBus.on('api:generate', async data => {
       // Process generation request
       this.emit('generation-request', data);
     });

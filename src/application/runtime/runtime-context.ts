@@ -36,6 +36,8 @@ export interface RuntimeContext {
   resourceCoordinator: UnifiedResourceCoordinator; // existing singleton wrapped for now
   securityValidator?: UnifiedSecurityValidator;
   configManager?: UnifiedConfigurationManager;
+  // Optional concrete infrastructure runtime helpers (set by application layer)
+  rustBackend?: any;
 }
 
 export interface CreateRuntimeContextOptions {

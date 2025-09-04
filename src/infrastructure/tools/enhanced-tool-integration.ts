@@ -46,7 +46,7 @@ export class EnhancedToolIntegration extends EventEmitter {
   private activeExecutions: Set<string> = new Set();
   private cacheCleanupInterval?: NodeJS.Timeout;
 
-  constructor(config?: Partial<EnhancedToolConfig>) {
+  constructor(config?: Partial<EnhancedToolConfig>, rustBackend?: any) {
     super();
 
     this.config = {
@@ -90,8 +90,8 @@ export class EnhancedToolIntegration extends EventEmitter {
         autoDiscovery: true,
       },
     };
-    const mcpManager = new MCPServerManager(mcpConfig);
-    this.baseToolIntegration = new ToolIntegration(mcpManager);
+  const mcpManager = new MCPServerManager(mcpConfig);
+  this.baseToolIntegration = new ToolIntegration(mcpManager, rustBackend);
     this.orchestrator = new DomainAwareToolOrchestrator();
 
     this.setupCacheCleanup();

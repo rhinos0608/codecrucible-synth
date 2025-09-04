@@ -28,11 +28,17 @@ module.exports = {
     "node_modules/(?!(ora|chalk|inquirer|commander)/)"
   ],
   moduleNameMapper: {
-    '^(\\.{1,2}/.*)(\\.js)$': '$1',
+    // Map .js extensions to actual TypeScript files for ESM compatibility
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+    // Handle src-relative imports
+    '^@/(.*)$': '<rootDir>/src/$1',
+    // Mock external dependencies that need special handling
     '^chalk$': '<rootDir>/tests/__mocks__/chalk.js',
     '^ora$': '<rootDir>/tests/__mocks__/ora.js',
     '^inquirer$': '<rootDir>/tests/__mocks__/inquirer.js'
   },
+  // Add resolver to help with .js import resolution
+  resolver: '<rootDir>/jest.resolver.cjs',
   testPathIgnorePatterns: [
     "<rootDir>/archive/",
     "<rootDir>/tests/__mocks__/",

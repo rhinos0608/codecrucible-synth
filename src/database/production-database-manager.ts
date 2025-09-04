@@ -3,7 +3,7 @@
  * Replaces the SQLite-based DatabaseManager with enterprise-grade database support
  */
 
-import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { Pool, QueryResult, QueryResultRow } from 'pg';
 import knex, { Knex } from 'knex';
 import Redis from 'redis';
 import { mkdir, writeFile } from 'fs/promises';
@@ -478,7 +478,6 @@ export class ProductionDatabaseManager {
       const placeholders = batch
         .map((_, i) => {
           const start = i * columns.length + 1;
-          const end = start + columns.length - 1;
           return `(${Array.from({ length: columns.length }, (_, j) => `$${start + j}`).join(', ')})`;
         })
         .join(', ');

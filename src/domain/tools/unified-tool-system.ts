@@ -9,17 +9,17 @@
 import { EventEmitter } from 'events';
 import {
   ITool,
-  IToolRegistry,
   IToolExecutor,
+  IToolRegistry,
   ToolDefinition,
   ToolExecutionContext,
-  ToolExecutionResult,
   ToolExecutionRequest,
+  ToolExecutionResult,
 } from '../interfaces/tool-system.js';
 import { IUnifiedSecurityValidator } from '../services/unified-security-validator.js';
 import { IEventBus } from '../interfaces/event-bus.js';
 import { ILogger } from '../interfaces/logger.js';
-import { RustExecutionBackend } from '../../infrastructure/execution/rust-executor/rust-execution-backend.js';
+import type { IExecutionBackend } from '../interfaces/execution-backend.js';
 
 // ============================================================================
 // CORE TOOL FRAMEWORK - Base classes and interfaces
@@ -33,19 +33,19 @@ export abstract class BaseTool implements ITool {
   protected context?: ToolExecutionContext;
   protected decorators: ToolDecorator[] = [];
 
-  constructor(definition: Omit<ToolDefinition, 'id'> & { name: string }) {
+  public constructor(definition: Omit<ToolDefinition, 'id'> & { name: string }) {
     this.definition = {
       ...definition,
       id: this.generateToolId(definition.name),
     };
   }
 
-  abstract execute(
-    args: Record<string, any>,
+  public abstract execute(
+    args: Record<string, unknown>,
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult>;
 
-  validateArguments(args: Record<string, any>): { valid: boolean; errors?: string[] } {
+  public validateArguments(args: Record<string, unknown>): { valid: boolean; errors?: string[] } {
     const errors: string[] = [];
 
     // Check required parameters
@@ -75,7 +75,7 @@ export abstract class BaseTool implements ITool {
     };
   }
 
-  canExecute(context: ToolExecutionContext): boolean {
+  public canExecute(context: ToolExecutionContext): boolean {
     // Check security level compatibility
     const toolSecurity = this.definition.securityLevel;
     const contextSecurity = context.securityLevel;
@@ -100,8 +100,8 @@ export abstract class BaseTool implements ITool {
   /**
    * Add a decorator to modify tool behavior
    */
-  addDecorator(decorator: ToolDecorator): this {
-    this.decorators.push(decorator);
+  public addDecorator(decorator: unknown): ITool {
+    this.decorators.push(decorator as ToolDecorator);
     return this;
   }
 
@@ -109,7 +109,7 @@ export abstract class BaseTool implements ITool {
    * Execute with decorators applied
    */
   protected async executeWithDecorators(
-    args: Record<string, any>,
+    args: Record<string, unknown>,
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
     let result = await this.execute(args, context);
@@ -126,47 +126,39 @@ export abstract class BaseTool implements ITool {
     return `tool_${name.toLowerCase().replace(/\s+/g, '_')}`;
   }
 
-  private validateParameter(name: string, value: any, definition: any): string | null {
+  private validateParameter(paramName: string, value: unknown, paramDef: ParameterDefinition): string | null {
     // Type validation
-    const expectedType = definition.type;
-    const actualType = typeof value;
-
-    if (expectedType === 'string' && actualType !== 'string') {
-      return `Parameter ${name} must be a string, got ${actualType}`;
+    if (paramDef.type === 'string' && typeof value !== 'string') {
+      return `Parameter ${paramName} must be a string`;
     }
-
-    if (expectedType === 'number' && actualType !== 'number') {
-      return `Parameter ${name} must be a number, got ${actualType}`;
+    if (paramDef.type === 'number' && typeof value !== 'number') {
+      return `Parameter ${paramName} must be a number`;
     }
-
-    if (expectedType === 'boolean' && actualType !== 'boolean') {
-      return `Parameter ${name} must be a boolean, got ${actualType}`;
+    if (paramDef.type === 'boolean' && typeof value !== 'boolean') {
+      return `Parameter ${paramName} must be a boolean`;
     }
-
-    if (expectedType === 'array' && !Array.isArray(value)) {
-      return `Parameter ${name} must be an array`;
+    if (paramDef.type === 'array' && !Array.isArray(value)) {
+      return `Parameter ${paramName} must be an array`;
     }
 
     // Enum validation
-    if (definition.enum && !definition.enum.includes(value)) {
-      return `Parameter ${name} must be one of: ${definition.enum.join(', ')}`;
+    if (paramDef.enum && !paramDef.enum.includes(value)) {
+      return `Parameter ${paramName} must be one of: ${paramDef.enum.join(', ')}`;
     }
 
-    // String length validation
-    if (expectedType === 'string' && typeof value === 'string') {
-      if (definition.minLength && value.length < definition.minLength) {
-        return `Parameter ${name} must be at least ${definition.minLength} characters`;
+    // String-specific validations
+    if (typeof value === 'string') {
+      if (paramDef.minLength && value.length < paramDef.minLength) {
+        return `Parameter ${paramName} must be at least ${paramDef.minLength} characters long`;
       }
-      if (definition.maxLength && value.length > definition.maxLength) {
-        return `Parameter ${name} must be at most ${definition.maxLength} characters`;
+      if (paramDef.maxLength && value.length > paramDef.maxLength) {
+        return `Parameter ${paramName} must be at most ${paramDef.maxLength} characters long`;
       }
-    }
-
-    // Regex validation
-    if (definition.validation && typeof value === 'string') {
-      const regex = new RegExp(definition.validation);
-      if (!regex.test(value)) {
-        return `Parameter ${name} does not match required pattern`;
+      if (paramDef.validation) {
+        const regex = new RegExp(paramDef.validation);
+        if (!regex.test(value)) {
+          return `Parameter ${paramName} does not match required format`;
+        }
       }
     }
 
@@ -174,34 +166,43 @@ export abstract class BaseTool implements ITool {
   }
 }
 
+interface ParameterDefinition {
+  // Include 'object' to match the broader ToolParameter types used across definitions
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  enum?: unknown[];
+  minLength?: number;
+  maxLength?: number;
+  validation?: string;
+}
+
 /**
  * Tool decorator interface for behavior composition
  */
 export interface ToolDecorator {
   name: string;
-  preProcess?(
-    args: Record<string, any>,
+  preProcess?: ((
+    args: Record<string, unknown>,
     context: ToolExecutionContext
-  ): Promise<Record<string, any>>;
-  postProcess(
+  ) => Promise<Record<string, unknown>>) | undefined;
+  postProcess: (
     result: ToolExecutionResult,
-    args: Record<string, any>,
+    args: Record<string, unknown>,
     context: ToolExecutionContext
-  ): Promise<ToolExecutionResult>;
+  ) => Promise<ToolExecutionResult>;
 }
 
 /**
  * Security decorator that validates tool execution
  */
 export class SecurityDecorator implements ToolDecorator {
-  name = 'security';
+  public readonly name = 'security';
 
-  constructor(private securityValidator: IUnifiedSecurityValidator) {}
+  public constructor(private readonly securityValidator: IUnifiedSecurityValidator) {}
 
-  async preProcess(
-    args: Record<string, any>,
+  public async preProcess(
+    args: Record<string, unknown>,
     context: ToolExecutionContext
-  ): Promise<Record<string, any>> {
+  ): Promise<Record<string, unknown>> {
     // Validate arguments for security threats
     for (const [key, value] of Object.entries(args)) {
       if (typeof value === 'string') {
@@ -227,9 +228,9 @@ export class SecurityDecorator implements ToolDecorator {
     return args;
   }
 
-  async postProcess(
+  public async postProcess(
     result: ToolExecutionResult,
-    args: Record<string, any>,
+    args: Record<string, unknown>,
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
     // Sanitize output if needed
@@ -253,17 +254,17 @@ export class SecurityDecorator implements ToolDecorator {
  * Caching decorator that caches tool results
  */
 export class CachingDecorator implements ToolDecorator {
-  name = 'caching';
-  private cache = new Map<
+  public readonly name = 'caching';
+  private readonly cache = new Map<
     string,
     { result: ToolExecutionResult; timestamp: number; ttl: number }
   >();
 
-  constructor(private defaultTTL: number = 300000) {} // 5 minutes
+  constructor(private readonly defaultTTL: number = 300000) {} // 5 minutes
 
-  async postProcess(
+  public async postProcess(
     result: ToolExecutionResult,
-    args: Record<string, any>,
+    args: Record<string, unknown>,
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
     if (result.success) {
@@ -283,10 +284,10 @@ export class CachingDecorator implements ToolDecorator {
     return result;
   }
 
-  async preProcess(
-    args: Record<string, any>,
+  public async preProcess(
+    args: Record<string, unknown>,
     context: ToolExecutionContext
-  ): Promise<Record<string, any>> {
+  ): Promise<Record<string, unknown>> {
     const cacheKey = this.generateCacheKey(args, context);
     const cached = this.cache.get(cacheKey);
 
@@ -298,7 +299,7 @@ export class CachingDecorator implements ToolDecorator {
     return args;
   }
 
-  private generateCacheKey(args: Record<string, any>, context: ToolExecutionContext): string {
+  private generateCacheKey(args: Record<string, unknown>, context: ToolExecutionContext): string {
     const normalized = JSON.stringify({
       args,
       sessionId: context.sessionId,
@@ -327,17 +328,17 @@ export class CacheHitException extends Error {
  * Logging decorator that logs tool execution
  */
 export class LoggingDecorator implements ToolDecorator {
-  name = 'logging';
+  public readonly name = 'logging';
 
   constructor(
-    private logger?: ILogger,
-    private eventBus?: IEventBus
+    private readonly logger?: ILogger,
+    private readonly eventBus?: IEventBus
   ) {}
 
-  async preProcess(
-    args: Record<string, any>,
+  public async preProcess(
+    args: Record<string, unknown>,
     context: ToolExecutionContext
-  ): Promise<Record<string, any>> {
+  ): Promise<Record<string, unknown>> {
     if (this.logger) {
       this.logger.debug('Tool execution started', {
         sessionId: context.sessionId,
@@ -358,9 +359,9 @@ export class LoggingDecorator implements ToolDecorator {
     return args;
   }
 
-  async postProcess(
+  public async postProcess(
     result: ToolExecutionResult,
-    args: Record<string, any>,
+    args: Record<string, unknown>,
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
     if (this.logger) {
@@ -393,8 +394,8 @@ export class LoggingDecorator implements ToolDecorator {
     return result;
   }
 
-  private sanitizeArgsForLogging(args: Record<string, any>): Record<string, any> {
-    const sanitized: Record<string, any> = {};
+  private sanitizeArgsForLogging(args: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(args)) {
       if (typeof value === 'string' && value.length > 200) {
         sanitized[key] = `${value.substring(0, 200)}... (${value.length} chars total)`;
@@ -410,17 +411,17 @@ export class LoggingDecorator implements ToolDecorator {
  * Retry decorator that retries failed tool executions
  */
 export class RetryDecorator implements ToolDecorator {
-  name = 'retry';
+  public readonly name = 'retry';
 
   constructor(
-    private maxRetries: number = 3,
-    private backoffMs: number = 1000,
-    private backoffMultiplier: number = 2
+    private readonly maxRetries: number = 3,
+    private readonly backoffMs: number = 1000,
+    private readonly backoffMultiplier: number = 2
   ) {}
 
-  async postProcess(
+  public async postProcess(
     result: ToolExecutionResult,
-    args: Record<string, any>,
+    args: Record<string, unknown>,
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
     if (result.success) {
@@ -486,25 +487,25 @@ export class RetryDecorator implements ToolDecorator {
  * Performance monitoring decorator
  */
 export class PerformanceDecorator implements ToolDecorator {
-  name = 'performance';
-  private metrics = new Map<string, { count: number; totalTime: number; errors: number }>();
+  public readonly name = 'performance';
+  private readonly metrics = new Map<string, { count: number; totalTime: number; errors: number }>();
 
-  async preProcess(
-    args: Record<string, any>,
+  public async preProcess(
+    args: Record<string, unknown>,
     context: ToolExecutionContext
-  ): Promise<Record<string, any>> {
+  ): Promise<Record<string, unknown>> {
     // Record start time
     context.metadata = context.metadata || {};
     context.metadata.startTime = Date.now();
     return args;
   }
 
-  async postProcess(
+  public async postProcess(
     result: ToolExecutionResult,
-    args: Record<string, any>,
+    args: Record<string, unknown>,
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
-    const executionTime = Date.now() - (context.metadata?.startTime || 0);
+    const executionTime = Date.now() - (Number(context.metadata?.startTime) || 0);
     const toolId = 'unknown'; // Would need access to tool ID
 
     // Update metrics
@@ -531,7 +532,7 @@ export class PerformanceDecorator implements ToolDecorator {
     };
   }
 
-  getMetrics(): Map<string, { count: number; totalTime: number; errors: number }> {
+  public getMetrics(): Map<string, { count: number; totalTime: number; errors: number }> {
     return new Map(this.metrics);
   }
 }
@@ -541,15 +542,15 @@ export class PerformanceDecorator implements ToolDecorator {
 // ============================================================================
 
 export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
-  private tools = new Map<string, ITool>();
-  private categories = new Map<string, Set<string>>();
+  private readonly tools = new Map<string, ITool>();
+  private readonly categories = new Map<string, Set<string>>();
 
-  constructor(private logger: ILogger) {
+  public constructor(private readonly logger: ILogger) {
     super();
     this.logger.info('UnifiedToolRegistry initialized');
   }
 
-  register(tool: ITool): void {
+  public register(tool: ITool): void {
     if (this.tools.has(tool.definition.id)) {
       this.logger.warn(`Tool ${tool.definition.id} is already registered, overwriting`);
     }
@@ -567,15 +568,15 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
     this.logger.info(`Tool registered: ${tool.definition.name} (${tool.definition.id})`);
   }
 
-  getTool(id: string): ITool | undefined {
+  public getTool(id: string): ITool | undefined {
     return this.tools.get(id);
   }
 
-  getAllTools(): ITool[] {
+  public getAllTools(): ITool[] {
     return Array.from(this.tools.values());
   }
 
-  getToolsByCategory(category: string): ITool[] {
+  public getToolsByCategory(category: string): ITool[] {
     const toolIds = this.categories.get(category);
     if (!toolIds) {
       return [];
@@ -586,7 +587,7 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
       .filter((tool): tool is ITool => tool !== undefined);
   }
 
-  searchTools(query: string): ITool[] {
+  public searchTools(query: string): ITool[] {
     const lowerQuery = query.toLowerCase();
     return this.getAllTools().filter(
       tool =>
@@ -595,7 +596,7 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
     );
   }
 
-  unregister(id: string): boolean {
+  public unregister(id: string): boolean {
     const tool = this.tools.get(id);
     if (!tool) {
       return false;
@@ -619,11 +620,11 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
     return true;
   }
 
-  getCategories(): string[] {
+  public getCategories(): string[] {
     return Array.from(this.categories.keys());
   }
 
-  getToolCount(): number {
+  public getToolCount(): number {
     return this.tools.size;
   }
 }
@@ -633,26 +634,30 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
 // ============================================================================
 
 export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
-  private rustBackend?: RustExecutionBackend;
+  private rustBackend?: IExecutionBackend;
 
-  constructor(
-    private logger: ILogger,
-    private registry: IToolRegistry,
-    private securityValidator?: IUnifiedSecurityValidator,
-    private eventBus?: IEventBus,
-    rustBackend?: RustExecutionBackend
+  public constructor(
+    private readonly logger: ILogger,
+    private readonly registry: IToolRegistry,
+    private readonly securityValidator?: IUnifiedSecurityValidator,
+    private readonly eventBus?: IEventBus,
+    rustBackend?: IExecutionBackend
   ) {
     super();
     this.rustBackend = rustBackend;
-    // Inject this orchestrator into the Rust backend for fallback execution
-    this.rustBackend?.setTypescriptOrchestrator(this);
+    // Inject this orchestrator into the execution backend for fallback execution
+    try {
+      this.rustBackend?.setTypescriptOrchestrator(this);
+    } catch (e) {
+      // Backend may be a no-op implementation in tests
+    }
     this.logger.info('UnifiedToolExecutor initialized', {
       rustBackendEnabled: !!this.rustBackend,
-      rustAvailable: this.rustBackend?.isAvailable() || false,
+      rustAvailable: this.rustBackend?.isAvailable() ?? false,
     });
   }
 
-  async execute(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
+  public async execute(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
     const startTime = Date.now();
 
     // Try Rust backend first if available and enabled
@@ -749,7 +754,7 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
     }
   }
 
-  async executeSequence(requests: ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
+  public async executeSequence(requests: readonly ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
     const results: ToolExecutionResult[] = [];
 
     for (const request of requests) {
@@ -765,14 +770,14 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
     return results;
   }
 
-  async executeParallel(requests: ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
-    const promises = requests.map(async request => this.execute(request));
-    return await Promise.all(promises);
+  public async executeParallel(requests: readonly ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
+    const promises = requests.map(async (request): Promise<ToolExecutionResult> => this.execute(request));
+    return Promise.all(promises);
   }
 
   private applyDecorators(tool: ITool, request: ToolExecutionRequest): ITool {
     // Create a copy of the tool with decorators applied
-    const decoratedTool = Object.create(tool);
+    const decoratedTool: ITool = Object.create(tool) as ITool;
 
     // Apply standard decorators based on context
     const decorators: ToolDecorator[] = [];
@@ -798,8 +803,12 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
       decorators.push(new RetryDecorator(3, 1000));
     }
 
-    // Add decorators to tool
-    decorators.forEach(decorator => decoratedTool.addDecorator(decorator));
+    // Add decorators to tool if the implementation supports it
+    decorators.forEach((decorator): void => {
+      if (typeof (decoratedTool as any).addDecorator === 'function') {
+        (decoratedTool as any).addDecorator(decorator);
+      }
+    });
 
     return decoratedTool;
   }

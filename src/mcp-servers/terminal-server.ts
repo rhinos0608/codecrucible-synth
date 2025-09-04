@@ -5,7 +5,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { exec, spawn, ChildProcess } from 'child_process';
+import { exec, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import { logger } from '../infrastructure/logging/logger.js';
@@ -431,7 +431,7 @@ export class TerminalMCPServer {
 
   async shutdown(): Promise<void> {
     // Kill all active processes
-    for (const [id, process] of this.activeProcesses) {
+    for (const [_id, process] of this.activeProcesses) {
       try {
         process.kill('SIGTERM');
       } catch {} // Ignore errors during shutdown

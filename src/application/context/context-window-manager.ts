@@ -442,8 +442,6 @@ export class ContextWindowManager {
     // Removed unused variable 'chunks'
     logger.debug(`Chunks initialized with strategy: ${strategy}`);
     // Removed unused variable 'currentChunk'
-    const _currentTokens = 0;
-    const _chunkId = 1;
 
     logger.info(`🧩 Creating context chunks with ${strategy} strategy`);
 
@@ -628,7 +626,6 @@ export class ContextWindowManager {
    */
   private finalizeChunk(files: FileAnalysisResult[], id: number, focusArea?: string): ContextChunk {
     const totalTokens = files.reduce((sum, f) => sum + f.tokens, 0);
-    const _avgPriority = files.reduce((sum, f) => sum + f.priority, 0) / files.length;
 
     return {
       id: `chunk-${id}`,

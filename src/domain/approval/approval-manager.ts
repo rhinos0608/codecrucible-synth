@@ -1,4 +1,4 @@
-import { logger } from '../../infrastructure/logging/logger.js';
+import { ILogger, createConsoleLogger } from '../interfaces/logger.js';
 import * as readline from 'readline';
 
 export type SandboxMode = 'read-only' | 'workspace-write' | 'full-access';
@@ -26,7 +26,7 @@ export interface Operation {
   type: OperationType;
   target: string;
   description: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface OperationContext {
@@ -86,7 +86,7 @@ export class ApprovalManager {
   private approvalHistory: Map<string, ApprovalResult[]>;
   private userInterface: readline.Interface;
 
-  constructor() {
+  constructor(private logger: ILogger = createConsoleLogger('ApprovalManager')) {
     this.policies = new Map();
     this.approvalHistory = new Map();
     this.userInterface = readline.createInterface({
@@ -95,7 +95,7 @@ export class ApprovalManager {
     });
     this.initializePolicies();
 
-    logger.info('Approval manager initialized with three-tier policy system');
+    this.logger.info('Approval manager initialized with three-tier policy system');
   }
 
   /**
@@ -105,7 +105,7 @@ export class ApprovalManager {
     const startTime = Date.now();
     const sessionHistory = this.approvalHistory.get(context.sessionId) || [];
 
-    logger.info(`Approval request: ${operation.type} on ${operation.target}`, {
+  this.logger.info(`Approval request: ${operation.type} on ${operation.target}`, {
       sandboxMode: context.sandboxMode,
       userIntent: context.userIntent,
     });
@@ -129,7 +129,7 @@ export class ApprovalManager {
 
       const duration = Date.now() - startTime;
 
-      logger.info(`Approval ${result.status}: ${operation.type} (${duration}ms)`, {
+  this.logger.info(`Approval ${result.status}: ${operation.type} (${duration}ms)`, {
         riskLevel: riskAssessment.level,
         riskScore: riskAssessment.score,
         autoApproved: result.autoApproved,
@@ -137,7 +137,7 @@ export class ApprovalManager {
 
       return result;
     } catch (error) {
-      logger.error(`Approval request failed for ${operation.type}:`, error);
+  this.logger.error(`Approval request failed for ${operation.type}:`, error);
 
       return {
         status: 'denied',
@@ -240,10 +240,19 @@ export class ApprovalManager {
 
             case 'require-confirmation':
               return await this.requestUserConfirmation(operation, context, riskAssessment);
+
+            default:
+              this.logger.warn(`Unknown rule action: ${rule.action}`);
+              return {
+                status: 'denied',
+                granted: false,
+                reason: `Unknown rule action: ${rule.action}`,
+                suggestions: ['Check approval rule configuration'],
+              };
           }
         }
       } catch (error) {
-        logger.warn(`Failed to evaluate rule ${rule.id}:`, error);
+    this.logger.warn(`Failed to evaluate rule ${rule.id}:`, error);
       }
     }
 
@@ -677,7 +686,7 @@ export class ApprovalManager {
       const func = new Function('data', `with(data) { return ${condition}; }`);
       return func(data);
     } catch (error) {
-      logger.warn(`Failed to evaluate condition: ${condition}`, error);
+  this.logger.warn(`Failed to evaluate condition: ${condition}`, error);
       return false;
     }
   }
@@ -767,7 +776,7 @@ export class ApprovalManager {
    */
   setMode(mode: ApprovalMode): void {
     // Implementation for setting approval mode
-    logger.info(`Approval mode set to: ${mode}`);
+  this.logger.info(`Approval mode set to: ${mode}`);
   }
 
   /**
@@ -783,6 +792,6 @@ export class ApprovalManager {
   dispose(): void {
     this.userInterface.close();
     this.approvalHistory.clear();
-    logger.info('Approval manager disposed');
+  this.logger.info('Approval manager disposed');
   }
 }

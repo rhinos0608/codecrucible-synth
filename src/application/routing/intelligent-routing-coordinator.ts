@@ -35,7 +35,6 @@ import { ProcessingRequest } from '../../domain/entities/request.js';
 // Core imports
 import {
   IProviderSelectionStrategy,
-  SelectionContext,
   SelectionResult,
 } from '../../providers/provider-selection-strategy.js';
 import {
@@ -351,7 +350,6 @@ export class IntelligentRoutingCoordinator
     context: RoutingContext,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
-    const { request } = context;
 
     switch (strategy) {
       case 'single-voice-fast':
@@ -384,7 +382,7 @@ export class IntelligentRoutingCoordinator
     context: RoutingContext,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
-    const { request, preferences } = context;
+    const { request } = context;
 
     // Select fast provider
     const providerSelection = this.providerSelectionStrategy.selectProvider({
@@ -421,7 +419,7 @@ export class IntelligentRoutingCoordinator
     context: RoutingContext,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
-    const { request, preferences } = context;
+    const { request } = context;
 
     // Select quality-focused provider
     const providerSelection = this.providerSelectionStrategy.selectProvider({
@@ -458,7 +456,7 @@ export class IntelligentRoutingCoordinator
     context: RoutingContext,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
-    const { request, preferences } = context;
+    const { request } = context;
 
     // Select analytical-capable provider
     const providerSelection = this.providerSelectionStrategy.selectProvider({
@@ -495,7 +493,7 @@ export class IntelligentRoutingCoordinator
     context: RoutingContext,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
-    const { request, preferences } = context;
+    const { request } = context;
 
     // Select balanced provider for multi-voice coordination
     const providerSelection = this.providerSelectionStrategy.selectProvider({
@@ -567,7 +565,7 @@ export class IntelligentRoutingCoordinator
     context: RoutingContext,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
-    const { request, preferences } = context;
+    const { request } = context;
 
     // Use hybrid router for quality-focused routing
     const hybridDecision = await this.hybridRouter.routeTask(
@@ -623,7 +621,6 @@ export class IntelligentRoutingCoordinator
     const modelSelection = await this.modelSelectionService.selectOptimalModel(request);
 
     // Select provider based on hybrid routing decision
-    const providerType = hybridDecision.selectedLLM === 'lm-studio' ? 'lm-studio' : 'ollama';
     const providerSelection = this.providerSelectionStrategy.selectProvider({
       complexity: 'medium',
       selectionStrategy: 'balanced',
@@ -651,7 +648,7 @@ export class IntelligentRoutingCoordinator
     context: RoutingContext,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
-    const { request, preferences } = context;
+    const { request } = context;
 
     // Use hybrid router with implementation focus
     const hybridDecision = await this.hybridRouter.routeTask('implementation', request.prompt, {
@@ -694,7 +691,7 @@ export class IntelligentRoutingCoordinator
     context: RoutingContext,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
-    const { request, preferences } = context;
+    const { request } = context;
 
     // Fast provider selection
     const providerSelection = this.providerSelectionStrategy.selectProvider({
@@ -730,7 +727,7 @@ export class IntelligentRoutingCoordinator
     context: RoutingContext,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
-    const { request, preferences } = context;
+    const { request } = context;
 
     // Quality-focused provider selection
     const providerSelection = this.providerSelectionStrategy.selectProvider({
@@ -1442,7 +1439,7 @@ export class IntelligentRoutingCoordinator
     // Pre-cache common routing decisions
     const commonPatterns = ['simple_generation', 'complex_analysis', 'multi_voice_synthesis'];
 
-    for (const pattern of commonPatterns) {
+    for (const _pattern of commonPatterns) {
       // Pre-calculate routing for common patterns
       // This would use actual pattern matching in production
     }

@@ -33,11 +33,13 @@ export class ToolIntegration {
   protected availableTools: Map<string, any> = new Map();
   private initializationPromise: Promise<void> | null = null;
   private isInitialized = false;
+  private rustBackend: any | null = null;
 
   private readonly logger = createLogger('ToolIntegration');
 
-  constructor(mcpManager: MCPServerManager) {
+  constructor(mcpManager: MCPServerManager, rustBackend?: any) {
     this.mcpManager = mcpManager;
+    this.rustBackend = rustBackend ?? null;
     // Don't initialize synchronously - use lazy initialization
   }
 
@@ -67,22 +69,14 @@ export class ToolIntegration {
         this.filesystemTools.setMCPManager(this.mcpManager);
       }
 
-      // Try to initialize Rust backend
-      try {
-        const { RustExecutionBackend } = await import(
-          '../execution/rust-executor/rust-execution-backend.js'
-        );
-        const rustBackend = new RustExecutionBackend();
-        const initialized = await rustBackend.initialize();
-
-        if (initialized) {
-          this.filesystemTools.setRustBackend(rustBackend);
-          this.logger.info('Rust execution backend initialized for filesystem tools');
-        } else {
-          this.logger.warn('Rust execution backend failed to initialize, using MCP fallback');
+      // If an injected rustBackend exists, attach it to filesystem tools
+      if (this.rustBackend) {
+        try {
+          this.filesystemTools.setRustBackend(this.rustBackend);
+          this.logger.info('Injected Rust execution backend attached to filesystem tools');
+        } catch (error) {
+          this.logger.warn('Failed to attach injected Rust backend to filesystem tools', error);
         }
-      } catch (error) {
-        this.logger.warn('Failed to load Rust execution backend, using MCP fallback', error);
       }
 
       // Register filesystem tools
@@ -241,3 +235,18 @@ export function initializeGlobalToolIntegration(mcpManager: MCPServerManager): v
 export function getGlobalToolIntegration(): ToolIntegration | null {
   return globalToolIntegration;
 }
+
+// Allow application code to inject a rust backend into the global instance later
+export function setGlobalToolIntegrationRustBackend(backend: any): void {
+  if (globalToolIntegration) {
+    try {
+      // @ts-ignore - attach if method exists
+      if (typeof (globalToolIntegration as any).setRustBackend === 'function') {
+        (globalToolIntegration as any).setRustBackend(backend);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+

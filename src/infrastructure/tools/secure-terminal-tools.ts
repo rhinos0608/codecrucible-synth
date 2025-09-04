@@ -29,7 +29,7 @@ import { logger } from '../logging/logger.js';
 export class SecureTerminalExecuteTool extends BaseTool {
   private secureExecutionManager: SecureExecutionManager;
 
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     const parameters = z.object({
       command: z.string().describe('Command to execute in secure sandbox'),
       language: z
@@ -125,7 +125,7 @@ export class SecureTerminalExecuteTool extends BaseTool {
 export class SecureProcessManagementTool extends BaseTool {
   private secureExecutionManager: SecureExecutionManager;
 
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     const parameters = z.object({
       action: z
         .enum(['list', 'status'])
@@ -230,7 +230,7 @@ export class SecureProcessManagementTool extends BaseTool {
 export class SecureShellEnvironmentTool extends BaseTool {
   private secureExecutionManager: SecureExecutionManager;
 
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     const parameters = z.object({
       action: z.enum(['pwd', 'whoami', 'which', 'env']).describe('Environment query action'),
       command: z.string().optional().describe('Command to locate with which'),

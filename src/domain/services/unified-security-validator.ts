@@ -9,7 +9,7 @@
  * Provides comprehensive security validation for all use cases.
  */
 
-import { createHash, randomBytes } from 'crypto';
+import { randomBytes } from 'crypto';
 import { EventEmitter } from 'events';
 import { IEventBus } from '../interfaces/event-bus.js';
 import { ILogger } from '../interfaces/logger.js';

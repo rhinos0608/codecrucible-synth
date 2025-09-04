@@ -30,10 +30,10 @@ export interface RuntimeContext {
 }
 
 export class EnterpriseVoicePromptBuilder {
-  private static readonly BASE_SECURITY = `# SECURITY CONSTRAINTS
+  private static readonly _BASE_SECURITY = `# SECURITY CONSTRAINTS
 CRITICAL: Only assist with defensive security tasks. Refuse malicious code creation, modification, or improvement. Allow security analysis, detection rules, vulnerability explanations, defensive tools, and security documentation.`;
 
-  private static readonly BASE_INSTRUCTIONS = `# CORE INSTRUCTIONS
+  private static readonly _BASE_INSTRUCTIONS = `# CORE INSTRUCTIONS
 Use available tools to assist with software engineering tasks following these priorities:
 1. Understand the codebase through search tools
 2. Plan tasks using TodoWrite before implementation  
@@ -41,7 +41,7 @@ Use available tools to assist with software engineering tasks following these pr
 4. Verify solutions with tests when possible
 5. Run lint/typecheck commands if available`;
 
-  private static readonly BASE_TONE = `# TONE AND STYLE
+  private static readonly _BASE_TONE = `# TONE AND STYLE
 - You MUST answer concisely with fewer than 4 lines unless detail requested
 - Minimize output tokens while maintaining quality and accuracy
 - Avoid preamble/postamble unless user requests explanation
@@ -56,13 +56,13 @@ user: Find files containing 'authentication'
 assistant: [uses search tools]
 Found in: src/auth/manager.ts:15, src/security/validator.ts:8`;
 
-  private static readonly BASE_PROACTIVENESS = `# PROACTIVENESS
+  private static readonly _BASE_PROACTIVENESS = `# PROACTIVENESS
 Strike balance between helpful action and user surprise:
 - Do the right thing when asked, including follow-up actions
 - Don't surprise users with unexpected actions
 - Answer questions first before taking actions`;
 
-  private static readonly BASE_CONVENTIONS = `# CONVENTIONS
+  private static readonly _BASE_CONVENTIONS = `# CONVENTIONS
 When modifying files:
 - Understand existing code conventions first
 - Mimic code style, use existing libraries
@@ -71,7 +71,7 @@ When modifying files:
 - Follow security best practices
 - DO NOT ADD COMMENTS unless asked`;
 
-  private static readonly BASE_TASK_MANAGEMENT = `# TASK MANAGEMENT
+  private static readonly _BASE_TASK_MANAGEMENT = `# TASK MANAGEMENT
 CRITICAL: Use TodoWrite tools VERY frequently for:
 - Planning complex tasks (3+ steps)
 - Breaking down large tasks into steps
@@ -85,7 +85,7 @@ Example flow:
 4. Complete task step by step
 5. Mark each task as completed when done`;
 
-  private static readonly BASE_TOOL_POLICIES = `# TOOL USAGE POLICIES
+  private static readonly _BASE_TOOL_POLICIES = `# TOOL USAGE POLICIES
 - Prefer Task tool for file searches to reduce context usage
 - Use specialized agents when task matches agent description
 - Batch multiple independent tool calls for performance
@@ -93,7 +93,7 @@ Example flow:
 - Follow WebFetch redirects immediately
 - Use Grep, Glob, and Read tools properly instead of bash commands`;
 
-  private static readonly BASE_CODE_REFERENCES = `# CODE REFERENCES
+  private static readonly _BASE_CODE_REFERENCES = `# CODE REFERENCES
 Reference code using pattern: \`file_path:line_number\`
 Example: "Authentication handled in src/auth/manager.ts:142"`;
 
@@ -106,7 +106,7 @@ Example: "Authentication handled in src/auth/manager.ts:142"`;
     });
   }
 
-  private static getVoiceIdentity(voiceId: string): string {
+  private static _getVoiceIdentity(voiceId: string): string {
     const identities: Record<string, string> = {
       explorer: `# IDENTITY
 You are Explorer Voice, a specialized enterprise CLI agent focused on innovative discovery and creative problem-solving within CodeCrucible Synth's multi-agent architecture.`,
@@ -142,7 +142,7 @@ You are Guardian Voice, a specialized enterprise CLI agent focused on quality ga
     return identities[voiceId] || identities.developer;
   }
 
-  private static getVoiceSpecificBehavior(voiceId: string): string {
+  private static _getVoiceSpecificBehavior(voiceId: string): string {
     const behaviors: Record<string, string> = {
       explorer: `# VOICE-SPECIFIC BEHAVIOR
 As Explorer Voice:
@@ -248,7 +248,7 @@ As Guardian Voice:
     return behaviors[voiceId] || behaviors.developer;
   }
 
-  private static buildEnvironmentContext(context: RuntimeContext): string {
+  private static _buildEnvironmentContext(context: RuntimeContext): string {
     return `# ENVIRONMENT CONTEXT
 Working Directory: ${context.workingDirectory}
 Git Repository: ${context.isGitRepo}

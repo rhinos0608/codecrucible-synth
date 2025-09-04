@@ -4,6 +4,7 @@
  */
 
 import path from 'path';
+import { promises as fs } from 'fs';
 import { SecretsManager } from './secrets-manager.js';
 import { logger } from '../logging/logger.js';
 
@@ -431,12 +432,204 @@ export class EncryptedConfig {
    * Load configuration from file
    */
   private async loadFromFile(): Promise<void> {
+    if (!this.options.configPath) {
+      logger.debug('No configuration file path specified, skipping file loading');
+      return;
+    }
+
     try {
-      // Implementation would load from YAML/JSON file
-      // For now, we'll skip file loading in this example
-      logger.debug('File configuration loading not implemented');
+      // Check if file exists
+      const configPath = path.resolve(this.options.configPath);
+      try {
+        await fs.access(configPath, fs.constants.F_OK);
+      } catch {
+        logger.warn('Configuration file not found, skipping file loading', { 
+          configPath: this.options.configPath 
+        });
+        return;
+      }
+
+      // Read file content
+      const fileContent = await fs.readFile(configPath, 'utf-8');
+      const fileExtension = path.extname(configPath).toLowerCase();
+      
+      let configData: Record<string, any> = {};
+
+      // Parse based on file extension
+      switch (fileExtension) {
+        case '.json':
+          configData = await this.parseJsonConfig(fileContent);
+          break;
+        case '.yaml':
+        case '.yml':
+          configData = await this.parseYamlConfig(fileContent);
+          break;
+        default:
+          throw new Error(`Unsupported configuration file format: ${fileExtension}`);
+      }
+
+      // Environment-specific configuration loading
+      const environmentConfig = this.extractEnvironmentConfig(configData);
+      
+      // Merge configuration data into current config
+      this.mergeConfiguration(environmentConfig);
+      
+      logger.info('Configuration loaded from file', {
+        configPath: this.options.configPath,
+        environment: this.environment,
+        keysLoaded: Object.keys(environmentConfig).length,
+      });
+
     } catch (error) {
-      logger.error('Failed to load configuration from file', error as Error);
+      logger.error('Failed to load configuration from file', error as Error, {
+        configPath: this.options.configPath,
+      });
+      // Don't throw - allow the system to continue with environment variables and defaults
+    }
+  }
+
+  /**
+   * Parse JSON configuration file
+   */
+  private async parseJsonConfig(content: string): Promise<Record<string, any>> {
+    try {
+      return JSON.parse(content);
+    } catch (error) {
+      throw new Error(`Invalid JSON configuration: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Parse YAML configuration file
+   */
+  private async parseYamlConfig(content: string): Promise<Record<string, any>> {
+    try {
+      // Basic YAML parsing for simple key-value pairs and objects
+      // This is a simplified YAML parser - for full YAML support, would use 'yaml' package
+      const lines = content.split('\n').filter(line => 
+        line.trim() && !line.trim().startsWith('#')
+      );
+      
+      const result: Record<string, any> = {};
+      let currentSection = '';
+      let indent = 0;
+      
+      for (const line of lines) {
+        const trimmed = line.trim();
+        const lineIndent = line.length - line.trimStart().length;
+        
+        if (trimmed.includes(':')) {
+          const [key, ...valueParts] = trimmed.split(':');
+          const value = valueParts.join(':').trim();
+          const cleanKey = key.trim();
+          
+          if (lineIndent === 0) {
+            // Top-level key
+            currentSection = cleanKey;
+            if (value) {
+              result[cleanKey] = this.parseYamlValue(value);
+            } else {
+              result[cleanKey] = {};
+            }
+          } else if (lineIndent > 0 && currentSection) {
+            // Nested key
+            if (!result[currentSection]) {
+              result[currentSection] = {};
+            }
+            result[currentSection][cleanKey] = this.parseYamlValue(value);
+          }
+        }
+      }
+      
+      return result;
+    } catch (error) {
+      throw new Error(`Invalid YAML configuration: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Parse YAML value with type conversion
+   */
+  private parseYamlValue(value: string): any {
+    const trimmed = value.trim();
+    
+    // Handle quoted strings
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+        (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+      return trimmed.slice(1, -1);
+    }
+    
+    // Handle booleans
+    if (trimmed.toLowerCase() === 'true') return true;
+    if (trimmed.toLowerCase() === 'false') return false;
+    
+    // Handle null/undefined
+    if (trimmed.toLowerCase() === 'null' || trimmed === '~') return null;
+    if (trimmed.toLowerCase() === 'undefined') return undefined;
+    
+    // Handle numbers
+    if (!isNaN(Number(trimmed))) {
+      return Number(trimmed);
+    }
+    
+    // Return as string
+    return trimmed;
+  }
+
+  /**
+   * Extract environment-specific configuration
+   */
+  private extractEnvironmentConfig(configData: Record<string, any>): Record<string, any> {
+    const result: Record<string, any> = {};
+    
+    // First, add all non-environment-specific keys
+    for (const [key, value] of Object.entries(configData)) {
+      if (typeof value !== 'object' || Array.isArray(value)) {
+        result[key] = value;
+      }
+    }
+    
+    // Then, override with environment-specific configuration
+    if (configData[this.environment] && typeof configData[this.environment] === 'object') {
+      Object.assign(result, configData[this.environment]);
+    }
+    
+    // Handle common environment patterns
+    const environmentAliases = [
+      this.environment,
+      this.environment.toLowerCase(),
+      this.environment.toUpperCase(),
+    ];
+    
+    for (const env of environmentAliases) {
+      if (configData[env] && typeof configData[env] === 'object') {
+        Object.assign(result, configData[env]);
+      }
+    }
+    
+    return result;
+  }
+
+  /**
+   * Merge configuration data into current config
+   */
+  private mergeConfiguration(configData: Record<string, any>): void {
+    for (const [key, value] of Object.entries(configData)) {
+      // Validate against schema if available
+      if (this.schema?.[key]) {
+        try {
+          this.validateValue(key, value, this.schema[key]);
+          this.config[key] = value;
+        } catch (error) {
+          logger.warn('Configuration value failed validation', {
+            key,
+            error: (error as Error).message,
+          });
+        }
+      } else {
+        // No schema validation - store as-is
+        this.config[key] = value;
+      }
     }
   }
 

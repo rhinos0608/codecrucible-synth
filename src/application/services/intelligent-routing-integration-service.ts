@@ -10,8 +10,6 @@ import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 
 // Domain imports
 import { ProcessingRequest } from '../../domain/entities/request.js';
-import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
-import { IVoiceOrchestrationService } from '../../domain/services/voice-orchestration-service.js';
 
 // Core imports
 import {
@@ -21,15 +19,11 @@ import {
   RoutingPreferences,
   RoutingPerformance,
 } from '../routing/intelligent-routing-coordinator.js';
-import { IProviderSelectionStrategy } from '../../providers/provider-selection-strategy.js';
-import { HybridLLMRouter } from '../../providers/hybrid/hybrid-llm-router.js';
-import { PerformanceMonitor } from '../../utils/performance.js';
 
 const logger = createLogger('IntelligentRouting');
 
 // Use case imports
 import {
-  LivingSpiralProcessUseCase,
   SpiralIteration,
 } from '../use-cases/living-spiral-process-use-case.js';
 
@@ -102,15 +96,12 @@ export interface IIntelligentRoutingIntegrationService {
  */
 export class IntelligentRoutingIntegrationService implements IIntelligentRoutingIntegrationService {
   private routingCoordinator: IIntelligentRoutingCoordinator;
-  private livingSpiralUseCase: LivingSpiralProcessUseCase;
   private executionTracking: Map<string, { plan: ExecutionPlan; startTime: number }> = new Map();
 
   constructor(
-    routingCoordinator: IIntelligentRoutingCoordinator,
-    livingSpiralUseCase: LivingSpiralProcessUseCase
+    routingCoordinator: IIntelligentRoutingCoordinator
   ) {
     this.routingCoordinator = routingCoordinator;
-    this.livingSpiralUseCase = livingSpiralUseCase;
   }
 
   /**

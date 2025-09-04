@@ -1,12 +1,12 @@
 import { EventEmitter } from 'events';
-import { join, dirname } from 'path';
+import { dirname, join } from 'path';
 import { homedir } from 'os';
 import type { IEventBus } from '../interfaces/event-bus.js';
 import type { ILogger } from '../interfaces/logger.js';
 import {
-  UnifiedConfiguration,
-  ConfigurationValidation,
   ConfigurationSource,
+  ConfigurationValidation,
+  UnifiedConfiguration,
 } from '../interfaces/configuration.js';
 import { getDefaultConfig, mergeConfigurations, resolveConfig } from './config-hierarchy.js';
 import { saveConfigFile } from './config-loader.js';
@@ -14,17 +14,17 @@ import { validateConfiguration } from './config-validator.js';
 import { ConfigWatcher } from './config-watcher.js';
 
 export interface IUnifiedConfigurationManager {
-  initialize(): Promise<void>;
-  loadConfiguration(): Promise<UnifiedConfiguration>;
-  getConfiguration(): UnifiedConfiguration;
-  updateConfiguration(
-    updates: Partial<UnifiedConfiguration>,
-    source: ConfigurationSource
-  ): Promise<void>;
-  validateConfiguration(config: Partial<UnifiedConfiguration>): ConfigurationValidation;
-  saveConfiguration(filePath?: string): Promise<void>;
-  resetToDefaults(): Promise<void>;
-  watchForChanges(enabled: boolean): void;
+  initialize: () => Promise<void>;
+  loadConfiguration: () => Promise<UnifiedConfiguration>;
+  getConfiguration: () => UnifiedConfiguration;
+  updateConfiguration: (
+    updates: Readonly<Partial<UnifiedConfiguration>>,
+    source: Readonly<ConfigurationSource>
+  ) => Promise<void>;
+  validateConfiguration: (config: Readonly<Partial<UnifiedConfiguration>>) => ConfigurationValidation;
+  saveConfiguration: (filePath?: string) => Promise<void>;
+  resetToDefaults: () => Promise<void>;
+  watchForChanges: (enabled: boolean) => void;
 }
 
 export class UnifiedConfigurationManager
@@ -33,28 +33,26 @@ export class UnifiedConfigurationManager
 {
   private currentConfig!: UnifiedConfiguration;
   private watcher?: ConfigWatcher;
-  private isInitialized = false;
 
-  constructor(
-    private logger: ILogger,
-    private configFilePath: string = join(homedir(), '.codecrucible', 'config.yaml'),
-    private eventBus?: IEventBus
+  public constructor(
+    private readonly logger: ILogger,
+    private readonly configFilePath: string = join(homedir(), '.codecrucible', 'config.yaml'),
+    private readonly eventBus?: IEventBus
   ) {
     super();
   }
 
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     const { mkdir } = await import('fs/promises');
     await mkdir(dirname(this.configFilePath), { recursive: true });
     this.currentConfig = await resolveConfig(this.configFilePath);
-    this.isInitialized = true;
     this.emit('initialized', this.currentConfig);
     this.eventBus?.emit('system:initialize', {
       component: 'UnifiedConfigurationManager',
     });
   }
 
-  async loadConfiguration(): Promise<UnifiedConfiguration> {
+  public async loadConfiguration(): Promise<UnifiedConfiguration> {
     this.currentConfig = await resolveConfig(this.configFilePath);
     return this.currentConfig;
   }
@@ -81,16 +79,16 @@ export class UnifiedConfigurationManager
     return validateConfiguration(config);
   }
 
-  async set(path: string, value: any): Promise<void> {
+  public async set(path: string, value: unknown): Promise<void> {
     // Set a specific configuration value at the given path
     const pathParts = path.split('.');
-    const updates: any = {};
-    let current = updates;
+    const updates: Record<string, unknown> = {};
+    let current: Record<string, unknown> = updates;
 
     // Build nested object structure based on path
     for (let i = 0; i < pathParts.length - 1; i++) {
       current[pathParts[i]] = {};
-      current = current[pathParts[i]];
+      current = current[pathParts[i]] as Record<string, unknown>;
     }
     current[pathParts[pathParts.length - 1]] = value;
 
@@ -103,14 +101,14 @@ export class UnifiedConfigurationManager
     });
   }
 
-  get(path: string): any {
+  public get(path: string): unknown {
     // Get a specific configuration value at the given path
     const pathParts = path.split('.');
-    let current: any = this.currentConfig;
+    let current: unknown = this.currentConfig;
 
     for (const part of pathParts) {
       if (current && typeof current === 'object' && part in current) {
-        current = current[part];
+        current = (current as Record<string, unknown>)[part];
       } else {
         return undefined;
       }
@@ -119,21 +117,21 @@ export class UnifiedConfigurationManager
     return current;
   }
 
-  getAll(): UnifiedConfiguration {
+  public getAll(): UnifiedConfiguration {
     return this.getConfiguration();
   }
 
-  async saveConfiguration(filePath?: string): Promise<void> {
-    await saveConfigFile(filePath || this.configFilePath, this.currentConfig);
+  public async saveConfiguration(filePath?: string): Promise<void> {
+    await saveConfigFile(filePath ?? this.configFilePath, this.currentConfig);
   }
 
-  async resetToDefaults(): Promise<void> {
+  public async resetToDefaults(): Promise<void> {
     this.currentConfig = getDefaultConfig();
     await this.saveConfiguration();
     this.emit('reset', this.currentConfig);
   }
 
-  watchForChanges(enabled: boolean): void {
+  public watchForChanges(enabled: boolean): void {
     if (enabled) {
       if (!this.watcher) {
         this.watcher = new ConfigWatcher(this.configFilePath, async () => {
@@ -152,8 +150,9 @@ export class UnifiedConfigurationManager
 let singleton: UnifiedConfigurationManager | null = null;
 export async function getUnifiedConfigurationManager(): Promise<UnifiedConfigurationManager> {
   if (!singleton) {
-    const { createLogger } = await import('../../infrastructure/logging/logger-adapter.js');
-    singleton = new UnifiedConfigurationManager(createLogger('UnifiedConfigurationManager'));
+    // Use console-backed logger by default to avoid importing infrastructure
+    const { createConsoleLogger } = await import('../interfaces/logger.js');
+    singleton = new UnifiedConfigurationManager(createConsoleLogger('UnifiedConfigurationManager'));
     await singleton.initialize();
   }
   return singleton;
@@ -164,16 +163,8 @@ export async function createUnifiedConfigurationManager(options?: {
   configFilePath?: string;
   eventBus?: IEventBus;
 }): Promise<UnifiedConfigurationManager> {
-  const logger =
-    options?.logger ||
-    (await import('../../infrastructure/logging/logger-adapter.js')).createLogger(
-      'UnifiedConfigurationManager'
-    );
-  const manager = new UnifiedConfigurationManager(
-    logger,
-    options?.configFilePath,
-    options?.eventBus
-  );
+  const logger = options?.logger || (await import('../interfaces/logger.js')).createConsoleLogger('UnifiedConfigurationManager');
+  const manager = new UnifiedConfigurationManager(logger, options?.configFilePath, options?.eventBus);
   await manager.initialize();
   return manager;
 }

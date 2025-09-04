@@ -17,11 +17,6 @@ import { ServerModeInterface } from '../../server/server-mode.js';
 import { analysisWorkerPool } from './analysis-worker-pool.js';
 import { randomUUID } from 'crypto';
 
-interface AnalysisTask {
-  id: string;
-  files: string[];
-  delay?: number;
-}
 
 export class CLICommands {
   private context: CLIContext;
@@ -529,39 +524,4 @@ export class CLICommands {
       .join(', ');
   }
 
-  /**
-   * Dispatch analysis task to worker pool
-   */
-  // (eslint rule '@typescript-eslint/no-unused-private-class-member' removed because it is not installed)
-  private async performDirectAnalysis(
-    task: Readonly<AnalysisTask>,
-    _config: Readonly<Record<string, unknown>>
-  ): Promise<{
-    success: boolean;
-    duration: number;
-    result: {
-      totalFiles: number;
-      chunks: unknown[];
-      summary: { successRate: number };
-    };
-  }> {
-    const result = await analysisWorkerPool.runTask(task);
-
-    // Type guard for expected result structure
-    function isExpectedResult(obj: unknown): obj is { totalFiles: number } {
-      return typeof obj === 'object' && obj !== null && typeof (obj as { totalFiles?: unknown }).totalFiles === 'number';
-    }
-
-    return {
-      success: true,
-      duration: 0,
-      result: {
-        totalFiles: isExpectedResult(result) ? result.totalFiles : 0,
-        chunks: [],
-        summary: {
-          successRate: 100,
-        },
-      },
-    };
-  }
 }

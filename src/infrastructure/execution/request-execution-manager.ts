@@ -150,29 +150,53 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   private processManager: ActiveProcessManager;
   private providerRepository: any;
   private domainOrchestrator: DomainAwareToolOrchestrator;
-  private rustBackend: RustExecutionBackend;
+  private rustBackend: RustExecutionBackend | null;
   private isShuttingDown = false;
   private queueProcessor: NodeJS.Timeout | null = null;
 
   constructor(
     config: ExecutionConfig,
     processManager: ActiveProcessManager,
-    providerRepository: any
+    providerRepository: any,
+    rustBackend?: RustExecutionBackend | null
   ) {
     super();
     this.config = config;
     this.processManager = processManager;
     this.providerRepository = providerRepository;
     this.domainOrchestrator = new DomainAwareToolOrchestrator();
-    this.rustBackend = new RustExecutionBackend({
-      enableProfiling: true,
-      maxConcurrency: 4,
-      timeoutMs: config.defaultTimeout,
-      logLevel: 'info',
-    });
+    this.rustBackend = rustBackend ?? null;
 
-    // Initialize Rust backend asynchronously
-    this.initializeRustBackend();
+    // If no injected backend, lazily create one
+    if (!this.rustBackend) {
+      try {
+        const { RustExecutionBackend } = require('./rust-executor/index.js');
+        this.rustBackend = new RustExecutionBackend({
+          enableProfiling: true,
+          maxConcurrency: 4,
+          timeoutMs: config.defaultTimeout,
+          logLevel: 'info',
+        });
+        // Initialize asynchronously
+        this.initializeRustBackend();
+      } catch (e) {
+        // If import fails, leave rustBackend null and continue
+        logger.warn('RequestExecutionManager: Rust backend not available at construction', e);
+        this.rustBackend = null;
+      }
+    } else {
+      // If an injected backend exists, we may optionally initialize/verify it
+      try {
+        if (typeof (this.rustBackend as any).initialize === 'function') {
+          // Fire-and-forget initialization
+          (this.rustBackend as any).initialize().catch((err: any) =>
+            logger.warn('Injected rustBackend failed to initialize', err)
+          );
+        }
+      } catch (err) {
+        logger.warn('Error while initializing injected rustBackend', err);
+      }
+    }
 
     // Start event-driven queue processor instead of infinite loop
     this.scheduleQueueProcessor();

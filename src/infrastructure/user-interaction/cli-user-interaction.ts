@@ -16,10 +16,10 @@ import inquirer from 'inquirer';
 
 export class CLIUserInteraction implements IUserInteraction {
   private currentSpinner: Ora | null = null;
-  private isVerbose: boolean;
+  private _isVerbose: boolean;
 
   constructor(options: { verbose?: boolean } = {}) {
-    this.isVerbose = options.verbose ?? false;
+    this._isVerbose = options.verbose ?? false;
   }
 
   async display(message: string, options: DisplayOptions = {}): Promise<void> {
@@ -154,7 +154,7 @@ export class CLIUserInteraction implements IUserInteraction {
    * Set verbose mode
    */
   setVerbose(verbose: boolean): void {
-    this.isVerbose = verbose;
+    this._isVerbose = verbose;
   }
 
   private formatMessage(message: string, type?: string, prefix?: string): string {

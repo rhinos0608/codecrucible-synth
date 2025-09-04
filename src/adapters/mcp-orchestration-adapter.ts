@@ -20,9 +20,6 @@ import {
   MCPServerProfile,
   ServerDiscoveryQuery,
   ServerSelectionResult,
-  ServerOrchestrationPlan,
-  OrchestrationRequirements,
-  CapabilityType,
 } from '../domain/services/mcp-discovery-service.js';
 
 // Application layer interfaces

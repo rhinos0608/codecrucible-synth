@@ -65,7 +65,7 @@ async function basicWebSearch(query: string, numResults: number = 5): Promise<an
 
 // Ref Documentation Tool
 export class RefDocumentationTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     super({
       name: 'refDocumentationSearch',
       description: 'Search programming documentation and API references',
@@ -108,7 +108,7 @@ export class RefDocumentationTool extends BaseTool {
 
 // Exa Web Search Tool
 export class ExaWebSearchTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     super({
       name: 'exaWebSearch',
       description: 'Perform advanced web search using Exa AI',
@@ -172,7 +172,7 @@ export class ExaWebSearchTool extends BaseTool {
 
 // Exa Deep Research Tool
 export class ExaDeepResearchTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     super({
       name: 'exaDeepResearch',
       description: 'Conduct comprehensive research on complex topics',
@@ -313,7 +313,7 @@ export class ExaDeepResearchTool extends BaseTool {
 
 // Exa Company Research Tool
 export class ExaCompanyResearchTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     super({
       name: 'exaCompanyResearch',
       description: 'Research companies, startups, and business information',
@@ -482,7 +482,7 @@ export class ExaCompanyResearchTool extends BaseTool {
 
 // MCP Server Manager Tool
 export class MCPServerTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  constructor(private _agentContext: { workingDirectory: string }) {
     super({
       name: 'mcpServer',
       description: 'Manage and interact with MCP servers',

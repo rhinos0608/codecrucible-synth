@@ -10,7 +10,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
-import { mcpServerRegistry, MCPServerDefinition } from './mcp-server-registry.js';
+import { mcpServerRegistry } from './mcp-server-registry.js';
 
 export interface LifecycleConfig {
   maxStartupTime: number; // Max time for all servers to start

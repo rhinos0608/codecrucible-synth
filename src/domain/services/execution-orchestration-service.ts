@@ -17,12 +17,10 @@ import {
 } from '../entities/execution-plan.js';
 import {
   ReasoningStep,
-  ReasoningStepType,
   ConfidenceScore,
   ToolArguments,
 } from '../entities/reasoning-step.js';
-import { ToolExecution, ToolName, ExecutionStatus } from '../entities/tool-execution.js';
-import { WorkflowTemplate, WorkflowStep } from '../entities/workflow-template.js';
+import { WorkflowTemplate } from '../entities/workflow-template.js';
 
 /**
  * Execution Context Value Object

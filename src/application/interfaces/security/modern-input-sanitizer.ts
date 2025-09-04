@@ -1,7 +1,7 @@
 // Modern Input Sanitizer Interface
 // Application layer security interface
 
-import { SecurityValidation } from '../../../infrastructure/security/security-types.js';
+import { SecurityValidation } from '@/infrastructure/security/security-types.js';
 
 export interface ModernInputSanitizerInterface {
   sanitize: (input: string) => SecurityValidation;

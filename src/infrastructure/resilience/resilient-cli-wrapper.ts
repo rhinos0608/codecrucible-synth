@@ -104,7 +104,7 @@ export class ResilientCLIWrapper extends EventEmitter {
           };
         } catch (error) {
           lastError = error as Error;
-          attempts++;
+          // Remove double increment - the for loop already increments attempts
 
           // Create error context
           const errorContext: ErrorContext = {

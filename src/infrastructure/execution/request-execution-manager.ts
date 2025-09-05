@@ -172,21 +172,10 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
 
     // If no injected backend, lazily create one
     if (!this.rustBackend) {
-      try {
-        const { RustExecutionBackend } = require('./rust-executor/index.js');
-        this.rustBackend = new RustExecutionBackend({
-          enableProfiling: true,
-          maxConcurrency: 4,
-          timeoutMs: config.defaultTimeout,
-          logLevel: 'info',
-        });
-        // Initialize asynchronously
-        this.initializeRustBackend();
-      } catch (e) {
-        // If import fails, leave rustBackend null and continue
-        logger.warn('RequestExecutionManager: Rust backend not available at construction', e);
-        this.rustBackend = null;
-      }
+      // Initialize Rust backend asynchronously
+      this.initializeRustBackend().catch((e) => {
+        logger.warn('RequestExecutionManager: Failed to initialize Rust backend', e);
+      });
     } else {
       // If an injected backend exists, we may optionally initialize/verify it
       try {
@@ -210,9 +199,25 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   }
 
   private async initializeRustBackend(): Promise<void> {
+    // If rustBackend doesn't exist, try to load it dynamically
     if (!this.rustBackend) {
-      logger.warn('RequestExecutionManager: Rust backend not available');
-      return;
+      try {
+        // Use dynamic import for ESM compatibility
+        const rustModule = await import('./rust-executor/index.js');
+        const { RustExecutionBackend } = rustModule;
+        
+        this.rustBackend = new RustExecutionBackend({
+          enableProfiling: true,
+          maxConcurrency: 4,
+          timeoutMs: this.config.defaultTimeout,
+          logLevel: 'info',
+        });
+        
+        logger.info('RequestExecutionManager: Rust backend loaded dynamically');
+      } catch (e) {
+        logger.warn('RequestExecutionManager: Rust backend not available', e);
+        return;
+      }
     }
 
     try {

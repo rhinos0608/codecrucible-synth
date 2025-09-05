@@ -268,8 +268,6 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
 
   // Tool registry cache to avoid rebuilding definitions
   private toolRegistryCache: Map<string, ModelTool> | null = null;
-  private toolSelectionCache: Map<string, ModelTool[]> = new Map();
-  private readonly maxCacheSize = 50;
 
   /**
    * Initialize tool registry cache once to avoid rebuilding static definitions
@@ -293,39 +291,14 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       // Initialize tool registry cache
       const registry = this.initializeToolRegistry();
 
-      // If no query, return minimal essential tools
-      if (!userQuery) {
-        const essentialTools = ['filesystem_list', 'filesystem_read', 'git_status'];
-        return essentialTools.map(key => registry.get(key)!).filter(Boolean);
-      }
-
-      // Check cache first
-      const cacheKey = this.generateCacheKey(userQuery);
-      if (this.toolSelectionCache.has(cacheKey)) {
-        const cached = this.toolSelectionCache.get(cacheKey)!;
-        logger.debug(`🎯 Using cached tool selection: ${cached.length} tools`);
-        return cached;
-      }
-
-      // Intelligent tool selection based on query analysis
-      const selectedToolKeys = this.analyzeQueryForTools(userQuery);
-      const selectedTools = selectedToolKeys
-        .map(key => registry.get(key))
-        .filter(Boolean) as ModelTool[];
-
-      // Cache the result (with LRU eviction)
-      if (this.toolSelectionCache.size >= this.maxCacheSize) {
-        const firstKey = this.toolSelectionCache.keys().next().value;
-        if (firstKey !== undefined) {
-          this.toolSelectionCache.delete(firstKey);
-        }
-      }
-      this.toolSelectionCache.set(cacheKey, selectedTools);
-
+      // Return all available tools - let the intelligent system prompt handle selection
+      // This replaces rule-based tool filtering with AI-driven decision making
+      const allTools = Array.from(registry.values());
+      
       logger.info(
-        `🎯 Dynamic tool selection: ${selectedTools.length} tools for "${userQuery.substring(0, 50)}..." (from ${registry.size} available)`
+        `🎯 Providing all ${allTools.length} available tools to AI for intelligent selection`
       );
-      return selectedTools;
+      return allTools;
     } catch (error) {
       logger.warn('Failed to get MCP tools for model:', error);
       // Return essential tools as fallback
@@ -335,130 +308,14 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   }
 
   /**
-   * Analyze user query to determine which tools are needed
+   * Get all available tools - system prompt now handles intelligent selection
+   * This replaces the previous rule-based tool filtering approach
    */
-  private analyzeQueryForTools(query: string): string[] {
-    const normalizedQuery = query.toLowerCase();
-    const selectedTools = new Set<string>();
-
-    // Always include basic filesystem operations for most queries
-    selectedTools.add('filesystem_list');
-    selectedTools.add('filesystem_read');
-
-    // Query intent patterns
-    const patterns = [
-      // Filesystem operations
-      {
-        pattern: /\b(write|create|save|edit|modify|update)\b.*\bfile/i,
-        tools: ['filesystem_write'],
-      },
-      { pattern: /\b(stat|size|info|details|properties)\b/i, tools: ['filesystem_stats'] },
-      { pattern: /\b(show|display|cat|view|open)\b.*\bfile/i, tools: ['filesystem_read'] },
-
-      // Git operations
-      { pattern: /\bgit\s+(status|st)\b/i, tools: ['git_status'] },
-      { pattern: /\bgit\s+(add|stage)\b/i, tools: ['git_add'] },
-      { pattern: /\bgit\s+(commit|ci)\b/i, tools: ['git_commit'] },
-      { pattern: /\b(commit|stage|git)\b/i, tools: ['git_status', 'git_add', 'git_commit'] },
-
-      // Terminal operations
-      { pattern: /\b(run|execute|command|terminal|shell|bash)\b/i, tools: ['execute_command'] },
-      { pattern: /\b(npm|yarn|node|build|test|start)\b/i, tools: ['execute_command', 'npm_run'] },
-      { pattern: /\binstall\b.*\bpackage/i, tools: ['npm_install'] },
-
-      // Smithery/MCP operations
-      {
-        pattern: /\b(smithery|mcp|registry|server)\b/i,
-        tools: ['smithery_status', 'smithery_refresh'],
-      },
-
-      // TypeScript operations and diagnostics
-      {
-        pattern: /\b(typescript?|ts)\s+(errors?|issues?|problems?|check|compile)\b/i,
-        tools: ['execute_command', 'filesystem_read'],
-      },
-      {
-        pattern: /\b(type|typing)\s+(errors?|issues?|problems?|check)\b/i,
-        tools: ['execute_command', 'filesystem_read'],
-      },
-      {
-        pattern: /\b(diagnose|troubleshoot|investigate)\s+(?:.*\b)?(ts|typescript|type)\b/i,
-        tools: ['execute_command', 'filesystem_read', 'filesystem_list'],
-      },
-      {
-        pattern: /\btsc\b/i,
-        tools: ['execute_command'],
-      },
-      {
-        pattern: /\b(npm|yarn)\s+(run\s+)?(typecheck|type-check|tsc)\b/i,
-        tools: ['execute_command', 'npm_run'],
-      },
-      {
-        pattern: /\b(lint|linting|eslint|tslint)\b/i,
-        tools: ['execute_command', 'npm_run', 'filesystem_read'],
-      },
-    ];
-
-    // Apply patterns
-    for (const { pattern, tools } of patterns) {
-      if (pattern.test(normalizedQuery)) {
-        tools.forEach(tool => selectedTools.add(tool));
-      }
-    }
-
-    // Context-based tool additions
-    if (normalizedQuery.includes('analyze') || normalizedQuery.includes('check')) {
-      selectedTools.add('filesystem_stats');
-      selectedTools.add('git_status');
-    }
-
-    if (normalizedQuery.includes('fix') || normalizedQuery.includes('debug')) {
-      selectedTools.add('filesystem_write');
-      selectedTools.add('execute_command');
-    }
-
-    // TypeScript/diagnostic context additions
-    if (
-      normalizedQuery.includes('diagnose') ||
-      normalizedQuery.includes('diagnostic') ||
-      normalizedQuery.includes('troubleshoot')
-    ) {
-      selectedTools.add('execute_command'); // For running diagnostic commands
-      selectedTools.add('filesystem_read'); // For reading log files, config files
-      selectedTools.add('filesystem_list'); // For exploring project structure
-    }
-
-    // TypeScript-specific context
-    if (
-      normalizedQuery.includes('typescript') ||
-      normalizedQuery.includes('ts') ||
-      normalizedQuery.includes('type error') ||
-      normalizedQuery.includes('tsc')
-    ) {
-      selectedTools.add('execute_command'); // For running tsc, npm run typecheck
-      selectedTools.add('filesystem_read'); // For reading tsconfig.json, .ts files
-      if (!selectedTools.has('npm_run')) {
-        selectedTools.add('npm_run'); // For npm/yarn scripts
-      }
-    }
-
-    return Array.from(selectedTools);
+  private getAllAvailableTools(): string[] {
+    const registry = this.initializeToolRegistry();
+    return Array.from(registry.keys());
   }
 
-  /**
-   * Generate cache key for tool selection
-   */
-  private generateCacheKey(query: string): string {
-    // Create a normalized cache key based on query intent
-    const normalized = query
-      .toLowerCase()
-      .replace(/[^\w\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    // Use first 100 chars for cache key to balance specificity and reuse
-    return normalized.substring(0, 100);
-  }
 
   private async handlePromptRequest(request: WorkflowRequest): Promise<any> {
     const { payload } = request;

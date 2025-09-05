@@ -219,7 +219,8 @@ export class UnifiedCLICoordinator extends EventEmitter {
       maxConcurrentOperations: 10,
       enableGracefulDegradation: true,
       retryAttempts: 3,
-      timeoutMs: 120000, // 2 minutes for complex operations
+      // Configurable timeout - defaults to 5 minutes, can be overridden via environment variable
+      timeoutMs: parseInt(process.env.CLI_TIMEOUT_MS || '300000', 10), // 5 minutes default for complex operations
       fallbackMode: 'basic',
       errorNotification: true,
       ...options,

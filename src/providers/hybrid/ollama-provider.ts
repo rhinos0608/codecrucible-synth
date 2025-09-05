@@ -10,6 +10,7 @@ import {
   LLMCapabilities,
   LLMStatus,
 } from '../../domain/interfaces/llm-interfaces.js';
+import { generateSystemPrompt, generateContextualSystemPrompt } from '../../domain/prompts/system-prompt.js';
 
 export interface OllamaConfig {
   endpoint: string;
@@ -217,7 +218,8 @@ export class OllamaProvider implements LLMProvider {
         prompt_eval_count: result.prompt_eval_count,
         eval_count: result.eval_count,
         eval_duration: result.eval_duration,
-        tool_calls: result.tool_calls,
+        // Map tool_calls to toolCalls for consistency with orchestrator
+        toolCalls: result.tool_calls,
       };
     }
 
@@ -655,9 +657,17 @@ export class OllamaProvider implements LLMProvider {
         // Sanitize options to only include Ollama-supported parameters
         const sanitizedOptions = this.sanitizeOllamaOptions(request.options || {});
 
+        // Generate comprehensive system prompt with tool context
+        const availableToolNames = validatedTools.map(tool => tool.function?.name || 'unknown').filter(name => name !== 'unknown');
+        const systemPrompt = generateContextualSystemPrompt(availableToolNames, `Working with model: ${request.model || this.config.defaultModel}`);
+
         const ollamaRequest = {
           model: request.model || this.config.defaultModel,
           messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
+            },
             {
               role: 'user',
               content: request.prompt,
@@ -721,10 +731,10 @@ export class OllamaProvider implements LLMProvider {
         }
 
         // Robust JSON parsing for function calling responses
-        console.log('DEBUG: About to parse JSON for function calling');
+        logger.debug('About to parse JSON for function calling');
         const responseText = await response.text();
-        console.log('DEBUG: Raw response text length:', responseText.length);
-        console.log('DEBUG: Raw response preview:', responseText.substring(0, 300));
+        logger.debug('Raw response text length:', responseText.length);
+        logger.debug('Raw response preview:', responseText.substring(0, 300));
         
         // Reset response for parseRobustJSON (since we already consumed the text)
         const mockResponse = {
@@ -737,12 +747,12 @@ export class OllamaProvider implements LLMProvider {
           toolCallCount: result.message?.tool_calls?.length || 0,
         });
         
-        console.log('DEBUG OllamaProvider function calling: result keys:', Object.keys(result));
-        console.log('DEBUG OllamaProvider function calling: result.message keys:', result.message ? Object.keys(result.message) : 'no message');
-        console.log('DEBUG OllamaProvider function calling: result.message.tool_calls exists:', !!result.message?.tool_calls);
-        console.log('DEBUG OllamaProvider function calling: result.message.tool_calls length:', result.message?.tool_calls?.length || 0);
+        logger.debug('OllamaProvider function calling: result keys:', Object.keys(result));
+        logger.debug('OllamaProvider function calling: result.message keys:', result.message ? Object.keys(result.message) : 'no message');
+        logger.debug('OllamaProvider function calling: result.message.tool_calls exists:', !!result.message?.tool_calls);
+        logger.debug('OllamaProvider function calling: result.message.tool_calls length:', result.message?.tool_calls?.length || 0);
         if (result.message?.tool_calls?.length > 0) {
-          console.log('DEBUG OllamaProvider function calling: first tool call:', JSON.stringify(result.message.tool_calls[0], null, 2));
+          logger.debug('OllamaProvider function calling: first tool call:', JSON.stringify(result.message.tool_calls[0], null, 2));
         }
 
         // Return response in expected format
@@ -1062,7 +1072,7 @@ export class OllamaProvider implements LLMProvider {
         }
         
         // Fallback to original strategy if no tool calls found
-        const jsonMatch = responseText.match(/^({.*?})\s*[\s\S]*$/s);
+        const jsonMatch = responseText.match(/^({.*?})\s*[\s\S]*$/);
         if (jsonMatch) {
           const extractedJson = jsonMatch[1];
           logger.info('Extracted JSON from mixed content (fallback)', {
@@ -1162,14 +1172,14 @@ export class OllamaProvider implements LLMProvider {
           const jsonResponse = JSON.parse(responseText.trim());
           if (jsonResponse.message?.content) {
             actualContent = jsonResponse.message.content;
-            console.log('DEBUG OllamaProvider: extracted message.content:', actualContent.substring(0, 100));
+            logger.debug('OllamaProvider: extracted message.content:', actualContent.substring(0, 100));
           } else if (jsonResponse.response) {
             actualContent = jsonResponse.response;
-            console.log('DEBUG OllamaProvider: extracted response field:', actualContent.substring(0, 100));
+            logger.debug('OllamaProvider: extracted response field:', actualContent.substring(0, 100));
           }
         } catch (parseError) {
           // If JSON parsing fails, use the raw text
-          console.log('DEBUG OllamaProvider: JSON parse failed, using raw text');
+          logger.debug('OllamaProvider: JSON parse failed, using raw text');
         }
         
         const fallbackResponse = {
@@ -1183,7 +1193,7 @@ export class OllamaProvider implements LLMProvider {
           eval_duration: null,
         };
         
-        console.log('DEBUG OllamaProvider: final content length:', actualContent.length);
+        logger.debug('OllamaProvider: final content length:', actualContent.length);
         
         return fallbackResponse;
       }

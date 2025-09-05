@@ -141,7 +141,7 @@ export class RustExecutionBackend {
       );
 
       if (RustExecutor || createRustExecutor) {
-        this.rustExecutor = RustExecutor ? RustExecutor.create() : createRustExecutor();
+        this.rustExecutor = RustExecutor ? new RustExecutor() : createRustExecutor();
 
         // Initialize the Rust executor
         const initResult = await this.rustExecutor?.initialize();

@@ -10,6 +10,7 @@ import {
   LLMCapabilities,
   LLMStatus,
 } from '../../domain/interfaces/llm-interfaces.js';
+import { generateSystemPrompt, generateContextualSystemPrompt } from '../../domain/prompts/system-prompt.js';
 
 export interface LMStudioConfig {
   endpoint: string;

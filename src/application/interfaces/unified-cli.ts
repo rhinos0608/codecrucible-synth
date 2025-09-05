@@ -158,6 +158,12 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
           enableContextIntelligence: Boolean(this.context.options.contextAware),
           enablePerformanceOptimization: Boolean(this.context.options.performance),
           enableErrorResilience: Boolean(this.context.options.resilience),
+          // Required properties from ResilientOptions with defaults
+          enableGracefulDegradation: true,
+          retryAttempts: 3,
+          timeoutMs: 300000, // 5 minutes
+          fallbackMode: 'basic' as const,
+          errorNotification: true,
           ...this.context.options,
           ...options,
         },

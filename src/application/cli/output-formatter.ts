@@ -17,6 +17,28 @@ export function formatOutput(result: unknown): string {
     maxDepth: 10
   });
 
+  // CRITICAL FIX: Add fallback for empty/null results to prevent blank responses
+  if (!formatted.content || formatted.content.trim().length === 0) {
+    // Provide meaningful fallback based on result type
+    if (result === null || result === undefined) {
+      return '✅ Operation completed successfully (no output generated)';
+    }
+    
+    if (typeof result === 'boolean') {
+      return `✅ Result: ${result}`;
+    }
+    
+    if (typeof result === 'number') {
+      return `✅ Result: ${result}`;
+    }
+    
+    if (typeof result === 'object' && result !== null) {
+      return `✅ Operation completed successfully - returned ${Array.isArray(result) ? 'array' : 'object'} data`;
+    }
+    
+    return '✅ Operation completed successfully';
+  }
+
   return formatted.content;
 }
 

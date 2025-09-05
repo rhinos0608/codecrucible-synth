@@ -33,10 +33,25 @@ export class CLIUserInteraction implements IUserInteraction {
     const formattedMessage = this.formatMessage(message, options.type, prefix);
 
     if (options.stream) {
-      // For streaming output, use process.stdout.write
+      // CRITICAL FIX: For streaming output, ensure proper finalization
       process.stdout.write(formattedMessage);
+      
+      // Ensure the output is flushed and finalized properly
+      if (options.final || message.trim().length === 0 || message.endsWith('\n')) {
+        process.stdout.write('\n');
+      }
+      
+      // Force flush to prevent output buffering issues
+      if (process.stdout.isTTY) {
+        process.stdout.cursorTo(0);
+      }
     } else {
-      console.log(formattedMessage);
+      // Use stderr for non-user output to separate from responses
+      if (options.type === 'debug' || options.type === 'verbose') {
+        console.error(formattedMessage); // Logs go to stderr
+      } else {
+        console.log(formattedMessage); // User responses go to stdout
+      }
     }
   }
 

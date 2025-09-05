@@ -4,10 +4,12 @@
  *
  * Architecture Compliance:
  * - Domain layer: pure business logic only
- * - No infrastructure dependencies
+ * - Uses centralized PathUtilities for consistent path handling
  * - File security policies and validation rules
  * - Path sanitization and access control logic
  */
+
+import { PathUtilities } from '../../utils/path-utilities.js';
 
 export interface FileSecurityPolicy {
   allowedExtensions: string[];
@@ -325,29 +327,16 @@ export class FileSecurityService {
   }
 
   /**
-   * Sanitize file path to prevent security issues
+   * Sanitize file path using centralized PathUtilities
    */
   sanitizePath(path: string): string {
-    // Remove null bytes
-    let sanitized = path.replace(/\0/g, '');
-
-    // Normalize path separators
-    sanitized = sanitized.replace(/\\/g, '/');
-
-    // Remove double slashes
-    sanitized = sanitized.replace(/\/+/g, '/');
-
-    // Remove path traversal attempts
-    sanitized = sanitized.replace(/\.\.\//g, '');
-    sanitized = sanitized.replace(/\.\.\\/g, '');
-
-    // Remove leading/trailing whitespace
-    sanitized = sanitized.trim();
-
-    // Remove control characters
-    sanitized = sanitized.replace(/[\x00-\x1f\x7f]/g, '');
-
-    return sanitized;
+    // Use centralized path normalization for consistency
+    return PathUtilities.normalizeAIPath(path, {
+      allowAbsolute: true,
+      allowRelative: true,
+      allowTraversal: false,
+      basePath: process.cwd()
+    });
   }
 
   /**
@@ -559,7 +548,8 @@ export class FileSecurityService {
   // Private helper methods
 
   private hasPathTraversal(path: string): boolean {
-    return /\.\.(\/|\\)/.test(path) || /\.(\/|\\)\.(\/|\\)/.test(path);
+    // Use centralized path traversal detection for consistency
+    return PathUtilities.hasPathTraversal(path);
   }
 
   private findInvalidCharacters(path: string): string[] {

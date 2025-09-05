@@ -209,10 +209,13 @@ export class UnifiedLogger extends EventEmitter {
     const resetColor = '\x1b[0m';
     const color = colors[entry.level] || resetColor;
 
+    // CRITICAL FIX: Separate logs from user output by using stderr for all system logs
+    // This prevents debug/info logs from mixing with AI responses on stdout
     if (entry.level >= LogLevel.ERROR) {
       console.error(`${color}${formatted}${resetColor}`);
     } else {
-      console.log(`${color}${formatted}${resetColor}`);
+      // Send all non-error system logs to stderr to keep stdout clean for user responses
+      process.stderr.write(`${color}${formatted}${resetColor}\n`);
     }
   }
 

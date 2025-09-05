@@ -259,10 +259,35 @@ export class PathUtilities {
     try {
       const normalizedPath = path.resolve(this.normalizeAIPath(filePath));
       
-      return allowedPaths.some(allowedPath => {
+      // If no allowed paths specified, default to current working directory
+      const pathsToCheck = allowedPaths.length > 0 ? allowedPaths : [process.cwd()];
+      
+      return pathsToCheck.some(allowedPath => {
         const normalizedAllowed = path.resolve(allowedPath);
+        
+        // Check if the path is exactly the allowed path or a subdirectory
+        if (normalizedPath === normalizedAllowed) {
+          return true; // Exact match is always allowed
+        }
+        
+        // Check if it's a subdirectory
         const relativePath = path.relative(normalizedAllowed, normalizedPath);
-        return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+        const isSubdirectory = !relativePath.startsWith('..') && !path.isAbsolute(relativePath) && relativePath !== '';
+        
+        // Additional check for Windows-style absolute paths that resolve to the same location
+        if (process.platform === 'win32') {
+          try {
+            const absoluteAllowed = path.resolve(allowedPath);
+            const absoluteFile = path.resolve(filePath);
+            if (absoluteFile.startsWith(absoluteAllowed)) {
+              return true;
+            }
+          } catch (err) {
+            // Ignore resolution errors and continue with other checks
+          }
+        }
+        
+        return isSubdirectory;
       });
     } catch (error) {
       logger.warn(`Error checking path boundaries for ${filePath}:`, error);

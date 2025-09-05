@@ -19,6 +19,7 @@ export interface SecurityConfig {
   maxPathDepth: number; // Maximum directory traversal depth
   allowedExtensions: string[]; // Whitelisted file extensions
   blockedPaths: string[]; // Blacklisted path patterns
+  allowedBasePaths: string[]; // Whitelisted base paths for operations
   sanitizeInputs: boolean; // Enable input sanitization
   enablePathTraversal: boolean; // Enable path traversal protection
   maxConcurrentOperations: number; // Limit concurrent security checks
@@ -102,6 +103,11 @@ export class MCPServerSecurity {
         '__pycache__',
         '.vscode',
         '.idea',
+      ],
+      allowedBasePaths: [
+        process.cwd(),
+        // Allow absolute paths that resolve to the current directory
+        path.resolve(process.cwd()),
       ],
       sanitizeInputs: true,
       enablePathTraversal: true,
@@ -369,11 +375,14 @@ export class MCPServerSecurity {
    */
   private sanitizePath(filePath: string): string {
     // Use centralized path normalization with security features
+    // Use the first allowed base path as the reference point
+    const basePath = this.config.allowedBasePaths.length > 0 ? this.config.allowedBasePaths[0] : process.cwd();
+    
     return PathUtilities.normalizeAIPath(filePath, {
       allowAbsolute: true,
       allowRelative: true,
       allowTraversal: false,
-      basePath: process.cwd()
+      basePath: basePath
     });
   }
 
@@ -382,7 +391,7 @@ export class MCPServerSecurity {
    */
   private checkPathTraversal(filePath: string): { safe: boolean; suspicious: boolean } {
     const hasTraversal = PathUtilities.hasPathTraversal(filePath);
-    const isWithinBounds = PathUtilities.isWithinBoundaries(filePath, [process.cwd()]);
+    const isWithinBounds = PathUtilities.isWithinBoundaries(filePath, this.config.allowedBasePaths);
     
     const safe = !hasTraversal && isWithinBounds;
     const suspicious = hasTraversal || !isWithinBounds;

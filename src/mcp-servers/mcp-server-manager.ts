@@ -284,6 +284,7 @@ export class MCPServerManager {
 
   /**
    * Execute a tool with unified security and monitoring using strict typing
+   * Ensures initialization is complete before tool execution
    */
   async executeTool(
     toolName: string, 
@@ -291,6 +292,11 @@ export class MCPServerManager {
     context: ToolExecutionContext = {},
     options: ToolExecutionOptions = {}
   ): Promise<ToolExecutionResult> {
+    // Ensure initialization is complete before executing tools
+    if (!this.isInitialized) {
+      logger.debug('MCPServerManager not initialized, initializing now before tool execution');
+      await this.initialize();
+    }
     // Normalize paths before security validation to handle AI-generated paths
     const normalizedPath = this.normalizeAIPath(args.path || args.directory || args.filePath);
     

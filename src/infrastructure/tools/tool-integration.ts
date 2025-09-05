@@ -7,6 +7,7 @@ import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { createDefaultToolRegistry, createLegacyToolRegistry } from './default-tool-registry.js';
 import { createLogger } from '../logging/logger-adapter.js';
 import { unifiedToolRegistry, ToolDefinition } from './unified-tool-registry.js';
+import { PathUtilities } from '../../utils/path-utilities.js';
 
 export interface LLMFunction {
   type: 'function';
@@ -46,47 +47,39 @@ export class ToolIntegration {
   }
 
   /**
-   * Normalize file paths to ensure they are relative to the working directory
+   * Normalize file paths using centralized PathUtilities
    */
   private normalizePath(filePath: string): string {
     if (typeof filePath !== 'string') {
-      this.logger.info(`[PATH DEBUG] Non-string path:`, filePath);
+      this.logger.debug(`[PATH DEBUG] Non-string path, using as-is:`, filePath);
       return filePath;
     }
     
-    this.logger.info(`[PATH DEBUG] Original path: "${filePath}"`);
+    this.logger.debug(`[PATH DEBUG] Original path: "${filePath}"`);
     
-    // Handle placeholder repository paths more intelligently
-    // Only collapse obvious placeholder patterns, not valid nested paths
+    // Handle special AI placeholders first
     if (filePath === '/project' || filePath === '/project/' || filePath === 'codecrucible') {
-      this.logger.info(`[PATH DEBUG] Repository root placeholder detected, converting to "."`);
+      this.logger.debug(`[PATH DEBUG] Repository root placeholder detected, converting to "."`);
       return '.';
     }
     
     // Handle placeholder paths like /project/nested/file.txt by extracting the relative part
     if (filePath.startsWith('/project/') && filePath.length > 9) {
       const relativePath = filePath.substring(9); // Remove '/project/' prefix
-      this.logger.info(`[PATH DEBUG] Extracted relative path from placeholder: "${filePath}" → "${relativePath}"`);
-      return relativePath;
+      this.logger.debug(`[PATH DEBUG] Extracted relative path from placeholder: "${filePath}" → "${relativePath}"`);
+      filePath = relativePath; // Continue with extracted path
     }
     
-    // Convert absolute paths starting with "/" to relative paths
-    if (filePath.startsWith('/')) {
-      const relativePath = filePath.substring(1);
-      const result = relativePath || '.';
-      this.logger.info(`[PATH DEBUG] Absolute path converted: "${filePath}" → "${result}"`);
-      return result;
-    }
+    // Use centralized path normalization
+    const normalizedPath = PathUtilities.normalizeAIPath(filePath, {
+      allowAbsolute: true,
+      allowRelative: true,
+      allowTraversal: false,
+      basePath: process.cwd()
+    });
     
-    // Ensure path starts with "./" for clarity if it's just a filename
-    if (!filePath.startsWith('./') && !filePath.startsWith('../') && !filePath.includes('/') && filePath !== '.') {
-      const result = './' + filePath;
-      this.logger.info(`[PATH DEBUG] Filename prefixed: "${filePath}" → "${result}"`);
-      return result;
-    }
-    
-    this.logger.info(`[PATH DEBUG] Path unchanged: "${filePath}"`);
-    return filePath;
+    this.logger.debug(`[PATH DEBUG] Normalized: "${filePath}" → "${normalizedPath}"`);
+    return normalizedPath;
   }
 
   /**
@@ -151,6 +144,69 @@ export class ToolIntegration {
   }
 
   /**
+   * Create reverse mapping and aliases for tool resolution
+   */
+  private createToolAliasMapping(): Record<string, string> {
+    const aliases: Record<string, string> = {};
+    
+    // Standard aliases for filesystem tools
+    aliases['filesystem_read_file'] = 'filesystem_read_file';
+    aliases['read_file'] = 'filesystem_read_file';
+    
+    aliases['filesystem_write_file'] = 'filesystem_write_file';
+    aliases['write_file'] = 'filesystem_write_file';
+    
+    aliases['filesystem_list_directory'] = 'filesystem_list_directory';
+    aliases['list_directory'] = 'filesystem_list_directory';
+    
+    aliases['filesystem_get_stats'] = 'filesystem_get_stats';
+    aliases['get_stats'] = 'filesystem_get_stats';
+    
+    // Add aliases for all registered tools
+    for (const [toolId] of this.availableTools) {
+      aliases[toolId] = toolId; // Self-mapping
+      
+      // Create short aliases by removing prefixes
+      if (toolId.includes('_')) {
+        const shortName = toolId.split('_').slice(1).join('_');
+        if (shortName) {
+          aliases[shortName] = toolId;
+        }
+      }
+    }
+    
+    return aliases;
+  }
+
+  /**
+   * Resolve tool name through alias mapping
+   */
+  private resolveToolName(functionName: string): string | null {
+    // First check direct match
+    if (this.availableTools.has(functionName)) {
+      return functionName;
+    }
+    
+    // Create and check alias mapping
+    const aliasMapping = this.createToolAliasMapping();
+    const resolvedName = aliasMapping[functionName];
+    
+    if (resolvedName && this.availableTools.has(resolvedName)) {
+      return resolvedName;
+    }
+    
+    // Try the MCP mapping as a fallback
+    const mcpName = this.mapToMcpToolName(functionName);
+    for (const [toolId] of this.availableTools) {
+      if (this.mapToMcpToolName(toolId) === mcpName) {
+        return toolId;
+      }
+    }
+    
+    return null; // Tool not found
+  }
+
+  /**
    * Map AI-facing parameter names to MCP server parameter names
    */
   private mapArgsForMcpTool(functionName: string, args: any): any {
@@ -211,19 +267,26 @@ export class ToolIntegration {
 
     // If previous initialization failed, provide clear error message
     if (this.initializationFailed && this.lastInitializationError) {
-      throw new Error(
-        `Tool system unavailable due to previous initialization failure: ${this.lastInitializationError.message}`
-      );
+      this.logger.warn('Previous initialization failed, attempting retry', {
+        previousError: this.lastInitializationError.message
+      });
+      // Allow retry by resetting the failure flags
+      this.initializationFailed = false;
+      this.lastInitializationError = null;
     }
 
     if (this.initializationPromise) {
+      this.logger.debug('Waiting for ongoing initialization to complete');
       return this.initializationPromise;
     }
 
+    this.logger.debug('Starting tool system initialization');
     this.initializationPromise = this.initializeTools();
     try {
       await this.initializationPromise;
+      this.logger.info('Tool system initialization completed successfully');
     } catch (error) {
+      this.logger.error('Tool system initialization failed', error);
       // Reset promise to allow retry in different conditions
       this.initializationPromise = null;
       throw error;
@@ -262,7 +325,10 @@ export class ToolIntegration {
         };
         this.availableTools.set(internalTool.id, internalTool);
         
-        // CRITICAL FIX: Register tool into unified registry for execution
+        // DISABLED: Do not register with unified registry to prevent circular dependency
+        // MCPServerManager already handles unified registry registration
+        // The circular dependency was: ToolIntegration -> unifiedRegistry -> MCPManager -> unifiedRegistry -> loop
+        /*
         const toolDefinition: ToolDefinition = {
           id: internalTool.id,
           name: internalTool.name, 
@@ -286,8 +352,8 @@ export class ToolIntegration {
             cpuIntensive: false,
           },
         };
-        
         unifiedToolRegistry.registerTool(toolDefinition);
+        */
       }
 
       this.isInitialized = true;
@@ -381,16 +447,29 @@ export class ToolIntegration {
         isString: typeof toolCall.function.arguments === 'string'
       });
       
-      // Handle both string and object arguments
+      // Handle both string and object arguments with robust parsing
       let args: any;
       if (typeof toolCall.function.arguments === 'string') {
         try {
           args = JSON.parse(toolCall.function.arguments);
           
-          // Check for double-encoded JSON strings
-          if (typeof args === 'string') {
-            this.logger.info(`[DEBUG] Detected double-encoded JSON, parsing again`);
-            args = JSON.parse(args);
+          // Check for multiple levels of JSON encoding (common with AI providers)
+          let parseAttempts = 0;
+          while (typeof args === 'string' && parseAttempts < 3) {
+            parseAttempts++;
+            this.logger.debug(`[ARGS DEBUG] Detected level-${parseAttempts} encoded JSON, parsing again`);
+            
+            try {
+              const parsed = JSON.parse(args);
+              args = parsed;
+            } catch (innerError) {
+              this.logger.warn(`[ARGS DEBUG] Failed to parse level-${parseAttempts} JSON, using previous level`);
+              break; // Use the previous level if parsing fails
+            }
+          }
+          
+          if (parseAttempts > 0) {
+            this.logger.info(`[ARGS DEBUG] Successfully decoded ${parseAttempts}-level JSON encoding`);
           }
         } catch (parseError) {
           this.logger.error(`Failed to parse arguments JSON:`, parseError);
@@ -401,14 +480,31 @@ export class ToolIntegration {
         args = toolCall.function.arguments;
       }
 
+      // Validate that args is an object (not a primitive)
+      if (args === null || (typeof args !== 'object' && typeof args !== 'undefined')) {
+        this.logger.warn(`[ARGS DEBUG] Arguments resolved to primitive type: ${typeof args}, wrapping in object`);
+        args = { value: args }; // Wrap primitive values
+      }
+
       this.logger.info(`Executing tool: ${functionName} with args:`, args);
 
-      const tool = this.availableTools.get(functionName);
-      if (!tool) {
+      // Resolve tool name through alias mapping
+      const resolvedToolName = this.resolveToolName(functionName);
+      if (!resolvedToolName) {
         const availableTools = Array.from(this.availableTools.keys());
+        const aliasMapping = this.createToolAliasMapping();
+        const availableAliases = Object.keys(aliasMapping).filter(alias => alias !== aliasMapping[alias]);
+        
         throw new Error(
-          `Unknown tool: ${functionName}. Available tools: ${availableTools.join(', ')}`
+          `Unknown tool: ${functionName}. Available tools: ${availableTools.join(', ')}${
+            availableAliases.length > 0 ? `. Available aliases: ${availableAliases.join(', ')}` : ''
+          }`
         );
+      }
+
+      const tool = this.availableTools.get(resolvedToolName);
+      if (!tool) {
+        throw new Error(`Tool resolution failed for: ${functionName} -> ${resolvedToolName}`);
       }
 
       const context = {
@@ -420,10 +516,22 @@ export class ToolIntegration {
 
       const result = await tool.execute(args, context);
 
-      this.logger.info(`Tool ${functionName} executed successfully:`, {
-        success: result.success,
-        executionTime: result.metadata?.executionTime,
-      });
+      // Log based on actual execution result status
+      if (result.success !== false) {
+        this.logger.info(`Tool ${functionName} (resolved: ${resolvedToolName}) executed successfully`, {
+          success: result.success,
+          executionTime: result.metadata?.executionTime,
+          hasOutput: !!result.output,
+          outputType: typeof result.output
+        });
+      } else {
+        this.logger.warn(`Tool ${functionName} (resolved: ${resolvedToolName}) execution failed`, {
+          success: result.success,
+          error: result.error || 'Unknown error',
+          executionTime: result.metadata?.executionTime,
+          details: result.details
+        });
+      }
 
       return result;
     } catch (error) {
@@ -463,6 +571,21 @@ export class ToolIntegration {
    */
   hasToolFunctionCached(functionName: string): boolean {
     return this.availableTools.has(functionName);
+  }
+
+  /**
+   * Set the Rust backend for high-performance operations
+   */
+  setRustBackend(backend: any): void {
+    this.rustBackend = backend;
+    this.logger.info('Rust backend configured for high-performance tool operations');
+  }
+
+  /**
+   * Get the current Rust backend
+   */
+  getRustBackend(): any | null {
+    return this.rustBackend;
   }
 }
 

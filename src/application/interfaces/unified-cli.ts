@@ -25,13 +25,12 @@ import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-us
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import {
-  ApprovalModesManager,
-  Permission,
   cleanupApprovalManager,
-  getApprovalManager,
 } from '../../infrastructure/security/approval-modes-manager.js';
 import chalk from 'chalk';
 import { parseCommand, enrichContext, routeThroughTools, formatOutput } from '../cli/index.js';
+import { ApprovalHandler } from '../cli/approval-handler.js';
+import { InteractiveSessionHandler } from '../cli/interactive-session-handler.js';
 
 export interface CLIOptions {
   verbose?: boolean;
@@ -54,10 +53,13 @@ export interface CLIContext {
  */
 export class UnifiedCLI extends EventEmitter implements REPLInterface {
   private readonly coordinator: UnifiedCLICoordinator;
-  // Removed unused orchestrator property
   private readonly userInteraction: IUserInteraction;
   private readonly eventBus: IEventBus;
   private readonly logger: ILogger;
+
+  // Modular components
+  private readonly approvalHandler: ApprovalHandler;
+  private readonly interactiveSessionHandler: InteractiveSessionHandler;
 
   private readonly context: CLIContext;
   private currentSession: CLISession | null = null;
@@ -104,6 +106,32 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
     };
 
     this.coordinator = new UnifiedCLICoordinator(coordinatorOptions);
+    
+    // Initialize modular components
+    this.approvalHandler = new ApprovalHandler(this.userInteraction);
+    this.interactiveSessionHandler = new InteractiveSessionHandler(this.userInteraction, {
+      enableHelp: true,
+      enableStatus: true,
+      enableSuggestions: true,
+      defaultToDryRun: true,
+      showWelcomeMessage: true,
+    });
+    
+    // Set up callbacks for interactive session handler
+    this.interactiveSessionHandler.setCallbacks({
+      processPrompt: (prompt: string, options?: Record<string, unknown>) => this.processPrompt(prompt, options),
+      getSuggestions: async () => {
+        const suggestions = await this.getSuggestions();
+        return suggestions.map(s => ({
+          command: s.command,
+          description: s.description,
+          relevance: s.relevance,
+        }));
+      },
+      showStatus: () => this.showStatus(),
+      execCommand: (name: string, args: any[]) => this.execCommand(name, args),
+    });
+    
     this.setupEventHandlers();
   }
 
@@ -345,101 +373,23 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
       this.context.sessionId = this.currentSession.id;
     }
 
-    await this.userInteraction.display('🚀 Starting interactive mode...', { type: 'info' });
-    await this.userInteraction.display('Type "exit", "quit", or press Ctrl+C to quit.', {
-      type: 'info',
-    });
-
-    // Show quick context status if available
+    // Get context information for display
+    let contextInfo: { type?: string; language?: string; confidence?: number } = {};
     try {
       const contextStatus = await this.coordinator.getQuickContextStatus();
       if (contextStatus.basic) {
-        await this.userInteraction.display(
-          `📊 Project: ${contextStatus.basic.type} (${contextStatus.basic.language}) - Confidence: ${(contextStatus.confidence * 100).toFixed(0)}%`,
-          { type: 'info' }
-        );
+        contextInfo = {
+          type: contextStatus.basic.type,
+          language: contextStatus.basic.language,
+          confidence: contextStatus.confidence,
+        };
       }
     } catch (error) {
       // Silent fail for context status
     }
 
-    let running = true;
-    while (running) {
-      try {
-        const input = await this.userInteraction.prompt('🤖 > ');
-
-        if (['exit', 'quit', '.exit', '.quit'].includes(input.trim().toLowerCase())) {
-          running = false;
-          continue;
-        }
-
-        if (input.trim() === '') {
-          continue;
-        }
-
-        // Special commands
-        if (input.trim() === 'help' || input.trim() === '.help') {
-          await this.showHelp();
-          continue;
-        }
-
-        if (input.trim() === 'status' || input.trim() === '.status') {
-          await this.showStatus();
-          continue;
-        }
-
-        if (input.trim() === 'suggestions' || input.trim() === '.suggestions') {
-          await this.showSuggestions();
-          continue;
-        }
-
-        // Plugin command registry helpers
-        if (input.trim() === 'commands' || input.trim() === '.commands') {
-          await this.showCommands();
-          continue;
-        }
-
-        if (input.trim().startsWith('exec ') || input.trim().startsWith('.exec ')) {
-          const line = input.trim().replace(/^\.?exec\s+/, '');
-          const [name, ...rest] = line.split(/\s+/);
-          if (!name) {
-            await this.userInteraction.error('Usage: exec <command> [args as JSON or tokens]');
-            continue;
-          }
-          let args: unknown[] = [];
-          const joined = rest.join(' ');
-          if (joined) {
-            try {
-              // Try JSON array or single JSON value
-              const parsed: unknown = JSON.parse(joined);
-              args = Array.isArray(parsed) ? parsed : [parsed];
-            } catch {
-              args = rest;
-            }
-          }
-          const result: unknown = await this.execCommand(name, args);
-          await this.userInteraction.display(
-            typeof result === 'string' ? result : JSON.stringify(result, null, 2)
-          );
-          continue;
-        }
-
-        // Interactive mode defaults to dry-run to avoid accidental writes
-        const response = await this.processPrompt(input.trim(), { dryRun: true });
-        await this.userInteraction.display(response);
-      } catch (error) {
-        const errorMessage = getErrorMessage(error);
-        await this.userInteraction.error(`Error: ${errorMessage}`);
-
-        // Ask if user wants to continue
-        const continueSession = await this.userInteraction.confirm('Continue session?');
-        if (!continueSession) {
-          running = false;
-        }
-      }
-    }
-
-    await this.userInteraction.display('👋 Interactive session ended.', { type: 'success' });
+    // Delegate to InteractiveSessionHandler
+    await this.interactiveSessionHandler.startInteractive(contextInfo);
   }
 
   /**
@@ -605,7 +555,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   }
 
   /**
-   * Check operation approval using ApprovalModesManager
+   * Check operation approval using ApprovalHandler
    */
   private async checkOperationApproval(
     operation: string,
@@ -613,101 +563,20 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
     riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'medium',
     hasWriteAccess: boolean = false
   ): Promise<{ approved: boolean; reason?: string }> {
-    const approvalManager = getApprovalManager();
-
-    // Determine required permissions based on operation
-    const permissions: Permission[] = [];
-
-    if (hasWriteAccess) {
-      permissions.push(ApprovalModesManager.permissions.writeWorkingDir());
-    } else {
-      permissions.push(ApprovalModesManager.permissions.readWorkingDir());
-    }
-
-    // Add execute permission for command operations
-    if (operation.includes('execute') || operation.includes('command')) {
-      permissions.push(ApprovalModesManager.permissions.executeWorkingDir());
-    }
-
-    const request = ApprovalModesManager.createRequest(
+    return await this.approvalHandler.checkOperationApproval({
       operation,
       description,
-      permissions,
-      {
-        workingDirectory: process.cwd(),
-        enterpriseCompliance: true,
-      },
-      riskLevel
-    );
-
-    return await approvalManager.requestApproval(request);
+      riskLevel,
+      hasWriteAccess,
+      workingDirectory: process.cwd(),
+    });
   }
 
   /**
    * Handle approval mode commands
    */
   private async handleApprovalsCommand(args: string[]): Promise<void> {
-    const approvalManager = getApprovalManager();
-
-    if (args.length === 0) {
-      // Show current approval mode and statistics
-      const stats = approvalManager.getStats();
-      await this.userInteraction.display(`
-${chalk.cyan('🔒 Approval System Status')}
-
-${chalk.yellow('Current Mode:')} ${chalk.green(stats.currentMode)}
-${chalk.yellow('Cached Rules:')} ${stats.cachedRules}
-${chalk.yellow('Session Approvals:')} ${stats.sessionApprovals}
-
-${chalk.yellow('Available Modes:')}
-  • auto - Automatic approval for safe operations
-  • read-only - Only read operations allowed
-  • full-access - All operations approved (except critical)
-  • interactive - Always prompt for approval
-  • enterprise-audit - Strict compliance with audit trail
-  • voice-collaborative - Optimized for multi-voice collaboration
-
-${chalk.gray('Usage:')} approvals <mode> | approvals status | approvals clear
-      `);
-      return;
-    }
-
-    const command = args[0].toLowerCase();
-
-    switch (command) {
-      case 'status': {
-        const stats = approvalManager.getStats();
-        await this.userInteraction.display(JSON.stringify(stats, null, 2));
-        break;
-      }
-
-      case 'clear': {
-        approvalManager.clearCache();
-        await this.userInteraction.display(chalk.green('✅ Approval cache cleared'));
-        break;
-      }
-
-      case 'auto':
-      case 'read-only':
-      case 'full-access':
-      case 'interactive':
-      case 'enterprise-audit':
-      case 'voice-collaborative':
-        try {
-          approvalManager.setMode(command as any);
-          await this.userInteraction.display(chalk.green(`✅ Approval mode set to: ${command}`));
-        } catch (error) {
-          await this.userInteraction.error(
-            `Failed to set approval mode: ${getErrorMessage(error)}`
-          );
-        }
-        break;
-
-      default:
-        await this.userInteraction.error(
-          `Unknown approval command: ${command}. Use 'approvals' for help.`
-        );
-    }
+    await this.approvalHandler.handleApprovalsCommand(args);
   }
 
   /**
@@ -749,72 +618,7 @@ ${chalk.yellow('Examples:')}
    * Check if a prompt is likely a code generation request
    */
   private isLikelyCodeGeneration(prompt: string): boolean {
-    const lowerPrompt = prompt.toLowerCase();
-
-    // EXCLUDE: Help/advice/explanation questions should NOT be treated as code generation
-    const helpPatterns = [
-      'how do i',
-      'how to',
-      'help me',
-      'explain',
-      'what is',
-      'what are',
-      'why',
-      'when',
-      'where',
-      'fix',
-      'debug',
-      'solve',
-      'resolve',
-      'error',
-      'issue',
-      'problem',
-      'trouble',
-      'advice',
-      'suggest',
-      'recommend',
-      'best practice',
-      'should i',
-      'can you',
-      'could you',
-    ];
-
-    // If it's a help/advice question, definitely not code generation
-    if (helpPatterns.some(pattern => lowerPrompt.includes(pattern))) {
-      return false;
-    }
-
-    // INCLUDE: Strong code generation indicators
-    const strongGenerationKeywords = [
-      'create a',
-      'generate a',
-      'write a',
-      'build a',
-      'implement a',
-      'create class',
-      'create function',
-      'create component',
-      'create module',
-      'generate code',
-      'write code',
-      'build app',
-      'implement feature',
-    ];
-
-    // Check for strong generation patterns
-    if (strongGenerationKeywords.some(keyword => lowerPrompt.includes(keyword))) {
-      return true;
-    }
-
-    // Weaker keywords only if they appear with creation context
-    const weakKeywords = ['function', 'class', 'component', 'module', 'interface'];
-    const creationContext = ['new', 'create', 'make', 'add', 'build'];
-
-    return weakKeywords.some(
-      keyword =>
-        lowerPrompt.includes(keyword) &&
-        creationContext.some(context => lowerPrompt.includes(context))
-    );
+    return this.approvalHandler.isLikelyCodeGeneration(prompt);
   }
 
   /**
@@ -952,7 +756,8 @@ ${chalk.yellow('Capabilities:')}
     await this.coordinator.shutdown();
     this.cleanupEventHandlers();
 
-    // Cleanup singleton instances
+    // Cleanup modular components
+    this.approvalHandler.cleanup();
     cleanupApprovalManager();
 
     const sessionDuration = performance.now() - this.context.startTime;

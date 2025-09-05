@@ -50,9 +50,10 @@ export interface IUserInput {
 }
 
 export interface DisplayOptions {
-  type?: 'info' | 'warn' | 'error' | 'success';
+  type?: 'info' | 'warn' | 'error' | 'success' | 'debug' | 'verbose';
   stream?: boolean;
   prefix?: string;
+  final?: boolean; // Indicates this is the final message in a streaming sequence
 }
 
 export interface PromptOptions {

@@ -42,7 +42,7 @@ export interface RustExecutionResult {
 
 // Import the actual NAPI module types
 interface NativeRustExecutor {
-  initialize(): Promise<boolean>;
+  initialize(): boolean;
   executeFilesystem(
     operation: string,
     path: string,
@@ -58,7 +58,7 @@ interface NativeRustExecutor {
   getFilesystemOperations(): string[];
   getSupportedCommands(): string[];
   cleanup(): Promise<void>;
-  getId(): string;
+  id(): string;
 }
 
 /**
@@ -144,11 +144,11 @@ export class RustExecutionBackend {
         this.rustExecutor = RustExecutor ? new RustExecutor() : createRustExecutor();
 
         // Initialize the Rust executor
-        const initResult = await this.rustExecutor?.initialize();
+        const initResult = this.rustExecutor?.initialize();
         if (initResult) {
           this.initialized = true;
           logger.info('🚀 RustExecutionBackend initialized successfully', {
-            executorId: this.rustExecutor?.getId(),
+            executorId: this.rustExecutor?.id(),
             supportedTools: this.rustExecutor?.getSupportedTools(),
             performanceMetrics: this.options.enableProfiling,
           });
@@ -157,13 +157,6 @@ export class RustExecutionBackend {
           this.initialized = false;
           throw new Error('Rust executor initialization failed');
         }
-
-        this.initialized = true;
-        logger.info('🚀 RustExecutionBackend initialized successfully', {
-          executorId: this.rustExecutor?.getId(),
-          supportedTools: this.rustExecutor?.getSupportedTools(),
-          performanceMetrics: this.options.enableProfiling,
-        });
         return true;
       }
 

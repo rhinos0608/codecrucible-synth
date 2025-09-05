@@ -33,6 +33,8 @@ export class ToolIntegration {
   protected availableTools: Map<string, any> = new Map();
   private initializationPromise: Promise<void> | null = null;
   private isInitialized = false;
+  private initializationFailed = false;
+  private lastInitializationError: Error | null = null;
   private rustBackend: any | null = null;
 
   private readonly logger = createLogger('ToolIntegration');
@@ -44,11 +46,18 @@ export class ToolIntegration {
   }
 
   /**
-   * Lazy initialization with race condition protection
+   * Lazy initialization with race condition protection and proper error handling
    */
   private async ensureInitialized(): Promise<void> {
     if (this.isInitialized) {
       return;
+    }
+
+    // If previous initialization failed, provide clear error message
+    if (this.initializationFailed && this.lastInitializationError) {
+      throw new Error(
+        `Tool system unavailable due to previous initialization failure: ${this.lastInitializationError.message}`
+      );
     }
 
     if (this.initializationPromise) {
@@ -56,7 +65,13 @@ export class ToolIntegration {
     }
 
     this.initializationPromise = this.initializeTools();
-    await this.initializationPromise;
+    try {
+      await this.initializationPromise;
+    } catch (error) {
+      // Reset promise to allow retry in different conditions
+      this.initializationPromise = null;
+      throw error;
+    }
   }
 
   private async initializeTools(): Promise<void> {
@@ -91,16 +106,25 @@ export class ToolIntegration {
       );
     } catch (error) {
       this.logger.error('Failed to initialize tools:', error);
-      // Don't throw - allow system to continue without tools
-      this.isInitialized = true; // Mark as initialized to prevent retry loops
+      this.initializationFailed = true;
+      this.lastInitializationError = error as Error;
+      // DO NOT mark as initialized - this allows the system to know tools are unavailable
+      // and potentially retry under different conditions
+      throw new Error(`Tool initialization failed: ${(error as Error).message}`);
     }
   }
 
   /**
    * Get all tools in LLM function calling format with lazy initialization
+   * Returns empty array if tools are unavailable rather than failing silently
    */
   async getLLMFunctions(): Promise<LLMFunction[]> {
-    await this.ensureInitialized();
+    try {
+      await this.ensureInitialized();
+    } catch (error) {
+      this.logger.warn('Tools unavailable for LLM functions:', error);
+      return []; // Return empty array instead of failing
+    }
 
     const functions: LLMFunction[] = [];
 
@@ -119,6 +143,7 @@ export class ToolIntegration {
       });
     }
 
+    this.logger.info(`Providing ${functions.length} tools to LLM for function calling`);
     return functions;
   }
 

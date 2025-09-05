@@ -316,6 +316,41 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     return Array.from(registry.keys());
   }
 
+  /**
+   * Create enhanced prompt with explicit tool usage instructions
+   * This is critical to ensure AI uses available tools instead of hallucinating responses
+   */
+  private createEnhancedPrompt(userPrompt: string, toolsAvailable: boolean): string {
+    if (!toolsAvailable) {
+      return userPrompt;
+    }
+
+    const systemInstructions = `SYSTEM INSTRUCTIONS: You have access to powerful tools for file system operations, code analysis, and project management. You MUST use these tools when:
+
+1. **Reading/analyzing files**: Use filesystem_read_file to read actual file contents instead of guessing
+2. **Listing directories**: Use filesystem_list_directory to see what files exist instead of assuming
+3. **Writing/modifying files**: Use filesystem_write_file to make actual changes instead of showing example code
+4. **Getting file information**: Use filesystem_get_stats to check if files exist and get metadata
+5. **Code analysis**: Read the actual files first, then provide analysis based on real content
+6. **Making changes**: Always read existing files first, then make informed modifications
+
+DO NOT:
+- Generate responses based on assumptions about file contents
+- Provide generic code examples without checking actual project structure
+- Make recommendations without examining the actual codebase first
+- Describe files or code without actually reading them
+
+ALWAYS:
+- Use tools to examine the actual state of the project before responding
+- Base your responses on real file contents, not knowledge or assumptions
+- Read configuration files, source code, and project structure when relevant
+- Verify file existence before making recommendations
+
+User Request: ${userPrompt}`;
+
+    return systemInstructions;
+  }
+
 
   private async handlePromptRequest(request: WorkflowRequest): Promise<any> {
     const { payload } = request;
@@ -327,19 +362,28 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
           ? await this.getMCPToolsForModel(payload.input || payload.prompt)
           : [];
 
+      // CRITICAL FIX: Create enhanced prompt with explicit tool usage instructions
+      const originalPrompt = payload.input || payload.prompt;
+      const enhancedPrompt = this.createEnhancedPrompt(originalPrompt, mcpTools.length > 0);
+      
       const modelRequest: ModelRequest = {
         id: request.id,
-        prompt: payload.input || payload.prompt,
+        prompt: enhancedPrompt,
         model: payload.options?.model,
         temperature: payload.options?.temperature,
         maxTokens: payload.options?.maxTokens,
-        stream: payload.options?.stream || false,
+        stream: false, // Temporarily disable streaming to test tool usage
         tools: mcpTools, // Include MCP tools for AI model (empty array if useTools is false)
         context: request.context,
         // CRITICAL FIX: Always include num_ctx to override Ollama's 4096 default
         num_ctx: parseInt(process.env.OLLAMA_NUM_CTX || '131072'),
         options: payload.options,
       };
+      
+      // Log when enhanced prompt is used
+      if (mcpTools.length > 0) {
+        logger.info(`🎯 Enhanced prompt with explicit tool usage instructions (${mcpTools.length} tools available)`);
+      }
 
       // Log when tools are disabled for simple questions
       if (payload.options?.useTools === false) {
@@ -544,16 +588,24 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
 
     // Get MCP tools for AI model with smart selection
     const mcpTools = await this.getMCPToolsForModel(analysisPrompt);
+    
+    // CRITICAL FIX: Create enhanced analysis prompt with explicit tool usage instructions
+    const enhancedAnalysisPrompt = this.createEnhancedPrompt(analysisPrompt, mcpTools.length > 0);
 
     const modelRequest: ModelRequest = {
       id: request.id,
-      prompt: analysisPrompt,
+      prompt: enhancedAnalysisPrompt,
       model: payload.options?.model,
       temperature: payload.options?.temperature || 0.3, // Lower temperature for analysis
       maxTokens: payload.options?.maxTokens || 32768, // Increased from 2000 for comprehensive responses
       tools: mcpTools, // Include MCP tools for analysis too
       context: request.context,
     };
+    
+    // Log when enhanced analysis prompt is used
+    if (mcpTools.length > 0) {
+      logger.info(`🔍 Enhanced analysis prompt with explicit tool usage instructions (${mcpTools.length} tools available)`);
+    }
 
     const result = await this.processModelRequest(modelRequest);
 

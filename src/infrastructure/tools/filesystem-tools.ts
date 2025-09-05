@@ -281,98 +281,102 @@ export class FilesystemTools {
   getTools(): Array<any> {
     return [
       {
-        id: 'read_file',
-        name: 'Read File',
-        description: 'Read contents of a file',
+        id: 'filesystem_read',
+        name: 'filesystem_read_file',
+        description: 'Read the contents of a file from the filesystem',
         inputSchema: {
           type: 'object',
           properties: {
-            path: {
+            file_path: {
               type: 'string',
-              description: 'The file path to read',
+              description: 'The path to the file to read',
             },
           },
-          required: ['path'],
+          required: ['file_path'],
         },
-        execute: async (args: any) => {
-          const content = await this.readFile(args.path);
+        execute: async (args: any, context: any) => {
+          const startTime = context?.startTime || Date.now();
+          const content = await this.readFile(args.file_path);
           return {
             success: true,
             data: content,
-            metadata: { executionTime: Date.now() - args.startTime },
+            metadata: { executionTime: Date.now() - startTime },
           };
         },
       },
       {
-        id: 'write_file',
-        name: 'Write File',
-        description: 'Write content to a file',
+        id: 'filesystem_write',
+        name: 'filesystem_write_file',
+        description: 'Write content to a file on the filesystem',
         inputSchema: {
           type: 'object',
           properties: {
-            path: {
+            file_path: {
               type: 'string',
-              description: 'The file path to write to',
+              description: 'The path where to write the file',
             },
             content: {
               type: 'string',
               description: 'The content to write to the file',
             },
           },
-          required: ['path', 'content'],
+          required: ['file_path', 'content'],
         },
-        execute: async (args: any) => {
-          await this.writeFile(args.path, args.content);
+        execute: async (args: any, context: any) => {
+          const startTime = context?.startTime || Date.now();
+          await this.writeFile(args.file_path, args.content);
           return {
             success: true,
-            data: `File written successfully: ${args.path}`,
-            metadata: { executionTime: Date.now() - args.startTime },
+            data: `File written successfully: ${args.file_path}`,
+            metadata: { executionTime: Date.now() - startTime },
           };
         },
       },
       {
-        id: 'list_files',
-        name: 'List Files',
-        description: 'List files and directories in a directory',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            directory: {
-              type: 'string',
-              description: 'The directory path to list',
-            },
-          },
-          required: ['directory'],
-        },
-        execute: async (args: any) => {
-          const files = await this.listFiles(args.directory);
-          return {
-            success: true,
-            data: files,
-            metadata: { executionTime: Date.now() - args.startTime },
-          };
-        },
-      },
-      {
-        id: 'file_exists',
-        name: 'File Exists',
-        description: 'Check if a file or directory exists',
+        id: 'filesystem_list',
+        name: 'filesystem_list_directory',
+        description: 'List files and directories in a specified path',
         inputSchema: {
           type: 'object',
           properties: {
             path: {
               type: 'string',
-              description: 'The path to check for existence',
+              description: 'The directory path to list contents for',
             },
           },
           required: ['path'],
         },
-        execute: async (args: any) => {
-          const exists = await this.exists(args.path);
+        execute: async (args: any, context: any) => {
+          const startTime = context?.startTime || Date.now();
+          const files = await this.listFiles(args.path);
           return {
             success: true,
-            data: exists,
-            metadata: { executionTime: Date.now() - args.startTime },
+            data: files,
+            metadata: { executionTime: Date.now() - startTime },
+          };
+        },
+      },
+      {
+        id: 'filesystem_stats',
+        name: 'filesystem_get_stats',
+        description: 'Get file or directory statistics (size, modified time, etc.)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            file_path: {
+              type: 'string',
+              description: 'The path to get statistics for',
+            },
+          },
+          required: ['file_path'],
+        },
+        execute: async (args: any, context: any) => {
+          const startTime = context?.startTime || Date.now();
+          const exists = await this.exists(args.file_path);
+          return {
+            success: true,
+            data: { exists, path: args.file_path },
+            metadata: { executionTime: Date.now() - startTime },
           };
         },
       },

@@ -121,7 +121,7 @@ impl RustExecutor {
     }
 
     /// Get the executor ID
-    #[napi(getter)]
+    #[napi]
     pub fn id(&self) -> String {
         self.id.clone()
     }

@@ -24,7 +24,6 @@ import {
   getGlobalEnhancedToolIntegration,
 } from '../../infrastructure/tools/enhanced-tool-integration.js';
 import { getGlobalToolIntegration } from '../../infrastructure/tools/tool-integration.js';
-import { DomainAwareToolOrchestrator } from '../tools/domain-aware-tool-orchestrator.js';
 import { requestBatcher } from '../performance/intelligent-request-batcher.js';
 import { adaptiveTuner } from '../performance/adaptive-performance-tuner.js';
 import { requestTimeoutOptimizer } from '../performance/request-timeout-optimizer.js';
@@ -152,7 +151,6 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   }> = [];
   private processManager: ActiveProcessManager;
   private providerRepository: any;
-  private domainOrchestrator: DomainAwareToolOrchestrator;
   private rustBackend: RustExecutionBackend | null;
   private isShuttingDown = false;
   private queueProcessor: NodeJS.Timeout | null = null;
@@ -167,7 +165,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     this.config = config;
     this.processManager = processManager;
     this.providerRepository = providerRepository;
-    this.domainOrchestrator = new DomainAwareToolOrchestrator();
+    // Domain orchestrator removed - AI now intelligently selects tools
     this.rustBackend = rustBackend ?? null;
 
     // If no injected backend, lazily create one
@@ -405,47 +403,40 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         if (supportsTools && toolIntegration) {
           const allTools = await toolIntegration.getLLMFunctions();
 
-          // Use domain orchestrator to select relevant tools only
-          const domainResult = this.domainOrchestrator.getToolsForPrompt(
-            request.prompt || '',
-            allTools
-          );
+          // Let the AI choose which tools to use - no pre-filtering
+          // The AI is intelligent enough to select appropriate tools for the task
+          tools = allTools;
+          domainInfo = 'all-tools-available';
 
-          tools = domainResult.tools;
-          domainInfo = `${domainResult.analysis.primaryDomain} (${(domainResult.analysis.confidence * 100).toFixed(1)}%)`;
-
-          logger.info('🎯 REQUEST-EXECUTION-MANAGER: Domain-aware tool selection', {
+          logger.info('🎯 REQUEST-EXECUTION-MANAGER: All tools provided to AI for intelligent selection', {
             prompt: `${request.prompt?.substring(0, 80)}...`,
-            primaryDomain: domainResult.analysis.primaryDomain,
-            confidence: domainResult.analysis.confidence.toFixed(2),
-            originalToolCount: allTools.length,
-            selectedToolCount: tools.length,
+            availableToolCount: allTools.length,
             toolNames: tools.map(t => t.function?.name || t.name),
-            reasoning: domainResult.reasoning,
+            approach: 'AI-driven tool selection',
           });
         }
 
-        // ENHANCED DEBUG: Show domain-aware tool selection results
-        logger.info('🔧 ENHANCED TOOL DEBUG: Domain-aware request execution status', {
+        // ENHANCED DEBUG: Show AI-driven tool selection status
+        logger.info('🔧 ENHANCED TOOL DEBUG: AI-driven tool selection status', {
           provider: providerType,
           model: provider.getModelName?.() || 'unknown',
           supportsTools,
           hasEnhanced: !!enhancedToolIntegration,
           hasBasic: !!getGlobalToolIntegration(),
           hasIntegration: !!toolIntegration,
-          selectedToolCount: tools.length,
-          domainInfo,
+          availableToolCount: tools.length,
+          approach: 'AI-intelligent-selection',
         });
 
         if (tools.length > 0) {
-          logger.info('🎯 DOMAIN-SELECTED TOOLS for request execution', {
+          logger.info('✅ ALL TOOLS PROVIDED for AI intelligent selection', {
             toolNames: tools.map(t => t.function?.name || t.name),
-            domain: domainInfo,
-            sampleTool: tools[0],
+            approach: 'ai-driven',
+            toolCount: tools.length,
           });
         } else {
-          logger.warn('⚠️ NO DOMAIN TOOLS SELECTED for request execution', {
-            domain: domainInfo,
+          logger.warn('⚠️ NO TOOLS AVAILABLE for request execution', {
+            integrationStatus: 'failed',
           });
         }
 

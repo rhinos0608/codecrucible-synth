@@ -45,7 +45,7 @@ export class ResilientCLIWrapper extends EventEmitter {
     this.defaultOptions = {
       enableGracefulDegradation: true,
       retryAttempts: 3,
-      timeoutMs: 30000,
+      timeoutMs: 120000, // 2 minutes for complex AI operations
       fallbackMode: 'basic',
       errorNotification: true,
       ...options,

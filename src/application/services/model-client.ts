@@ -77,13 +77,19 @@ export class ModelClient extends EventEmitter implements IModelClient {
       const raw = await adapter.request(processed);
       return this.responseHandler.parse(raw, adapter.name);
     } catch (err) {
+      // handleError has return type 'never' and always throws
       this.responseHandler.handleError(err);
     }
   }
 
   async generate(prompt: string, options: any = {}): Promise<string> {
-    const response = await this.request({ prompt, ...options });
-    return response.content;
+    try {
+      const response = await this.request({ prompt, ...options });
+      return response?.content || '';
+    } catch (err) {
+      this.logger.error('ModelClient.generate() failed:', err);
+      throw err;
+    }
   }
 
   async *stream(request: ModelRequest): AsyncIterableIterator<StreamToken> {

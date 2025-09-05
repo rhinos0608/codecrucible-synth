@@ -8,10 +8,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::time::{Duration, Instant};
 use thiserror::Error;
-use tokio::{process::Command, time::timeout};
+#[cfg(test)]
+use std::process::Stdio;
+#[cfg(test)]
+use tokio::process::Command;
+#[cfg(test)]
+use tokio::time::timeout;
 
 #[derive(Error, Debug)]
 pub enum CommandExecutionError {
@@ -117,10 +121,13 @@ pub struct CommandExecutor {
     isolation: ProcessIsolation,
     command_whitelist: Vec<String>,
     blocked_patterns: Vec<String>,
+    #[cfg_attr(not(unix), allow(dead_code))]
     max_execution_time: Duration,
+    #[allow(dead_code)]
     max_output_size: usize,
     /// Maximum amount of memory the spawned process can allocate (in bytes).
     /// This limit is best-effort and currently enforced only on Unix systems.
+    #[cfg_attr(not(unix), allow(dead_code))]
     max_memory_bytes: u64,
 }
 
@@ -344,6 +351,7 @@ impl CommandExecutor {
     }
 
     /// Execute the actual command (runs in isolated process)
+    #[cfg(test)]
     async fn execute_command_internal(
         &self,
         request: CommandRequest,

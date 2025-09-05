@@ -4,6 +4,8 @@
  */
 
 import { logger } from '../../infrastructure/logging/logger.js';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 export interface EnterpriseConfig {
   security: {
@@ -35,13 +37,26 @@ export interface EnterpriseConfig {
 export class EnterpriseConfigManager {
   private config: EnterpriseConfig;
   private readonly configPath: string;
+  private initialized: boolean = false;
 
   public constructor(configPath: string = './config/enterprise.json') {
     this.configPath = configPath;
     this.config = this.getDefaultConfig();
-    this.loadConfig().catch(error => {
-      logger.error('Failed to load config during initialization:', error);
-    });
+    // Don't load async in constructor - require explicit initialization
+  }
+
+  /**
+   * Initialize the configuration manager by loading config from disk
+   * This must be called before using the manager
+   */
+  public async initialize(): Promise<void> {
+    if (this.initialized) {
+      logger.debug('EnterpriseConfigManager already initialized');
+      return;
+    }
+    
+    await this.loadConfig();
+    this.initialized = true;
   }
 
   private getDefaultConfig(): EnterpriseConfig {
@@ -75,10 +90,35 @@ export class EnterpriseConfigManager {
 
   private async loadConfig(): Promise<void> {
     try {
-      // TODO: Implement actual config loading from this.configPath
       logger.debug(`Loading enterprise config from: ${this.configPath}`);
-      // Simulate an asynchronous operation, e.g., reading a file
-      await new Promise(resolve => setTimeout(resolve, 100)); // Simulated delay
+      
+      // Resolve the config path relative to the project root
+      const resolvedPath = path.resolve(process.cwd(), this.configPath);
+      
+      // Check if file exists
+      try {
+        await fs.access(resolvedPath);
+      } catch {
+        // File doesn't exist, create it with defaults
+        logger.info('Config file not found, creating with defaults');
+        await this.saveConfig();
+        return;
+      }
+      
+      // Read and parse the config file
+      const configData = await fs.readFile(resolvedPath, 'utf-8');
+      const loadedConfig = JSON.parse(configData) as Partial<EnterpriseConfig>;
+      
+      // Merge loaded config with defaults to ensure all fields exist
+      this.config = {
+        ...this.getDefaultConfig(),
+        ...loadedConfig,
+        security: { ...this.getDefaultConfig().security, ...loadedConfig.security },
+        monitoring: { ...this.getDefaultConfig().monitoring, ...loadedConfig.monitoring },
+        backup: { ...this.getDefaultConfig().backup, ...loadedConfig.backup },
+        compliance: { ...this.getDefaultConfig().compliance, ...loadedConfig.compliance },
+      };
+      
       logger.info('Enterprise configuration loaded successfully');
     } catch (error) {
       logger.warn('Failed to load enterprise config, using defaults:', error);
@@ -86,7 +126,14 @@ export class EnterpriseConfigManager {
   }
 
   public getConfig(): EnterpriseConfig {
+    if (!this.initialized) {
+      logger.warn('EnterpriseConfigManager used before initialization, returning defaults');
+    }
     return { ...this.config };
+  }
+
+  public isInitialized(): boolean {
+    return this.initialized;
   }
 
   public getSecurityConfig() {
@@ -112,11 +159,23 @@ export class EnterpriseConfigManager {
 
   public async saveConfig(): Promise<void> {
     try {
-      // Simulate an asynchronous operation, e.g., saving to a file
-      await new Promise(resolve => setTimeout(resolve, 100)); // Simulated delay
+      const resolvedPath = path.resolve(process.cwd(), this.configPath);
+      
+      // Ensure the directory exists
+      const dir = path.dirname(resolvedPath);
+      await fs.mkdir(dir, { recursive: true });
+      
+      // Write the config file
+      await fs.writeFile(
+        resolvedPath,
+        JSON.stringify(this.config, null, 2),
+        'utf-8'
+      );
+      
       logger.info('Enterprise configuration saved successfully');
     } catch (error) {
       logger.error('Failed to save enterprise config:', error);
+      throw error;
     }
   }
 

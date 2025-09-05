@@ -14,6 +14,7 @@ import { logger } from '../../infrastructure/logging/unified-logger.js';
 
 export type CommandIntent =
   | 'analyze'
+  | 'diagnose'
   | 'generate'
   | 'refactor'
   | 'fix'
@@ -107,20 +108,48 @@ export class NaturalLanguageInterface {
     return [
       {
         intent: 'analyze',
-        keywords: ['analyze', 'review', 'audit', 'check', 'examine', 'inspect', 'look at', 'study'],
+        keywords: ['analyze', 'review', 'audit', 'check', 'examine', 'inspect', 'look at', 'study', 'diagnose', 'diagnostic', 'troubleshoot', 'investigate'],
         patterns: [
           /analyze\s+(?:this|the|my)?\s*(.*)/i,
           /review\s+(?:this|the|my)?\s*(.*)/i,
           /audit\s+(?:this|the|my)?\s*(.*)/i,
+          /(?:diagnose|diagnostic|troubleshoot)\s+(?:this|the|my)?\s*(.*)/i,
+          /(?:investigate|check\s+for)\s+(?:the|any|these)?\s*(.*)/i,
           /(?:what|how)\s+(?:does|is)\s+(?:this|the)\s+(.*?)(?:\s+(?:work|do))?/i,
+          /(?:typescript?|ts)\s+(?:errors?|issues?|problems?)/i,
+          /(?:type\s+)?(?:errors?|issues?|problems?)\s+(?:in|with|from)\s+(.*)/i,
         ],
         examples: [
           'analyze this code',
           'review my component',
           'audit the security',
           'examine this function',
+          'diagnose TS errors',
+          'troubleshoot TypeScript issues',
+          'investigate type problems',
         ],
         weight: 0.9,
+      },
+      {
+        intent: 'diagnose',
+        keywords: ['diagnose', 'diagnostic', 'troubleshoot', 'investigate', 'debug', 'find issue', 'find problem'],
+        patterns: [
+          /(?:diagnose|diagnostic|troubleshoot)\s+(?:the|this|these|my)?\s*(.*)/i,
+          /(?:investigate|find)\s+(?:the|any)?\s*(?:issue|problem|bug|error)\s*(?:in|with|from)?\s*(.*)/i,
+          /(?:typescript?|ts)\s+(?:errors?|issues?|problems?|bugs?)/i,
+          /(?:type\s+)?(?:errors?|issues?|problems?|bugs?)\s+(?:in|with|from)\s+(.*)/i,
+          /(?:what\'s|whats)\s+wrong\s+(?:with|in)\s+(.*)/i,
+          /(?:why\s+(?:is|are|does|doesn\'t))\s+(.*?)\s+(?:not\s+working|failing|broken)/i,
+        ],
+        examples: [
+          'diagnose TS errors',
+          'troubleshoot TypeScript issues',
+          'investigate type problems',
+          'find issues in this code',
+          'what\'s wrong with this function',
+          'why is this component broken',
+        ],
+        weight: 0.95, // Higher weight than analyze for diagnostic queries
       },
       {
         intent: 'generate',
@@ -357,6 +386,11 @@ export class NaturalLanguageInterface {
         /check\s+(\w+(?:\s+\w+)?)/i,
         /review\s+(\w+(?:\s+\w+)?)/i,
       ],
+      diagnose: [
+        /diagnose\s+(\w+(?:\s+\w+)?)/i,
+        /troubleshoot\s+(\w+(?:\s+\w+)?)/i,
+        /investigate\s+(\w+(?:\s+\w+)?)/i,
+      ],
       generate: [
         /create\s+(?:a|an)\s+(\w+(?:\s+\w+)?)/i,
         /generate\s+(\w+(?:\s+\w+)?)/i,
@@ -430,6 +464,7 @@ export class NaturalLanguageInterface {
     // Add intent as action verb
     const intentVerbs: Record<CommandIntent, string> = {
       analyze: 'Analyze and provide insights about',
+      diagnose: 'Diagnose and troubleshoot problems in',
       generate: 'Create and implement',
       refactor: 'Refactor and improve',
       fix: 'Debug and fix issues in',

@@ -219,7 +219,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
       maxConcurrentOperations: 10,
       enableGracefulDegradation: true,
       retryAttempts: 3,
-      timeoutMs: 30000,
+      timeoutMs: 120000, // 2 minutes for complex operations
       fallbackMode: 'basic',
       errorNotification: true,
       ...options,
@@ -521,15 +521,16 @@ export class UnifiedCLICoordinator extends EventEmitter {
       const enhancedInput = contextEnhancement?.enhancedPrompt || contextEnhancedInput;
 
       // Use natural language intent to refine operation type if confidence is high
-      let effectiveOperationType: 'analyze' | 'prompt' | 'execute' | 'navigate' | 'suggest' =
+      let effectiveOperationType: 'analyze' | 'diagnose' | 'prompt' | 'execute' | 'navigate' | 'suggest' =
         request.type;
       if (parsedCommand && parsedCommand.confidence > 0.5) {
         // Map natural language intents to operation types
         const intentToOperationMap: Record<
           string,
-          'analyze' | 'prompt' | 'execute' | 'navigate' | 'suggest'
+          'analyze' | 'diagnose' | 'prompt' | 'execute' | 'navigate' | 'suggest'
         > = {
           analyze: 'analyze',
+          diagnose: 'diagnose',
           review: 'analyze',
           explain: 'analyze', // Explanation should be analysis, not code generation
           generate: 'prompt', // Code generation goes through prompt system
@@ -586,15 +587,17 @@ export class UnifiedCLICoordinator extends EventEmitter {
             }
           } else {
             // Check if this is a simple question that should go directly to AI
-            const inputStr = enhancedInput as string;
-            const isSimpleQuestion = this.isSimpleQuestion(inputStr);
+            // IMPORTANT: Use original input for classification, not enhanced context
+            const originalInputStr = request.input as string;
+            const isSimpleQuestion = this.isSimpleQuestion(originalInputStr);
 
             if (isSimpleQuestion) {
               // Route simple questions directly to orchestrator for real AI responses
-              logger.info('🎯 Routing simple question directly to AI orchestrator');
+              // BUT don't include tools for simple questions to enable pure streaming
+              logger.info('🎯 Routing simple question directly to AI orchestrator (no tools)');
               return await this.executeUseCaseWithWorkflow(
                 sessionId,
-                async () => this.executeViaOrchestrator(request, enhancedInput, options),
+                async () => this.executeViaOrchestratorWithoutTools(request, enhancedInput, options),
                 'AI response'
               );
             } else {
@@ -644,6 +647,19 @@ export class UnifiedCLICoordinator extends EventEmitter {
               'prompt processing'
             );
           }
+        }
+
+        case 'diagnose': {
+          // Handle diagnostic queries with specialized tool selection
+          logger.info('🔍 Processing diagnostic request with enhanced tooling');
+          
+          // For diagnostic queries, we want to use tools that can help identify problems
+          // This includes file analysis, type checking, linting, etc.
+          return await this.executeUseCaseWithWorkflow(
+            sessionId,
+            async () => this.executeViaOrchestrator(request, enhancedInput, options),
+            'diagnostic analysis'
+          );
         }
 
         case 'execute':
@@ -823,13 +839,19 @@ export class UnifiedCLICoordinator extends EventEmitter {
     operationType: string
   ): Promise<any> {
     try {
-      // Execute the use case directly - the streaming should be handled by the model client
-      // Not by simulating streaming with static text
+      logger.info(`🌊 Starting streaming for ${operationType}`);
+      
+      // Execute the use case - streaming tokens will be handled by model client
+      // The streaming visual feedback will be handled by the concrete workflow orchestrator
       const result = await useCase();
+      
+      logger.info(`✅ Streaming completed for ${operationType}`);
+      
       return result;
     } catch (error) {
       // Ensure streaming is stopped on error
       streamingWorkflowIntegration.stopStreaming(stepId);
+      logger.error(`❌ Streaming failed for ${operationType}:`, error);
       throw error;
     }
   }
@@ -1057,7 +1079,11 @@ export class UnifiedCLICoordinator extends EventEmitter {
       payload: {
         input: enhancedInput,
         originalInput: request.input,
-        options,
+        options: {
+          ...options,
+          // CRITICAL FIX: Enable streaming for Ollama responses
+          stream: true,
+        },
       },
       context: request.session?.context,
       metadata: {
@@ -1065,6 +1091,48 @@ export class UnifiedCLICoordinator extends EventEmitter {
         capabilities: {
           contextIntelligence: options.enableContextIntelligence,
           performanceOptimized: options.enablePerformanceOptimization,
+          errorResilience: options.enableErrorResilience,
+        },
+      },
+    };
+
+    const workflowResponse = await this.orchestrator.processRequest(workflowRequest);
+
+    if (!workflowResponse.success) {
+      throw workflowResponse.error || new Error('Workflow execution failed');
+    }
+
+    return workflowResponse.result;
+  }
+
+  /**
+   * Execute via orchestrator without tools (for simple questions to enable pure streaming)
+   */
+  private async executeViaOrchestratorWithoutTools(
+    request: CLIOperationRequest,
+    enhancedInput: string | any,
+    options: UnifiedCLIOptions
+  ): Promise<any> {
+    const workflowRequest: WorkflowRequest = {
+      id: request.id,
+      type: this.mapOperationType(request.type),
+      payload: {
+        input: enhancedInput,
+        originalInput: request.input,
+        options: {
+          ...options,
+          // CRITICAL FIX: Enable streaming for Ollama responses
+          stream: true,
+          // CRITICAL: Disable tools for simple questions to enable pure streaming
+          useTools: false,
+        },
+      },
+      context: request.session?.context,
+      metadata: {
+        coordinatorVersion: '2.0.0-clean-architecture',
+        capabilities: {
+          contextIntelligence: options.enableContextIntelligence,
+          performanceOptimization: options.enablePerformanceOptimization,
           errorResilience: options.enableErrorResilience,
         },
       },

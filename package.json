@@ -11,7 +11,6 @@
   },
   "scripts": {
     "build": "npm run lint && npm run build:rust && tsc && npm run copy-assets",
-    "build:all": "npm run lint && npm run build:rust && tsc && npm run copy-assets",
     "build:rust": "cd rust-executor && napi build --release",
     "build:rust:dev": "cd rust-executor && napi build",
     "build:cross-platform": "cd rust-executor && napi build --release --target x86_64-pc-windows-msvc && napi build --release --target x86_64-apple-darwin && napi build --release --target x86_64-unknown-linux-gnu",

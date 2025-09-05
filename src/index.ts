@@ -75,14 +75,23 @@ async function _getPackageVersion(): Promise<string> {
 export async function initialize(
   cliOptions: CLIOptions,
   isInteractive: boolean
-): Promise<UnifiedCLI> {
+): Promise<{ cli: UnifiedCLI; serviceFactory: any }> {
   try {
     logger.info('🚀 Initializing CodeCrucible Synth with Unified Architecture...');
     const startTime = Date.now();
 
-    // Create and set global event bus for decoupled communication
-    const { EventBus } = await import('./infrastructure/messaging/event-bus.js');
-    const eventBus = new EventBus();
+    // Use ServiceFactory for proper dependency injection and component wiring
+    const { ServiceFactory } = await import('./application/services/service-factory.js');
+    const serviceFactory = new ServiceFactory({
+      correlationId: `cli-${Date.now()}`,
+      logLevel: cliOptions.verbose ? 'debug' : 'info',
+    });
+
+    // Get properly wired runtime context with RustExecutionBackend
+    const runtimeContext = serviceFactory.getRuntimeContext();
+    const { eventBus } = runtimeContext;
+
+    // Set global event bus for backward compatibility
     const { setGlobalEventBus } = await import('./domain/interfaces/event-bus.js');
     setGlobalEventBus(eventBus);
 
@@ -194,6 +203,11 @@ export async function initialize(
     try {
       await mcpServerManager.startServers();
       logger.info('✅ MCP servers are ready for tool execution');
+      
+      // Initialize global tool integration now that MCP servers are ready
+      const { initializeGlobalToolIntegration } = await import('./infrastructure/tools/tool-integration.js');
+      initializeGlobalToolIntegration(mcpServerManager);
+      logger.info('✅ Global tool integration initialized with MCP servers');
     } catch (error) {
       logger.warn(
         '⚠️ MCP servers initialization had issues, continuing with degraded capabilities:',
@@ -202,7 +216,7 @@ export async function initialize(
       // Continue without MCP servers - graceful degradation
     }
 
-    // Create concrete workflow orchestrator (breaks circular dependencies)
+    // Create ConcreteWorkflowOrchestrator (implements IWorkflowOrchestrator interface)
     const orchestrator = new ConcreteWorkflowOrchestrator();
 
     // Initialize proper UnifiedModelClient with dynamic model selection
@@ -264,16 +278,10 @@ export async function initialize(
       logger.info(`🤖 Using model: ${selectedModelInfo.selectedModel.name}`);
     }
 
-    // Build runtime context (initial version)
-    const runtimeContext = createRuntimeContext({
-      eventBus,
-      // securityValidator: unifiedSecurityValidator,
-      // configManager: unifiedConfigManager,
-    });
-
+    // Initialize ConcreteWorkflowOrchestrator with all dependencies
     await orchestrator.initialize({
       userInteraction,
-      eventBus, // kept for backward compatibility
+      eventBus,
       modelClient,
       mcpManager: mcpServerManager,
       runtimeContext,
@@ -297,7 +305,7 @@ export async function initialize(
       console.log('📊 Complexity: Reduced by 90% through unified coordination');
     }
 
-    return cli;
+    return { cli, serviceFactory };
   } catch (error) {
     logger.error('❌ Failed to initialize system:', error);
     throw error;
@@ -313,39 +321,41 @@ async function runCLI(
   isInteractive: boolean
 ): Promise<void> {
   try {
-    const args = process.argv.slice(2);
+    // Use the provided args parameter instead of re-reading from process.argv
+    // If no args provided, fallback to process.argv
+    const cliArgs = args.length > 0 ? args : process.argv.slice(2);
 
     // Handle version command
-    if (args.includes('--version') || args.includes('-v')) {
+    if (cliArgs.includes('--version') || cliArgs.includes('-v')) {
       console.log(`CodeCrucible Synth v${await getVersion()} (Unified Architecture)`);
       return;
     }
 
     // Handle help command
-    if (args.includes('--help') || args.includes('-h')) {
+    if (cliArgs.includes('--help') || cliArgs.includes('-h')) {
       showHelp();
       return;
     }
 
     // Handle status command
-    if (args[0] === 'status') {
+    if (cliArgs[0] === 'status') {
       await showStatus();
       return;
     }
 
     // Handle models command
-    if (args[0] === 'models') {
+    if (cliArgs[0] === 'models') {
       const { ModelsCommand, parseModelsArgs } = await import(
         './application/cli/models-command.js'
       );
       const modelsCommand = new ModelsCommand();
-      const modelsOptions = parseModelsArgs(args.slice(1));
+      const modelsOptions = parseModelsArgs(cliArgs.slice(1));
       await modelsCommand.execute(modelsOptions);
       return;
     }
 
     // Initialize full system
-    const cli = await initialize(cliOptions, isInteractive);
+    const { cli, serviceFactory } = await initialize(cliOptions, isInteractive);
 
     // Setup graceful shutdown
     let cleanedUp = false;
@@ -354,6 +364,8 @@ async function runCLI(
       cleanedUp = true;
       console.log('\n🔄 Shutting down gracefully...');
       await cli.shutdown();
+      // Dispose ServiceFactory and all its managed resources
+      await serviceFactory.dispose();
       // Avoid forced exit to let stdout flush naturally
     };
 
@@ -366,7 +378,7 @@ async function runCLI(
     // Note: do not attach to 'exit' to avoid recursive exits
 
     // Run CLI with arguments
-    await cli.run(args);
+    await cli.run(cliArgs);
 
     // After command completion (non-interactive), shutdown and let process exit naturally
     if (!isInteractive) {

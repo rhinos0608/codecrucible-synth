@@ -185,13 +185,22 @@ export class StreamingWorkflowIntegration extends EventEmitter {
 
       case 'text-delta':
         if (chunk.delta) {
+          // Implement sliding window to prevent memory accumulation
+          const maxContentLength = this.config.maxDisplayTokens ?? 1000;
           progress.currentContent += chunk.delta;
+          
+          // Trim content if it exceeds maximum length (sliding window)
+          if (progress.currentContent.length > maxContentLength) {
+            const trimStart = progress.currentContent.length - maxContentLength * 0.8; // Keep 80%
+            progress.currentContent = '...' + progress.currentContent.slice(trimStart);
+          }
+          
           progress.tokensGenerated += this.estimateTokensInDelta(chunk.delta);
 
           // Show live content if enabled
           if (
             this.config.showTokens &&
-            progress.currentContent.length <= (this.config.maxDisplayTokens ?? 100)
+            progress.currentContent.length <= maxContentLength
           ) {
             console.log(chunk.delta, { end: '' }); // Real-time token display
           }

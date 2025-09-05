@@ -123,21 +123,25 @@ struct ChunkBatch {
 }
 
 #[derive(Debug, Clone, Default)]
-struct BatcherMetrics {
+pub struct BatcherMetrics {
     total_chunks_processed: u64,
     total_batches_sent: u64,
     total_bytes_processed: u64,
     avg_batch_size: f64,
     avg_latency_us: f64,
+    #[allow(dead_code)]
     adaptive_adjustments: u64,
 }
 
 #[derive(Debug, Clone)]
 struct BatchPerformance {
+    #[allow(dead_code)]
     batch_size: usize,
+    #[allow(dead_code)]
     byte_size: usize,
     hold_time_us: u64,
     js_processing_time_us: u64,
+    #[allow(dead_code)]
     timestamp: Instant,
 }
 

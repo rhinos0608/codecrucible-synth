@@ -1,169 +1,42 @@
-# Unified Model Configuration - Single Source of Truth
-# Created: August 21, 2025
-# Purpose: Resolves configuration conflicts identified in audit report
+# DEPRECATED - Configuration moved to unified-config.yaml
+# This file is kept for backward compatibility but should not be modified.
+# All model configuration is now managed through the main unified-config.yaml
+# which includes:
+# - Sliding adaptive context windows (131K max)
+# - Memory-aware model selection
+# - Robust JSON parsing
+# - Consolidated configuration management
+#
+# To modify model settings, edit: config/unified-config.yaml
+#
+# This configuration is automatically overridden by unified-config.yaml
 
+# Minimal compatibility configuration
 llm:
-  # Default provider selection
+  # Redirect to unified config - DO NOT MODIFY
+  _config_source: "unified-config.yaml"
+  _deprecated: true
+  _message: "Use config/unified-config.yaml for all model configuration"
+  
+  # Basic fallback settings (overridden by unified config)
   default_provider: "ollama"
-  fallback_chain: ["ollama", "lm-studio", "mock"]
+  fallback_chain: ["ollama"]
   
   providers:
     ollama:
       endpoint: "http://localhost:11434"
-      timeout:
-        connection: 5000     # 5s for connection establishment
-        response: 30000      # 30s for response generation
-        status_check: 3000   # 3s for health checks
-      models:
-        # Preferred models in priority order (INTELLIGENT ROUTING)
-        preferred: 
-          - "gemma:latest"         # Available model with function calling (PRIORITIZED)
-          - "gemma3n:e4b"          # 6.9B parameters, good performance
-          - "qwen2.5-coder:7b"     # Excellent function calling + coding (if available)
-          - "llama3.1:8b"          # Best overall for function calling (if available)
-          - "deepseek-coder:8b"    # Decent function calling (if available)
-          - "codellama:34b"        # Large model (HIGH MEMORY - 34B parameters)
-        # Fallback models if preferred not available
-        fallback:
-          - "qwen2.5-coder:3b"     # Limited function calling
-          - "llama3.2:latest"      # Basic capabilities
-          - "gemma:latest"         # Basic capabilities
-        # Model-specific settings (OPTIMIZED FOR FUNCTION CALLING)
-        settings:
-          "gpt-oss:20b":
-            temperature: 0.1         # Low temp for precise function calls
-            max_tokens: 128000
-            context_window: 128000
-            function_calling: true   # Latest GPT with function calling
-          "llama3.1:8b":
-            temperature: 0.1         # Low temp for precise function calls
-            max_tokens: 128000
-            context_window: 128000
-            function_calling: true   # Enable function calling capability
-          "qwen2.5-coder:7b":
-            temperature: 0.1         # Low temp for precise function calls  
-            max_tokens: 128000
-            context_window: 128000
-            function_calling: true   # Enable function calling capability
-          "qwen2.5-coder:14b":
-            temperature: 0.1         # Low temp for precise function calls
-            max_tokens: 128000 
-            context_window: 128000
-            function_calling: true   # Enable function calling capability
-          "qwen2.5:32b":
-            temperature: 0.1         # Low temp for precise function calls
-            max_tokens: 128000
-            context_window: 128000
-            function_calling: true   # Enable function calling capability
-          "deepseek-coder:8b":
-            temperature: 0.1         # Function calling optimized
-            max_tokens: 128000
-            context_window: 128000
-            function_calling: true   # Enable function calling capability
-      # Task routing preferences
-      optimal_for:
-        - "analysis"
-        - "planning"
-        - "complex"
-        - "multi-file"
-        - "architecture"
-        - "debugging"
-    
-    lm-studio:
-      endpoint: "http://localhost:1234"
-      timeout:
-        connection: 3000     # 3s for connection
-        response: 15000      # 15s for response
-        status_check: 2000   # 2s for health checks
       models:
         preferred:
-          - "codellama-7b-instruct"
-          - "gemma-2b-it"
-          - "qwen/qwen2.5-coder-14b"
+          - "llama3.1:8b"  # Will use settings from unified-config.yaml
         fallback:
-          - "gpt-3.5-turbo"  # OpenAI compatible fallback
-        settings:
-          "codellama-7b-instruct":
-            temperature: 0.7
-            max_tokens: 128000
-            context_window: 128000
-      optimal_for:
-        - "template"
-        - "edit"
-        - "format"
-        - "boilerplate"
-        - "quick-fix"
-        - "streaming"
-
-  # Routing strategy configuration
+          - "qwen2.5-coder:3b"
+      
+  # All other settings come from unified-config.yaml
   routing:
-    strategy: "hybrid"  # Options: hybrid, simple, complex
-    
-    # Task complexity mapping
-    task_complexity:
-      simple:
-        - "format"
-        - "template"
-        - "boilerplate"
-        - "edit"
-        - "rename"
-      complex:
-        - "analysis"
-        - "architecture"
-        - "planning"
-        - "debug"
-        - "security"
-        - "multi-file"
-    
-    # Confidence thresholds for routing decisions
-    confidence_thresholds:
-      high: 0.9       # Use fast path
-      medium: 0.7     # Standard routing
-      low: 0.5        # Require validation
-      escalation: 0.3 # Escalate to human
-    
-    # Performance targets
-    performance_targets:
-      simple_task_response: 1000    # 1s for simple tasks
-      complex_task_response: 30000  # 30s for complex tasks
-      streaming_latency: 100        # 100ms for first token
-
-  # Monitoring and metrics
+    strategy: "hybrid"
   monitoring:
     enabled: true
-    metrics_port: 3001
-    collect_performance: true
-    collect_errors: trueDon't
-    
-    # Alert thresholds
-    alerts:
-      error_rate: 0.05         # Alert if >5% errors
-      response_time_p99: 5000  # Alert if p99 > 5s
-      availability: 0.95       # Alert if <95% available
-
-  # Security settings
   security:
     validate_inputs: true
-    sanitize_outputs: true
-    max_prompt_length: 128000
-    max_response_length: 128000
-    blocked_patterns:
-      - "password"
-      - "secret"
-      - "api_key"
-      - "private_key"
-
-  # Caching configuration
   caching:
     enabled: true
-    ttl: 3600               # 1 hour cache TTL
-    max_cache_size: 1000    # Max cached responses
-    cache_strategy: "lru"   # Least recently used
-
-  # Experimental features
-  experimental:
-    dual_agent_review: true     # Enable sequential review system
-    auto_retry_on_timeout: true # Automatic retry with backoff
-    adaptive_timeouts: true     # Adjust timeouts based on task
-    connection_pooling: true    # HTTP connection pooling
-    circuit_breaker: false      # Not yet implemented

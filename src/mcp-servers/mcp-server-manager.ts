@@ -189,7 +189,10 @@ export class MCPServerManager {
     // Lifecycle manager handles the actual startup
     await mcpServerLifecycle.startAll();
 
-    // Start monitoring after servers are running
+    // Register servers with monitoring before starting monitoring to prevent warnings
+    this.registerServersWithMonitoring();
+
+    // Start monitoring after servers are running and registered
     mcpServerMonitoring.startMonitoring();
 
     // Initialize Smithery if enabled
@@ -488,6 +491,20 @@ export class MCPServerManager {
     if (toolName.includes('command') || toolName.includes('execute')) return 'command';
     if (toolName.includes('network') || toolName.includes('http')) return 'network';
     return 'file';
+  }
+
+  /**
+   * Register all server IDs with monitoring to prevent "unregistered server" warnings
+   */
+  private registerServersWithMonitoring(): void {
+    const serverIds = ['filesystem', 'git', 'terminal', 'packageManager'];
+    
+    for (const serverId of serverIds) {
+      mcpServerMonitoring.registerServer(serverId);
+      logger.debug(`Registered server ${serverId} with monitoring system`);
+    }
+    
+    logger.info(`Registered ${serverIds.length} servers with monitoring system`);
   }
 
   private getServerIdForTool(toolName: string): string | null {

@@ -21,7 +21,56 @@ export class OllamaAdapter implements ProviderAdapter {
   async request(req: ModelRequest): Promise<ModelResponse> {
     logger.debug('OllamaAdapter.request', { model: req.model });
     const cfg = (this.provider as any).config;
-    return this.provider.request({ ...req, model: req.model || cfg.defaultModel });
+    
+    try {
+      const providerResponse = await this.provider.request({ ...req, model: req.model || cfg.defaultModel });
+      
+      // Extract content with multiple fallbacks
+      let content = '';
+      if (typeof providerResponse === 'string') {
+        content = providerResponse;
+      } else if (providerResponse && typeof providerResponse === 'object') {
+        content = providerResponse.content || 
+                 providerResponse.response || 
+                 providerResponse.message?.content ||
+                 providerResponse.output ||
+                 providerResponse.text || 
+                 '';
+      }
+      
+      // Log if we're getting empty content
+      if (!content) {
+        logger.warn('OllamaAdapter received empty content from provider', {
+          responseType: typeof providerResponse,
+          responseKeys: providerResponse && typeof providerResponse === 'object' ? Object.keys(providerResponse) : [],
+          hasToolCalls: !!providerResponse?.toolCalls?.length,
+        });
+        
+        // If we have tool calls but no content, that might be intentional
+        if (!providerResponse?.toolCalls?.length) {
+          logger.error('No content and no tool calls in Ollama response');
+        }
+      }
+      
+      // Transform OllamaProvider response to ModelResponse format
+      return {
+        id: providerResponse?.id || `ollama_${Date.now()}`,
+        content: content,
+        model: providerResponse?.model || req.model || cfg.defaultModel,
+        provider: this.name,
+        usage: providerResponse?.usage || {
+          promptTokens: providerResponse?.prompt_eval_count || 0,
+          completionTokens: providerResponse?.eval_count || 0,
+          totalTokens: (providerResponse?.prompt_eval_count || 0) + (providerResponse?.eval_count || 0),
+        },
+        responseTime: providerResponse?.total_duration || undefined,
+        finishReason: providerResponse?.done ? 'stop' : undefined,
+        toolCalls: providerResponse?.toolCalls,
+      };
+    } catch (error) {
+      logger.error('OllamaAdapter request failed:', error);
+      throw new Error(`Ollama request failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async *stream(req: ModelRequest): AsyncIterable<StreamToken> {

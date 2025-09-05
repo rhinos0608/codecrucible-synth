@@ -44,7 +44,10 @@ class GlobalEvidenceCollector {
   }
 
   addToolResult(toolResult: any): void {
-    console.log('🚨 DEBUG: addToolResult called! Collectors:', this.evidenceCollectors.size);
+    logger.debug('Evidence collector: Adding tool result', {
+      collectorCount: this.evidenceCollectors.size,
+      hasResult: !!toolResult
+    });
     logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool result captured', {
       hasResult: !!toolResult,
       success: toolResult?.success,
@@ -57,17 +60,17 @@ class GlobalEvidenceCollector {
     // Notify all registered evidence collectors
     this.evidenceCollectors.forEach(collector => {
       try {
-        console.log('🚨 DEBUG: Calling collector callback');
+        logger.debug('Evidence collector: Calling collector callback');
         collector(toolResult);
       } catch (error) {
-        console.error('🚨 ERROR: Evidence collector callback failed:', error);
+        logger.error('Evidence collector callback failed', { error });
         logger.warn('Evidence collector callback failed:', error);
       }
     });
   }
 
   registerEvidenceCollector(callback: (toolResult: any) => void): void {
-    console.log('🚨 DEBUG: registerEvidenceCollector called!');
+    logger.debug('Evidence collector: Registering evidence collector');
     this.evidenceCollectors.add(callback);
     logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Evidence collector registered', {
       totalCollectors: this.evidenceCollectors.size,
@@ -476,7 +479,16 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         requestTimeoutOptimizer.completeRequest(requestId);
 
         // Check if response contains tool calls that need to be executed
+        logger.debug('RequestExecutionManager: Checking response for tool calls', {
+          responseKeys: Object.keys(response),
+          hasToolCalls: !!response.toolCalls,
+          toolCallsLength: response.toolCalls?.length
+        });
+        
         if (response.toolCalls && response.toolCalls.length > 0) {
+          logger.debug('RequestExecutionManager: Entering tool execution path', {
+            toolCallCount: response.toolCalls.length
+          });
           logger.debug('Tool execution: Found tool calls in request execution', {
             count: response.toolCalls.length,
           });

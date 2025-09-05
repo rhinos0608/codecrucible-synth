@@ -154,6 +154,7 @@ pub struct StreamOptions {
 
 /// High-performance streaming engine with worker pool and chunk batching
 pub struct StreamingEngine {
+    #[allow(dead_code)]
     active_streams: Arc<tokio::sync::RwLock<std::collections::HashMap<String, StreamSession>>>,
     metrics: Arc<tokio::sync::RwLock<StreamingMetrics>>,
     worker_pool: Arc<StreamingWorkerPool>,
@@ -192,6 +193,7 @@ impl StreamingEngine {
     }
 
     /// Process individual chunk asynchronously (restores fine-grained parallelism)
+    #[allow(dead_code)]
     async fn process_chunk_async(
         &self,
         data: Vec<u8>,

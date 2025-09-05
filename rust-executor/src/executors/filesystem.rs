@@ -3,7 +3,7 @@ use std::fs;
 use std::io::Write;
 use serde::{Deserialize, Serialize};
 use tokio::fs as async_fs;
-use crate::security::{SecurityContext, SecurityError, ProcessIsolation, IsolationError};
+use crate::security::{SecurityContext, SecurityError, IsolationError};
 use crate::protocol::messages::{ExecutionRequest, ExecutionResponse, ErrorInfo, ErrorCategory, PerformanceMetrics};
 use thiserror::Error;
 use std::time::Instant;
@@ -70,17 +70,14 @@ pub struct FileSystemResult {
 /// Secure file system executor with comprehensive sandboxing and validation
 pub struct FileSystemExecutor {
     security_context: SecurityContext,
-    isolation: ProcessIsolation,
     max_file_size: u64,
     max_files_per_operation: usize,
 }
 
 impl FileSystemExecutor {
     pub fn new(security_context: SecurityContext) -> Self {
-        let isolation = ProcessIsolation::new(security_context.clone());
         Self {
             security_context,
-            isolation,
             max_file_size: 10 * 1024 * 1024, // 10MB default
             max_files_per_operation: 1000,   // 1000 files default
         }

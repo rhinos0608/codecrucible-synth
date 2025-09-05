@@ -262,10 +262,12 @@ export interface ScalingPlan {
 export class MCPDiscoveryService {
   private serverRegistry: Map<string, MCPServerProfile> = new Map();
   private discoveryStrategies: DiscoveryStrategy[] = [];
+  private selectionStrategies: Map<SelectionStrategy, (server: MCPServerProfile, query: ServerDiscoveryQuery) => number> = new Map();
 
   constructor() {
     // Initialize default strategies
     this.initializeDefaultStrategies();
+    this.initializeSelectionStrategies();
   }
 
   /**
@@ -469,17 +471,207 @@ export class MCPDiscoveryService {
       DiscoveryStrategy.NETWORK_SCAN,
       DiscoveryStrategy.CONFIGURATION_BASED,
     ];
+  }
 
-    // TODO: Initialize selection strategies when implemented
+  private initializeSelectionStrategies(): void {
+    // Performance-optimized strategy - prioritizes low latency and high throughput
+    this.selectionStrategies.set(
+      SelectionStrategy.PERFORMANCE_OPTIMIZED,
+      (server: MCPServerProfile, query: ServerDiscoveryQuery) => {
+        const latencyScore = Math.max(0, 1 - (server.performance.averageLatency / 1000));
+        const throughputScore = Math.min(1, server.performance.throughput / 1000);
+        const errorScore = 1 - server.performance.errorRate;
+        return (latencyScore * 0.5) + (throughputScore * 0.3) + (errorScore * 0.2);
+      }
+    );
+
+    // Reliability-focused strategy - prioritizes uptime and low error rates
+    this.selectionStrategies.set(
+      SelectionStrategy.RELIABILITY_FOCUSED,
+      (server: MCPServerProfile, query: ServerDiscoveryQuery) => {
+        const availabilityScore = server.reliability.availabilityScore;
+        const errorScore = 1 - server.performance.errorRate;
+        const uptimeScore = Math.min(1, server.performance.uptime / (365 * 24 * 60)); // Normalize to 1 year
+        return (availabilityScore * 0.5) + (errorScore * 0.3) + (uptimeScore * 0.2);
+      }
+    );
+
+    // Cost-minimized strategy - prioritizes free/low-cost servers
+    this.selectionStrategies.set(
+      SelectionStrategy.COST_MINIMIZED,
+      (server: MCPServerProfile, query: ServerDiscoveryQuery) => {
+        if (!server.cost) return 0.5; // Neutral score if no cost info
+        const costScores = {
+          [CostTier.FREE]: 1.0,
+          [CostTier.BASIC]: 0.7,
+          [CostTier.PREMIUM]: 0.3,
+          [CostTier.ENTERPRISE]: 0.1,
+        };
+        return costScores[server.cost.tier] || 0.5;
+      }
+    );
+
+    // Capability-specialized strategy - prioritizes servers with specific capabilities
+    this.selectionStrategies.set(
+      SelectionStrategy.CAPABILITY_SPECIALIZED,
+      (server: MCPServerProfile, query: ServerDiscoveryQuery) => {
+        const requiredMatches = query.requiredCapabilities.filter(cap =>
+          server.capabilities.some(sc => sc.type === cap)
+        ).length;
+        const optionalMatches = (query.optionalCapabilities || []).filter(cap =>
+          server.capabilities.some(sc => sc.type === cap)
+        ).length;
+        const totalRequired = query.requiredCapabilities.length || 1;
+        const totalOptional = (query.optionalCapabilities || []).length || 1;
+        return (requiredMatches / totalRequired) * 0.7 + (optionalMatches / totalOptional) * 0.3;
+      }
+    );
   }
 
   private async applyDiscoveryStrategy(
     strategy: DiscoveryStrategy,
     query: ServerDiscoveryQuery
   ): Promise<MCPServerProfile[]> {
-    // Implementation would depend on the specific strategy
-    // This is a placeholder for the discovery logic
-    return [];
+    switch (strategy) {
+      case DiscoveryStrategy.REGISTRY_LOOKUP:
+        // Return servers from registry that match basic criteria
+        return Array.from(this.serverRegistry.values()).filter(
+          server => server.status === ServerProfileStatus.ACTIVE
+        );
+
+      case DiscoveryStrategy.CAPABILITY_MATCH:
+        // Return servers that have required capabilities
+        return Array.from(this.serverRegistry.values()).filter(server =>
+          query.requiredCapabilities.every(cap =>
+            server.capabilities.some(sc => sc.type === cap)
+          )
+        );
+
+      case DiscoveryStrategy.NETWORK_SCAN:
+        // Simulate network scan - in production, would scan network for MCP servers
+        // For now, return predefined common MCP servers
+        return this.getDefaultMCPServers();
+
+      case DiscoveryStrategy.CONFIGURATION_BASED:
+        // Return servers defined in configuration
+        // For now, return servers matching performance criteria
+        return Array.from(this.serverRegistry.values()).filter(server => {
+          if (query.maxLatency && server.performance.averageLatency > query.maxLatency) {
+            return false;
+          }
+          if (query.minReliability && server.reliability.availabilityScore < query.minReliability) {
+            return false;
+          }
+          return true;
+        });
+
+      default:
+        return [];
+    }
+  }
+
+  private getDefaultMCPServers(): MCPServerProfile[] {
+    // Return common MCP servers with realistic data
+    return [
+      {
+        id: 'filesystem-server',
+        name: 'FileSystem MCP Server',
+        description: 'Provides file system operations',
+        vendor: 'anthropic',
+        version: '1.0.0',
+        capabilities: [
+          {
+            type: CapabilityType.RESOURCE,
+            name: 'file_read',
+            description: 'Read file contents',
+          },
+          {
+            type: CapabilityType.RESOURCE,
+            name: 'file_write',
+            description: 'Write file contents',
+          },
+        ],
+        performance: {
+          averageLatency: 10,
+          throughput: 1000,
+          concurrentConnectionLimit: 100,
+          memoryUsage: 512,
+          cpuUsage: 10,
+          errorRate: 0.01,
+          uptime: 99.9,
+        },
+        reliability: {
+          availabilityScore: 0.99,
+          mttr: 5,
+          mtbf: 720,
+          errorCount: 10,
+          successRate: 0.99,
+          consecutiveFailures: 0,
+        },
+        compatibility: {
+          protocolVersions: ['1.0'],
+          requiredFeatures: [],
+          optionalFeatures: [],
+          platformSupport: ['windows', 'linux', 'darwin'],
+          dependencies: [],
+        },
+        cost: {
+          tier: CostTier.FREE,
+          currency: 'USD',
+        },
+        lastSeen: new Date(),
+        status: ServerProfileStatus.ACTIVE,
+      },
+      {
+        id: 'git-server',
+        name: 'Git MCP Server',
+        description: 'Provides git operations',
+        vendor: 'anthropic',
+        version: '1.0.0',
+        capabilities: [
+          {
+            type: CapabilityType.TOOL,
+            name: 'git_status',
+            description: 'Get git status',
+          },
+          {
+            type: CapabilityType.TOOL,
+            name: 'git_commit',
+            description: 'Create git commit',
+          },
+        ],
+        performance: {
+          averageLatency: 50,
+          throughput: 500,
+          concurrentConnectionLimit: 50,
+          memoryUsage: 256,
+          cpuUsage: 5,
+          errorRate: 0.02,
+          uptime: 99.5,
+        },
+        reliability: {
+          availabilityScore: 0.98,
+          mttr: 10,
+          mtbf: 480,
+          errorCount: 20,
+          successRate: 0.98,
+          consecutiveFailures: 0,
+        },
+        compatibility: {
+          protocolVersions: ['1.0'],
+          requiredFeatures: ['git'],
+          optionalFeatures: [],
+          platformSupport: ['windows', 'linux', 'darwin'],
+          dependencies: ['git'],
+        },
+        cost: {
+          tier: CostTier.FREE,
+          currency: 'USD',
+        },
+        lastSeen: new Date(),
+        status: ServerProfileStatus.ACTIVE,
+      },
+    ];
   }
 
   private deduplicateServers(servers: MCPServerProfile[]): MCPServerProfile[] {

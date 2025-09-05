@@ -107,6 +107,7 @@ pub struct StreamingWorkerPool {
     circuit_breaker_state: Arc<RwLock<CircuitBreakerState>>,
     
     /// Task queue for backpressure management
+    #[allow(dead_code)]
     task_queue: Arc<RwLock<std::collections::VecDeque<QueuedTask>>>,
 }
 
@@ -665,6 +666,7 @@ impl StreamingWorkerPool {
     }
 
     /// Update circuit breaker state based on operation result
+    #[allow(dead_code)]
     async fn update_circuit_breaker(&self, success: bool) {
         let mut breaker = self.circuit_breaker_state.write().await;
         let now = std::time::Instant::now();
@@ -694,6 +696,7 @@ impl StreamingWorkerPool {
     }
     
     /// Check if circuit breaker allows operation
+    #[allow(dead_code)]
     async fn circuit_breaker_allows_request(&self) -> bool {
         let mut breaker = self.circuit_breaker_state.write().await;
         let now = std::time::Instant::now();
@@ -722,6 +725,7 @@ impl StreamingWorkerPool {
     }
     
     /// Get current circuit breaker health with detailed metrics
+    #[allow(dead_code)]
     async fn get_circuit_breaker_health(&self) -> super::atomic_metrics::CircuitBreakerHealth {
         let breaker = self.circuit_breaker_state.read().await;
         

@@ -18,13 +18,30 @@ const require = createRequire(import.meta.url);
 function loadPrebuiltBinding(name: string, fallbackPath?: string): any {
   try {
     // Try to load from optionalDependencies first (napi-rs approach)
-    const packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}`;
+    let packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}`;
+    
     if (process.platform === 'win32') {
+      // Windows uses MSVC ABI
       const winPackageName = `@codecrucible/rust-executor-win32-${process.arch}-msvc`;
       try {
         return require(winPackageName);
       } catch {
         // Fall through to try other variants
+      }
+    } else if (process.platform === 'linux') {
+      // Linux requires GNU or Musl ABI suffix
+      // Try GNU first (most common)
+      const gnuPackageName = `@codecrucible/rust-executor-linux-${process.arch}-gnu`;
+      try {
+        return require(gnuPackageName);
+      } catch {
+        // Try Musl variant
+        const muslPackageName = `@codecrucible/rust-executor-linux-${process.arch}-musl`;
+        try {
+          return require(muslPackageName);
+        } catch {
+          // Fall through to try without ABI suffix
+        }
       }
     }
 
@@ -80,10 +97,15 @@ export function getPlatformInfo(): PlatformInfo {
   const napiPlatform = platformMap[platform] || platform;
   const napiArch = archMap[arch] || arch;
 
-  // Determine ABI for Windows
+  // Determine ABI
   let abi: string | undefined;
   if (platform === 'win32') {
     abi = 'msvc'; // Default to MSVC on Windows
+  } else if (platform === 'linux') {
+    // Detect GNU vs Musl libc
+    // Default to GNU as it's most common
+    // Alpine Linux uses Musl
+    abi = detectLinuxABI();
   }
 
   return {
@@ -91,6 +113,35 @@ export function getPlatformInfo(): PlatformInfo {
     arch: napiArch,
     abi,
   };
+}
+
+/**
+ * Detect Linux ABI (GNU vs Musl)
+ * Returns 'gnu' for most Linux distros, 'musl' for Alpine
+ */
+function detectLinuxABI(): string {
+  try {
+    // Check if we're on Alpine Linux (uses Musl)
+    const fs = require('fs');
+    if (fs.existsSync('/etc/alpine-release')) {
+      return 'musl';
+    }
+    
+    // Check ldd version for musl
+    const { execSync } = require('child_process');
+    try {
+      const lddOutput = execSync('ldd --version 2>&1', { encoding: 'utf8' });
+      if (lddOutput.toLowerCase().includes('musl')) {
+        return 'musl';
+      }
+    } catch {
+      // ldd might not exist or fail
+    }
+  } catch {
+    // Default to GNU if detection fails
+  }
+  
+  return 'gnu'; // Default to GNU
 }
 
 /**
@@ -104,6 +155,12 @@ export function generateBinaryNames(baseName: string): string[] {
   // Platform-specific with ABI (e.g., codecrucible-rust-executor.win32-x64-msvc.node)
   if (abi) {
     names.push(`${baseName}.${platform}-${arch}-${abi}.node`);
+    
+    // For Linux, also try the opposite ABI as fallback
+    if (platform === 'linux') {
+      const alternateABI = abi === 'gnu' ? 'musl' : 'gnu';
+      names.push(`${baseName}.${platform}-${arch}-${alternateABI}.node`);
+    }
   }
 
   // Platform-specific without ABI (e.g., codecrucible-rust-executor.darwin-arm64.node)
@@ -215,7 +272,14 @@ export function loadRustExecutorSafely(baseDir?: string): {
 
     try {
       // Check if prebuilt package exists
-      const packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}`;
+      let packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}`;
+      
+      // Add ABI suffix for platforms that need it
+      const { abi } = getPlatformInfo();
+      if (abi && (process.platform === 'win32' || process.platform === 'linux')) {
+        packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}-${abi}`;
+      }
+      
       require.resolve(packageName);
       source = 'prebuilt';
       binaryPath = packageName;

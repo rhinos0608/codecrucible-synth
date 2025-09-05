@@ -11,6 +11,7 @@ import { glob } from 'glob';
 import { logger } from '../../infrastructure/logging/logger.js';
 
 import { CLIContext, CLIOptions } from './cli-types.js';
+import { AIModel } from '../../domain/types/unified-types.js';
 // import { CLIDisplay } from './cli-display.js';
 // import { ProjectContext } from '../client.js';
 import { ServerModeInterface } from '../../server/server-mode.js';
@@ -150,20 +151,20 @@ export class CLICommands {
 
         if (models.length > 0) {
           console.log(chalk.cyan('📋 Available Models:'));
-          models.forEach(
-            (
-              model: { name?: string; id?: string; size?: string; modified_at?: string },
-              index: number
-            ) => {
-              // TODO: Import AIModel from unified-types
-              console.log(chalk.white(`  ${index + 1}. ${model.name || model.id || model}`));
-              if (model?.size) {
-                console.log(chalk.gray(`     Size: ${model.size}`));
+          models.forEach((model: any, index: number) => {
+              console.log(chalk.white(`  ${index + 1}. ${model.name || model.id || String(model)}`));
+              // Show additional metadata if available from provider-specific response
+              const rawModel = model as any;
+              if (rawModel?.size) {
+                console.log(chalk.gray(`     Size: ${rawModel.size}`));
               }
-              if (model.modified_at) {
+              if (rawModel?.modified_at) {
                 console.log(
-                  chalk.gray(`     Modified: ${new Date(model.modified_at).toLocaleDateString()}`)
+                  chalk.gray(`     Modified: ${new Date(rawModel.modified_at).toLocaleDateString()}`)
                 );
+              }
+              if (model.contextLength) {
+                console.log(chalk.gray(`     Context: ${model.contextLength} tokens`));
               }
             }
           );

@@ -151,9 +151,8 @@ export class LivingSpiralIntegrationTest {
       } else {
         // Test multi-voice coordination
         await this.voiceSystem.generateMultiVoiceSolutions(finalVoices, testPrompt, {
-          taskType: phase.name.toLowerCase(),
-          timeConstraint: 'thorough',
-          qualityRequirement: 'high',
+          strategy: 'consensus',
+          maxVoices: finalVoices.length,
         });
 
         // Use synthesis for final result

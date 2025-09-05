@@ -18,6 +18,7 @@ import {
 } from '../services/unified-cli-coordinator.js';
 import { IWorkflowOrchestrator } from '../../domain/interfaces/workflow-orchestrator.js';
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
+import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { IEventBus, getGlobalEventBus } from '../../domain/interfaces/event-bus.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-user-interaction.js';
@@ -990,20 +991,67 @@ ${chalk.yellow('Capabilities:')}
    * Format response for display with ultra-concise patterns
    */
   private formatResponse(result: any): string {
+    // DEBUG: Log what we're trying to format
+    console.log('DEBUG: formatResponse called with result:', typeof result, result?.constructor?.name);
+    console.log('DEBUG: result keys:', result && typeof result === 'object' ? Object.keys(result) : 'not object');
+    if (result?.response) console.log('DEBUG: result.response exists, length:', result.response.length);
+    if (result?.content) console.log('DEBUG: result.content exists, length:', result.content.length);
+    
     let formattedResult = '';
 
     if (typeof result === 'string') {
       formattedResult = result;
+      console.log('DEBUG: using result as string, length:', formattedResult.length);
     } else {
       formattedResult = this.formatComplexResult(result);
+      console.log('DEBUG: formatComplexResult returned, length:', formattedResult.length);
     }
 
     // Apply Claude Code ultra-concise communication patterns
-    return this.applyCLIConciseness(formattedResult);
+    const finalResult = this.applyCLIConciseness(formattedResult);
+    console.log('DEBUG: applyCLIConciseness returned, length:', finalResult.length);
+    console.log('DEBUG: final formatted response:', finalResult);
+    
+    return finalResult;
   }
 
   private formatComplexResult(result: any): string {
     if (result && typeof result === 'object') {
+      // Handle model response object (from OllamaProvider)
+      logger.debug('Formatting complex result', {
+        hasResponse: 'response' in result,
+        hasContent: 'content' in result,
+        responseType: typeof result.response,
+        contentType: typeof result.content,
+        responseLength: result.response?.length || 0,
+        contentLength: result.content?.length || 0,
+        resultKeys: Object.keys(result),
+      });
+      
+      if ('response' in result || 'content' in result) {
+        const responseText = result.response || result.content;
+        
+        if (responseText && typeof responseText === 'string' && responseText.trim()) {
+          return responseText;
+        } else {
+          // Enhanced diagnostics for empty responses
+          const errorDetails = {
+            provider: result.provider || 'unknown',
+            model: result.model || 'unknown',
+            hasToolCalls: !!(result.toolCalls?.length),
+            responseType: typeof responseText,
+          };
+          
+          logger.error('Model returned empty content', errorDetails);
+          
+          if (result.toolCalls?.length > 0) {
+            return `Tool execution completed but no text response was generated. (${result.toolCalls.length} tools called)`;
+          } else {
+            return `❌ AI model (${errorDetails.model}) returned empty response. Check if Ollama is running: "ollama serve"`;
+          }
+        }
+      }
+      
       // Handle code generation results
       if (result.generated && Array.isArray(result.generated.files)) {
         const files = result.generated.files;

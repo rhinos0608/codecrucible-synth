@@ -109,6 +109,15 @@ export interface IModelClient {
   stream(request: ModelRequest): AsyncIterableIterator<StreamToken>;
 
   /**
+   * Send a streaming request to the model with callback
+   */
+  streamRequest(
+    request: ModelRequest,
+    onToken: (token: StreamToken) => void,
+    context?: any
+  ): Promise<ModelResponse>;
+
+  /**
    * Get available models
    */
   getAvailableModels(): Promise<ModelInfo[]>;

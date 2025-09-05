@@ -137,7 +137,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
         const processManager = new (
           await import('../../infrastructure/performance/active-process-manager.js')
         ).ActiveProcessManager(hardwareSelector);
-        this.requestExecutionManager = new RequestExecutionManager(config, processManager, null);
+        // Create a proper provider repository adapter to bridge the interface mismatch
+        const providerRepository = this.createProviderRepositoryAdapter(this.modelClient);
+        
+        this.requestExecutionManager = new RequestExecutionManager(config, processManager, providerRepository);
         logger.info(
           '  - requestExecutionManager: ✅ Initialized with advanced execution strategies'
         );
@@ -349,6 +352,7 @@ User Request: ${userPrompt}`;
 
       let response: ModelResponse;
 
+
       if (payload.options?.stream && this.modelClient) {
         logger.info('🌊 Using streaming response for Ollama');
         try {
@@ -357,6 +361,20 @@ User Request: ${userPrompt}`;
           logger.error('❌ Streaming failed, falling back to standard request:', streamError);
           response = await this.processModelRequest(modelRequest);
         }
+
+      // CRITICAL FIX: Unified request path for both streaming and non-streaming
+      // This ensures tool integration works consistently for both modes
+      if (payload.options?.stream) {
+        logger.info('🌊 Using streaming response through unified pipeline');
+        // Set streaming flag in model request
+        modelRequest.stream = true;
+        
+        // TODO: Implement streaming token callback in RequestExecutionManager
+        // For now, route through unified pipeline which will handle tools correctly
+        response = await this.processModelRequest(modelRequest);
+        
+        logger.info('✅ Streaming completed via unified pipeline');
+
       } else {
         response = await this.processModelRequest(modelRequest);
       }
@@ -650,6 +668,58 @@ User Request: ${userPrompt}`;
       logger.warn('Failed to load configuration:', error);
     }
     return null;
+  }
+
+  /**
+   * Create a provider repository adapter to bridge interface mismatch
+   * between IModelClient and RequestExecutionManager expectations
+   */
+  private createProviderRepositoryAdapter(modelClient: IModelClient): any {
+    return {
+      getProvider: (providerType: string) => {
+        // The RequestExecutionManager expects specific provider names
+        // Map these to the modelClient which handles provider routing internally
+        logger.debug(`Provider repository adapter: requested provider ${providerType}`);
+        
+        // Return an adapter that delegates to the modelClient for actual requests
+        return {
+          // Main method that RequestExecutionManager calls
+          processRequest: async (request: ModelRequest, context?: any): Promise<ModelResponse> => {
+            // Set the provider preference in the request
+            const requestWithProvider = {
+              ...request,
+              provider: providerType,
+            };
+            logger.debug(`Provider adapter: delegating processRequest to modelClient with provider: ${providerType}`);
+            return await modelClient.request(requestWithProvider);
+          },
+          
+          // Legacy request method for compatibility
+          request: async (request: ModelRequest): Promise<ModelResponse> => {
+            const requestWithProvider = {
+              ...request,
+              provider: providerType,
+            };
+            return await modelClient.request(requestWithProvider);
+          },
+          
+          // Methods that RequestExecutionManager expects
+          getModelName: () => providerType,
+          isAvailable: () => true, // Assume modelClient handles availability
+          getCapabilities: () => ['text-generation', 'tool-calling'],
+          getName: () => providerType,
+          getType: () => providerType,
+        };
+      },
+      
+      // Provide other methods that RequestExecutionManager might expect
+      listProviders: () => {
+        // Return common provider types
+        return ['ollama', 'lm-studio', 'openai', 'anthropic'];
+      },
+      
+      isProviderAvailable: (providerType: string) => true,
+    };
   }
 
   async shutdown(): Promise<void> {

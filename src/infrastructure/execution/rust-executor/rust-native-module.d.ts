@@ -29,7 +29,7 @@ export class RustExecutor {
   getFilesystemOperations(): string[];
   getSupportedCommands(): string[];
   cleanup(): Promise<void>;
-  getId(): string;
+  id(): string;
 }
 
 export function createRustExecutor(): RustExecutor;

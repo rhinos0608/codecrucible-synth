@@ -4,14 +4,12 @@
  * Provides CLI commands for listing, selecting, and managing AI models
  */
 
-import { ModelSelector } from '../../infrastructure/user-interaction/model-selector.js';
+import { ModelInfo, ModelSelector } from '../../infrastructure/user-interaction/model-selector.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { createCliTimeout } from '../../utils/timeout-utils.js';
 import { 
-  enterpriseErrorHandler,
-  EnterpriseErrorHandler 
+  enterpriseErrorHandler
 } from '../../infrastructure/error-handling/enterprise-error-handler.js';
-import { ErrorCategory, ErrorSeverity } from '../../infrastructure/error-handling/structured-error-system.js';
 
 export interface ModelsCommandOptions {
   list?: boolean;
@@ -23,22 +21,22 @@ export interface ModelsCommandOptions {
  * Handle models-related CLI commands
  */
 export class ModelsCommand {
-  private modelSelector: ModelSelector;
+  private readonly modelSelector: ModelSelector;
 
-  constructor() {
+  public constructor() {
     this.modelSelector = new ModelSelector();
   }
 
   /**
    * Execute models command based on options
    */
-  async execute(options: ModelsCommandOptions = {}): Promise<void> {
+  public async execute(options: Readonly<ModelsCommandOptions> = {}): Promise<void> {
     if (options.list) {
       await this.listModels();
-    } else if (options.select || options.interactive) {
+    } else if (options.select ?? options.interactive) {
       await this.selectModel();
     } else {
-      await this.showModelsHelp();
+      this.showModelsHelp();
     }
   }
 
@@ -82,16 +80,18 @@ export class ModelsCommand {
       }
 
       // Group by provider
-      const groupedModels = models.reduce(
-        (groups, model) => {
-          const provider = model.provider;
-          if (!groups[provider]) {
-            groups[provider] = [];
+      const groupedModels = models.reduce<Record<string, ReadonlyArray<typeof models[number]>>>(
+        (groups: Readonly<Record<string, ReadonlyArray<typeof models[number]>>>, model) => {
+          const { provider } = model;
+          // Create a new object to maintain immutability
+          const updatedGroups = { ...groups };
+          if (!updatedGroups[provider]) {
+            updatedGroups[provider] = [];
           }
-          groups[provider].push(model);
-          return groups;
+          updatedGroups[provider] = [...updatedGroups[provider], model];
+          return updatedGroups;
         },
-        {} as Record<string, typeof models>
+        {}
       );
 
       Object.entries(groupedModels).forEach(([provider, providerModels]) => {
@@ -161,7 +161,7 @@ export class ModelsCommand {
       }
 
       const selection = selectionResult.result;
-      if (selection && selection.selectedModel) {
+      if (selection?.selectedModel) {
         console.log(`\n🎯 Model selected: ${selection.selectedModel.name}`);
         console.log('💾 This selection will be used for the current session.');
         console.log('\n💡 Restart CodeCrucible to select a different model.');
@@ -197,7 +197,7 @@ export class ModelsCommand {
   /**
    * Show models command help
    */
-  private async showModelsHelp(): Promise<void> {
+  private showModelsHelp(): void {
     console.log('🤖 Models Command Help');
     console.log('═'.repeat(30));
     console.log('');
@@ -226,7 +226,7 @@ export class ModelsCommand {
   /**
    * Get discovered models for programmatic use
    */
-  async getModels() {
+  public async getModels(): Promise<ModelInfo[]> {
     const modelsResult = await createCliTimeout(
       this.modelSelector.discoverModels(),
       'model discovery (programmatic)',
@@ -249,9 +249,7 @@ export class ModelsCommand {
 export function parseModelsArgs(args: string[]): ModelsCommandOptions {
   const options: ModelsCommandOptions = {};
 
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
+  for (const arg of args) {
     switch (arg) {
       case '--list':
       case '-l':
@@ -269,6 +267,10 @@ export function parseModelsArgs(args: string[]): ModelsCommandOptions {
       case '--help':
       case '-h':
         // Will show help by default when no other options
+        break;
+
+      default:
+        // Unknown argument, ignore or handle as needed
         break;
     }
   }

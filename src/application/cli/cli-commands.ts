@@ -9,10 +9,9 @@ import { readFile, stat } from 'fs/promises';
 import { extname, isAbsolute, join } from 'path';
 import { glob } from 'glob';
 import { logger } from '../../infrastructure/logging/logger.js';
-import { withMcpTimeout, createCliTimeout } from '../../utils/timeout-utils.js';
+import { createCliTimeout, withMcpTimeout } from '../../utils/timeout-utils.js';
 
 import { CLIContext, CLIOptions } from './cli-types.js';
-import { AIModel } from '../../domain/types/unified-types.js';
 // import { CLIDisplay } from './cli-display.js';
 // import { ProjectContext } from '../client.js';
 import { ServerModeInterface } from '../../server/server-mode.js';
@@ -20,10 +19,10 @@ import { analysisWorkerPool } from './analysis-worker-pool.js';
 import { randomUUID } from 'crypto';
 
 export class CLICommands {
-  private context: CLIContext;
-  private workingDirectory: string;
+  private readonly context: CLIContext;
+  private readonly workingDirectory: string;
 
-  public constructor(context: CLIContext, workingDirectory: string = process.cwd()) {
+  public constructor(context: Readonly<CLIContext>, workingDirectory: string = process.cwd()) {
     this.context = context;
     this.workingDirectory = workingDirectory;
   }
@@ -182,23 +181,48 @@ export class CLICommands {
 
         if (models.length > 0) {
           console.log(chalk.cyan('📋 Available Models:'));
-          models.forEach((model: any, index: number) => {
-              console.log(chalk.white(`  ${index + 1}. ${model.name || model.id || String(model)}`));
-              // Show additional metadata if available from provider-specific response
-              const rawModel = model as any;
-              if (rawModel?.size) {
-                console.log(chalk.gray(`     Size: ${rawModel.size}`));
-              }
-              if (rawModel?.modified_at) {
+
+          // Define a type for the model object
+          interface ModelInfo {
+            name?: string;
+            id?: string;
+            size?: string | number;
+            modified_at?: string | number | Date;
+            contextLength?: number;
+            [key: string]: unknown;
+          }
+
+          models.forEach((model: unknown, index: number) => {
+            // Type guard for ModelInfo
+            const m = model as ModelInfo;
+            const displayName = typeof m.name === 'string'
+              ? m.name
+              : typeof m.id === 'string'
+                ? m.id
+                : String(index + 1);
+
+            console.log(chalk.white(`  ${index + 1}. ${displayName}`));
+
+            if (typeof m.size === 'string' || typeof m.size === 'number') {
+              console.log(chalk.gray(`     Size: ${m.size}`));
+            }
+            if (m.modified_at !== undefined) {
+              const date =
+                typeof m.modified_at === 'string' || typeof m.modified_at === 'number'
+                  ? new Date(m.modified_at)
+                  : m.modified_at instanceof Date
+                  ? m.modified_at
+                  : undefined;
+              if (date && !isNaN(date.getTime())) {
                 console.log(
-                  chalk.gray(`     Modified: ${new Date(rawModel.modified_at).toLocaleDateString()}`)
+                  chalk.gray(`     Modified: ${date.toLocaleDateString()}`)
                 );
               }
-              if (model.contextLength) {
-                console.log(chalk.gray(`     Context: ${model.contextLength} tokens`));
-              }
             }
-          );
+            if (typeof m.contextLength === 'number') {
+              console.log(chalk.gray(`     Context: ${m.contextLength} tokens`));
+            }
+          });
         } else {
           console.log(chalk.yellow('No models found. Make sure your AI service is running.'));
         }

@@ -48,16 +48,16 @@ export interface CommandPattern {
  * Natural Language Command Interface for AI CLI
  */
 export class NaturalLanguageInterface {
-  private commandPatterns: CommandPattern[];
+  private readonly commandPatterns: CommandPattern[];
 
-  constructor() {
+  public constructor() {
     this.commandPatterns = this.initializeCommandPatterns();
   }
 
   /**
    * Parse natural language input into structured command
    */
-  parseCommand(input: string): ParsedCommand {
+  public parseCommand(input: string): ParsedCommand {
     const normalizedInput = input.toLowerCase().trim();
 
     // Handle empty input
@@ -74,8 +74,9 @@ export class NaturalLanguageInterface {
     const intentScores = this.calculateIntentScores(normalizedInput);
 
     // Find best matching intent
-    const bestMatch = intentScores.reduce((best, current) =>
-      current.score > best.score ? current : best
+    const bestMatch = intentScores.reduce(
+      (best: Readonly<{ intent: CommandIntent; score: number }>, current: Readonly<{ intent: CommandIntent; score: number }>) =>
+        current.score > best.score ? current : best
     );
 
     // Extract additional details
@@ -138,8 +139,8 @@ export class NaturalLanguageInterface {
           /(?:investigate|find)\s+(?:the|any)?\s*(?:issue|problem|bug|error)\s*(?:in|with|from)?\s*(.*)/i,
           /(?:typescript?|ts)\s+(?:errors?|issues?|problems?|bugs?)/i,
           /(?:type\s+)?(?:errors?|issues?|problems?|bugs?)\s+(?:in|with|from)\s+(.*)/i,
-          /(?:what\'s|whats)\s+wrong\s+(?:with|in)\s+(.*)/i,
-          /(?:why\s+(?:is|are|does|doesn\'t))\s+(.*?)\s+(?:not\s+working|failing|broken)/i,
+          /(?:what's|whats)\s+wrong\s+(?:with|in)\s+(.*)/i,
+          /(?:why\s+(?:is|are|does|doesn't))\s+(.*?)\s+(?:not\s+working|failing|broken)/i,
         ],
         examples: [
           'diagnose TS errors',
@@ -208,8 +209,8 @@ export class NaturalLanguageInterface {
         patterns: [
           /(?:fix|debug|solve|repair)\s+(?:this|the|my)?\s*(.*)/i,
           /(?:correct|resolve)\s+(?:this|the)?\s*(.*)/i,
-          /(?:there\'s\s+a\s+|i\s+have\s+a\s+)?(?:bug|error|issue)\s+(?:in|with)\s+(.*)/i,
-          /(?:this|it)\s+(?:doesn\'t|isn\'t|won\'t)\s+work/i,
+          /(?:there's\s+a\s+|i\s+have\s+a\s+)?(?:bug|error|issue)\s+(?:in|with)\s+(.*)/i,
+          /(?:this|it)\s+(?:doesn't|isn't|won't)\s+work/i,
         ],
         examples: [
           'fix this bug',
@@ -226,7 +227,7 @@ export class NaturalLanguageInterface {
           /(?:explain|describe)\s+(?:how|what|why)?\s*(.*)/i,
           /(?:what|how|why)\s+(?:does|is)\s+(.*?)(?:\s+(?:work|do|mean))?/i,
           /(?:tell|show)\s+me\s+(?:about|how|what)\s+(.*)/i,
-          /i\s+(?:don\'t\s+understand|need\s+to\s+understand)\s+(.*)/i,
+          /i\s+(?:don't\s+understand|need\s+to\s+understand)\s+(.*)/i,
         ],
         examples: [
           'explain how this works',
@@ -325,7 +326,7 @@ export class NaturalLanguageInterface {
       score += (keywordMatches.length / pattern.keywords.length) * 0.4;
 
       // Check regex pattern matches
-      const patternMatches = pattern.patterns.filter(regex => regex.test(input));
+      const patternMatches = pattern.patterns.filter((regex: Readonly<RegExp>) => regex.test(input));
       score += (patternMatches.length > 0 ? 1 : 0) * 0.4;
 
       // Apply weight multiplier
@@ -368,7 +369,7 @@ export class NaturalLanguageInterface {
 
     for (const pattern of targetPatterns) {
       const match = input.match(pattern);
-      if (match && match[1]) {
+      if (match?.[1]) {
         return match[1].trim();
       }
     }
@@ -407,10 +408,10 @@ export class NaturalLanguageInterface {
       unknown: [],
     };
 
-    const patterns = actionPatterns[intent] || [];
+    const patterns = actionPatterns[intent];
     for (const pattern of patterns) {
       const match = input.match(pattern);
-      if (match && match[1]) {
+      if (match?.[1]) {
         return match[1].trim();
       }
     }
@@ -524,7 +525,7 @@ export class NaturalLanguageInterface {
   /**
    * Get command suggestions based on partial input
    */
-  getSuggestions(partialInput: string): string[] {
+  public getSuggestions(partialInput: string): string[] {
     const suggestions: string[] = [];
     const inputLower = partialInput.toLowerCase();
 
@@ -546,8 +547,8 @@ export class NaturalLanguageInterface {
   /**
    * Get usage help for specific intent
    */
-  getUsageHelp(intent: CommandIntent): string {
-    const pattern = this.commandPatterns.find(p => p.intent === intent);
+  public getUsageHelp(intent: Readonly<CommandIntent>): string {
+    const pattern = this.commandPatterns.find((p: Readonly<CommandPattern>) => p.intent === intent);
     if (!pattern) return 'No help available for this command.';
 
     return `

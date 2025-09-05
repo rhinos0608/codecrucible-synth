@@ -22,8 +22,8 @@ import {
   ServerSelectionResult,
 } from '../domain/services/mcp-discovery-service.js';
 import {
-  ToolExecutionArgs,
   ToolExecutionResult as BaseToolExecutionResult,
+  ToolExecutionArgs,
 } from '../infrastructure/types/tool-execution-types.js';
 
 // Application layer interfaces
@@ -163,18 +163,18 @@ export enum LoadBalancingStrategy {
  * High-level interface for MCP server orchestration and management
  */
 export class MCPOrchestrationAdapter extends EventEmitter {
-  private discoveryService: MCPDiscoveryService;
-  private connections: Map<string, MCPServerConnection> = new Map();
+  private readonly discoveryService: MCPDiscoveryService;
+  private readonly connections: Map<string, MCPServerConnection> = new Map();
   private operationCounter: number = 0;
   private healthCheckInterval?: NodeJS.Timeout;
-  private loadBalancingConfig: LoadBalancingConfig;
+  private readonly loadBalancingConfig: LoadBalancingConfig;
 
-  constructor(
+  public constructor(
     discoveryService?: MCPDiscoveryService,
-    loadBalancingConfig?: Partial<LoadBalancingConfig>
+    loadBalancingConfig?: Readonly<Partial<LoadBalancingConfig>>
   ) {
     super();
-    this.discoveryService = discoveryService || new MCPDiscoveryService();
+    this.discoveryService = discoveryService ?? new MCPDiscoveryService();
     this.loadBalancingConfig = {
       strategy: LoadBalancingStrategy.CAPABILITY_BASED,
       healthCheckInterval: 30000,
@@ -190,7 +190,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   /**
    * Initialize the orchestration adapter
    */
-  async initialize(): Promise<void> {
+  public initialize(): void {
     this.emit('initialized');
   }
 
@@ -199,7 +199,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   /**
    * Discover and connect to MCP servers based on requirements
    */
-  async discoverAndConnect(query: ServerDiscoveryQuery): Promise<ServerSelectionResult> {
+  public async discoverAndConnect(query: Readonly<ServerDiscoveryQuery>): Promise<ServerSelectionResult> {
     const operationId = this.generateOperationId();
 
     try {
@@ -215,14 +215,14 @@ export class MCPOrchestrationAdapter extends EventEmitter {
 
       // Connect to selected servers
       await Promise.allSettled(
-        selectionResult.primaryServers.map(async server => this.connectToServer(server))
+        selectionResult.primaryServers.map(async (server: Readonly<MCPServerProfile>) => this.connectToServer(server))
       );
 
       // Connect to fallback servers (fire-and-forget; do not return a Promise in forEach callback)
-      selectionResult.fallbackServers.forEach(server => {
-        void this.connectToServer(server).catch(error =>
-          this.emit('fallbackConnectionError', { server: server.id, error })
-        );
+      selectionResult.fallbackServers.forEach((server: Readonly<MCPServerProfile>) => {
+        this.connectToServer(server).catch((error: unknown) => {
+          this.emit('fallbackConnectionError', { server: server.id, error });
+        });
       });
 
       this.emit('serversDiscoveredAndConnected', {
@@ -242,7 +242,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   /**
    * Connect to a specific MCP server
    */
-  async connectToServer(serverProfile: MCPServerProfile): Promise<MCPServerConnection> {
+  public async connectToServer(serverProfile: Readonly<MCPServerProfile>): Promise<MCPServerConnection> {
     const existingConnection = this.connections.get(serverProfile.id);
     if (existingConnection && existingConnection.client.isConnected()) {
       return existingConnection;
@@ -303,7 +303,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       this.emit('serverConnected', {
         serverId: serverProfile.id,
         serverName: serverProfile.name,
-        capabilities: serverProfile.capabilities.map(c => c.type),
+        capabilities: serverProfile.capabilities.map((c: Readonly<{ type: string }>) => c.type),
       });
 
       return connection;
@@ -311,7 +311,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       connection.status.errorCount++;
       this.emit('serverConnectionError', {
         serverId: serverProfile.id,
-        error,
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -320,7 +320,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   /**
    * Disconnect from a server
    */
-  async disconnectFromServer(serverId: string): Promise<void> {
+  public async disconnectFromServer(serverId: string): Promise<void> {
     const connection = this.connections.get(serverId);
     if (!connection) {
       return;
@@ -344,7 +344,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   /**
    * Execute a tool with intelligent server selection
    */
-  async executeTool(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
+  public async executeTool(request: Readonly<ToolExecutionRequest>): Promise<ToolExecutionResult> {
     const operationId = this.generateOperationId();
     const startTime = Date.now();
 
@@ -357,9 +357,15 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       }
 
       // Execute with retry policy
-      const result = await this.executeWithRetry(
-        async () => connection.client.callTool(request.toolName, request.arguments),
-        request.retryPolicy || this.getDefaultRetryPolicy()
+      const result = await this.executeWithRetry<BaseToolExecutionResult>(
+        async () => {
+          const toolResult: unknown = await connection.client.callTool(request.toolName, request.arguments);
+          if (typeof toolResult !== 'object' || toolResult === null) {
+            throw new Error('Tool execution did not return a valid result object');
+          }
+          return toolResult as BaseToolExecutionResult;
+        },
+        request.retryPolicy ?? this.getDefaultRetryPolicy()
       );
 
       const executionTime = Date.now() - startTime;
@@ -394,7 +400,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       this.emit('toolExecutionError', {
         operationId,
         toolName: request.toolName,
-        error,
+        error: error instanceof Error ? error.message : String(error),
         executionTime,
       });
 
@@ -402,7 +408,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
         success: false,
         error: error instanceof Error ? error.message : String(error),
         executionTime,
-        serverId: request.serverId || 'unknown',
+        serverId: request.serverId ?? 'unknown',
         serverLatency: 0,
         retryCount: 0,
       };
@@ -412,15 +418,17 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   /**
    * Execute multiple tools in parallel
    */
-  async executeToolsBatch(requests: ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
+  public async executeToolsBatch(
+    requests: readonly ToolExecutionRequest[]
+  ): Promise<ToolExecutionResult[]> {
     const operationId = this.generateOperationId();
 
     try {
       const results = await Promise.allSettled(
-        requests.map(async request => this.executeTool(request))
+        requests.map(async (request: Readonly<ToolExecutionRequest>) => this.executeTool(request))
       );
 
-      const batchResults = results.map((result, index) => {
+      const batchResults = results.map((result: PromiseSettledResult<ToolExecutionResult>, index: number) => {
         if (result.status === 'fulfilled') {
           return result.value;
         } else {
@@ -428,7 +436,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
             success: false,
             error: result.reason instanceof Error ? result.reason.message : String(result.reason),
             executionTime: 0,
-            serverId: requests[index].serverId || 'unknown',
+            serverId: requests[index].serverId ?? 'unknown',
             serverLatency: 0,
             retryCount: 0,
           };
@@ -438,8 +446,8 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       this.emit('toolsBatchExecuted', {
         operationId,
         totalTools: requests.length,
-        successCount: batchResults.filter(r => r.success).length,
-        failureCount: batchResults.filter(r => !r.success).length,
+        successCount: batchResults.filter((r: Readonly<ToolExecutionResult>) => r.success).length,
+        failureCount: batchResults.filter((r: Readonly<ToolExecutionResult>) => !r.success).length,
       });
 
       return batchResults;
@@ -454,20 +462,20 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   /**
    * Access a resource with caching and server selection
    */
-  async accessResource(request: ResourceAccessRequest): Promise<ResourceAccessResult> {
+  public async accessResource(request: Readonly<ResourceAccessRequest>): Promise<ResourceAccessResult> {
     const operationId = this.generateOperationId();
     const startTime = Date.now();
 
     try {
       // Select server for resource access
-      const connection = await this.selectServerForResource(request.resourceUri, request.serverId);
+      const connection = this.selectServerForResource(request.resourceUri, request.serverId);
 
       if (!connection) {
         throw new Error(`No server available for resource: ${request.resourceUri}`);
       }
 
       // Access resource
-      const result = await connection.client.readResource(request.resourceUri);
+      const result = await connection.client.readResource(request.resourceUri) as { contents?: string | Buffer | object; mimeType?: string };
       const accessTime = Date.now() - startTime;
 
       // Update metrics
@@ -478,9 +486,9 @@ export class MCPOrchestrationAdapter extends EventEmitter {
 
       const resourceResult: ResourceAccessResult = {
         success: true,
-        content: result.contents,
-        contentType: result.mimeType,
-        size: result.contents?.length || 0,
+        content: result?.contents,
+        contentType: result?.mimeType,
+        size: (typeof result.contents === 'string' || Buffer.isBuffer(result.contents)) ? result.contents.length : 0,
         serverId: connection.id,
         fromCache: false, // Would implement caching logic
       };
@@ -500,14 +508,14 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       this.emit('resourceAccessError', {
         operationId,
         resourceUri: request.resourceUri,
-        error,
+        error: error instanceof Error ? error.message : String(error),
         accessTime,
       });
 
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
-        serverId: request.serverId || 'unknown',
+        serverId: request.serverId ?? 'unknown',
         fromCache: false,
       };
     }
@@ -518,7 +526,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   /**
    * Get health status of all servers
    */
-  async getServersHealth(): Promise<ServerHealthStatus[]> {
+  public async getServersHealth(): Promise<ServerHealthStatus[]> {
     const healthStatuses: ServerHealthStatus[] = [];
 
     for (const connection of this.connections.values()) {
@@ -532,7 +540,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   /**
    * Get connection metrics for all servers
    */
-  getConnectionMetrics(): Map<string, ConnectionMetrics> {
+  public getConnectionMetrics(): Map<string, ConnectionMetrics> {
     const metrics = new Map<string, ConnectionMetrics>();
 
     for (const [serverId, connection] of this.connections) {
@@ -545,14 +553,14 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   /**
    * Get active connections
    */
-  getActiveConnections(): MCPServerConnection[] {
-    return Array.from(this.connections.values()).filter(conn => conn.status.connected);
+  public getActiveConnections(): MCPServerConnection[] {
+    return Array.from(this.connections.values()).filter((conn: Readonly<MCPServerConnection>) => conn.status.connected);
   }
 
   /**
    * Force reconnection to a server
    */
-  async reconnectServer(serverId: string): Promise<void> {
+  public async reconnectServer(serverId: string): Promise<void> {
     const connection = this.connections.get(serverId);
     if (!connection) {
       throw new Error(`Server not found: ${serverId}`);
@@ -580,7 +588,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   /**
    * Close all connections and cleanup
    */
-  async close(): Promise<void> {
+  public async close(): Promise<void> {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
     }
@@ -596,7 +604,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   // Private helper methods
 
   private setupClientEventHandlers(connection: MCPServerConnection): void {
-    const client = connection.client;
+    const { client } = connection;
 
     client.on('connected', () => {
       connection.status.connected = true;
@@ -616,12 +624,12 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       });
     });
 
-    client.on('connectionError', error => {
+    client.on('connectionError', (error: unknown) => {
       connection.status.errorCount++;
       connection.status.isHealthy = false;
       this.emit('connectionError', {
         serverId: connection.id,
-        error,
+        error: error instanceof Error ? error.message : String(error),
       });
     });
 
@@ -677,10 +685,10 @@ export class MCPOrchestrationAdapter extends EventEmitter {
     return this.applyLoadBalancing(eligibleConnections);
   }
 
-  private async selectServerForResource(
+  private selectServerForResource(
     resourceUri: string,
     preferredServerId?: string
-  ): Promise<MCPServerConnection | null> {
+  ): MCPServerConnection | null {
     // Similar logic to selectServerForTool but for resources
     if (preferredServerId) {
       const connection = this.connections.get(preferredServerId);
@@ -824,27 +832,27 @@ export class MCPOrchestrationAdapter extends EventEmitter {
 
   private startHealthMonitoring(): void {
     this.healthCheckInterval = setInterval(() => {
-      void this.getServersHealth()
-        .then(healthStatuses => {
-          const unhealthyServers = healthStatuses.filter(status => !status.isHealthy);
+      this.getServersHealth()
+        .then((healthStatuses: readonly ServerHealthStatus[]) => {
+          const unhealthyServers = healthStatuses.filter((status: Readonly<ServerHealthStatus>) => !status.isHealthy);
           if (unhealthyServers.length > 0) {
             this.emit('unhealthyServersDetected', unhealthyServers);
           }
 
           this.emit('healthCheckCompleted', {
             totalServers: healthStatuses.length,
-            healthyServers: healthStatuses.filter(s => s.isHealthy).length,
+            healthyServers: healthStatuses.filter((s: Readonly<ServerHealthStatus>) => s.isHealthy).length,
             unhealthyServers: unhealthyServers.length,
           });
         })
-        .catch(error => {
-          this.emit('healthCheckError', { error });
+        .catch((error: unknown) => {
+          this.emit('healthCheckError', { error: error instanceof Error ? error.message : String(error) });
         });
     }, this.loadBalancingConfig.healthCheckInterval);
   }
 
   private updateLatencyMetrics(connection: MCPServerConnection, latency: number): void {
-    const metrics = connection.metrics;
+    const { metrics } = connection;
     const totalRequests = metrics.requestCount;
 
     // Calculate running average

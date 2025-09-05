@@ -9,6 +9,7 @@
  */
 
 import {
+  ApprovalMode,
   ApprovalModesManager,
   Permission,
   cleanupApprovalManager,
@@ -16,7 +17,6 @@ import {
 } from '../../infrastructure/security/approval-modes-manager.js';
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
-import { logger } from '../../infrastructure/logging/unified-logger.js';
 import chalk from 'chalk';
 
 export interface ApprovalResult {
@@ -36,7 +36,7 @@ export interface OperationInfo {
  * Handles operation approval workflows and management
  */
 export class ApprovalHandler {
-  private userInteraction: IUserInteraction;
+  private readonly userInteraction: IUserInteraction;
 
   constructor(userInteraction: IUserInteraction) {
     this.userInteraction = userInteraction;
@@ -45,7 +45,7 @@ export class ApprovalHandler {
   /**
    * Check operation approval
    */
-  async checkOperationApproval(operationInfo: OperationInfo): Promise<ApprovalResult> {
+  public async checkOperationApproval(operationInfo: OperationInfo): Promise<ApprovalResult> {
     const approvalManager = getApprovalManager();
 
     // Determine required permissions based on operation
@@ -73,13 +73,13 @@ export class ApprovalHandler {
       operationInfo.riskLevel
     );
 
-    return await approvalManager.requestApproval(request);
+    return approvalManager.requestApproval(request);
   }
 
   /**
    * Handle approval mode commands
    */
-  async handleApprovalsCommand(args: string[]): Promise<void> {
+  public async handleApprovalsCommand(args: readonly string[]): Promise<void> {
     const approvalManager = getApprovalManager();
 
     if (args.length === 0) {
@@ -127,7 +127,7 @@ ${chalk.gray('Usage:')} approvals <mode> | approvals status | approvals clear
       case 'enterprise-audit':
       case 'voice-collaborative':
         try {
-          approvalManager.setMode(command as any);
+          approvalManager.setMode(command as ApprovalMode);
           await this.userInteraction.display(chalk.green(`✅ Approval mode set to: ${command}`));
         } catch (error) {
           await this.userInteraction.error(

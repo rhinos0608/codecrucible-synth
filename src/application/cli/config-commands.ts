@@ -143,7 +143,7 @@ export class ConfigCommands {
   /**
    * Analyze legacy configuration files
    */
-  async analyze(options: ConfigCommandOptions = {}): Promise<void> {
+  public async analyze(options: Readonly<ConfigCommandOptions> = {}): Promise<void> {
     try {
       console.log('🔍 Analyzing legacy configuration files...\n');
 
@@ -153,12 +153,12 @@ export class ConfigCommands {
       if (analysis.legacyFiles.length === 0) {
         console.log('   No legacy configuration files detected.');
       } else {
-        analysis.legacyFiles.forEach(file => {
+        analysis.legacyFiles.forEach((file: Readonly<(typeof analysis.legacyFiles)[number]>) => {
           const status = file.canAutoMigrate ? '✅' : '❌';
           console.log(`   ${status} ${file.path} (${file.format}, ${file.issues.length} issues)`);
 
           if (options.verbose && file.issues.length > 0) {
-            file.issues.forEach(issue => {
+            file.issues.forEach((issue: Readonly<(typeof file.issues)[number]>) => {
               console.log(`      - ${issue.type}: ${issue.message}`);
             });
           }
@@ -167,7 +167,7 @@ export class ConfigCommands {
 
       if (analysis.conflicts.length > 0) {
         console.log(`\n⚠️  Conflicts Detected: ${analysis.conflicts.length}`);
-        analysis.conflicts.forEach(conflict => {
+        analysis.conflicts.forEach((conflict: Readonly<(typeof analysis.conflicts)[number]>) => {
           const severityIcon = {
             low: '🟡',
             medium: '🟠',
@@ -179,7 +179,7 @@ export class ConfigCommands {
           console.log(`      ${conflict.suggestion}`);
 
           if (options.verbose) {
-            conflict.values.forEach(value => {
+            conflict.values.forEach((value: Readonly<(typeof conflict.values)[number]>) => {
               console.log(`      - ${value.source}: ${JSON.stringify(value.value)}`);
             });
           }
@@ -301,11 +301,11 @@ export class ConfigCommands {
   /**
    * Export current configuration in specified format
    */
-  async export(filePath: string, options: ConfigCommandOptions = {}): Promise<void> {
+  public async export(filePath: string, options: Readonly<ConfigCommandOptions> = {}): Promise<void> {
     try {
       await this.configManager.initialize();
       const config = this.configManager.getConfiguration();
-      const format = options.format || 'yaml';
+      const format = options.format ?? 'yaml';
 
       let content: string;
       if (format === 'json') {
@@ -328,7 +328,7 @@ export class ConfigCommands {
   /**
    * Show configuration help
    */
-  help(): void {
+  public help(): void {
     console.log(`
 📖 Configuration Management Commands
 

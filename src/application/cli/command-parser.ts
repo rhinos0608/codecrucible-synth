@@ -16,8 +16,8 @@ export interface ParsedCommandOptions {
 
 export function parseCommand(
   prompt: string,
-  options: ParsedCommandOptions,
-  session?: CLISession | null
+  options: Readonly<ParsedCommandOptions>,
+  session?: Readonly<CLISession> | null
 ): CLIOperationRequest {
   return {
     id: randomUUID(),
@@ -30,13 +30,13 @@ export function parseCommand(
 
 // CLI coordinator expects a CommandParser class
 export class CommandParser {
-  static parseArgs(argv: string[]): { command?: string } {
+  public static parseArgs(argv: readonly string[]): { command?: string } {
     // Simple argument parsing - extract command from argv
-    const command = argv[2]; // Skip node and script name
+    const [, , command] = argv; // Skip node and script name
     return { command };
   }
 
-  static parseInput(line: string): { intent: string } {
+  public static parseInput(line: string): { intent: string } {
     // Simple intent parsing from user input
     const trimmed = line.trim().toLowerCase();
     if (trimmed.startsWith('help')) return { intent: 'help' };

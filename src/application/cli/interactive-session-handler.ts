@@ -10,7 +10,6 @@
 
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
-import { logger } from '../../infrastructure/logging/unified-logger.js';
 import chalk from 'chalk';
 
 export interface InteractiveSessionOptions {
@@ -34,44 +33,44 @@ export interface ShowStatusFunction {
 }
 
 export interface ExecCommandFunction {
-  (name: string, args: any[]): Promise<any>;
+  (name: string, args: readonly unknown[]): Promise<unknown>;
 }
 
 /**
  * Handles interactive CLI session functionality (REPL)
  */
 export class InteractiveSessionHandler {
-  private userInteraction: IUserInteraction;
-  private options: Required<InteractiveSessionOptions>;
+  private readonly userInteraction: IUserInteraction;
+  private readonly options: Required<InteractiveSessionOptions>;
 
   private processPrompt?: ProcessPromptFunction;
   private getSuggestions?: GetSuggestionsFunction;
   private showStatus?: ShowStatusFunction;
   private execCommand?: ExecCommandFunction;
 
-  constructor(
-    userInteraction: IUserInteraction,
-    options: InteractiveSessionOptions = {}
+  public constructor(
+    userInteraction: Readonly<IUserInteraction>,
+    options: Readonly<InteractiveSessionOptions> = {}
   ) {
     this.userInteraction = userInteraction;
     this.options = {
-      enableHelp: options.enableHelp || true,
-      enableStatus: options.enableStatus || true,
-      enableSuggestions: options.enableSuggestions || true,
-      defaultToDryRun: options.defaultToDryRun || true,
-      showWelcomeMessage: options.showWelcomeMessage || true,
+      enableHelp: options.enableHelp ?? true,
+      enableStatus: options.enableStatus ?? true,
+      enableSuggestions: options.enableSuggestions ?? true,
+      defaultToDryRun: options.defaultToDryRun ?? true,
+      showWelcomeMessage: options.showWelcomeMessage ?? true,
     };
   }
 
   /**
    * Set callback functions for interactive operations
    */
-  setCallbacks(callbacks: {
+  public setCallbacks(callbacks: Readonly<{
     processPrompt?: ProcessPromptFunction;
     getSuggestions?: GetSuggestionsFunction;
     showStatus?: ShowStatusFunction;
     execCommand?: ExecCommandFunction;
-  }): void {
+  }>): void {
     this.processPrompt = callbacks.processPrompt;
     this.getSuggestions = callbacks.getSuggestions;
     this.showStatus = callbacks.showStatus;
@@ -81,7 +80,7 @@ export class InteractiveSessionHandler {
   /**
    * Start interactive REPL mode
    */
-  async startInteractive(contextInfo?: { type?: string; language?: string; confidence?: number }): Promise<void> {
+  public async startInteractive(contextInfo?: Readonly<{ type?: string; language?: string; confidence?: number }>): Promise<void> {
     if (this.options.showWelcomeMessage) {
       await this.userInteraction.display('🚀 Starting interactive mode...', { type: 'info' });
       await this.userInteraction.display('Type "exit", "quit", or press Ctrl+C to quit.', {
@@ -91,7 +90,7 @@ export class InteractiveSessionHandler {
       // Show context info if available
       if (contextInfo?.type && contextInfo?.language) {
         await this.userInteraction.display(
-          `📊 Project: ${contextInfo.type} (${contextInfo.language}) - Confidence: ${((contextInfo.confidence || 0) * 100).toFixed(0)}%`,
+          `📊 Project: ${contextInfo.type} (${contextInfo.language}) - Confidence: ${((contextInfo.confidence ?? 0) * 100).toFixed(0)}%`,
           { type: 'info' }
         );
       }

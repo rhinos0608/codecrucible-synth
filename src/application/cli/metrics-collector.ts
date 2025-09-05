@@ -71,16 +71,16 @@ export interface MetricsSummary {
  * Collects and manages performance metrics and system health data
  */
 export class MetricsCollector extends EventEmitter {
-  private observabilitySystem: ObservabilitySystem;
-  private options: Required<MetricsCollectorOptions>;
+  private readonly observabilitySystem: ObservabilitySystem;
+  private readonly options: Required<MetricsCollectorOptions>;
   
   // Metrics storage
-  private operationMetrics: Map<string, OperationMetrics> = new Map();
+  private readonly operationMetrics: Map<string, OperationMetrics> = new Map();
   private systemHealthHistory: SystemHealthMetrics[] = [];
-  private activeOperations: Map<string, OperationMetrics> = new Map();
+  private readonly activeOperations: Map<string, OperationMetrics> = new Map();
   
   // Performance tracking
-  private globalStats = {
+  private readonly globalStats = {
     totalOperations: 0,
     successfulOperations: 0,
     failedOperations: 0,
@@ -92,15 +92,15 @@ export class MetricsCollector extends EventEmitter {
   private healthCheckInterval?: NodeJS.Timeout;
   private isShuttingDown = false;
 
-  constructor(options: MetricsCollectorOptions = {}) {
+  public constructor(options: MetricsCollectorOptions = {}) {
     super();
 
     this.options = {
-      enableDetailedMetrics: options.enableDetailedMetrics || true,
-      enableSystemMonitoring: options.enableSystemMonitoring || true,
-      metricsRetentionMs: options.metricsRetentionMs || 3600000, // 1 hour
-      healthCheckIntervalMs: options.healthCheckIntervalMs || 30000, // 30 seconds
-      errorThreshold: options.errorThreshold || 0.1, // 10% error rate threshold
+      enableDetailedMetrics: options.enableDetailedMetrics ?? true,
+      enableSystemMonitoring: options.enableSystemMonitoring ?? true,
+      metricsRetentionMs: options.metricsRetentionMs ?? 3600000, // 1 hour
+      healthCheckIntervalMs: options.healthCheckIntervalMs ?? 30000, // 30 seconds
+      errorThreshold: options.errorThreshold ?? 0.1, // 10% error rate threshold
     };
 
     // Initialize observability system
@@ -125,10 +125,10 @@ export class MetricsCollector extends EventEmitter {
   /**
    * Start tracking an operation
    */
-  startOperation(
+  public startOperation(
     operationId: string,
     operationType: string,
-    metadata?: Record<string, any>
+    metadata?: Readonly<Record<string, unknown>>
   ): TraceSpan | undefined {
     const startTime = performance.now();
     
@@ -164,12 +164,12 @@ export class MetricsCollector extends EventEmitter {
   /**
    * Record operation completion
    */
-  recordOperation(
+  public recordOperation(
     operationId: string,
     success: boolean,
     error?: string,
-    metadata?: Record<string, any>,
-    traceSpan?: TraceSpan
+    metadata?: Readonly<Record<string, unknown>>,
+    traceSpan?: Readonly<TraceSpan>
   ): void {
     const activeMetrics = this.activeOperations.get(operationId);
     if (!activeMetrics) {
@@ -204,7 +204,7 @@ export class MetricsCollector extends EventEmitter {
     this.globalStats.totalProcessingTime += duration;
 
     // Update memory high water mark
-    const currentMemory = completedMetrics.memoryUsed || 0;
+    const currentMemory = completedMetrics.memoryUsed ?? 0;
     if (currentMemory > this.globalStats.memoryHighWaterMark) {
       this.globalStats.memoryHighWaterMark = currentMemory;
     }
@@ -231,7 +231,7 @@ export class MetricsCollector extends EventEmitter {
         this.observabilitySystem.finishSpan(traceSpan, {
           status: success ? 'ok' : 'error',
           'operation.duration': duration.toString(),
-          'operation.error': error || '',
+          'operation.error': error ?? '',
         });
       }
     }
@@ -251,7 +251,7 @@ export class MetricsCollector extends EventEmitter {
   /**
    * Record system health metrics
    */
-  recordSystemHealth(activeSessions: number = 0): SystemHealthMetrics {
+  public recordSystemHealth(activeSessions: number = 0): SystemHealthMetrics {
     const memoryUsage = process.memoryUsage();
     const timestamp = performance.now();
 
@@ -318,7 +318,7 @@ export class MetricsCollector extends EventEmitter {
   /**
    * Get comprehensive metrics summary
    */
-  getMetricsSummary(): MetricsSummary {
+  public getMetricsSummary(): MetricsSummary {
     const operationTypeDistribution: Record<string, number> = {};
 
     // Calculate operation type distribution
@@ -350,7 +350,7 @@ export class MetricsCollector extends EventEmitter {
   /**
    * Get current system health
    */
-  getCurrentSystemHealth(): SystemHealthMetrics | null {
+  public getCurrentSystemHealth(): SystemHealthMetrics | null {
     return this.systemHealthHistory.length > 0
       ? this.systemHealthHistory[this.systemHealthHistory.length - 1]
       : null;
@@ -359,7 +359,7 @@ export class MetricsCollector extends EventEmitter {
   /**
    * Get system health trend over time
    */
-  getSystemHealthTrend(timeRangeMs: number = 300000): SystemHealthMetrics[] {
+  public getSystemHealthTrend(timeRangeMs: Readonly<number> = 300000): SystemHealthMetrics[] {
     const cutoffTime = performance.now() - timeRangeMs;
     return this.systemHealthHistory.filter(h => h.timestamp >= cutoffTime);
   }
@@ -367,7 +367,7 @@ export class MetricsCollector extends EventEmitter {
   /**
    * Check if system is healthy
    */
-  isSystemHealthy(): boolean {
+  public isSystemHealthy(): boolean {
     const health = this.getCurrentSystemHealth();
     if (!health) return true; // No data means healthy by default
 
@@ -451,21 +451,21 @@ export class MetricsCollector extends EventEmitter {
   /**
    * Get operation metrics by ID
    */
-  getOperationMetrics(operationId: string): OperationMetrics | undefined {
+  public getOperationMetrics(operationId: string): OperationMetrics | undefined {
     return this.operationMetrics.get(operationId);
   }
 
   /**
    * Get all active operations
    */
-  getActiveOperations(): OperationMetrics[] {
+  public getActiveOperations(): OperationMetrics[] {
     return Array.from(this.activeOperations.values());
   }
 
   /**
    * Export metrics data for analysis
    */
-  exportMetrics(): {
+  public exportMetrics(): {
     summary: MetricsSummary;
     operations: OperationMetrics[];
     systemHealth: SystemHealthMetrics[];
@@ -480,7 +480,7 @@ export class MetricsCollector extends EventEmitter {
   /**
    * Shutdown and cleanup all resources
    */
-  async shutdown(): Promise<void> {
+  public shutdown(): void {
     this.isShuttingDown = true;
     
     logger.info('Shutting down MetricsCollector');

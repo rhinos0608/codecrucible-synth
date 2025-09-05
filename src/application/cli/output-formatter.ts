@@ -1,5 +1,5 @@
 import { logger } from '../../infrastructure/logging/unified-logger.js';
-import { modelDiscoveryService, ModelInfo } from '../../infrastructure/discovery/model-discovery-service.js';
+import { ModelInfo, modelDiscoveryService } from '../../infrastructure/discovery/model-discovery-service.js';
 import { unifiedResultFormatter } from '../../infrastructure/formatting/unified-result-formatter.js';
 
 /**
@@ -32,10 +32,6 @@ export function formatOutput(result: unknown): string {
       return `✅ Result: ${result}`;
     }
     
-    if (typeof result === 'object' && result !== null) {
-      return `✅ Operation completed successfully - returned ${Array.isArray(result) ? 'array' : 'object'} data`;
-    }
-    
     return '✅ Operation completed successfully';
   }
 
@@ -44,11 +40,11 @@ export function formatOutput(result: unknown): string {
 
 // CLI coordinator expects an OutputFormatter class
 export class OutputFormatter {
-  print(message: string): void {
+  public print(message: string): void {
     console.log(message);
   }
 
-  showHelp(): void {
+  public showHelp(): void {
     console.log('CodeCrucible Synth - Help');
     console.log('Commands:');
     console.log('  help    - Show this help message');
@@ -56,7 +52,7 @@ export class OutputFormatter {
     console.log('  exit    - Exit the application');
   }
 
-  async showModels(): Promise<void> {
+  public async showModels(): Promise<void> {
     console.log('🤖 Discovering available models...');
     console.log('═'.repeat(40));
 
@@ -101,7 +97,7 @@ export class OutputFormatter {
       }
 
       // Show summary statistics
-      const available = models.filter(m => m.isAvailable).length;
+      const available = models.filter((m: Readonly<ModelInfo>) => m.isAvailable).length;
       const total = models.length;
       
       console.log(`\n📊 Summary: ${available}/${total} models available`);
@@ -123,24 +119,24 @@ export class OutputFormatter {
     }
   }
 
-  private groupModelsByProvider(models: ModelInfo[]): Record<string, ModelInfo[]> {
+  private groupModelsByProvider(models: ReadonlyArray<ModelInfo>): Record<string, ModelInfo[]> {
     const grouped: Record<string, ModelInfo[]> = {};
     
     for (const model of models) {
-      if (!grouped[model.provider]) {
-        grouped[model.provider] = [];
-      }
+      (grouped[model.provider] ??= []);
       grouped[model.provider].push(model);
     }
 
     // Sort models within each provider by availability and name
     for (const provider in grouped) {
-      grouped[provider].sort((a, b) => {
-        if (a.isAvailable !== b.isAvailable) {
-          return a.isAvailable ? -1 : 1; // Available models first
-        }
-        return a.name.localeCompare(b.name);
-      });
+      if (Object.prototype.hasOwnProperty.call(grouped, provider)) {
+        grouped[provider].sort((a: Readonly<ModelInfo>, b: Readonly<ModelInfo>) => {
+          if (a.isAvailable !== b.isAvailable) {
+            return a.isAvailable ? -1 : 1; // Available models first
+          }
+          return a.name.localeCompare(b.name);
+        });
+      }
     }
 
     return grouped;

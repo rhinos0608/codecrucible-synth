@@ -17,7 +17,7 @@ export interface ParsedCommand {
   intent: string;
   confidence: number;
   operationType?: 'analyze' | 'diagnose' | 'prompt' | 'execute' | 'navigate' | 'suggest';
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
   isCodeGeneration?: boolean;
   isSimpleQuestion?: boolean;
   complexity?: 'simple' | 'medium' | 'complex';
@@ -33,20 +33,20 @@ export interface NLPOptions {
  * Natural Language Processor for CLI commands
  */
 export class NaturalLanguageProcessor {
-  private options: Required<NLPOptions>;
+  private readonly options: Required<NLPOptions>;
 
-  constructor(options: NLPOptions = {}) {
+  public constructor(options: Readonly<NLPOptions> = {}) {
     this.options = {
-      enableDeepAnalysis: options.enableDeepAnalysis || true,
-      confidenceThreshold: options.confidenceThreshold || 0.7,
-      complexityAnalysis: options.complexityAnalysis || true,
+      enableDeepAnalysis: options.enableDeepAnalysis ?? true,
+      confidenceThreshold: options.confidenceThreshold ?? 0.7,
+      complexityAnalysis: options.complexityAnalysis ?? true,
     };
   }
 
   /**
    * Parse and analyze a natural language command
    */
-  parseCommand(input: string): ParsedCommand {
+  public parseCommand(input: string): ParsedCommand {
     if (!input || typeof input !== 'string') {
       return {
         intent: 'unknown',
@@ -161,7 +161,7 @@ export class NaturalLanguageProcessor {
       help: /\b(help|how\s+do\s+i|what\s+is)\b/i,
     };
 
-    if (specificPatterns[intent as keyof typeof specificPatterns]?.test(input)) {
+    if (specificPatterns[intent as keyof typeof specificPatterns].test(input)) {
       confidence += 0.3;
     }
 
@@ -219,7 +219,7 @@ export class NaturalLanguageProcessor {
     const inputLower = input.toLowerCase().trim();
 
     // Simple math questions
-    if (/^\s*\d+\s*[+\-*\/]\s*\d+[\s?]*$/.test(inputLower)) return true;
+    if (/^\s*\d+\s*[+\-*/]\s*\d+[\s?]*$/.test(inputLower.replace(/\//g, '/'))) return true;
 
     // Simple "what is" questions
     if (inputLower.startsWith('what is') && inputLower.length < 50) return true;
@@ -315,25 +315,27 @@ export class NaturalLanguageProcessor {
       chat: 'prompt',
     };
 
-    return intentToOperationMap[intent] || 'prompt';
+    return intentToOperationMap[intent];
   }
 
   /**
    * Extract parameters from natural language input
    */
-  extractParameters(input: string): Record<string, any> {
-    const parameters: Record<string, any> = {};
+  public extractParameters(input: string): Record<string, unknown> {
+    const parameters: Record<string, unknown> = {};
 
     // Extract file paths
     const filePathMatch = input.match(/([./\w-]+\.(ts|js|tsx|jsx|py|java|cpp|c|h|md|json|yaml|yml|txt))/i);
     if (filePathMatch) {
-      parameters.filePath = filePathMatch[1];
+      const [, filePath] = filePathMatch;
+      parameters.filePath = filePath;
     }
 
     // Extract directory references
     const dirMatch = input.match(/(src\/\w+|\.\/\w+|\/\w+)/i);
     if (dirMatch) {
-      parameters.directory = dirMatch[1];
+      const [, directory] = dirMatch;
+      parameters.directory = directory;
     }
 
     // Extract language hints
@@ -354,7 +356,7 @@ export class NaturalLanguageProcessor {
   /**
    * Get processing statistics
    */
-  getStats(): {
+  public getStats(): {
     totalProcessed: number;
     averageConfidence: number;
     intentDistribution: Record<string, number>;

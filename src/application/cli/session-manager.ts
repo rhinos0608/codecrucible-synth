@@ -47,24 +47,24 @@ export interface SessionManagerOptions {
  * Maintains backward compatibility with existing simple interface
  */
 export class SessionManager extends EventEmitter {
-  private sessions = new Map<string, CLISession>();
+  private readonly sessions = new Map<string, CLISession>();
   private eventBus?: IEventBus;
-  private options: Required<SessionManagerOptions>;
+  private readonly options: Required<SessionManagerOptions>;
 
-  constructor(options: SessionManagerOptions = {}) {
+  public constructor(options: Readonly<SessionManagerOptions> = {}) {
     super();
 
     this.options = {
-      historyLimit: options.historyLimit || 50,
-      sessionTimeout: options.sessionTimeout || 300000, // 5 minutes
-      maxConcurrentSessions: options.maxConcurrentSessions || 10,
+      historyLimit: options.historyLimit ?? 50,
+      sessionTimeout: options.sessionTimeout ?? 300000, // 5 minutes
+      maxConcurrentSessions: options.maxConcurrentSessions ?? 10,
     };
   }
 
   /**
    * Initialize the session manager with dependencies (optional)
    */
-  initialize(eventBus: IEventBus): void {
+  public initialize(eventBus: Readonly<IEventBus>): void {
     this.eventBus = eventBus;
     this.emit('initialized');
   }
@@ -72,9 +72,7 @@ export class SessionManager extends EventEmitter {
   /**
    * Create a new CLI session (backward compatible)
    */
-  createSession(): CLISession;
-  createSession(workingDirectory: string): Promise<CLISession>;
-  createSession(workingDirectory?: string): CLISession | Promise<CLISession> {
+  public createSession(workingDirectory?: string): CLISession | Promise<CLISession> {
     if (workingDirectory) {
       return this.createAdvancedSession(workingDirectory);
     }
@@ -92,11 +90,11 @@ export class SessionManager extends EventEmitter {
   /**
    * Create an advanced CLI session with full context and metrics
    */
-  private async createAdvancedSession(workingDirectory: string = process.cwd()): Promise<CLISession> {
+  private createAdvancedSession(workingDirectory: string = process.cwd()): CLISession {
     // Check session limit
     if (this.sessions.size >= this.options.maxConcurrentSessions) {
       // Clean up oldest sessions if at limit
-      await this.cleanupOldestSessions(1);
+      this.cleanupOldestSessions(1);
     }
 
     const sessionId = randomUUID();
@@ -136,26 +134,26 @@ export class SessionManager extends EventEmitter {
   /**
    * Get session by ID (backward compatible)
    */
-  getSession(id: string): CLISession | undefined {
+  public getSession(id: string): CLISession | undefined {
     return this.sessions.get(id);
   }
 
   /**
    * Get all active sessions
    */
-  getActiveSessions(): CLISession[] {
+  public getActiveSessions(): CLISession[] {
     return Array.from(this.sessions.values());
   }
 
   /**
    * Update session metrics (enhanced functionality)
    */
-  updateSessionMetrics(
+  public updateSessionMetrics(
     sessionId: string,
-    updates: Partial<CLISessionMetrics>
+    updates: Readonly<Partial<CLISessionMetrics>>
   ): void {
     const session = this.sessions.get(sessionId);
-    if (!session || !session.metrics) {
+    if (!session?.metrics) {
       logger.warn(`Attempted to update metrics for session without metrics: ${sessionId}`);
       return;
     }
@@ -179,7 +177,7 @@ export class SessionManager extends EventEmitter {
   /**
    * End/close a session (backward compatible, enhanced with cleanup)
    */
-  endSession(id: string): void {
+  public endSession(id: string): void {
     const session = this.sessions.get(id);
     if (!session) {
       logger.warn(`Attempted to close non-existent session: ${id}`);
@@ -208,7 +206,7 @@ export class SessionManager extends EventEmitter {
   /**
    * Record history entry (backward compatible)
    */
-  record(id: string, entry: string): void {
+  public record(id: string, entry: string): void {
     const session = this.sessions.get(id);
     if (!session) return;
     
@@ -221,19 +219,19 @@ export class SessionManager extends EventEmitter {
   /**
    * Close all sessions
    */
-  async closeAllSessions(): Promise<void> {
+  public closeAllSessions(): void {
     const sessionIds = Array.from(this.sessions.keys());
-    sessionIds.forEach(id => this.endSession(id));
+    sessionIds.forEach(id => { this.endSession(id); });
   }
 
   /**
    * Clean up oldest sessions to make room for new ones
    */
-  private async cleanupOldestSessions(count: number): Promise<void> {
+  private cleanupOldestSessions(count: number): void {
     const sessions = Array.from(this.sessions.values());
     
     // Sort by start time (oldest first)
-    sessions.sort((a, b) => a.startTime - b.startTime);
+    sessions.sort((a: Readonly<CLISession>, b: Readonly<CLISession>) => a.startTime - b.startTime);
     
     const sessionsToClose = sessions.slice(0, count);
     
@@ -247,10 +245,10 @@ export class SessionManager extends EventEmitter {
   /**
    * Clean up expired sessions based on timeout
    */
-  async cleanupExpiredSessions(): Promise<void> {
+  public cleanupExpiredSessions(): void {
     const now = performance.now();
     const expiredSessions = Array.from(this.sessions.values())
-      .filter(session => now - session.startTime > this.options.sessionTimeout);
+      .filter((session: Readonly<CLISession>) => now - session.startTime > this.options.sessionTimeout);
 
     if (expiredSessions.length > 0) {
       logger.info(`Cleaning up ${expiredSessions.length} expired sessions`);
@@ -264,7 +262,7 @@ export class SessionManager extends EventEmitter {
   /**
    * Get session statistics
    */
-  getSessionStats(): {
+  public getSessionStats(): {
     activeSessions: number;
     totalCommandsExecuted: number;
     totalErrorsRecovered: number;
@@ -275,22 +273,22 @@ export class SessionManager extends EventEmitter {
     const now = performance.now();
 
     const totalCommandsExecuted = sessions.reduce(
-      (sum, session) => sum + (session.metrics?.commandsExecuted || 0), 
+      (sum: number, session: Readonly<CLISession>) => sum + (session.metrics?.commandsExecuted ?? 0), 
       0
     );
     
     const totalErrorsRecovered = sessions.reduce(
-      (sum, session) => sum + (session.metrics?.errorsRecovered || 0), 
+      (sum: number, session: Readonly<CLISession>) => sum + (session.metrics?.errorsRecovered ?? 0), 
       0
     );
     
     const totalProcessingTime = sessions.reduce(
-      (sum, session) => sum + (session.metrics?.totalProcessingTime || 0), 
+      (sum: number, session: Readonly<CLISession>) => sum + (session.metrics?.totalProcessingTime ?? 0), 
       0
     );
     
     const averageSessionDuration = sessions.length > 0 
-      ? sessions.reduce((sum, session) => sum + (now - session.startTime), 0) / sessions.length
+      ? sessions.reduce((sum: number, session: Readonly<CLISession>) => sum + (now - session.startTime), 0) / sessions.length
       : 0;
 
     return {
@@ -305,25 +303,27 @@ export class SessionManager extends EventEmitter {
   /**
    * Start periodic cleanup of expired sessions
    */
-  startPeriodicCleanup(intervalMs: number = 60000): void {
+  public startPeriodicCleanup(intervalMs: number = 60000): void {
     setInterval(() => {
-      this.cleanupExpiredSessions().catch(error => {
+      try {
+        this.cleanupExpiredSessions();
+      } catch (error: unknown) {
         logger.error('Error during periodic session cleanup:', error);
-      });
+      }
     }, intervalMs);
-    
+
     logger.info(`Started periodic session cleanup with ${intervalMs}ms interval`);
   }
 
   /**
    * Shutdown and cleanup all resources
    */
-  async shutdown(): Promise<void> {
+  public shutdown(): void {
     logger.info('Shutting down SessionManager');
-    
+
     // Close all active sessions
-    await this.closeAllSessions();
-    
+    this.closeAllSessions();
+
     // Remove all listeners
     this.removeAllListeners();
   }

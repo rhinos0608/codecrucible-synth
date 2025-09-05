@@ -7,26 +7,34 @@ import chalk from 'chalk';
 // import ora from 'ora';
 import { SynthesisResult } from '../../voices/voice-system-coordinator.js';
 
+export interface VoiceResponse {
+  readonly voice: string;
+  readonly content: string;
+}
+
 export class CLIDisplay {
   /**
    * Display synthesis results with proper formatting
    */
-  static displayResults(synthesis: SynthesisResult, responses: any[]): void {
+  public static displayResults(
+    synthesis: Readonly<SynthesisResult>,
+    responses: readonly VoiceResponse[]
+  ): void {
     console.log(chalk.green('\n🎯 Synthesis Complete!'));
     console.log(chalk.gray(`   Consensus: ${(synthesis.consensus * 100).toFixed(0)}/100`));
-    console.log(chalk.gray(`   Voices Used: ${synthesis.voicesUsed?.join(', ') || 'N/A'}`));
+    console.log(chalk.gray(`   Voices Used: ${synthesis.voicesUsed.join(', ') || 'N/A'}`));
 
     // Show combined result
     console.log(chalk.bold('\n📄 Final Synthesis:'));
     console.log(synthesis.finalDecision || 'No decision available');
 
     // Show individual responses
-    if (responses && responses.length > 0) {
+    if (responses.length > 0) {
       console.log(chalk.bold('\n👥 Individual Voice Responses:'));
       responses.forEach((response, index) => {
         console.log(chalk.cyan(`\n   ${index + 1}. ${response.voice || 'Unknown Voice'}:`));
         console.log(
-          response.content?.substring(0, 200) + (response.content?.length > 200 ? '...' : '')
+          response.content.substring(0, 200) + (response.content.length > 200 ? '...' : '')
         );
       });
     }
@@ -38,7 +46,7 @@ export class CLIDisplay {
   /**
    * Show CLI help information
    */
-  static showHelp(): void {
+  public static showHelp(): void {
     console.log(chalk.bold('\n🔨 CodeCrucible Synth - AI-Powered Development Tool\n'));
 
     console.log(chalk.cyan('📖 USAGE:'));
@@ -82,7 +90,7 @@ export class CLIDisplay {
   /**
    * Display model recommendations
    */
-  static async showModelRecommendations(): Promise<void> {
+  public static showModelRecommendations(): void {
     console.log(chalk.bold('\n🤖 Model Recommendations\n'));
 
     const models = [
@@ -93,7 +101,7 @@ export class CLIDisplay {
     ];
 
     console.log(chalk.cyan('📋 Recommended Models:'));
-    models.forEach(model => {
+    models.forEach((model: Readonly<typeof models[number]>) => {
       const perfColor =
         model.performance === 'Very High'
           ? 'green'
@@ -111,7 +119,7 @@ export class CLIDisplay {
   /**
    * Get performance indicator for a model
    */
-  static getModelPerformance(model: string): string {
+  public static getModelPerformance(model: string): string {
     const highPerf = ['qwen2.5-coder', 'deepseek-coder', 'codestral'];
     const mediumPerf = ['llama3.1', 'mistral'];
 

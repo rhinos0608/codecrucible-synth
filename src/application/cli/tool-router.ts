@@ -1,12 +1,12 @@
 import type {
-  UnifiedCLICoordinator,
   CLIOperationRequest,
   CLIOperationResponse,
+  UnifiedCLICoordinator,
 } from '../services/unified-cli-coordinator.js';
 
 export async function routeThroughTools(
-  coordinator: UnifiedCLICoordinator,
-  request: CLIOperationRequest
+  coordinator: Readonly<UnifiedCLICoordinator>,
+  request: Readonly<CLIOperationRequest>
 ): Promise<CLIOperationResponse> {
   return coordinator.processOperation(request);
 }

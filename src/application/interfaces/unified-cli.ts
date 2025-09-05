@@ -31,6 +31,7 @@ import {
   getApprovalManager,
 } from '../../infrastructure/security/approval-modes-manager.js';
 import chalk from 'chalk';
+import { parseCommand, enrichContext, routeThroughTools, formatOutput } from '../cli/index.js';
 
 export interface CLIOptions {
   verbose?: boolean;
@@ -151,26 +152,21 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
     }
 
     try {
-      const request: CLIOperationRequest = {
-        id: randomUUID(),
-        type: 'prompt',
-        input: prompt,
-        options: {
-          enableGracefulDegradation: true,
-          retryAttempts: 3,
-          timeoutMs: 30000,
-          fallbackMode: 'basic',
-          errorNotification: this.context.options.verbose || false,
-          enableContextIntelligence: this.context.options.contextAware,
-          enablePerformanceOptimization: this.context.options.performance,
-          enableErrorResilience: this.context.options.resilience,
+      const request = parseCommand(
+        prompt,
+        {
+          enableContextIntelligence: Boolean(this.context.options.contextAware),
+          enablePerformanceOptimization: Boolean(this.context.options.performance),
+          enableErrorResilience: Boolean(this.context.options.resilience),
           ...this.context.options,
           ...options,
         },
-        session: this.currentSession ?? undefined,
-      };
+        this.currentSession
+      );
 
-      const response = await this.coordinator.processOperation(request);
+      const enriched = enrichContext(request);
+
+      const response = await routeThroughTools(this.coordinator, enriched);
 
       if (response.success) {
         if (this.context.options.verbose && response.enhancements) {
@@ -189,7 +185,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
           }
         }
 
-        return this.formatResponse(response.result);
+        return formatOutput(response.result);
       } else {
         throw new Error(response.error ?? 'Processing failed');
       }
@@ -985,240 +981,6 @@ ${chalk.yellow('Capabilities:')}
       process.off('SIGTERM', this.sigtermHandler);
       this.sigtermHandler = undefined;
     }
-  }
-
-  /**
-   * Format response for display with ultra-concise patterns
-   */
-  private formatResponse(result: any): string {
-    // DEBUG: Log what we're trying to format
-    console.log('DEBUG: formatResponse called with result:', typeof result, result?.constructor?.name);
-    console.log('DEBUG: result keys:', result && typeof result === 'object' ? Object.keys(result) : 'not object');
-    if (result?.response) console.log('DEBUG: result.response exists, length:', result.response.length);
-    if (result?.content) console.log('DEBUG: result.content exists, length:', result.content.length);
-    
-    let formattedResult = '';
-
-    if (typeof result === 'string') {
-      formattedResult = result;
-      console.log('DEBUG: using result as string, length:', formattedResult.length);
-    } else {
-      formattedResult = this.formatComplexResult(result);
-      console.log('DEBUG: formatComplexResult returned, length:', formattedResult.length);
-    }
-
-    // Apply Claude Code ultra-concise communication patterns
-    const finalResult = this.applyCLIConciseness(formattedResult);
-    console.log('DEBUG: applyCLIConciseness returned, length:', finalResult.length);
-    console.log('DEBUG: final formatted response:', finalResult);
-    
-    return finalResult;
-  }
-
-  private formatComplexResult(result: any): string {
-    if (result && typeof result === 'object') {
-      // Handle model response object (from OllamaProvider)
-      logger.debug('Formatting complex result', {
-        hasResponse: 'response' in result,
-        hasContent: 'content' in result,
-        responseType: typeof result.response,
-        contentType: typeof result.content,
-        responseLength: result.response?.length || 0,
-        contentLength: result.content?.length || 0,
-        resultKeys: Object.keys(result),
-      });
-      
-      if ('response' in result || 'content' in result) {
-        const responseText = result.response || result.content;
-        
-        if (responseText && typeof responseText === 'string' && responseText.trim()) {
-          return responseText;
-        } else {
-          // Enhanced diagnostics for empty responses
-          const errorDetails = {
-            provider: result.provider || 'unknown',
-            model: result.model || 'unknown',
-            hasToolCalls: !!(result.toolCalls?.length),
-            responseType: typeof responseText,
-          };
-          
-          logger.error('Model returned empty content', errorDetails);
-          
-          if (result.toolCalls?.length > 0) {
-            return `Tool execution completed but no text response was generated. (${result.toolCalls.length} tools called)`;
-          } else {
-            return `❌ AI model (${errorDetails.model}) returned empty response. Check if Ollama is running: "ollama serve"`;
-          }
-        }
-      }
-      
-      // Handle code generation results
-      if (result.generated && Array.isArray(result.generated.files)) {
-        const files = result.generated.files;
-        let output = `${result.generated.summary || 'Generated output'}\n`;
-        if (files.length > 0) {
-          output += '\nFiles:\n';
-          files.forEach((f: any) => {
-            const size = typeof f.content === 'string' ? `${f.content.length} chars` : '';
-            output += `- ${f.path} (${f.type}${size ? `, ${size}` : ''})\n`;
-          });
-          // If only a single fallback file was produced, show a short preview
-          if (files.length === 1 && String(files[0].path).startsWith('generated-code')) {
-            const preview =
-              typeof files[0].content === 'string' ? files[0].content.slice(0, 600) : '';
-            if (preview) {
-              output += '\nPreview (not saved by default):\n';
-              output += `\`\`\`\n${preview}${files[0].content.length > 600 ? '\n...\n' : '\n'}\`\`\`\n`;
-            }
-          }
-        }
-        return output.trim();
-      }
-      // Handle structured analysis results
-      if (result.analysis && typeof result.analysis === 'object') {
-        let output = '';
-
-        if (result.analysis.summary) {
-          output += `${result.analysis.summary}\n\n`;
-        }
-
-        if (
-          result.analysis.insights &&
-          Array.isArray(result.analysis.insights) &&
-          result.analysis.insights.length > 0
-        ) {
-          output += '💡 Key Insights:\n';
-          result.analysis.insights.forEach((insight: string) => {
-            output += `• ${insight}\n`;
-          });
-          output += '\n';
-        }
-
-        if (
-          result.analysis.recommendations &&
-          Array.isArray(result.analysis.recommendations) &&
-          result.analysis.recommendations.length > 0
-        ) {
-          output += '🔧 Recommendations:\n';
-          result.analysis.recommendations.forEach((rec: string) => {
-            output += `• ${rec}\n`;
-          });
-          output += '\n';
-        }
-
-        return output.trim();
-      }
-
-      if (result.response) {
-        return result.response;
-      }
-
-      if (result.content) {
-        return result.content;
-      }
-
-      if (result.suggestions && Array.isArray(result.suggestions)) {
-        let output = result.message || result.result || '';
-        if (result.suggestions.length > 0) {
-          output += '\n\n💡 Suggestions:\n';
-          result.suggestions.forEach((suggestion: any, index: number) => {
-            output += `${index + 1}. ${suggestion.title || suggestion.description || suggestion}\n`;
-          });
-        }
-        return output;
-      }
-
-      return JSON.stringify(result, null, 2);
-    }
-
-    return String(result);
-  }
-
-  /**
-   * Apply Claude Code ultra-concise communication patterns to CLI responses
-   */
-  private applyCLIConciseness(content: string): string {
-    if (!content || typeof content !== 'string') return content;
-
-    // Remove verbose CLI-specific patterns
-    content = content
-      // Remove status confirmations
-      .replace(/\b(successfully|completed successfully|operation completed)\b\s*/gi, '')
-      // Remove CLI pleasantries
-      .replace(/\b(please find|you can find|the following|as follows)\b\s*/gi, '')
-      // Remove redundant descriptions
-      .replace(/\b(the result is|the output is|here's the result)\b\s*/gi, '')
-      // Remove unnecessary status updates
-      .replace(/\b(processing|working|analyzing)\.\.\.\s*/gi, '')
-      // Simplify common CLI patterns
-      .replace(/generated output/gi, 'Generated')
-      .replace(/key insights:/gi, 'Insights:')
-      .replace(/recommendations:/gi, 'Actions:')
-      .replace(/suggestions:/gi, 'Options:');
-
-    // Apply direct response patterns for CLI
-    content = content
-      // Direct file operations
-      .replace(/files created:/gi, 'Created:')
-      .replace(/files modified:/gi, 'Modified:')
-      .replace(/files analyzed:/gi, 'Analyzed:')
-      // Direct status reports
-      .replace(/system status:/gi, 'Status:')
-      .replace(/current state:/gi, 'State:')
-      .replace(/available options:/gi, 'Options:');
-
-    // Ultra-concise error and success patterns
-    content = content
-      .replace(/error occurred:/gi, 'Error:')
-      .replace(/warning:/gi, 'Warning:')
-      .replace(/information:/gi, 'Info:')
-      .replace(/success:/gi, '✅')
-      .replace(/failed:/gi, '❌')
-      .replace(/completed:/gi, '✅');
-
-    // Remove CLI fluff and keep only essential information
-    content = content
-      .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
-      .replace(/\s{2,}/g, ' ') // Max 1 consecutive space
-      .replace(/^\s*\n/gm, '') // Remove lines with only whitespace
-      .trim();
-
-    // Apply line length limits for CLI readability (aim for <80 chars where possible)
-    const lines = content.split('\n');
-    const processedLines = lines.map(line => {
-      if (line.length > 120) {
-        // For very long lines, try to break at logical points
-        return this.breakLongLine(line);
-      }
-      return line;
-    });
-
-    return processedLines.join('\n');
-  }
-
-  /**
-   * Break long CLI lines at logical points
-   */
-  private breakLongLine(line: string): string {
-    if (line.length <= 120) return line;
-
-    // Don't break code blocks or JSON
-    if (line.includes('```') || line.trim().startsWith('{') || line.trim().startsWith('[')) {
-      return line;
-    }
-
-    // Break at logical separators
-    const breakPoints = [', ', ' - ', ' | ', ' and ', ' or ', ' but '];
-    for (const breakPoint of breakPoints) {
-      const index = line.indexOf(breakPoint, 80);
-      if (index > 0 && index < 120) {
-        return `${line.substring(0, index + breakPoint.length).trim()}\n  ${line
-          .substring(index + breakPoint.length)
-          .trim()}`;
-      }
-    }
-
-    return line; // Return as-is if no good break point found
   }
 
   private async showCommands(): Promise<void> {

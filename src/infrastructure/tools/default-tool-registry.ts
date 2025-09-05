@@ -14,7 +14,7 @@ export function createDefaultToolRegistry(
   options: ToolRegistryOptions = {}
 ): Map<string, ModelTool> {
   const { mcpManager, allowedOrigins, autoApproveTools } = options;
-  const origins = allowedOrigins || (process.env.TOOL_ALLOWED_ORIGINS || 'local').split(',');
+  const origins = allowedOrigins ?? (process.env.TOOL_ALLOWED_ORIGINS || 'local').split(',');
   const autoApprove = autoApproveTools ?? process.env.AUTO_APPROVE_TOOLS === 'true';
 
   const registry = new Map<string, ModelTool>();

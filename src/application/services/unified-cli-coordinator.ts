@@ -92,6 +92,7 @@ import {
   ResilientCLIWrapper,
   ResilientOptions,
 } from '../../infrastructure/resilience/resilient-cli-wrapper.js';
+import { setupResilienceEvents } from './cli/resilience-manager.js';
 
 // Session and Performance Types
 export interface CLISession {
@@ -247,8 +248,8 @@ export class UnifiedCLICoordinator extends EventEmitter {
       container.initialize(this.orchestrator);
       this.useCases = container.useCases;
 
-      // Initialize all specialized components
-      await this.initializeComponents();
+      // Initialize resilience policies
+      setupResilienceEvents(this.resilientWrapper, this);
 
       this.isInitialized = true;
       this.emit('initialized');
@@ -522,8 +523,13 @@ export class UnifiedCLICoordinator extends EventEmitter {
       const enhancedInput = contextEnhancement?.enhancedPrompt || contextEnhancedInput;
 
       // Use natural language intent to refine operation type if confidence is high
-      let effectiveOperationType: 'analyze' | 'diagnose' | 'prompt' | 'execute' | 'navigate' | 'suggest' =
-        request.type;
+      let effectiveOperationType:
+        | 'analyze'
+        | 'diagnose'
+        | 'prompt'
+        | 'execute'
+        | 'navigate'
+        | 'suggest' = request.type;
       if (parsedCommand && parsedCommand.confidence > 0.5) {
         // Map natural language intents to operation types
         const intentToOperationMap: Record<
@@ -598,7 +604,8 @@ export class UnifiedCLICoordinator extends EventEmitter {
               logger.info('🎯 Routing simple question directly to AI orchestrator (no tools)');
               return await this.executeUseCaseWithWorkflow(
                 sessionId,
-                async () => this.executeViaOrchestratorWithoutTools(request, enhancedInput, options),
+                async () =>
+                  this.executeViaOrchestratorWithoutTools(request, enhancedInput, options),
                 'AI response'
               );
             } else {
@@ -653,7 +660,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
         case 'diagnose': {
           // Handle diagnostic queries with specialized tool selection
           logger.info('🔍 Processing diagnostic request with enhanced tooling');
-          
+
           // For diagnostic queries, we want to use tools that can help identify problems
           // This includes file analysis, type checking, linting, etc.
           return await this.executeUseCaseWithWorkflow(
@@ -841,13 +848,13 @@ export class UnifiedCLICoordinator extends EventEmitter {
   ): Promise<any> {
     try {
       logger.info(`🌊 Starting streaming for ${operationType}`);
-      
+
       // Execute the use case - streaming tokens will be handled by model client
       // The streaming visual feedback will be handled by the concrete workflow orchestrator
       const result = await useCase();
-      
+
       logger.info(`✅ Streaming completed for ${operationType}`);
-      
+
       return result;
     } catch (error) {
       // Ensure streaming is stopped on error
@@ -1440,23 +1447,6 @@ export class UnifiedCLICoordinator extends EventEmitter {
         errorResilience: this.defaultOptions.enableErrorResilience,
       },
     };
-  }
-
-  /**
-   * Initialize all specialized components
-   */
-  private async initializeComponents(): Promise<void> {
-    // Legacy component initialization disabled
-    // Resilient wrapper is already initialized in constructor
-
-    // Only setup resilient wrapper events (legacy context components disabled)
-    this.resilientWrapper.on('critical_error', data => {
-      this.emit('error:critical', data);
-    });
-
-    this.resilientWrapper.on('system_overload', data => {
-      this.emit('error:overload', data);
-    });
   }
 
   /**

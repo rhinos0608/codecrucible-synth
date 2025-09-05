@@ -22,15 +22,15 @@ import {
   ModelRequest,
   ModelTool,
   ModelResponse,
-  StreamToken,
 } from '../../domain/interfaces/model-client.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import { randomUUID } from 'crypto';
-import { createDefaultToolRegistry } from '../../infrastructure/tools/default-tool-registry.js';
 import { RequestExecutionManager } from '../../infrastructure/execution/request-execution-manager.js';
 import fs from 'fs';
 import yaml from 'js-yaml';
+import { executeWithStreaming } from './orchestrator/streaming-handler.js';
+import { ToolRegistry } from './orchestrator/tool-registry.js';
 
 export interface WorkflowMetrics {
   totalRequests: number;
@@ -50,6 +50,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   private mcpManager?: any;
   private requestExecutionManager?: RequestExecutionManager;
   private isInitialized = false;
+  private toolRegistry?: ToolRegistry;
 
   // Request tracking
   private activeRequests: Map<
@@ -105,6 +106,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       this.userInteraction = dependencies.userInteraction;
       this.modelClient = dependencies.modelClient;
       this.mcpManager = dependencies.mcpManager;
+      this.toolRegistry = new ToolRegistry(this.mcpManager);
 
       // DEBUG: Verify critical dependencies
       logger.info('🔧 ConcreteWorkflowOrchestrator dependency injection:');
@@ -269,54 +271,8 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     }
   }
 
-  // Tool registry cache to avoid rebuilding definitions
-  private toolRegistryCache: Map<string, ModelTool> | null = null;
-
-  /**
-   * Initialize tool registry cache once to avoid rebuilding static definitions
-   */
-  private initializeToolRegistry(): Map<string, ModelTool> {
-    if (!this.toolRegistryCache) {
-      this.toolRegistryCache = createDefaultToolRegistry({ mcpManager: this.mcpManager });
-    }
-    return this.toolRegistryCache;
-  }
-
-  /**
-   * Dynamic MCP tool selection with intelligent context analysis and caching
-   */
   private async getMCPToolsForModel(userQuery?: string): Promise<ModelTool[]> {
-    if (!this.mcpManager) {
-      return [];
-    }
-
-    try {
-      // Initialize tool registry cache
-      const registry = this.initializeToolRegistry();
-
-      // Return all available tools - let the intelligent system prompt handle selection
-      // This replaces rule-based tool filtering with AI-driven decision making
-      const allTools = Array.from(registry.values());
-      
-      logger.info(
-        `🎯 Providing all ${allTools.length} available tools to AI for intelligent selection`
-      );
-      return allTools;
-    } catch (error) {
-      logger.warn('Failed to get MCP tools for model:', error);
-      // Return essential tools as fallback
-      const registry = this.initializeToolRegistry();
-      return ['filesystem_list', 'filesystem_read'].map(key => registry.get(key)!).filter(Boolean);
-    }
-  }
-
-  /**
-   * Get all available tools - system prompt now handles intelligent selection
-   * This replaces the previous rule-based tool filtering approach
-   */
-  private getAllAvailableTools(): string[] {
-    const registry = this.initializeToolRegistry();
-    return Array.from(registry.keys());
+    return this.toolRegistry?.getToolsForModel(userQuery) ?? [];
   }
 
   /**
@@ -354,7 +310,6 @@ User Request: ${userPrompt}`;
     return systemInstructions;
   }
 
-
   private async handlePromptRequest(request: WorkflowRequest): Promise<any> {
     const { payload } = request;
 
@@ -368,7 +323,7 @@ User Request: ${userPrompt}`;
       // CRITICAL FIX: Create enhanced prompt with explicit tool usage instructions
       const originalPrompt = payload.input || payload.prompt;
       const enhancedPrompt = this.createEnhancedPrompt(originalPrompt, mcpTools.length > 0);
-      
+
       const modelRequest: ModelRequest = {
         id: request.id,
         prompt: enhancedPrompt,
@@ -382,10 +337,12 @@ User Request: ${userPrompt}`;
         num_ctx: parseInt(process.env.OLLAMA_NUM_CTX || '131072'),
         options: payload.options,
       };
-      
+
       // Log when enhanced prompt is used
       if (mcpTools.length > 0) {
-        logger.info(`🎯 Enhanced prompt with explicit tool usage instructions (${mcpTools.length} tools available)`);
+        logger.info(
+          `🎯 Enhanced prompt with explicit tool usage instructions (${mcpTools.length} tools available)`
+        );
       }
 
       // Log when tools are disabled for simple questions
@@ -394,6 +351,16 @@ User Request: ${userPrompt}`;
       }
 
       let response: ModelResponse;
+
+
+      if (payload.options?.stream && this.modelClient) {
+        logger.info('🌊 Using streaming response for Ollama');
+        try {
+          response = await executeWithStreaming(this.modelClient, modelRequest);
+        } catch (streamError) {
+          logger.error('❌ Streaming failed, falling back to standard request:', streamError);
+          response = await this.processModelRequest(modelRequest);
+        }
 
       // CRITICAL FIX: Unified request path for both streaming and non-streaming
       // This ensures tool integration works consistently for both modes
@@ -407,8 +374,8 @@ User Request: ${userPrompt}`;
         response = await this.processModelRequest(modelRequest);
         
         logger.info('✅ Streaming completed via unified pipeline');
+
       } else {
-        // Standard non-streaming request
         response = await this.processModelRequest(modelRequest);
       }
 
@@ -562,7 +529,7 @@ User Request: ${userPrompt}`;
 
     // Get MCP tools for AI model with smart selection
     const mcpTools = await this.getMCPToolsForModel(analysisPrompt);
-    
+
     // CRITICAL FIX: Create enhanced analysis prompt with explicit tool usage instructions
     const enhancedAnalysisPrompt = this.createEnhancedPrompt(analysisPrompt, mcpTools.length > 0);
 
@@ -575,10 +542,12 @@ User Request: ${userPrompt}`;
       tools: mcpTools, // Include MCP tools for analysis too
       context: request.context,
     };
-    
+
     // Log when enhanced analysis prompt is used
     if (mcpTools.length > 0) {
-      logger.info(`🔍 Enhanced analysis prompt with explicit tool usage instructions (${mcpTools.length} tools available)`);
+      logger.info(
+        `🔍 Enhanced analysis prompt with explicit tool usage instructions (${mcpTools.length} tools available)`
+      );
     }
 
     const result = await this.processModelRequest(modelRequest);

@@ -3,12 +3,20 @@ import { createDefaultToolRegistry } from '../../../infrastructure/tools/default
 import { logger } from '../../../infrastructure/logging/logger.js';
 
 /**
+ * Interface for MCP Manager.
+ * TODO: Replace with actual type or expand as needed.
+ */
+interface McpManager {
+  // Define expected methods/properties here as needed
+}
+
+/**
  * Wrapper around MCP tool registry with simple caching.
  */
 export class ToolRegistry {
   private registryCache: Map<string, ModelTool> | null = null;
 
-  constructor(private readonly mcpManager?: any) {}
+  constructor(private readonly mcpManager?: McpManager) {}
 
   private initializeRegistry(): Map<string, ModelTool> {
     if (!this.registryCache) {

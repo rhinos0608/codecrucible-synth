@@ -27,8 +27,8 @@ import { logger } from '../../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import { randomUUID } from 'crypto';
 import { RequestExecutionManager } from '../../infrastructure/execution/request-execution-manager.js';
-import fs from 'fs';
-import yaml from 'js-yaml';
+import * as fs from 'fs';
+import * as yaml from 'js-yaml';
 import { executeWithStreaming } from './orchestrator/streaming-handler.js';
 import { ToolRegistry } from './orchestrator/tool-registry.js';
 
@@ -353,15 +353,6 @@ User Request: ${userPrompt}`;
       let response: ModelResponse;
 
 
-      if (payload.options?.stream && this.modelClient) {
-        logger.info('🌊 Using streaming response for Ollama');
-        try {
-          response = await executeWithStreaming(this.modelClient, modelRequest);
-        } catch (streamError) {
-          logger.error('❌ Streaming failed, falling back to standard request:', streamError);
-          response = await this.processModelRequest(modelRequest);
-        }
-
       // CRITICAL FIX: Unified request path for both streaming and non-streaming
       // This ensures tool integration works consistently for both modes
       if (payload.options?.stream) {
@@ -478,6 +469,7 @@ User Request: ${userPrompt}`;
     }
   }
 
+  // Tool execution handler
   private async handleToolExecution(request: WorkflowRequest): Promise<any> {
     const { payload } = request;
     const { toolName, args } = payload;

@@ -7,6 +7,7 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "allowJs": false,
+    "downlevelIteration": true,
 
     // Strict Type Checking - 2025 Enterprise Standards (gradual enablement)
     "strict": true,

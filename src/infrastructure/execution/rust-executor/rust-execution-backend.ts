@@ -58,7 +58,7 @@ interface NativeRustExecutor {
   getFilesystemOperations(): string[];
   getSupportedCommands(): string[];
   cleanup(): Promise<void>;
-  id(): string;
+  id: string; // This is a property, not a method
 }
 
 /**
@@ -148,8 +148,8 @@ export class RustExecutionBackend {
         if (initResult) {
           this.initialized = true;
           logger.info('🚀 RustExecutionBackend initialized successfully', {
-            executorId: this.rustExecutor?.id(),
-            supportedTools: this.rustExecutor?.getSupportedTools(),
+            executorId: this.rustExecutor?.id || 'unknown',
+            supportedTools: this.rustExecutor?.getSupportedTools || [],
             performanceMetrics: this.options.enableProfiling,
           });
         } else {

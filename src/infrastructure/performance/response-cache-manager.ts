@@ -8,7 +8,7 @@
  * - On cache miss, asynchronously prefetches from Redis to warm L1
  */
 
-import Redis from 'redis';
+import { createClient } from 'redis';
 
 interface CacheEntry {
   data: any;
@@ -20,7 +20,7 @@ class ResponseCacheManager {
   private hits = 0;
   private misses = 0;
 
-  private redis?: Redis.RedisClientType;
+  private redis?: ReturnType<typeof createClient>;
   private readonly namespace = 'responseCache';
 
   constructor() {
@@ -28,7 +28,7 @@ class ResponseCacheManager {
     const url = process.env.REDIS_URL || '';
     if (url) {
       try {
-        this.redis = Redis.createClient({ url });
+        this.redis = createClient({ url });
         // Connect in background; ignore failures, fallback to memory only
         this.redis.connect().catch(() => {
           this.redis = undefined;

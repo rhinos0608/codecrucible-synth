@@ -79,17 +79,58 @@ export class FilesystemTools {
           contextType: 'fileAnalysis',
         });
 
-        // Wait for completion (in a real implementation you might use events)
-        // For now, we'll poll until the session is complete
-        let session = rustStreamingClient
-          .getActiveSessionStats()
-          .find(s => s.sessionId === sessionId);
-        while (session) {
-          await new Promise(resolve => setTimeout(resolve, 10));
-          session = rustStreamingClient
-            .getActiveSessionStats()
-            .find(s => s.sessionId === sessionId);
-        }
+        // Wait for completion with timeout and event-based approach
+        const completionPromise = new Promise<void>((resolve, reject) => {
+          let resolved = false;
+          
+          // Event-based completion detection
+          const checkCompletion = () => {
+            if (resolved) return;
+            
+            const activeSession = rustStreamingClient
+              .getActiveSessionStats()
+              .find(s => s.sessionId === sessionId);
+              
+            if (!activeSession) {
+              resolved = true;
+              resolve();
+            }
+          };
+
+          // Set up periodic polling with reasonable interval
+          const pollInterval = setInterval(checkCompletion, 100); // 100ms instead of 10ms
+          
+          // Timeout mechanism to prevent indefinite hangs
+          const timeout = setTimeout(() => {
+            if (!resolved) {
+              resolved = true;
+              clearInterval(pollInterval);
+              logger.warn(`⏰ File read timeout for ${path} after 30 seconds`);
+              rustStreamingClient.cancelStream(sessionId);
+              reject(new Error(`File read timeout: ${path} - operation took longer than 30 seconds`));
+            }
+          }, 30000); // 30 second timeout
+          
+          // Clean up on completion
+          const cleanup = () => {
+            clearInterval(pollInterval);
+            clearTimeout(timeout);
+          };
+          
+          // Override resolve/reject to include cleanup
+          const originalResolve = resolve;
+          const originalReject = reject;
+          resolve = (...args) => {
+            cleanup();
+            originalResolve(...args);
+          };
+          reject = (...args) => {
+            cleanup();
+            originalReject(...args);
+          };
+        });
+
+        await completionPromise;
 
         if (fileContent.length > 0) {
           return fileContent;

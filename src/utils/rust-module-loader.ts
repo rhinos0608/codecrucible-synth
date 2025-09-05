@@ -337,6 +337,56 @@ export function createFallbackRustExecutor(error: string): any {
         throw new Error(`Rust module not available: ${error}`);
       }
 
+      id() {
+        throw new Error(`Rust module not available: ${error}`);
+      }
+
+      get_supported_tools() {
+        throw new Error(`Rust module not available: ${error}`);
+      }
+
+      getFilesystemOperations() {
+        throw new Error(`Rust module not available: ${error}`);
+      }
+
+      getSupportedCommands() {
+        throw new Error(`Rust module not available: ${error}`);
+      }
+
+      execute(toolId: string, args: string, options?: any) {
+        throw new Error(`Rust module not available: ${error}`);
+      }
+
+      executeFilesystem(operation: string, path: string, content?: string, options?: any) {
+        throw new Error(`Rust module not available: ${error}`);
+      }
+
+      executeCommand(command: string, args: string[], options?: any) {
+        throw new Error(`Rust module not available: ${error}`);
+      }
+
+      get_performance_metrics() {
+        return JSON.stringify({
+          total_requests: 0,
+          successful_requests: 0,
+          failed_requests: 0,
+          average_execution_time_ms: 0,
+          error: 'Rust module not available'
+        });
+      }
+
+      reset_performance_metrics() {
+        logger.warn('Rust performance metrics not available - module failed to load');
+      }
+
+      healthCheck() {
+        return Promise.resolve(`unhealthy: ${error}`);
+      }
+
+      cleanup() {
+        return Promise.resolve();
+      }
+
       streamFile() {
         throw new Error(`Rust streaming not available: ${error}`);
       }

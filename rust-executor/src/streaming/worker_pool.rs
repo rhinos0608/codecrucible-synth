@@ -1,4 +1,5 @@
 use super::error_handling::{StreamError, StreamResult};
+use crate::runtime::shared_runtime::RuntimeManager;
 use napi::threadsafe_function::ThreadsafeFunction;
 use serde::{Serialize};
 use std::collections::HashMap;
@@ -209,35 +210,27 @@ pub enum TaskPriority {
 impl StreamingWorkerPool {
     /// Create new worker pool with configuration
     pub fn new(config: WorkerPoolConfig) -> StreamResult<Self> {
-        // Get or create async runtime handle
-        let runtime_handle = match tokio::runtime::Handle::try_current() {
-            Ok(handle) => handle,
-            Err(_) => {
-                // Create a new runtime if none exists
-                let runtime = tokio::runtime::Runtime::new()
-                    .map_err(|_e| StreamError::StreamingError {
-                        stage: super::error_handling::StreamingStage::Initialization,
-                        stream_id: "worker_pool".to_string(),
-                        sequence: None,
-                        buffer_state: super::error_handling::BufferState {
-                            current_size: 0,
-                            max_size: 0,
-                            pending_chunks: 0,
-                            flush_threshold: 0,
-                        },
-                        performance_context: super::error_handling::PerformanceContext {
-                            start_time: 0,
-                            bytes_processed: 0,
-                            chunks_processed: 0,
-                            current_throughput_bps: 0.0,
-                            memory_usage_bytes: 0,
-                            cpu_usage_percent: 0.0,
-                        },
-                    })?;
-                
-                runtime.handle().clone()
-            }
-        };
+        // Get shared runtime handle for optimal resource utilization
+        let runtime_handle = RuntimeManager::get_handle()
+            .map_err(|_e| StreamError::StreamingError {
+                stage: super::error_handling::StreamingStage::Initialization,
+                stream_id: "worker_pool".to_string(),
+                sequence: None,
+                buffer_state: super::error_handling::BufferState {
+                    current_size: 0,
+                    max_size: 0,
+                    pending_chunks: 0,
+                    flush_threshold: 0,
+                },
+                performance_context: super::error_handling::PerformanceContext {
+                    start_time: 0,
+                    bytes_processed: 0,
+                    chunks_processed: 0,
+                    current_throughput_bps: 0.0,
+                    memory_usage_bytes: 0,
+                    cpu_usage_percent: 0.0,
+                },
+            })?;
 
         let atomic_metrics = Arc::new(super::AtomicStreamingMetrics::new());
         let metrics_aggregator = Arc::new(super::atomic_metrics::MetricsAggregator::new(

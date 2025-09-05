@@ -4,8 +4,9 @@
  */
 
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
-import { FilesystemTools } from './filesystem-tools.js';
+import { createDefaultToolRegistry, createLegacyToolRegistry } from './default-tool-registry.js';
 import { createLogger } from '../logging/logger-adapter.js';
+import { unifiedToolRegistry, ToolDefinition } from './unified-tool-registry.js';
 
 export interface LLMFunction {
   type: 'function';
@@ -29,7 +30,6 @@ export interface ToolCall {
 
 export class ToolIntegration {
   private mcpManager: MCPServerManager;
-  private filesystemTools: FilesystemTools | null = null;
   protected availableTools: Map<string, any> = new Map();
   private initializationPromise: Promise<void> | null = null;
   private isInitialized = false;
@@ -43,6 +43,154 @@ export class ToolIntegration {
     this.mcpManager = mcpManager;
     this.rustBackend = rustBackend ?? null;
     // Don't initialize synchronously - use lazy initialization
+  }
+
+  /**
+   * Normalize file paths to ensure they are relative to the working directory
+   */
+  private normalizePath(filePath: string): string {
+    if (typeof filePath !== 'string') {
+      this.logger.info(`[PATH DEBUG] Non-string path:`, filePath);
+      return filePath;
+    }
+    
+    this.logger.info(`[PATH DEBUG] Original path: "${filePath}"`);
+    
+    // Handle git repository paths - convert to current directory
+    if (filePath.includes('/project/') || filePath.includes('codecrucible')) {
+      this.logger.info(`[PATH DEBUG] Git project path detected, converting to "."`);
+      return '.';
+    }
+    
+    // Convert absolute paths starting with "/" to relative paths
+    if (filePath.startsWith('/')) {
+      const relativePath = filePath.substring(1);
+      const result = relativePath || '.';
+      this.logger.info(`[PATH DEBUG] Absolute path converted: "${filePath}" → "${result}"`);
+      return result;
+    }
+    
+    // Ensure path starts with "./" for clarity if it's just a filename
+    if (!filePath.startsWith('./') && !filePath.startsWith('../') && !filePath.includes('/') && filePath !== '.') {
+      const result = './' + filePath;
+      this.logger.info(`[PATH DEBUG] Filename prefixed: "${filePath}" → "${result}"`);
+      return result;
+    }
+    
+    this.logger.info(`[PATH DEBUG] Path unchanged: "${filePath}"`);
+    return filePath;
+  }
+
+  /**
+   * Infer tool category from function name
+   */
+  private inferCategory(functionName: string): ToolDefinition['category'] {
+    if (functionName.includes('filesystem') || functionName.includes('file')) return 'filesystem';
+    if (functionName.includes('git')) return 'git';
+    if (functionName.includes('command') || functionName.includes('execute')) return 'terminal';
+    if (functionName.includes('npm') || functionName.includes('package')) return 'package';
+    if (functionName.includes('smithery')) return 'external';
+    return 'system';
+  }
+  
+  /**
+   * Infer risk level from function name  
+   */
+  private inferRiskLevel(functionName: string): 'low' | 'medium' | 'high' | 'critical' {
+    if (functionName.includes('write') || functionName.includes('execute') || functionName.includes('command')) {
+      return 'high';
+    }
+    if (functionName.includes('git') || functionName.includes('npm')) {
+      return 'medium';
+    }
+    return 'low';
+  }
+  
+  /**
+   * Infer estimated duration from function name
+   */
+  private inferDuration(functionName: string): number {
+    if (functionName.includes('npm') || functionName.includes('execute')) return 5000; // 5 seconds
+    if (functionName.includes('git')) return 2000; // 2 seconds  
+    return 1000; // 1 second default
+  }
+
+  /**
+   * Map AI-facing function names to actual MCP tool names
+   */
+  private mapToMcpToolName(functionName: string): string {
+    const mapping: Record<string, string> = {
+      // Filesystem tools
+      'filesystem_read_file': 'read_file',
+      'filesystem_write_file': 'write_file', 
+      'filesystem_list_directory': 'list_directory',
+      'filesystem_get_stats': 'get_stats',
+      // Git tools
+      'git_status': 'git_status',
+      'git_add': 'git_add',
+      'git_commit': 'git_commit',
+      // System tools  
+      'execute_command': 'execute_command',
+      // Package manager tools
+      'npm_install': 'npm_install',
+      'npm_run': 'npm_run',
+      // Smithery tools
+      'smithery_status': 'smithery_status',
+      'smithery_refresh': 'smithery_refresh',
+    };
+
+    return mapping[functionName] || functionName;
+  }
+
+  /**
+   * Map AI-facing parameter names to MCP server parameter names
+   */
+  private mapArgsForMcpTool(functionName: string, args: any): any {
+    this.logger.info(`[ARGS DEBUG] Mapping args for ${functionName}:`, args);
+    const mappedArgs = { ...args };
+    
+    // Parameter name mappings for different tools
+    switch (functionName) {
+      case 'filesystem_read_file':
+        if (mappedArgs.file_path !== undefined) {
+          mappedArgs.path = this.normalizePath(mappedArgs.file_path);
+          delete mappedArgs.file_path;
+        }
+        break;
+        
+      case 'filesystem_write_file':
+        if (mappedArgs.file_path !== undefined) {
+          mappedArgs.path = this.normalizePath(mappedArgs.file_path);
+          delete mappedArgs.file_path;
+        }
+        break;
+        
+      case 'filesystem_list_directory':
+        if (mappedArgs.directory !== undefined) {
+          mappedArgs.path = this.normalizePath(mappedArgs.directory);
+          delete mappedArgs.directory;
+        }
+        break;
+        
+      case 'filesystem_get_stats':
+        if (mappedArgs.file_path !== undefined) {
+          mappedArgs.path = this.normalizePath(mappedArgs.file_path);
+          delete mappedArgs.file_path;
+        }
+        break;
+        
+      // Git tools
+      case 'git_status':
+      case 'git_add':
+      case 'git_commit':
+        if (mappedArgs.path !== undefined) {
+          mappedArgs.path = this.normalizePath(mappedArgs.path);
+        }
+        break;
+    }
+    
+    this.logger.info(`[ARGS DEBUG] Final mapped args for ${functionName}:`, mappedArgs);
+    return mappedArgs;
   }
 
   /**
@@ -76,33 +224,67 @@ export class ToolIntegration {
 
   private async initializeTools(): Promise<void> {
     try {
-      // Initialize filesystem tools with proper backend delegation
-      this.filesystemTools = new FilesystemTools();
+      // Use the unified tool registry instead of manually building tools
+      const toolRegistry = createLegacyToolRegistry({
+        mcpManager: this.mcpManager,
+        allowedOrigins: process.env.TOOL_ALLOWED_ORIGINS?.split(',') || ['local'],
+        autoApproveTools: process.env.AUTO_APPROVE_TOOLS === 'true'
+      });
 
-      // Set MCP manager as fallback
-      if (this.mcpManager) {
-        this.filesystemTools.setMCPManager(this.mcpManager);
-      }
-
-      // If an injected rustBackend exists, attach it to filesystem tools
-      if (this.rustBackend) {
-        try {
-          this.filesystemTools.setRustBackend(this.rustBackend);
-          this.logger.info('Injected Rust execution backend attached to filesystem tools');
-        } catch (error) {
-          this.logger.warn('Failed to attach injected Rust backend to filesystem tools', error);
-        }
-      }
-
-      // Register filesystem tools
-      const fsTools = this.filesystemTools.getTools();
-      for (const tool of fsTools) {
-        this.availableTools.set(tool.id, tool);
+      // Convert registry to our internal format
+      this.availableTools.clear();
+      for (const [key, tool] of toolRegistry.entries()) {
+        // Convert ModelTool format to our internal tool format
+        const internalTool = {
+          id: tool.function.name, // Use function name as ID for AI tool calls
+          name: tool.function.name,
+          description: tool.function.description,
+          inputSchema: {
+            properties: tool.function.parameters?.properties || {},
+            required: tool.function.parameters?.required || [],
+          },
+          // Execution will be handled by the unified tool system
+          handler: null, // Will be resolved during execution
+          // Add the missing execute method that delegates to MCP manager
+          execute: async (args: any, context: any) => {
+            const mcpToolName = this.mapToMcpToolName(tool.function.name);
+            const mappedArgs = this.mapArgsForMcpTool(tool.function.name, args);
+            return await this.mcpManager.executeTool(mcpToolName, mappedArgs, context);
+          },
+        };
+        this.availableTools.set(internalTool.id, internalTool);
+        
+        // CRITICAL FIX: Register tool into unified registry for execution
+        const toolDefinition: ToolDefinition = {
+          id: internalTool.id,
+          name: internalTool.name, 
+          description: internalTool.description,
+          category: this.inferCategory(internalTool.name),
+          aliases: [], // Could add category prefixes later
+          inputSchema: internalTool.inputSchema,
+          handler: async (args, context) => {
+            const mcpToolName = this.mapToMcpToolName(internalTool.name);
+            const mappedArgs = this.mapArgsForMcpTool(internalTool.name, args);
+            return await this.mcpManager.executeTool(mcpToolName, mappedArgs, context);
+          },
+          security: {
+            requiresApproval: false,
+            riskLevel: this.inferRiskLevel(internalTool.name),
+            allowedOrigins: ['local'],
+          },
+          performance: {
+            estimatedDuration: this.inferDuration(internalTool.name),
+            memoryUsage: 'low',
+            cpuIntensive: false,
+          },
+        };
+        
+        unifiedToolRegistry.registerTool(toolDefinition);
       }
 
       this.isInitialized = true;
       this.logger.info(
-        `Initialized ${this.availableTools.size} tools for LLM integration with Rust-first architecture`
+        `Initialized ${this.availableTools.size} tools using unified registry with type-safe architecture`
       );
     } catch (error) {
       this.logger.error('Failed to initialize tools:', error);
@@ -183,7 +365,33 @@ export class ToolIntegration {
 
     try {
       const functionName = toolCall.function.name;
-      const args = JSON.parse(toolCall.function.arguments);
+      
+      // Debug the arguments type and value
+      this.logger.info(`[DEBUG] Raw arguments:`, {
+        type: typeof toolCall.function.arguments,
+        value: toolCall.function.arguments,
+        isString: typeof toolCall.function.arguments === 'string'
+      });
+      
+      // Handle both string and object arguments
+      let args: any;
+      if (typeof toolCall.function.arguments === 'string') {
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+          
+          // Check for double-encoded JSON strings
+          if (typeof args === 'string') {
+            this.logger.info(`[DEBUG] Detected double-encoded JSON, parsing again`);
+            args = JSON.parse(args);
+          }
+        } catch (parseError) {
+          this.logger.error(`Failed to parse arguments JSON:`, parseError);
+          throw new Error(`Invalid JSON in tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        }
+      } else {
+        // Arguments are already an object
+        args = toolCall.function.arguments;
+      }
 
       this.logger.info(`Executing tool: ${functionName} with args:`, args);
 

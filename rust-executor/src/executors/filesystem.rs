@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tokio::fs as async_fs;
 use crate::security::{SecurityContext, SecurityError, IsolationError};
 use crate::protocol::messages::{ExecutionRequest, ExecutionResponse, ErrorInfo, ErrorCategory, PerformanceMetrics};
+use crate::runtime::shared_runtime::RuntimeManager;
 use thiserror::Error;
 use std::time::Instant;
 
@@ -132,9 +133,23 @@ impl FileSystemExecutor {
 
         // Execute in isolated process for additional security
         let operation_clone = operation.clone();
-        // Execute async operation with proper error handling
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let result = rt.block_on(self.execute_operation_internal(operation_clone));
+        // Execute async operation with proper error handling using shared runtime
+        let result = match RuntimeManager::execute_async(self.execute_operation_internal(operation_clone)) {
+            Ok(res) => res,
+            Err(e) => return ExecutionResponse {
+                request_id,
+                success: false,
+                result: None,
+                error: Some(ErrorInfo {
+                    code: "RuntimeError".to_string(),
+                    message: format!("Failed to execute filesystem operation: {}", e),
+                    category: ErrorCategory::SystemError,
+                    details: std::collections::HashMap::new(),
+                }),
+                execution_time_ms: start_time.elapsed().as_millis() as u64,
+                performance_metrics: None,
+            },
+        };
 
         let execution_time = start_time.elapsed().as_millis() as u64;
 

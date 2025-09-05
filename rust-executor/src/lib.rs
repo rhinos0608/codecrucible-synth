@@ -11,6 +11,7 @@ use uuid::Uuid;
 // Module declarations - keeping full complexity
 pub mod executors;
 pub mod protocol;
+pub mod runtime;
 pub mod security;
 pub mod streaming;
 // pub mod tools; // This line is intentionally commented out to avoid duplicate definition

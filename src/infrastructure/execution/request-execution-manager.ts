@@ -28,6 +28,7 @@ import { requestBatcher } from '../performance/intelligent-request-batcher.js';
 import { adaptiveTuner } from '../performance/adaptive-performance-tuner.js';
 import { requestTimeoutOptimizer } from '../performance/request-timeout-optimizer.js';
 import { RustExecutionBackend } from './rust-executor/index.js';
+import { contextualToolFilter, ToolFilterContext } from '../tools/contextual-tool-filter.js';
 
 // EVIDENCE COLLECTION BRIDGE - Global system to capture tool results for evidence collection
 class GlobalEvidenceCollector {
@@ -396,47 +397,68 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           provider.getModelName?.()
         );
 
-        // DOMAIN-AWARE TOOL SELECTION: Smart filtering based on request analysis
+        // CONTEXTUAL TOOL FILTERING: Smart filtering based on request analysis
         let tools: any[] = [];
         let domainInfo = '';
+        let filterReasoning = '';
 
-        if (supportsTools && toolIntegration) {
+        if (toolIntegration) {
           const allTools = await toolIntegration.getLLMFunctions();
 
-          // Let the AI choose which tools to use - no pre-filtering
-          // The AI is intelligent enough to select appropriate tools for the task
-          tools = allTools;
-          domainInfo = 'all-tools-available';
+          // Build context for tool filtering
+          const filterContext: ToolFilterContext = {
+            prompt: request.prompt || '',
+            userId: (request.context as any)?.userId,
+            sessionId: (request as any).sessionId || (request.context as any)?.sessionId,
+            riskLevel: this.inferRiskLevel(request),
+            previousTools: (request.context as any)?.previousTools || [],
+            fileContext: {
+              workingDirectory: request.context?.workingDirectory || process.cwd(),
+              recentFiles: (request.context as any)?.recentFiles || [],
+              projectType: this.inferProjectType(request),
+            },
+          };
 
-          logger.info('🎯 REQUEST-EXECUTION-MANAGER: All tools provided to AI for intelligent selection', {
+          // Apply contextual filtering to reduce prompt bloat and security risks
+          const filterResult = contextualToolFilter.filterTools(allTools, filterContext);
+          tools = filterResult.tools;
+          domainInfo = `contextual-${filterResult.categories.join('-')}`;
+          filterReasoning = filterResult.reasoning;
+
+          logger.info('🎯 REQUEST-EXECUTION-MANAGER: Contextual tool filtering applied', {
             prompt: `${request.prompt?.substring(0, 80)}...`,
-            availableToolCount: allTools.length,
-            toolNames: tools.map(t => t.function?.name || t.name),
-            approach: 'AI-driven tool selection',
+            originalToolCount: allTools.length,
+            filteredToolCount: tools.length,
+            categories: filterResult.categories,
+            confidence: filterResult.confidence.toFixed(2),
+            reasoning: filterReasoning,
+            approach: 'contextual-intelligent-filtering',
           });
         }
 
-        // ENHANCED DEBUG: Show AI-driven tool selection status
-        logger.info('🔧 ENHANCED TOOL DEBUG: AI-driven tool selection status', {
+        // ENHANCED DEBUG: Show contextual tool filtering status
+        logger.info('🔧 ENHANCED TOOL DEBUG: Contextual tool filtering status', {
           provider: providerType,
           model: provider.getModelName?.() || 'unknown',
           supportsTools,
           hasEnhanced: !!enhancedToolIntegration,
           hasBasic: !!getGlobalToolIntegration(),
           hasIntegration: !!toolIntegration,
-          availableToolCount: tools.length,
-          approach: 'AI-intelligent-selection',
+          filteredToolCount: tools.length,
+          approach: 'contextual-intelligent-filtering',
+          domainInfo,
         });
 
         if (tools.length > 0) {
-          logger.info('✅ ALL TOOLS PROVIDED for AI intelligent selection', {
+          logger.info('✅ CONTEXTUALLY FILTERED TOOLS provided for AI selection', {
             toolNames: tools.map(t => t.function?.name || t.name),
-            approach: 'ai-driven',
+            approach: 'contextual-filtering',
             toolCount: tools.length,
+            reasoning: filterReasoning,
           });
         } else {
-          logger.warn('⚠️ NO TOOLS AVAILABLE for request execution', {
-            integrationStatus: 'failed',
+          logger.warn('⚠️ NO TOOLS AVAILABLE after contextual filtering', {
+            integrationStatus: 'failed-after-filtering',
           });
         }
 
@@ -528,30 +550,57 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
               if (toolResults.length > 0) {
                 const firstResult = toolResults[0];
 
-                if (firstResult.success && firstResult.output) {
-                  // Return the actual tool result as the content
+                // Handle structured result with success/output properties
+                if (firstResult && typeof firstResult === 'object' && firstResult.success && firstResult.output) {
                   const content = firstResult.output.content || firstResult.output;
                   response.content = content;
-                  response.metadata = {
-                    tokens: 0,
-                    latency: 0,
-                    ...response.metadata,
-                  };
-
-                  logger.info(
-                    '🔧 TOOL EXECUTION: Tool successfully executed in request execution',
-                    {
-                      toolName:
-                        response.toolCalls[0]?.name || response.toolCalls[0]?.function?.name,
-                      resultContent: content,
-                    }
-                  );
-                } else if (firstResult.error) {
+                } 
+                // Handle structured result with error property
+                else if (firstResult && typeof firstResult === 'object' && firstResult.error) {
                   response.content = `Error executing tool: ${firstResult.error}`;
                   logger.error('Tool execution error in request execution', {
                     error: firstResult.error,
                   });
                 }
+                // Handle raw tool data (successful execution returns data directly)
+                else if (firstResult !== null && firstResult !== undefined) {
+                  // The result is the actual tool output - format it appropriately
+                  let content: string;
+                  if (typeof firstResult === 'string') {
+                    content = firstResult;
+                  } else if (Array.isArray(firstResult)) {
+                    // Format array results (like file listings)
+                    content = firstResult.join('\n');
+                  } else if (typeof firstResult === 'object') {
+                    // Format object results
+                    content = JSON.stringify(firstResult, null, 2);
+                  } else {
+                    content = String(firstResult);
+                  }
+
+                  response.content = content;
+                  
+                  logger.info(
+                    '🔧 TOOL EXECUTION: Tool successfully executed in request execution',
+                    {
+                      toolName: response.toolCalls[0]?.name || response.toolCalls[0]?.function?.name,
+                      resultType: typeof firstResult,
+                      resultLength: Array.isArray(firstResult) ? firstResult.length : String(firstResult).length,
+                    }
+                  );
+                }
+                // Handle null/undefined results
+                else {
+                  response.content = 'Tool executed successfully but returned no data';
+                  logger.info('Tool executed but returned empty result');
+                }
+
+                // Always set metadata for successful tool execution
+                response.metadata = {
+                  tokens: 0,
+                  latency: 0,
+                  ...response.metadata,
+                };
               }
             } catch (error) {
               logger.error('Error during tool execution in request execution', {
@@ -925,5 +974,96 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
       throw new Error('Rust execution backend is not available');
     }
     return this.rustBackend;
+  }
+
+  /**
+   * Infer risk level from request content and context
+   */
+  private inferRiskLevel(request: ModelRequest): 'low' | 'medium' | 'high' {
+    const prompt = (request.prompt || '').toLowerCase();
+    
+    // High risk indicators
+    const highRiskKeywords = [
+      'delete', 'remove', 'rm ', 'uninstall', 'format', 'wipe', 'destroy',
+      'sudo', 'admin', 'root', 'chmod', 'chown', 'passwd', 'su ',
+      'exec', 'eval', 'shell', 'cmd', 'powershell', 'bash',
+      'curl', 'wget', 'download', 'install', 'git push', 'commit'
+    ];
+    
+    // Medium risk indicators
+    const mediumRiskKeywords = [
+      'write', 'create', 'modify', 'edit', 'change', 'update',
+      'move', 'copy', 'rename', 'mkdir', 'touch',
+      'config', 'settings', 'environment', 'variables'
+    ];
+
+    if (highRiskKeywords.some(keyword => prompt.includes(keyword))) {
+      return 'high';
+    }
+    
+    if (mediumRiskKeywords.some(keyword => prompt.includes(keyword))) {
+      return 'medium';
+    }
+    
+    // Check for file paths that might indicate system areas
+    if (prompt.includes('/etc/') || prompt.includes('/sys/') || prompt.includes('c:\\windows\\')) {
+      return 'high';
+    }
+    
+    return 'low';
+  }
+
+  /**
+   * Infer project type from request content and context
+   */
+  private inferProjectType(request: ModelRequest): string {
+    const prompt = (request.prompt || '').toLowerCase();
+    const context = request.context;
+    
+    // Check working directory for clues
+    if (context?.workingDirectory) {
+      const workDir = context.workingDirectory.toLowerCase();
+      if (workDir.includes('node_modules') || workDir.includes('package.json')) {
+        return 'javascript';
+      }
+      if (workDir.includes('.git')) {
+        return 'git-project';
+      }
+    }
+    
+    // Check for file extensions and patterns in prompt
+    const typeIndicators = [
+      { pattern: /\.(js|jsx|ts|tsx|json|package\.json)/, type: 'javascript' },
+      { pattern: /\.(py|python|requirements\.txt|setup\.py)/, type: 'python' },
+      { pattern: /\.(java|class|jar|maven|gradle)/, type: 'java' },
+      { pattern: /\.(rs|cargo\.toml|cargo\.lock)/, type: 'rust' },
+      { pattern: /\.(go|mod|sum)/, type: 'go' },
+      { pattern: /\.(php|composer\.json)/, type: 'php' },
+      { pattern: /\.(rb|gemfile|rakefile)/, type: 'ruby' },
+      { pattern: /\.(cpp|c|h|cmake|makefile)/, type: 'cpp' },
+      { pattern: /\.(html|css|scss|sass|vue|react)/, type: 'web' },
+      { pattern: /\.(md|readme|doc|docs)/, type: 'documentation' },
+    ];
+
+    for (const indicator of typeIndicators) {
+      if (indicator.pattern.test(prompt)) {
+        return indicator.type;
+      }
+    }
+
+    // Check for technology keywords
+    if (prompt.includes('react') || prompt.includes('vue') || prompt.includes('angular')) {
+      return 'web-framework';
+    }
+    
+    if (prompt.includes('docker') || prompt.includes('kubernetes') || prompt.includes('container')) {
+      return 'devops';
+    }
+
+    if (prompt.includes('database') || prompt.includes('sql') || prompt.includes('mongodb')) {
+      return 'database';
+    }
+
+    return 'general';
   }
 }

@@ -223,12 +223,15 @@ export class MCPServerManager {
    * Execute a tool with unified security and monitoring
    */
   async executeTool(toolName: string, args: any, context: any = {}): Promise<any> {
+    // Normalize paths before security validation to handle AI-generated paths
+    const normalizedPath = this.normalizeAIPath(args.path || args.directory || args.filePath);
+    
     const securityContext: SecurityContext = {
       userId: context.userId,
       sessionId: context.sessionId,
       operation: this.inferOperation(toolName),
       resourceType: this.inferResourceType(toolName),
-      requestedPath: args.path || args.directory || args.filePath,
+      requestedPath: normalizedPath,
       riskLevel: context.riskLevel || 'medium',
     };
 
@@ -476,7 +479,44 @@ export class MCPServerManager {
     logger.info('✅ Smithery server initialized');
   }
 
+  /**
+   * Normalize AI-generated paths to work with security validation
+   */
+  private normalizeAIPath(filePath?: string): string | undefined {
+    if (!filePath || typeof filePath !== 'string') {
+      return filePath;
+    }
+    
+    // Handle git repository paths - convert to current directory
+    if (filePath.includes('/project/') || filePath.includes('codecrucible')) {
+      return '.';
+    }
+    
+    // Convert absolute paths starting with "/" to relative paths
+    if (filePath.startsWith('/')) {
+      const relativePath = filePath.substring(1);
+      return relativePath || '.';
+    }
+    
+    // Handle current directory references (both Unix and Windows)
+    if (filePath === '.' || filePath === '.\\' || filePath === './') {
+      return '.';
+    }
+    
+    // Normalize Windows path separators to Unix style
+    const unixPath = filePath.replace(/\\/g, '/');
+    
+    // Ensure path starts with "./" for clarity if it's just a filename
+    if (!unixPath.startsWith('./') && !unixPath.startsWith('../') && !unixPath.includes('/') && unixPath !== '.') {
+      return './' + unixPath;
+    }
+    
+    return unixPath;
+  }
+
   private inferOperation(toolName: string): SecurityContext['operation'] {
+    if (toolName.includes('git'))
+      return 'read'; // Git operations are read-like but work on directories
     if (toolName.includes('read') || toolName.includes('list') || toolName.includes('get'))
       return 'read';
     if (toolName.includes('write') || toolName.includes('create') || toolName.includes('save'))

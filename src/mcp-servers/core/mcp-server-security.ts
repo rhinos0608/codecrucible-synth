@@ -11,7 +11,7 @@
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
 import * as path from 'path';
-import { promises as fs } from 'fs';
+import { promises as fs, statSync } from 'fs';
 
 export interface SecurityConfig {
   maxFileSize: number; // Maximum file size for read operations
@@ -262,43 +262,50 @@ export class MCPServerSecurity {
       riskScore += 15;
     }
 
-    // 6. File size validation (for read operations)
+    // 6. File/directory validation (for read operations)
     if (context.operation === 'read') {
       try {
         const stats = await fs.stat(sanitizedPath);
-        if (stats.size > this.config.maxFileSize) {
-          return {
-            allowed: false,
-            reason: `File too large (${stats.size} bytes > ${this.config.maxFileSize} bytes)`,
-            warnings,
-            riskAssessment: {
-              level: 'medium',
-              factors: ['Oversized file'],
-              score: 50,
-            },
-          };
+        
+        // If it's a directory, allow directory operations
+        if (stats.isDirectory()) {
+          riskFactors.push('Directory operation');
+          riskScore += 5; // Lower risk for directory operations
         }
+        // If it's a file, validate size
+        else if (stats.isFile()) {
+          if (stats.size > this.config.maxFileSize) {
+            return {
+              allowed: false,
+              reason: `File too large (${stats.size} bytes > ${this.config.maxFileSize} bytes)`,
+              warnings,
+              riskAssessment: {
+                level: 'medium',
+                factors: ['Oversized file'],
+                score: 50,
+              },
+            };
+          }
 
-        // Large files are risky for memory
-        if (stats.size > outputConfig.getConfig().maxBufferSize) {
-          warnings.push('Large file - streaming recommended');
-          riskFactors.push('Large file size');
-          riskScore += 10;
+          // Large files are risky for memory
+          if (stats.size > outputConfig.getConfig().maxBufferSize) {
+            warnings.push('Large file - streaming recommended');
+            riskFactors.push('Large file size');
+            riskScore += 10;
+          }
         }
       } catch (error) {
-        // File doesn't exist - might be for write operation
-        if (context.operation === 'read') {
-          return {
-            allowed: false,
-            reason: 'File does not exist',
-            warnings,
-            riskAssessment: {
-              level: 'low',
-              factors: ['File not found'],
-              score: 10,
-            },
-          };
-        }
+        // Path doesn't exist - this is an error for read operations
+        return {
+          allowed: false,
+          reason: 'File or directory does not exist',
+          warnings,
+          riskAssessment: {
+            level: 'low',
+            factors: ['Path not found'],
+            score: 10,
+          },
+        };
       }
     }
 
@@ -372,6 +379,16 @@ export class MCPServerSecurity {
     // Check if path tries to escape current working directory
     const cwd = process.cwd();
     const safe = normalizedPath.startsWith(cwd);
+
+    // DEBUG: Log the path validation process
+    logger.info(`[SECURITY DEBUG] Path traversal check:`, {
+      originalPath: filePath,
+      normalizedPath,
+      cwd,
+      safe,
+      suspicious,
+      startsWithCwd: normalizedPath.startsWith(cwd)
+    });
 
     return { safe, suspicious };
   }

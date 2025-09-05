@@ -42,6 +42,7 @@ export { UnifiedServerSystem } from './domain/services/unified-server-system.js'
 
 // Export infrastructure services
 export { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-interaction.js';
+export * from './application/cli/index.js';
 
 // Export types and interfaces
 export type * from './domain/types/index.js';
@@ -203,9 +204,11 @@ export async function initialize(
     try {
       await mcpServerManager.startServers();
       logger.info('✅ MCP servers are ready for tool execution');
-      
+
       // Initialize global tool integration now that MCP servers are ready
-      const { initializeGlobalToolIntegration } = await import('./infrastructure/tools/tool-integration.js');
+      const { initializeGlobalToolIntegration } = await import(
+        './infrastructure/tools/tool-integration.js'
+      );
       initializeGlobalToolIntegration(mcpServerManager);
       logger.info('✅ Global tool integration initialized with MCP servers');
     } catch (error) {

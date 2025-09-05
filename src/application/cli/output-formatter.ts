@@ -1,20 +1,16 @@
-import { CLIDisplay } from './cli-display.js';
+import { logger } from '../../infrastructure/logging/unified-logger.js';
 
-/**
- * OutputFormatter centralizes how results and messages are rendered in the
- * terminal. It delegates rich formatting to core CLIDisplay utilities while
- * keeping the application layer decoupled from presentation specifics.
- */
-export class OutputFormatter {
-  showHelp(): void {
-    CLIDisplay.showHelp();
+export function formatOutput(result: unknown): string {
+  if (typeof result === 'string') {
+    return result;
   }
-
-  public async showModels(): Promise<void> {
-    return CLIDisplay.showModelRecommendations();
+  if (result && typeof result === 'object') {
+    const record = result as Record<string, unknown>;
+    const content = (record.response ?? record.content) as unknown;
+    if (typeof content === 'string') {
+      return content;
+    }
   }
-
-  print(message: string): void {
-    console.log(message);
-  }
+  logger.warn('Unknown result format', { type: typeof result });
+  return String(result ?? '');
 }

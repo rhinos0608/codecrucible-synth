@@ -1,6 +1,6 @@
 import type { CLIOperationRequest } from '../services/unified-cli-coordinator.js';
 
-export function enrichContext(request: CLIOperationRequest): CLIOperationRequest {
-  // Placeholder for real context enrichment logic
+  // TODO: Implement real context enrichment logic here.
+  // See issue #1234 for implementation plan. Remove this placeholder by Q3 2024.
   return request;
 }

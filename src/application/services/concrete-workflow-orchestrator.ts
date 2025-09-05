@@ -488,7 +488,19 @@ User Request: ${userPrompt}`;
   private async handleModelRequest(request: WorkflowRequest): Promise<any> {
     const { payload } = request;
 
-    return await this.processModelRequest(payload);
+    // Convert WorkflowPayload to ModelRequest format
+    const modelRequest: any = {
+      prompt: payload.prompt || payload.input || payload.messages?.[0]?.content || '',
+      model: payload.model,
+      temperature: payload.temperature,
+      maxTokens: payload.maxTokens,
+      stream: payload.stream,
+      provider: payload.provider,
+      context: payload.context,
+      ...payload // Spread any additional properties
+    };
+
+    return await this.processModelRequest(modelRequest);
   }
 
   private async handleAnalysisRequest(request: WorkflowRequest): Promise<any> {

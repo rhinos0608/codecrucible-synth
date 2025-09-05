@@ -21,6 +21,10 @@ import {
   ServerDiscoveryQuery,
   ServerSelectionResult,
 } from '../domain/services/mcp-discovery-service.js';
+import {
+  ToolExecutionArgs,
+  ToolExecutionResult as BaseToolExecutionResult,
+} from '../infrastructure/types/tool-execution-types.js';
 
 // Application layer interfaces
 export interface MCPServerConnection {
@@ -53,7 +57,7 @@ export interface ConnectionMetrics {
 
 export interface ToolExecutionRequest {
   toolName: string;
-  arguments: any;
+  arguments: ToolExecutionArgs;
   serverId?: string;
   timeout?: number;
   retryPolicy?: RetryPolicy;
@@ -62,7 +66,7 @@ export interface ToolExecutionRequest {
 
 export interface ToolExecutionResult {
   success: boolean;
-  result?: any;
+  result?: BaseToolExecutionResult;
   error?: string;
   executionTime: number;
   serverId: string;
@@ -79,7 +83,7 @@ export interface ResourceAccessRequest {
 
 export interface ResourceAccessResult {
   success: boolean;
-  content?: any;
+  content?: string | Buffer | object;
   contentType?: string;
   size?: number;
   error?: string;

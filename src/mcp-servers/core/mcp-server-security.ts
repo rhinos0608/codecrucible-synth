@@ -12,6 +12,7 @@ import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
 import * as path from 'path';
 import { promises as fs, statSync } from 'fs';
+import { PathUtilities } from '../../utils/path-utilities.js';
 
 export interface SecurityConfig {
   maxFileSize: number; // Maximum file size for read operations
@@ -54,6 +55,15 @@ export class MCPServerSecurity {
   private blockedOperations = 0; // Track actual blocked operations
   private blockedPathPatterns: RegExp[] = [];
   private riskLevelCounts = { low: 0, medium: 0, high: 0, critical: 0 }; // Track risk levels
+  
+  // Throttling for verbose path debug logs
+  private pathLogThrottler = {
+    count: 0,
+    lastLogged: 0,
+    logInterval: 30000, // Log every 30 seconds max
+    sampleRate: 100,    // Log every 100th validation
+    warningThreshold: 1000 // Warn if high volume
+  };
 
   constructor(config: Partial<SecurityConfig> = {}) {
     this.config = {
@@ -295,14 +305,18 @@ export class MCPServerSecurity {
           }
         }
       } catch (error) {
-        // Path doesn't exist - this is an error for read operations
+        // Path doesn't exist - provide specific error messages based on context
+        const { reason, actionableAdvice } = this.generateSpecificPathError(sanitizedPath, context);
+        
+        warnings.push(actionableAdvice);
+        
         return {
           allowed: false,
-          reason: 'File or directory does not exist',
+          reason,
           warnings,
           riskAssessment: {
             level: 'low',
-            factors: ['Path not found'],
+            factors: ['Path not found', 'Missing resource'],
             score: 10,
           },
         };
@@ -351,44 +365,30 @@ export class MCPServerSecurity {
   }
 
   /**
-   * Sanitize file path to prevent injection attacks
+   * Sanitize file path using centralized utilities
    */
   private sanitizePath(filePath: string): string {
-    // Remove null bytes and control characters
-    let sanitized = filePath.replace(/[\x00-\x1f\x7f]/g, '');
-
-    // Normalize path separators
-    sanitized = path.normalize(sanitized);
-
-    // Remove consecutive dots (but allow single . and ..)
-    sanitized = sanitized.replace(/\.{3,}/g, '..');
-
-    // Remove trailing spaces and dots
-    sanitized = sanitized.trim().replace(/[. ]+$/, '');
-
-    return sanitized;
+    // Use centralized path normalization with security features
+    return PathUtilities.normalizeAIPath(filePath, {
+      allowAbsolute: true,
+      allowRelative: true,
+      allowTraversal: false,
+      basePath: process.cwd()
+    });
   }
 
   /**
-   * Check for path traversal attacks
+   * Check for path traversal attacks using centralized utilities
    */
   private checkPathTraversal(filePath: string): { safe: boolean; suspicious: boolean } {
-    const normalizedPath = path.resolve(filePath);
-    const suspicious = filePath.includes('..') || /[\/\\]{2,}/.test(filePath);
+    const hasTraversal = PathUtilities.hasPathTraversal(filePath);
+    const isWithinBounds = PathUtilities.isWithinBoundaries(filePath, [process.cwd()]);
+    
+    const safe = !hasTraversal && isWithinBounds;
+    const suspicious = hasTraversal || !isWithinBounds;
 
-    // Check if path tries to escape current working directory
-    const cwd = process.cwd();
-    const safe = normalizedPath.startsWith(cwd);
-
-    // DEBUG: Log the path validation process
-    logger.info(`[SECURITY DEBUG] Path traversal check:`, {
-      originalPath: filePath,
-      normalizedPath,
-      cwd,
-      safe,
-      suspicious,
-      startsWithCwd: normalizedPath.startsWith(cwd)
-    });
+    // Throttled debug logging to prevent spam
+    this.logPathValidationThrottled(filePath, hasTraversal, isWithinBounds, safe, suspicious);
 
     return { safe, suspicious };
   }
@@ -523,6 +523,200 @@ export class MCPServerSecurity {
   clearCache(): void {
     this.pathCache.clear();
     logger.info('Security validation cache cleared');
+  }
+
+  /**
+   * Generate specific error messages and actionable advice for missing paths
+   */
+  private generateSpecificPathError(
+    sanitizedPath: string, 
+    context: SecurityContext
+  ): { reason: string; actionableAdvice: string } {
+    const pathExtension = path.extname(sanitizedPath);
+    const hasExtension = pathExtension.length > 0;
+    const operation = context.operation;
+    const resourceType = context.resourceType;
+
+    // Determine likely intended type based on context clues
+    const isLikelyFile = hasExtension || 
+                         operation === 'read' || 
+                         resourceType === 'file' ||
+                         sanitizedPath.includes('.');
+    
+    const isLikelyDirectory = !hasExtension || 
+                              operation === 'list' || 
+                              resourceType === 'directory' ||
+                              sanitizedPath.endsWith('/') ||
+                              sanitizedPath.endsWith('\\');
+
+    // Generate specific error message
+    let reason: string;
+    let actionableAdvice: string;
+
+    if (isLikelyFile && !isLikelyDirectory) {
+      reason = `File does not exist: ${sanitizedPath}`;
+      
+      // Provide specific advice for files
+      const fileName = path.basename(sanitizedPath);
+      const directory = path.dirname(sanitizedPath);
+      
+      actionableAdvice = this.generateFileAdvice(fileName, directory, pathExtension, operation);
+      
+    } else if (isLikelyDirectory && !isLikelyFile) {
+      reason = `Directory does not exist: ${sanitizedPath}`;
+      
+      // Provide specific advice for directories
+      actionableAdvice = this.generateDirectoryAdvice(sanitizedPath, operation);
+      
+    } else {
+      // Ambiguous case - provide both possibilities
+      reason = `Path does not exist: ${sanitizedPath}`;
+      actionableAdvice = `Check if this path should be a file or directory. ` +
+                        `Verify the path exists and you have access permissions.`;
+    }
+
+    return { reason, actionableAdvice };
+  }
+
+  /**
+   * Generate specific advice for missing files
+   */
+  private generateFileAdvice(fileName: string, directory: string, extension: string, operation: string): string {
+    const advice: string[] = [];
+
+    // Operation-specific advice
+    switch (operation) {
+      case 'read':
+        advice.push(`Ensure the file '${fileName}' exists in '${directory}'`);
+        break;
+      case 'write':
+        advice.push(`The file '${fileName}' will be created in '${directory}'`);
+        break;
+      default:
+        advice.push(`Verify the file '${fileName}' exists`);
+    }
+
+    // Extension-specific advice
+    if (extension) {
+      const commonExtensions: Record<string, string> = {
+        '.js': 'JavaScript file',
+        '.ts': 'TypeScript file', 
+        '.json': 'JSON configuration file',
+        '.md': 'Markdown documentation file',
+        '.txt': 'text file',
+        '.log': 'log file',
+        '.env': 'environment configuration file'
+      };
+      
+      const fileType = commonExtensions[extension.toLowerCase()];
+      if (fileType) {
+        advice.push(`Expected ${fileType}`);
+      }
+    }
+
+    // Directory-specific advice
+    const fullPath = path.join(directory, fileName);
+    if (directory !== '.' && directory !== fullPath) {
+      advice.push(`Check if directory '${directory}' exists`);
+    }
+
+    return advice.join('. ') + '.';
+  }
+
+  /**
+   * Generate specific advice for missing directories
+   */
+  private generateDirectoryAdvice(directoryPath: string, operation: string): string {
+    const advice: string[] = [];
+    const dirName = path.basename(directoryPath);
+    const parentDir = path.dirname(directoryPath);
+
+    // Operation-specific advice
+    switch (operation) {
+      case 'list':
+        advice.push(`Directory '${dirName}' not found for listing contents`);
+        break;
+      case 'read':
+        advice.push(`Cannot access directory '${dirName}' for reading`);
+        break;
+      case 'write':
+        advice.push(`Directory '${dirName}' must exist before writing files to it`);
+        break;
+      default:
+        advice.push(`Directory '${dirName}' does not exist`);
+    }
+
+    // Parent directory advice
+    if (parentDir !== '.' && parentDir !== directoryPath) {
+      advice.push(`Verify parent directory '${parentDir}' exists`);
+    }
+
+    // Common directory patterns advice
+    const commonDirPatterns = ['src', 'dist', 'build', 'node_modules', 'test', 'tests'];
+    if (commonDirPatterns.includes(dirName.toLowerCase())) {
+      advice.push(`'${dirName}' is typically a project directory`);
+    }
+
+    // Creation advice for write operations
+    if (operation === 'write') {
+      advice.push(`Consider creating the directory first`);
+    }
+
+    return advice.join('. ') + '.';
+  }
+
+  /**
+   * Throttled path validation logging to prevent spam
+   */
+  private logPathValidationThrottled(
+    filePath: string, 
+    hasTraversal: boolean, 
+    isWithinBounds: boolean, 
+    safe: boolean, 
+    suspicious: boolean
+  ): void {
+    this.pathLogThrottler.count++;
+    const now = Date.now();
+    
+    // Check if we should log based on sample rate or time interval
+    const shouldLogSample = this.pathLogThrottler.count % this.pathLogThrottler.sampleRate === 0;
+    const shouldLogTime = (now - this.pathLogThrottler.lastLogged) > this.pathLogThrottler.logInterval;
+    const shouldLogSuspicious = suspicious; // Always log suspicious activity
+    
+    if (shouldLogSample || shouldLogTime || shouldLogSuspicious) {
+      // Use debug level instead of info to reduce noise
+      const logLevel = suspicious ? 'warn' : 'debug';
+      const logData = {
+        originalPath: filePath,
+        hasTraversal,
+        isWithinBounds,
+        safe,
+        suspicious,
+        validationCount: this.pathLogThrottler.count,
+        ...(shouldLogSample && { reason: 'sample' }),
+        ...(shouldLogTime && { reason: 'time-interval' }),
+        ...(shouldLogSuspicious && { reason: 'suspicious-activity' })
+      };
+      
+      if (logLevel === 'warn') {
+        logger.warn(`[SECURITY] Suspicious path validation:`, logData);
+      } else {
+        logger.debug(`[SECURITY] Path validation sample:`, logData);
+      }
+      
+      this.pathLogThrottler.lastLogged = now;
+    }
+    
+    // Warn about high volume of path validations (potential DoS or bug)
+    if (this.pathLogThrottler.count > 0 && 
+        this.pathLogThrottler.count % this.pathLogThrottler.warningThreshold === 0) {
+      logger.warn(`[SECURITY] High volume of path validations detected`, {
+        totalValidations: this.pathLogThrottler.count,
+        timeElapsed: now - (this.pathLogThrottler.lastLogged - this.pathLogThrottler.logInterval),
+        avgPerSecond: Math.round(this.pathLogThrottler.count / ((now - (this.pathLogThrottler.lastLogged - this.pathLogThrottler.logInterval)) / 1000)),
+        possibleCause: 'DoS attack, infinite loop, or excessive file operations'
+      });
+    }
   }
 }
 

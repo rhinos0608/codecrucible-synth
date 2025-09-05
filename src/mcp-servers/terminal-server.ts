@@ -9,6 +9,8 @@ import { exec, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import { logger } from '../infrastructure/logging/logger.js';
+import { ToolExecutionArgs } from '../infrastructure/types/tool-execution-types.js';
+import { ToolCallResponse } from './smithery-mcp-server.js';
 
 const execAsync = promisify(exec);
 
@@ -235,7 +237,7 @@ export class TerminalMCPServer {
 
           default:
             return {
-              content: [{ type: 'text', text: `Unknown tool: ${name}` }],
+              content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
               isError: true,
             };
         }
@@ -243,7 +245,7 @@ export class TerminalMCPServer {
         const errorMessage = error instanceof Error ? error.message : String(error);
         logger.error(`Terminal operation failed: ${errorMessage}`);
         return {
-          content: [{ type: 'text', text: `Error: ${errorMessage}` }],
+          content: [{ type: 'text' as const, text: `Error: ${errorMessage}` }],
           isError: true,
         };
       }
@@ -318,7 +320,7 @@ export class TerminalMCPServer {
 
     if (!captureOutput) {
       return {
-        content: [{ type: 'text', text: `Command executed: ${result.command}` }],
+        content: [{ type: 'text' as const, text: `Command executed: ${result.command}` }],
         isError: result.exitCode !== 0,
       };
     }
@@ -336,7 +338,7 @@ export class TerminalMCPServer {
     ].join('\n');
 
     return {
-      content: [{ type: 'text', text: output }],
+      content: [{ type: 'text' as const, text: output }],
       isError: result.exitCode !== 0,
     };
   }
@@ -391,7 +393,7 @@ export class TerminalMCPServer {
       ].join('\n');
 
       return {
-        content: [{ type: 'text', text: output }],
+        content: [{ type: 'text' as const, text: output }],
         isError: result.exitCode !== 0,
       };
     } catch (error) {
@@ -407,7 +409,7 @@ export class TerminalMCPServer {
     if (variable) {
       const value = process.env[variable];
       return {
-        content: [{ type: 'text', text: value ? `${variable}=${value}` : `${variable} not set` }],
+        content: [{ type: 'text' as const, text: value ? `${variable}=${value}` : `${variable} not set` }],
         isError: !value,
       };
     } else {
@@ -415,7 +417,7 @@ export class TerminalMCPServer {
         .map(([key, value]) => `${key}=${value}`)
         .join('\n');
       return {
-        content: [{ type: 'text', text: envVars }],
+        content: [{ type: 'text' as const, text: envVars }],
         isError: false,
       };
     }
@@ -429,7 +431,7 @@ export class TerminalMCPServer {
       this.config.workingDirectory = path.resolve(dirPath);
       return {
         content: [
-          { type: 'text', text: `Working directory set to: ${this.config.workingDirectory}` },
+          { type: 'text' as const, text: `Working directory set to: ${this.config.workingDirectory}` },
         ],
         isError: false,
       };
@@ -446,7 +448,7 @@ export class TerminalMCPServer {
     return {
       content: [
         {
-          type: 'text',
+          type: 'text' as const,
           text: processList.length > 0 ? processList.join('\n') : 'No active processes',
         },
       ],
@@ -458,7 +460,7 @@ export class TerminalMCPServer {
     const process = this.activeProcesses.get(processId);
     if (!process) {
       return {
-        content: [{ type: 'text', text: `Process ${processId} not found` }],
+        content: [{ type: 'text' as const, text: `Process ${processId} not found` }],
         isError: true,
       };
     }
@@ -467,12 +469,12 @@ export class TerminalMCPServer {
       process.kill('SIGTERM');
       this.activeProcesses.delete(processId);
       return {
-        content: [{ type: 'text', text: `Process ${processId} terminated` }],
+        content: [{ type: 'text' as const, text: `Process ${processId} terminated` }],
         isError: false,
       };
     } catch (error) {
       return {
-        content: [{ type: 'text', text: `Failed to kill process ${processId}` }],
+        content: [{ type: 'text' as const, text: `Failed to kill process ${processId}` }],
         isError: true,
       };
     }
@@ -504,11 +506,11 @@ export class TerminalMCPServer {
   /**
    * Call a tool directly (for internal use)
    */
-  async callTool(toolName: string, args: any): Promise<any> {
+  async callTool(toolName: string, args: ToolExecutionArgs): Promise<ToolCallResponse> {
     switch (toolName) {
       case 'run_command':
         return this.runCommand(
-          args.command,
+          args.command || '',
           args.args || [],
           args.workingDirectory,
           args.timeout,
@@ -516,7 +518,7 @@ export class TerminalMCPServer {
         );
       case 'run_script':
         return this.runScript(
-          args.content,
+          args.content || '',
           args.interpreter || 'bash',
           args.workingDirectory,
           args.timeout
@@ -524,7 +526,7 @@ export class TerminalMCPServer {
       case 'get_environment':
         return this.getEnvironment(args.variable);
       case 'set_working_directory':
-        return this.setWorkingDirectory(args.path);
+        return this.setWorkingDirectory(args.path || '.');
       case 'list_processes':
         return this.listProcesses();
       case 'kill_process':

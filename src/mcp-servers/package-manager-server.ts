@@ -10,6 +10,8 @@ import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { logger } from '../infrastructure/logging/logger.js';
+import { ToolExecutionArgs } from '../infrastructure/types/tool-execution-types.js';
+import { ToolCallResponse } from './smithery-mcp-server.js';
 
 const execAsync = promisify(exec);
 
@@ -125,7 +127,7 @@ export class PackageManagerMCPServer {
   /**
    * Call a tool directly (for internal use)
    */
-  async callTool(toolName: string, args: any): Promise<any> {
+  async callTool(toolName: string, args: ToolExecutionArgs): Promise<ToolCallResponse> {
     switch (toolName) {
       case 'install_package':
         return this.installPackage(args.name, args.manager);

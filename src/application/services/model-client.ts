@@ -12,6 +12,11 @@ import { ResponseHandler, BasicResponseHandler } from './response-handler.js';
 import { StreamingManager, BasicStreamingManager } from './streaming-manager.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { logger as defaultLogger } from '../../infrastructure/logging/unified-logger.js';
+import { 
+  enterpriseErrorHandler,
+  EnterpriseErrorHandler 
+} from '../../infrastructure/error-handling/enterprise-error-handler.js';
+import { ErrorCategory, ErrorSeverity } from '../../infrastructure/error-handling/structured-error-system.js';
 
 export interface ModelClientOptions {
   adapters: ProviderAdapter[];
@@ -66,7 +71,19 @@ export class ModelClient extends EventEmitter implements IModelClient {
   private getAdapter(name?: string): ProviderAdapter {
     if (name && this.adapters.has(name)) return this.adapters.get(name)!;
     const first = this.adapters.values().next().value;
-    if (!first) throw new Error('No provider adapters configured');
+    if (!first) {
+      const error = EnterpriseErrorHandler.createEnterpriseError(
+        'No provider adapters configured for AI models',
+        ErrorCategory.SYSTEM,
+        ErrorSeverity.CRITICAL,
+        {
+          operation: 'model_adapter_selection',
+          resource: 'ai_providers',
+          context: { configuredProviders: 0, systemPhase: 'initialization' }
+        }
+      );
+      throw error;
+    }
     return first;
   }
 
@@ -77,8 +94,22 @@ export class ModelClient extends EventEmitter implements IModelClient {
       const raw = await adapter.request(processed);
       return this.responseHandler.parse(raw, adapter.name);
     } catch (err) {
-      // handleError has return type 'never' and always throws
-      this.responseHandler.handleError(err);
+      // Use enterprise error handler for AI provider failures
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
+        err as Error,
+        {
+          operation: 'ai_model_generation',
+          resource: 'ai_provider',
+          context: { 
+            modelName: request.model,
+            promptLength: request.prompt?.length || 0,
+            provider: 'unknown'
+          }
+        }
+      );
+      
+      // Always throw the structured error to prevent undefined returns
+      throw structuredError;
     }
   }
 
@@ -87,8 +118,28 @@ export class ModelClient extends EventEmitter implements IModelClient {
       const response = await this.request({ prompt, ...options });
       return response?.content || '';
     } catch (err) {
-      this.logger.error('ModelClient.generate() failed:', err);
-      throw err;
+      // Use enterprise error handler for generation failures
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
+        err as Error,
+        {
+          operation: 'ai_text_generation',
+          resource: 'ai_provider',
+          context: { 
+            prompt: prompt.substring(0, 100),
+            options: JSON.stringify(options).substring(0, 100)
+          }
+        }
+      );
+      
+      this.logger.error('ModelClient.generate() failed:', {
+        errorId: structuredError.id,
+        message: structuredError.message,
+        category: structuredError.category,
+        severity: structuredError.severity,
+        retryable: structuredError.retryable
+      });
+      
+      throw structuredError;
     }
   }
 

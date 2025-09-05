@@ -6,11 +6,12 @@ import {
   TypedToolIdentifiers,
   TYPED_TOOL_CATALOG 
 } from './typed-tool-identifiers.js';
+import { McpManager } from '../../application/services/orchestrator/tool-registry.js';
 
 const logger = createLogger('DefaultToolRegistry');
 
 interface ToolRegistryOptions {
-  mcpManager?: any;
+  mcpManager?: McpManager;
   allowedOrigins?: string[];
   autoApproveTools?: boolean;
 }

@@ -8,6 +8,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { logger } from '../infrastructure/logging/logger.js';
+import { PathUtilities } from '../utils/path-utilities.js';
 
 interface FilesystemConfig {
   allowedPaths?: string[];
@@ -181,7 +182,8 @@ export class FilesystemMCPServer {
   }
 
   private isPathAllowed(targetPath: string): boolean {
-    const normalizedPath = path.resolve(targetPath);
+    // Use centralized path validation
+    const normalizedPath = PathUtilities.resolveSafePath(targetPath);
 
     // Check if path contains blocked patterns
     for (const blocked of this.config.blockedPaths!) {
@@ -190,15 +192,8 @@ export class FilesystemMCPServer {
       }
     }
 
-    // Check if path is within allowed paths
-    for (const allowed of this.config.allowedPaths!) {
-      const allowedPath = path.resolve(allowed);
-      if (normalizedPath.startsWith(allowedPath)) {
-        return true;
-      }
-    }
-
-    return false;
+    // Check if path is within allowed boundaries using centralized utilities
+    return PathUtilities.isWithinBoundaries(targetPath, this.config.allowedPaths!);
   }
 
   private async readFile(filePath: string, encoding?: BufferEncoding) {
@@ -239,12 +234,16 @@ export class FilesystemMCPServer {
     const result: string[] = [];
 
     for (const entry of entries) {
-      const fullPath = path.join(dirPath, entry.name);
+      const fullPath = PathUtilities.joinPaths(dirPath, entry.name);
       if (entry.isDirectory()) {
         result.push(`[DIR] ${entry.name}`);
         if (recursive) {
           const subEntries = await this.listDirectory(fullPath, true);
-          result.push(...subEntries.content[0].text.split('\n').map(line => `  ${line}`));
+          // Extract all content from sub-directory listing
+          const allSubContent = subEntries.content
+            .map(item => item.text)
+            .join('\n');
+          result.push(...allSubContent.split('\n').map(line => `  ${line}`));
         }
       } else {
         result.push(`[FILE] ${entry.name}`);

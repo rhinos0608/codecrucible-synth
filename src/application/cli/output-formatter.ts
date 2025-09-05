@@ -1,126 +1,23 @@
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { modelDiscoveryService, ModelInfo } from '../../infrastructure/discovery/model-discovery-service.js';
+import { unifiedResultFormatter } from '../../infrastructure/formatting/unified-result-formatter.js';
 
+/**
+ * Centralized output formatting using UnifiedResultFormatter
+ * Replaces scattered formatting logic with consistent, comprehensive formatting
+ */
 export function formatOutput(result: unknown): string {
-  // Handle string results directly
-  if (typeof result === 'string') {
-    return result;
-  }
-  
-  // Handle null/undefined
-  if (!result) {
-    return '';
-  }
-  
-  // Handle object results - try multiple extraction strategies
-  if (typeof result === 'object') {
-    const record = result as Record<string, unknown>;
-    
-    // Strategy 1: Look for common response properties (prioritize MCP patterns)
-    const commonProperties = ['content', 'text', 'data', 'output', 'message', 'response'];
-    for (const prop of commonProperties) {
-      const value = record[prop];
-      if (typeof value === 'string' && value.trim()) {
-        return value;
-      }
-    }
-
-    // Strategy 1a: Look for MCP-specific nested content patterns
-    if (record.content && typeof record.content === 'object') {
-      const content = record.content as Record<string, unknown>;
-      if (typeof content.text === 'string') {
-        return content.text;
-      }
-      if (typeof content.content === 'string') {
-        return content.content;
-      }
-    }
-    
-    // Strategy 2: Look for nested result properties
-    if (record.result && typeof record.result === 'object') {
-      const nestedResult = record.result as Record<string, unknown>;
-      for (const prop of commonProperties) {
-        const value = nestedResult[prop];
-        if (typeof value === 'string' && value.trim()) {
-          return value;
-        }
-      }
-      
-      // If nested result is a string
-      if (typeof record.result === 'string') {
-        return record.result;
-      }
-    }
-    
-    // Strategy 3: Look for streaming response patterns
-    if (record.streamingResponse && typeof record.streamingResponse === 'string') {
-      return record.streamingResponse;
-    }
-    
-    // Strategy 4: Look for AI model response patterns
-    if (record.choices && Array.isArray(record.choices) && record.choices.length > 0) {
-      const choice = record.choices[0] as Record<string, unknown>;
-      if (choice.message && typeof choice.message === 'object') {
-        const message = choice.message as Record<string, unknown>;
-        if (typeof message.content === 'string') {
-          return message.content;
-        }
-      }
-      if (typeof choice.text === 'string') {
-        return choice.text;
-      }
-    }
-    
-    // Strategy 5: Handle error objects from failed MCP calls
-    if (record.error) {
-      const errorMsg = typeof record.error === 'string' ? record.error : 
-                      typeof record.error === 'object' && (record.error as any).message ? 
-                      (record.error as any).message : 'Tool execution failed';
-      return `❌ Error: ${errorMsg}`;
-    }
-
-    // Strategy 6: Handle array responses (common in MCP list operations)
-    if (Array.isArray(result)) {
-      if (result.length === 0) {
-        return '(empty result)';
-      }
-      // Try to format array elements as strings
-      const stringElements = result.map(item => {
-        if (typeof item === 'string') return item;
-        if (typeof item === 'object' && item) {
-          // Try to extract content from array objects
-          const obj = item as Record<string, unknown>;
-          for (const prop of commonProperties) {
-            const value = obj[prop];
-            if (typeof value === 'string' && value.trim()) {
-              return value;
-            }
-          }
-          return JSON.stringify(item);
-        }
-        return String(item);
-      });
-      return stringElements.join('\n');
-    }
-
-    // Strategy 7: Try JSON.stringify for debugging (fallback)
-    try {
-      const jsonString = JSON.stringify(result, null, 2);
-      // Only return JSON if it's a simple object, not a huge complex one
-      if (jsonString.length < 1000) {
-        return jsonString;
-      }
-    } catch {
-      // JSON.stringify failed, continue to final fallback
-    }
-  }
-  
-  // Final fallback - but provide more informative output
-  logger.warn('Unable to extract readable content from result', { 
-    type: typeof result,
-    resultKeys: result && typeof result === 'object' ? Object.keys(result as Record<string, unknown>) : undefined
+  // Use centralized result formatter for consistent output
+  const formatted = unifiedResultFormatter.formatResult(result, {
+    includeMetadata: false,
+    preferMarkdown: false,
+    highlightErrors: true,
+    format: 'text',
+    maxLength: 50000,
+    maxDepth: 10
   });
-  
-  return `[Unable to display result: ${typeof result}]`;
+
+  return formatted.content;
 }
 
 // CLI coordinator expects an OutputFormatter class
@@ -138,9 +35,92 @@ export class OutputFormatter {
   }
 
   async showModels(): Promise<void> {
-    console.log('Available models:');
-    console.log('  - qwen2.5-coder:7b');
-    console.log('  - deepseek-coder:8b');
-    // TODO: Get actual available models from Ollama
+    console.log('🤖 Discovering available models...');
+    console.log('═'.repeat(40));
+
+    try {
+      const models = await modelDiscoveryService.discoverModels({
+        includeUnavailable: true,
+        timeout: 8000,
+        cache: true,
+        providers: ['ollama', 'lm-studio', 'huggingface']
+      });
+
+      if (models.length === 0) {
+        console.log('❌ No models found. Make sure your model providers are running:');
+        console.log('  • Ollama: http://localhost:11434');
+        console.log('  • LM Studio: http://localhost:1234');
+        console.log('  • HuggingFace: Configure API token');
+        return;
+      }
+
+      // Group models by provider for better display
+      const modelsByProvider = this.groupModelsByProvider(models);
+
+      for (const [provider, providerModels] of Object.entries(modelsByProvider)) {
+        console.log(`\n📦 ${provider.toUpperCase()} Models:`);
+        console.log('─'.repeat(30));
+
+        for (const model of providerModels) {
+          const status = model.isAvailable ? '✅' : '⚠️';
+          const sizeInfo = model.size ? ` (${model.size})` : '';
+          const familyInfo = model.family ? ` [${model.family}]` : '';
+          
+          console.log(`  ${status} ${model.name}${sizeInfo}${familyInfo}`);
+          
+          if (model.capabilities && model.capabilities.length > 0) {
+            console.log(`     → ${model.capabilities.join(', ')}`);
+          }
+          
+          if (!model.isAvailable) {
+            console.log(`     → Last checked: ${model.lastChecked?.toLocaleTimeString()}`);
+          }
+        }
+      }
+
+      // Show summary statistics
+      const available = models.filter(m => m.isAvailable).length;
+      const total = models.length;
+      
+      console.log(`\n📊 Summary: ${available}/${total} models available`);
+      
+      if (available === 0) {
+        console.log('\n💡 Tip: Start your model providers to see available models:');
+        console.log('  • ollama serve');
+        console.log('  • Open LM Studio and load a model');
+      }
+
+    } catch (error) {
+      console.error('❌ Error discovering models:', (error as Error).message);
+      console.log('\n📋 Fallback models (may not be available):');
+      console.log('  ⚠️ qwen2.5-coder:7b (Ollama)');
+      console.log('  ⚠️ deepseek-coder:6.7b (Ollama)');
+      console.log('  ⚠️ local-model (LM Studio)');
+      
+      logger.error('Model discovery failed:', error);
+    }
+  }
+
+  private groupModelsByProvider(models: ModelInfo[]): Record<string, ModelInfo[]> {
+    const grouped: Record<string, ModelInfo[]> = {};
+    
+    for (const model of models) {
+      if (!grouped[model.provider]) {
+        grouped[model.provider] = [];
+      }
+      grouped[model.provider].push(model);
+    }
+
+    // Sort models within each provider by availability and name
+    for (const provider in grouped) {
+      grouped[provider].sort((a, b) => {
+        if (a.isAvailable !== b.isAvailable) {
+          return a.isAvailable ? -1 : 1; // Available models first
+        }
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    return grouped;
   }
 }

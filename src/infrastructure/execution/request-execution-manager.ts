@@ -30,68 +30,9 @@ import { requestTimeoutOptimizer } from '../performance/request-timeout-optimize
 import { RustExecutionBackend } from './rust-executor/index.js';
 import { contextualToolFilter, ToolFilterContext } from '../tools/contextual-tool-filter.js';
 
-// EVIDENCE COLLECTION BRIDGE - Global system to capture tool results for evidence collection
-class GlobalEvidenceCollector {
-  private static instance: GlobalEvidenceCollector;
-  private toolResults: any[] = [];
-  private evidenceCollectors: Set<(toolResult: any) => void> = new Set();
-
-  static getInstance(): GlobalEvidenceCollector {
-    if (!GlobalEvidenceCollector.instance) {
-      GlobalEvidenceCollector.instance = new GlobalEvidenceCollector();
-    }
-    return GlobalEvidenceCollector.instance;
-  }
-
-  addToolResult(toolResult: any): void {
-    logger.debug('Evidence collector: Adding tool result', {
-      collectorCount: this.evidenceCollectors.size,
-      hasResult: !!toolResult
-    });
-    logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool result captured', {
-      hasResult: !!toolResult,
-      success: toolResult?.success,
-      hasOutput: !!toolResult?.output,
-      collectorCount: this.evidenceCollectors.size,
-    });
-
-    this.toolResults.push(toolResult);
-
-    // Notify all registered evidence collectors
-    this.evidenceCollectors.forEach(collector => {
-      try {
-        logger.debug('Evidence collector: Calling collector callback');
-        collector(toolResult);
-      } catch (error) {
-        logger.error('Evidence collector callback failed', { error });
-        logger.warn('Evidence collector callback failed:', error);
-      }
-    });
-  }
-
-  registerEvidenceCollector(callback: (toolResult: any) => void): void {
-    logger.debug('Evidence collector: Registering evidence collector');
-    this.evidenceCollectors.add(callback);
-    logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Evidence collector registered', {
-      totalCollectors: this.evidenceCollectors.size,
-    });
-  }
-
-  unregisterEvidenceCollector(callback: (toolResult: any) => void): void {
-    this.evidenceCollectors.delete(callback);
-  }
-
-  getToolResults(): any[] {
-    return [...this.toolResults];
-  }
-
-  clearToolResults(): void {
-    this.toolResults = [];
-  }
-}
-
-// Export the GlobalEvidenceCollector for use by other modules
-export { GlobalEvidenceCollector };
+// Import the extracted GlobalEvidenceCollector from dedicated module
+import { GlobalEvidenceCollector } from '../evidence/global-evidence-collector.js';
+import { unifiedResultFormatter } from '../formatting/unified-result-formatter.js';
 
 export type ExecutionMode = 'fast' | 'quality' | 'balanced';
 export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
@@ -514,6 +455,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           if (toolIntegration) {
             try {
               const toolResults = [];
+              const toolExecutionStartTime = Date.now(); // Track tool execution timing
 
               // Execute each tool call
               for (const toolCall of response.toolCalls) {
@@ -546,61 +488,58 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
                 globalCollector.addToolResult(result);
               }
 
-              // If we have tool results, format them into a readable response
+              // If we have tool results, format them using centralized formatter
               if (toolResults.length > 0) {
-                const firstResult = toolResults[0];
-
-                // Handle structured result with success/output properties
-                if (firstResult && typeof firstResult === 'object' && firstResult.success && firstResult.output) {
-                  const content = firstResult.output.content || firstResult.output;
-                  response.content = content;
-                } 
-                // Handle structured result with error property
-                else if (firstResult && typeof firstResult === 'object' && firstResult.error) {
-                  response.content = `Error executing tool: ${firstResult.error}`;
-                  logger.error('Tool execution error in request execution', {
-                    error: firstResult.error,
-                  });
-                }
-                // Handle raw tool data (successful execution returns data directly)
-                else if (firstResult !== null && firstResult !== undefined) {
-                  // The result is the actual tool output - format it appropriately
-                  let content: string;
-                  if (typeof firstResult === 'string') {
-                    content = firstResult;
-                  } else if (Array.isArray(firstResult)) {
-                    // Format array results (like file listings)
-                    content = firstResult.join('\n');
-                  } else if (typeof firstResult === 'object') {
-                    // Format object results
-                    content = JSON.stringify(firstResult, null, 2);
-                  } else {
-                    content = String(firstResult);
+                const formattedResults = unifiedResultFormatter.formatMultipleToolResults(
+                  toolResults, 
+                  response.toolCalls, 
+                  {
+                    includeMetadata: true,
+                    preferMarkdown: true,
+                    highlightErrors: true
                   }
-
-                  response.content = content;
-                  
-                  logger.info(
-                    '🔧 TOOL EXECUTION: Tool successfully executed in request execution',
-                    {
-                      toolName: response.toolCalls[0]?.name || response.toolCalls[0]?.function?.name,
-                      resultType: typeof firstResult,
-                      resultLength: Array.isArray(firstResult) ? firstResult.length : String(firstResult).length,
-                    }
-                  );
-                }
-                // Handle null/undefined results
-                else {
-                  response.content = 'Tool executed successfully but returned no data';
-                  logger.info('Tool executed but returned empty result');
-                }
-
-                // Always set metadata for successful tool execution
+                );
+                
+                response.content = formattedResults.content;
+                
+                // Calculate aggregated metadata from tool executions
+                const toolExecutionTime = Date.now() - toolExecutionStartTime;
+                const totalTokens = this.calculateTotalTokens(toolResults);
+                const toolWarnings = formattedResults.toolResults
+                  .filter(tr => tr.metadata?.warnings?.length)
+                  .flatMap(tr => tr.metadata?.warnings || []);
+                
+                // Set comprehensive metadata from actual tool execution
                 response.metadata = {
-                  tokens: 0,
-                  latency: 0,
-                  ...response.metadata,
+                  tokens: totalTokens,
+                  latency: toolExecutionTime,
+                  toolExecutionStats: {
+                    toolCount: formattedResults.summary.totalTools,
+                    successCount: formattedResults.summary.successCount,
+                    errorCount: formattedResults.summary.errorCount,
+                    totalExecutionTime: toolExecutionTime,
+                    averageExecutionTime: Math.round(toolExecutionTime / formattedResults.summary.totalTools)
+                  },
+                  toolWarnings: toolWarnings.length > 0 ? toolWarnings : undefined,
+                  executedTools: formattedResults.toolResults.map(tr => tr.toolName),
+                  ...response.metadata // Preserve any existing metadata
                 };
+                
+                // Log details for all tool executions with rich metadata
+                logger.info(
+                  '🔧 TOOL EXECUTION: Tools successfully executed in request execution',
+                  {
+                    toolCount: toolResults.length,
+                    totalTokens,
+                    executionTime: toolExecutionTime,
+                    summary: formattedResults.summary,
+                    toolResults: formattedResults.toolResults.map(tr => ({
+                      toolName: tr.toolName,
+                      success: tr.success,
+                      hasWarnings: !!tr.metadata?.warnings?.length
+                    }))
+                  }
+                );
               }
             } catch (error) {
               logger.error('Error during tool execution in request execution', {
@@ -1066,4 +1005,85 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
 
     return 'general';
   }
+
+  /**
+   * Calculate total tokens from tool execution results
+   */
+  private calculateTotalTokens(toolResults: any[]): number {
+    let totalTokens = 0;
+
+    for (const result of toolResults) {
+      try {
+        // Check for token count in various possible locations
+        if (result && typeof result === 'object') {
+          // Common token fields from different providers
+          const tokenSources = [
+            result.tokens,
+            result.metadata?.tokens,
+            result.usage?.totalTokens,
+            result.usage?.total_tokens,
+            result.tokenCount,
+            result.token_count
+          ];
+
+          for (const tokenSource of tokenSources) {
+            if (typeof tokenSource === 'number' && tokenSource > 0) {
+              totalTokens += tokenSource;
+              break; // Use first valid token count found
+            }
+          }
+
+          // If no token count found, estimate based on content length
+          if (!tokenSources.some(s => typeof s === 'number' && s > 0)) {
+            const content = this.extractContentForTokenEstimation(result);
+            if (content) {
+              // Rough estimation: ~4 characters per token
+              totalTokens += Math.ceil(content.length / 4);
+            }
+          }
+        }
+      } catch (error) {
+        logger.debug('Error calculating tokens for tool result:', error);
+        // Continue processing other results
+      }
+    }
+
+    return totalTokens;
+  }
+
+  /**
+   * Extract content from result for token estimation
+   */
+  private extractContentForTokenEstimation(result: any): string {
+    if (typeof result === 'string') {
+      return result;
+    }
+
+    if (result && typeof result === 'object') {
+      // Try common content fields
+      const contentFields = [
+        result.content,
+        result.output,
+        result.data,
+        result.text,
+        result.message
+      ];
+
+      for (const field of contentFields) {
+        if (typeof field === 'string') {
+          return field;
+        }
+      }
+
+      // Try JSON stringify as fallback
+      try {
+        return JSON.stringify(result);
+      } catch {
+        return '';
+      }
+    }
+
+    return String(result || '');
+  }
+
 }

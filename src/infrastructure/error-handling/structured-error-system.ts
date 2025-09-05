@@ -7,6 +7,7 @@
 
 import { logger } from '../logging/logger.js';
 import chalk from 'chalk';
+import { normalizePathSeparators } from '../../utils/path-utilities.js';
 
 // Error severity levels
 export enum ErrorSeverity {
@@ -687,11 +688,10 @@ export class InputValidator {
     // Remove HTML tags completely
     sanitized = sanitized.replace(/<[^>]*>/g, '');
 
-    // Directory traversal protection
-    sanitized = sanitized
+    // Directory traversal protection - Use centralized path utilities for cross-platform consistency
+    sanitized = normalizePathSeparators(sanitized)
       .replace(/\.\./g, '') // Remove .. sequences
       .replace(/~/g, '') // Remove home directory references
-      .replace(/\\/g, '/') // Normalize path separators
       .replace(/\/\//g, '/'); // Remove double slashes
 
     // Encoding-based attack protection

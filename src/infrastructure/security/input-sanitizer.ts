@@ -6,6 +6,7 @@
 
 import { SecurityPolicyLoader } from './security-policy-loader.js';
 import { logger } from '../logging/logger.js';
+import { normalizePathSeparators } from '../../utils/path-utilities.js';
 
 export interface SanitizationResult {
   sanitized: string;
@@ -253,8 +254,8 @@ export class InputSanitizer {
       violations.push(`Dangerous file extension: .${ext}`);
     }
 
-    // Normalize path separators
-    sanitized = sanitized.replace(/\\/g, '/');
+    // Normalize path separators using centralized cross-platform utilities  
+    sanitized = normalizePathSeparators(sanitized);
 
     return {
       sanitized,

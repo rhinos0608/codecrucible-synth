@@ -18,6 +18,11 @@ import { createAdaptersFromProviders } from './application/services/adapter-fact
 // getGlobalEventBus intentionally not imported anymore – event bus is injected via RuntimeContext.
 import { getErrorMessage } from './utils/error-utils.js';
 import { logger } from './infrastructure/logging/logger.js';
+import { 
+  enterpriseErrorHandler,
+  EnterpriseErrorHandler 
+} from './infrastructure/error-handling/enterprise-error-handler.js';
+import { ErrorCategory, ErrorSeverity } from './infrastructure/error-handling/structured-error-system.js';
 
 import { Command } from 'commander';
 import { readFile } from 'fs/promises';
@@ -389,8 +394,37 @@ async function runCLI(
       return;
     }
   } catch (error) {
-    console.error('❌ Fatal error:', getErrorMessage(error));
-    process.exitCode = 1;
+    // Use enterprise error handler for graceful failure
+    try {
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
+        error as Error,
+        {
+          operation: 'cli_startup',
+          resource: 'main_application',
+          requestId: `cli-${Date.now()}`,
+          context: { args: args.join(' '), isInteractive }
+        }
+      );
+      
+      // Display user-friendly error message
+      console.error('❌ Application Error:', structuredError.userMessage);
+      
+      if (structuredError.suggestedActions && structuredError.suggestedActions.length > 0) {
+        console.error('💡 Suggested actions:');
+        structuredError.suggestedActions.forEach(action => {
+          console.error(`  • ${action}`);
+        });
+      }
+      
+      // Set appropriate exit code based on error severity
+      process.exitCode = structuredError.severity === ErrorSeverity.CRITICAL ? 1 : 2;
+      
+    } catch (handlerError) {
+      // Fallback to basic error handling if enterprise handler fails
+      console.error('❌ Fatal error:', getErrorMessage(error));
+      console.error('⚠️ Error handler also failed:', getErrorMessage(handlerError));
+      process.exitCode = 1;
+    }
   }
 }
 

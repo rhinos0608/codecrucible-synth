@@ -272,7 +272,9 @@ export class E2BCodeExecutionTool {
       });
 
       if (result.isError) {
-        throw new Error(`Dependency installation failed: ${result.content[0]?.text}`);
+        const { extractAllContentText } = await import('../mcp-content-utils.js');
+        const errorText = extractAllContentText(result.content);
+        throw new Error(`Dependency installation failed: ${errorText || 'Unknown error'}`);
       }
 
       logger.info('Dependencies installed successfully');
@@ -369,15 +371,19 @@ export class E2BCodeExecutionTool {
         await this.cleanupTemporaryFile(tempFile);
       }
 
+      const { extractAllContentText } = await import('../mcp-content-utils.js');
+      
       if (result.isError) {
+        const errorText = extractAllContentText(result.content);
         return {
           success: false,
-          error: result.content[0]?.text || 'Terminal execution failed',
+          error: errorText || 'Terminal execution failed',
           executionTime: Date.now() - startTime,
         };
       }
 
-      const executionResult = JSON.parse(result.content[0]?.text || '{}');
+      const allText = extractAllContentText(result.content);
+      const executionResult = JSON.parse(allText || '{}');
 
       return {
         success: executionResult.exitCode === 0,
@@ -493,7 +499,9 @@ export class E2BCodeExecutionTool {
     });
 
     if (result.isError) {
-      throw new Error(`Failed to create temporary file: ${result.content[0]?.text}`);
+      const { extractAllContentText } = await import('../mcp-content-utils.js');
+      const errorText = extractAllContentText(result.content);
+      throw new Error(`Failed to create temporary file: ${errorText || 'Unknown error'}`);
     }
 
     return filepath;

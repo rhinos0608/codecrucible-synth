@@ -15,6 +15,7 @@
 import { promises as fs, existsSync } from 'fs';
 import { relative, isAbsolute, dirname, extname, basename, resolve, sep } from 'path';
 import { glob } from 'glob';
+import { normalizePathSeparators } from '../../utils/path-utilities.js';
 import { BaseTool } from './unified-tool-system.js';
 import {
   ToolExecutionContext,
@@ -130,9 +131,9 @@ export class BasicFileStrategy implements FileOperationStrategy {
     }
     resolvedPath = resolve(resolvedPath); // Normalize and resolve
 
-    // Normalize path separators
-    const normalizedPath = resolvedPath.split(sep).join('/');
-    const normalizedRoot = resolve(root).split(sep).join('/');
+    // Use centralized path normalization for cross-platform consistency
+    const normalizedPath = normalizePathSeparators(resolvedPath);
+    const normalizedRoot = normalizePathSeparators(resolve(root));
 
     // Ensure path stays within root directory
     const relativeToRoot = relative(normalizedRoot, normalizedPath);

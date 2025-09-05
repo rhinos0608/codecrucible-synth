@@ -7,11 +7,70 @@
 
 import { IUserInteraction } from './user-interaction.js';
 import { IEventBus } from './event-bus.js';
+import {
+  ToolExecutionArgs,
+  ToolExecutionResult,
+} from '../../infrastructure/types/tool-execution-types.js';
+
+// Specific workflow payload types
+export interface PromptPayload {
+  prompt: string;
+  voiceId?: string;
+  model?: string;
+  parameters?: Record<string, any>;
+}
+
+export interface ToolExecutionPayload {
+  toolName: string;
+  arguments: ToolExecutionArgs;
+  timeout?: number;
+}
+
+export interface ModelRequestPayload {
+  model: string;
+  messages: Array<{
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+  }>;
+  parameters?: Record<string, any>;
+}
+
+export interface AnalysisPayload {
+  target: string;
+  type: 'file' | 'directory' | 'codebase';
+  options?: Record<string, any>;
+}
+
+export type WorkflowPayload = Record<string, any>;
+
+// Result types for different workflow operations
+export interface SpiralProcessResult {
+  phases: Array<{
+    name: string;
+    output: string;
+    metadata: Record<string, any>;
+  }>;
+  finalOutput: string;
+  convergenceReached: boolean;
+  iterationCount: number;
+}
+
+export interface CodeAnalysisResult {
+  summary: string;
+  issues: Array<{
+    type: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    message: string;
+    location?: string;
+  }>;
+  metrics: Record<string, number>;
+  recommendations: string[];
+}
 
 export interface WorkflowRequest {
   id: string;
   type: 'prompt' | 'tool-execution' | 'model-request' | 'analysis';
-  payload: any;
+  payload: WorkflowPayload;
   context?: WorkflowContext;
   metadata?: Record<string, any>;
 }
@@ -41,12 +100,12 @@ export interface IWorkflowOrchestrator {
   /**
    * Execute a tool with proper context and security
    */
-  executeTool(toolName: string, args: any, context: WorkflowContext): Promise<any>;
+  executeTool(toolName: string, args: ToolExecutionArgs, context: WorkflowContext): Promise<ToolExecutionResult>;
 
   /**
    * Process a model request with routing and fallbacks
    */
-  processModelRequest(request: any, context: WorkflowContext): Promise<any>;
+  processModelRequest(request: any, context?: any): Promise<any>;
 
   /**
    * Initialize the orchestrator with dependencies
@@ -94,13 +153,14 @@ export interface LivingSpiralCoordinatorInterface {
   shutdown(): Promise<void>;
 }
 
+
 export interface OrchestratorDependencies {
   userInteraction: IUserInteraction;
   eventBus: IEventBus;
-  modelClient?: any; // Interface to be defined later
-  mcpManager?: any; // Interface to be defined later
-  securityValidator?: any; // Interface to be defined later
-  configManager?: any; // Interface to be defined later
+  modelClient?: any;
+  mcpManager?: any;
+  securityValidator?: any;
+  configManager?: any;
   /**
    * Optional aggregated runtime context replacing scattered singletons.
    * When supplied, fields inside take precedence for orchestration internals.

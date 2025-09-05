@@ -111,16 +111,77 @@ export class ContextualToolFilter {
   private readonly MAX_TOOLS = 8; // Optimal for performance and context size
   private readonly MIN_TOOLS = 3; // Always include at least core tools
   
+  // Performance optimization: Pre-computed lookup indices
+  private toolNameIndex: Map<string, any> = new Map();
+  private aliasIndex: Map<string, string[]> = new Map(); // alias -> [registryKeys]
+  private functionNameIndex: Map<string, string> = new Map(); // functionName -> registryKey
+  private isIndexInitialized = false;
+  
+  /**
+   * Initialize performance indices for O(1) tool lookups
+   */
+  private initializeIndices(allTools: any[]): void {
+    if (this.isIndexInitialized) return;
+    
+    const indexStartTime = Date.now();
+    
+    // Clear existing indices
+    this.toolNameIndex.clear();
+    this.aliasIndex.clear();
+    this.functionNameIndex.clear();
+    
+    // Build tool name index: toolName -> tool object
+    for (const tool of allTools) {
+      const toolName = tool.function?.name || tool.name || '';
+      if (toolName) {
+        this.toolNameIndex.set(toolName, tool);
+        this.toolNameIndex.set(toolName.toLowerCase(), tool); // Case-insensitive
+      }
+    }
+    
+    // Build reverse indices from typed catalog
+    for (const [registryKey, toolDef] of Object.entries(TYPED_TOOL_CATALOG)) {
+      // Function name -> registry key mapping
+      if (toolDef.functionName) {
+        this.functionNameIndex.set(toolDef.functionName, registryKey);
+        this.functionNameIndex.set(toolDef.functionName.toLowerCase(), registryKey);
+      }
+      
+      // Alias -> registry keys mapping (one alias can map to multiple tools)
+      for (const alias of toolDef.aliases) {
+        const normalizedAlias = alias.toLowerCase();
+        if (!this.aliasIndex.has(normalizedAlias)) {
+          this.aliasIndex.set(normalizedAlias, []);
+        }
+        this.aliasIndex.get(normalizedAlias)!.push(registryKey);
+      }
+    }
+    
+    this.isIndexInitialized = true;
+    const indexDuration = Date.now() - indexStartTime;
+    
+    logger.debug('🚀 Tool lookup indices initialized', {
+      toolNameIndexSize: this.toolNameIndex.size,
+      functionNameIndexSize: this.functionNameIndex.size,
+      aliasIndexSize: this.aliasIndex.size,
+      indexingTime: `${indexDuration}ms`,
+      totalTools: allTools.length
+    });
+  }
+
   /**
    * Filter tools based on request context
    */
   filterTools(allTools: any[], context: ToolFilterContext): FilterResult {
     const startTime = Date.now();
     
+    // Initialize indices on first use for O(1) lookups
+    this.initializeIndices(allTools);
+    
     // Analyze the request to determine relevant categories
     const analysis = this.analyzeRequest(context);
     
-    // Select tools based on analysis
+    // Select tools based on analysis (now using O(1) lookups)
     const selectedTools = this.selectRelevantTools(allTools, analysis);
     
     // Build result
@@ -243,7 +304,7 @@ export class ContextualToolFilter {
   }
 
   /**
-   * Select relevant tools based on analysis
+   * Select relevant tools using O(1) hash map lookups (optimized from O(n*m))
    */
   private selectRelevantTools(allTools: any[], analysis: any): any[] {
     const selectedToolNames = new Set<string>();
@@ -260,76 +321,117 @@ export class ContextualToolFilter {
       }
     }
 
-    // Filter actual tools based on selected names (include aliases and function names)
-    let filteredTools = allTools.filter(tool => {
-      const toolName = tool.function?.name || tool.name || '';
+    // Use optimized O(1) lookups instead of O(n*m) nested loops
+    const matchedTools = new Set<any>();
+    
+    for (const selectedName of selectedToolNames) {
+      // Strategy 1: Direct registry key -> function name lookup
+      const toolDef = TYPED_TOOL_CATALOG[selectedName as keyof typeof TYPED_TOOL_CATALOG];
+      if (toolDef && toolDef.functionName) {
+        // O(1) lookup by function name
+        const tool = this.toolNameIndex.get(toolDef.functionName) || 
+                     this.toolNameIndex.get(toolDef.functionName.toLowerCase());
+        if (tool) {
+          matchedTools.add(tool);
+          continue;
+        }
+      }
       
-      return Array.from(selectedToolNames).some(selectedName => {
-        // Direct name match
-        if (toolName === selectedName || 
-            toolName.includes(selectedName) || 
-            selectedName.includes(toolName)) {
-          return true;
-        }
-        
-        // Check if selectedName is a registry key and match against function name
-        const toolDef = TYPED_TOOL_CATALOG[selectedName as keyof typeof TYPED_TOOL_CATALOG];
+      // Strategy 2: Direct tool name lookup  
+      const directTool = this.toolNameIndex.get(selectedName) || 
+                        this.toolNameIndex.get(selectedName.toLowerCase());
+      if (directTool) {
+        matchedTools.add(directTool);
+        continue;
+      }
+      
+      // Strategy 3: Function name reverse lookup
+      const registryKey = this.functionNameIndex.get(selectedName) || 
+                         this.functionNameIndex.get(selectedName.toLowerCase());
+      if (registryKey) {
+        const toolDef = TYPED_TOOL_CATALOG[registryKey as keyof typeof TYPED_TOOL_CATALOG];
         if (toolDef) {
-          return toolName === toolDef.functionName || 
-                 toolName.includes(toolDef.functionName) ||
-                 toolDef.functionName.includes(toolName);
+          const tool = this.toolNameIndex.get(toolDef.functionName) ||
+                       this.toolNameIndex.get(toolDef.functionName.toLowerCase());
+          if (tool) {
+            matchedTools.add(tool);
+            continue;
+          }
         }
-        
-        // Check aliases - find tool by alias
-        const aliasMatch = Object.values(TYPED_TOOL_CATALOG).find(def => 
-          def.aliases.some(alias => 
-            toolName === alias || 
-            toolName.includes(alias) || 
-            alias.includes(toolName)
-          )
-        );
-        
-        if (aliasMatch) {
-          return true;
+      }
+      
+      // Strategy 4: Alias lookup (O(1) hash map instead of O(n*m) search)
+      const registryKeys = this.aliasIndex.get(selectedName.toLowerCase());
+      if (registryKeys) {
+        for (const key of registryKeys) {
+          const toolDef = TYPED_TOOL_CATALOG[key as keyof typeof TYPED_TOOL_CATALOG];
+          if (toolDef && toolDef.functionName) {
+            const tool = this.toolNameIndex.get(toolDef.functionName) ||
+                        this.toolNameIndex.get(toolDef.functionName.toLowerCase());
+            if (tool) {
+              matchedTools.add(tool);
+            }
+          }
         }
-        
-        return false;
-      });
-    });
+      }
+    }
 
-    // Apply tool count limits
+    let filteredTools = Array.from(matchedTools);
+
+    // Apply tool count limits with O(1) priority lookups
     if (filteredTools.length > this.MAX_TOOLS) {
-      // Keep highest priority tools (core first, then by category priority)
-      const priorityOrder = Object.entries(TOOL_CATEGORIES)
-        .sort(([, a], [, b]) => b.priority - a.priority)
-        .flatMap(([, category]) => category.tools);
+      // Pre-compute priority map for O(1) lookups
+      const priorityMap = new Map<string, number>();
+      let priorityIndex = 0;
+      
+      for (const [, category] of Object.entries(TOOL_CATEGORIES).sort(([, a], [, b]) => b.priority - a.priority)) {
+        for (const toolName of category.tools) {
+          if (!priorityMap.has(toolName)) {
+            priorityMap.set(toolName, priorityIndex++);
+          }
+        }
+      }
 
       filteredTools = filteredTools
         .sort((a, b) => {
           const aName = a.function?.name || a.name || '';
           const bName = b.function?.name || b.name || '';
-          const aPriority = priorityOrder.findIndex(tool => aName.includes(tool) || tool.includes(aName));
-          const bPriority = priorityOrder.findIndex(tool => bName.includes(tool) || tool.includes(bName));
-          return (aPriority === -1 ? 999 : aPriority) - (bPriority === -1 ? 999 : bPriority);
+          
+          // O(1) priority lookup instead of O(n) findIndex
+          let aPriority = 999;
+          let bPriority = 999;
+          
+          // Check direct tool name priority
+          for (const [toolName, priority] of priorityMap) {
+            if (aName === toolName || aName.includes(toolName) || toolName.includes(aName)) {
+              aPriority = Math.min(aPriority, priority);
+            }
+            if (bName === toolName || bName.includes(toolName) || toolName.includes(bName)) {
+              bPriority = Math.min(bPriority, priority);
+            }
+          }
+          
+          return aPriority - bPriority;
         })
         .slice(0, this.MAX_TOOLS);
     }
 
-    // Ensure minimum tools (add filesystem basics if needed)
+    // Ensure minimum tools with optimized fallback
     if (filteredTools.length < this.MIN_TOOLS) {
-      const fallbackTools = allTools.filter(tool => {
-        const toolName = tool.function?.name || tool.name || '';
-        return toolName.includes('filesystem') || toolName.includes('read') || toolName.includes('list');
-      });
+      const fallbackKeys = ['filesystem', 'read', 'list'];
+      const fallbackTools = [];
       
-      for (const tool of fallbackTools) {
-        if (filteredTools.length >= this.MIN_TOOLS) break;
-        if (!filteredTools.some(existing => 
+      for (const key of fallbackKeys) {
+        const tool = this.toolNameIndex.get(key) || this.toolNameIndex.get(key.toLowerCase());
+        if (tool && !filteredTools.some(existing => 
           (existing.function?.name || existing.name) === (tool.function?.name || tool.name)
         )) {
-          filteredTools.push(tool);
+          fallbackTools.push(tool);
+          if (filteredTools.length + fallbackTools.length >= this.MIN_TOOLS) break;
         }
       }
+      
+      filteredTools.push(...fallbackTools);
     }
 
     return filteredTools;

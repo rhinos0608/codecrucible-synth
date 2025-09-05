@@ -9,6 +9,7 @@ import { readFile, stat } from 'fs/promises';
 import { extname, isAbsolute, join } from 'path';
 import { glob } from 'glob';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { withMcpTimeout, createCliTimeout } from '../../utils/timeout-utils.js';
 
 import { CLIContext, CLIOptions } from './cli-types.js';
 import { AIModel } from '../../domain/types/unified-types.js';
@@ -37,10 +38,22 @@ export class CLICommands {
     console.log(chalk.cyan('🤖 Model Client:'));
     try {
       if (this.context.modelClient) {
-        logger.debug('About to call healthCheck');
-        const healthCheck = await this.context.modelClient.isHealthy();
-        logger.debug('HealthCheck completed', { healthCheck });
-        console.log(chalk.green(`  ✅ Status: ${healthCheck ? 'Connected' : 'Disconnected'}`));
+        logger.debug('About to call healthCheck with timeout');
+        const healthResult = await withMcpTimeout(
+          this.context.modelClient.isHealthy(),
+          'health check',
+          false
+        );
+        logger.debug('HealthCheck completed', { healthResult });
+        
+        if (healthResult.timedOut) {
+          console.log(chalk.yellow('  ⚠️  Status: Timeout (may be initializing)'));
+          console.log(chalk.gray('     Health check timed out after 3s'));
+        } else if (healthResult.success) {
+          console.log(chalk.green(`  ✅ Status: ${healthResult.result ? 'Connected' : 'Disconnected'}`));
+        } else {
+          console.log(chalk.yellow(`  ⚠️  Status: Error (${healthResult.error})`));
+        }
 
         // Type guard for getCurrentModel
         interface ModelClientWithCurrentModel {
@@ -145,8 +158,26 @@ export class CLICommands {
 
       // Check if getAvailableModels method exists
       if (typeof this.context.modelClient.getAvailableModels === 'function') {
-        const models = await this.context.modelClient.getAvailableModels();
+        const modelsResult = await createCliTimeout(
+          this.context.modelClient.getAvailableModels(),
+          'model discovery',
+          8000, // 8 second timeout for model discovery
+          []
+        );
 
+        if (modelsResult.timedOut) {
+          spinner.warn('Model discovery timed out');
+          console.log(chalk.yellow('⚠️  Model discovery timed out after 8 seconds'));
+          console.log(chalk.gray('   This may indicate MCP server initialization issues'));
+          console.log(chalk.cyan('   Try running the command again in a few moments'));
+          return;
+        } else if (!modelsResult.success) {
+          spinner.fail('Model discovery failed');
+          console.log(chalk.red(`❌ Error: ${modelsResult.error}`));
+          return;
+        }
+
+        const models = modelsResult.result || [];
         spinner.succeed(`Found ${models.length} models`);
 
         if (models.length > 0) {

@@ -5,6 +5,7 @@
 
 import { ClaudeCodeSecurity, SecurityContext, SecurityDecision } from './claude-code-security.js';
 import { EventEmitter } from 'events';
+import { normalizePathSeparators } from '../../utils/path-utilities.js';
 
 export interface SanitizationResult {
   sanitized: string;
@@ -209,8 +210,8 @@ export class ModernInputSanitizer {
       );
     }
 
-    // Basic path cleanup
-    sanitized = sanitized.replace(/\\/g, '/'); // Normalize separators
+    // Basic path cleanup using centralized cross-platform utilities
+    sanitized = normalizePathSeparators(sanitized);
 
     // Create security context for file operation
     const context: SecurityContext = {

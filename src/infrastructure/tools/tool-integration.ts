@@ -56,10 +56,18 @@ export class ToolIntegration {
     
     this.logger.info(`[PATH DEBUG] Original path: "${filePath}"`);
     
-    // Handle git repository paths - convert to current directory
-    if (filePath.includes('/project/') || filePath.includes('codecrucible')) {
-      this.logger.info(`[PATH DEBUG] Git project path detected, converting to "."`);
+    // Handle placeholder repository paths more intelligently
+    // Only collapse obvious placeholder patterns, not valid nested paths
+    if (filePath === '/project' || filePath === '/project/' || filePath === 'codecrucible') {
+      this.logger.info(`[PATH DEBUG] Repository root placeholder detected, converting to "."`);
       return '.';
+    }
+    
+    // Handle placeholder paths like /project/nested/file.txt by extracting the relative part
+    if (filePath.startsWith('/project/') && filePath.length > 9) {
+      const relativePath = filePath.substring(9); // Remove '/project/' prefix
+      this.logger.info(`[PATH DEBUG] Extracted relative path from placeholder: "${filePath}" → "${relativePath}"`);
+      return relativePath;
     }
     
     // Convert absolute paths starting with "/" to relative paths

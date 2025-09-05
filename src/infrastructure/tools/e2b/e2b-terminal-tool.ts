@@ -213,11 +213,15 @@ export class E2BTerminalTool {
       environment: { ...session.environment, ...command.environment },
     });
 
+    const { extractAllContentText } = await import('../mcp-content-utils.js');
+
     if (toolResult.isError) {
-      throw new Error(toolResult.content[0]?.text || 'Terminal execution failed');
+      const errorText = extractAllContentText(toolResult.content);
+      throw new Error(errorText || 'Terminal execution failed');
     }
 
-    const result = JSON.parse(toolResult.content[0]?.text || '{}');
+    const allText = extractAllContentText(toolResult.content);
+    const result = JSON.parse(allText || '{}');
     return {
       stdout: result.stdout || '',
       stderr: result.stderr || '',

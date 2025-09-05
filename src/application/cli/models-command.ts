@@ -6,6 +6,12 @@
 
 import { ModelSelector } from '../../infrastructure/user-interaction/model-selector.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { createCliTimeout } from '../../utils/timeout-utils.js';
+import { 
+  enterpriseErrorHandler,
+  EnterpriseErrorHandler 
+} from '../../infrastructure/error-handling/enterprise-error-handler.js';
+import { ErrorCategory, ErrorSeverity } from '../../infrastructure/error-handling/structured-error-system.js';
 
 export interface ModelsCommandOptions {
   list?: boolean;
@@ -44,7 +50,27 @@ export class ModelsCommand {
     console.log('═'.repeat(50));
 
     try {
-      const models = await this.modelSelector.discoverModels();
+      // Apply timeout to prevent CLI hanging on model discovery
+      const modelsResult = await createCliTimeout(
+        this.modelSelector.discoverModels(),
+        'model discovery',
+        8000, // 8 second timeout
+        []
+      );
+
+      if (modelsResult.timedOut) {
+        console.log('⚠️  Model discovery timed out after 8 seconds');
+        console.log('💡 This may indicate:');
+        console.log('  • MCP servers are still initializing');
+        console.log('  • AI providers are not responding');
+        console.log('  • Network connectivity issues');
+        console.log('\n🔄 Try running the command again in a few moments.');
+        return;
+      } else if (!modelsResult.success) {
+        throw new Error(modelsResult.error || 'Model discovery failed');
+      }
+
+      const models = modelsResult.result || [];
 
       if (models.length === 0) {
         console.log('❌ No AI models found.');
@@ -86,8 +112,30 @@ export class ModelsCommand {
       );
       console.log('\n💡 Use "cc models --select" to interactively choose a model');
     } catch (error) {
-      logger.error('Failed to discover models:', error);
-      console.log('❌ Failed to discover models. Check your AI provider connections.');
+      // Use enterprise error handler for graceful model discovery failure
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
+        error as Error,
+        {
+          operation: 'model_discovery',
+          resource: 'ai_providers',
+          context: { command: 'models --list' }
+        }
+      );
+      
+      console.log(`❌ ${structuredError.userMessage}`);
+      
+      if (structuredError.suggestedActions && structuredError.suggestedActions.length > 0) {
+        console.log('💡 Suggested actions:');
+        structuredError.suggestedActions.forEach(action => {
+          console.log(`  • ${action}`);
+        });
+      }
+      
+      // Show specific guidance for model setup
+      console.log('\n🛠️  Setup Guide:');
+      console.log('  • Install Ollama: curl -fsSL https://ollama.ai/install.sh | sh');
+      console.log('  • Pull models: ollama pull codellama:7b');
+      console.log('  • Or set API keys: OPENAI_API_KEY, ANTHROPIC_API_KEY');
     }
   }
 
@@ -96,13 +144,53 @@ export class ModelsCommand {
    */
   private async selectModel(): Promise<void> {
     try {
-      const selection = await this.modelSelector.selectModel();
-      console.log(`\n🎯 Model selected: ${selection.selectedModel.name}`);
-      console.log('💾 This selection will be used for the current session.');
-      console.log('\n💡 Restart CodeCrucible to select a different model.');
+      // Apply timeout to model selection process
+      const selectionResult = await createCliTimeout(
+        this.modelSelector.selectModel(),
+        'model selection',
+        10000, // 10 second timeout for interactive selection
+        null
+      );
+
+      if (selectionResult.timedOut) {
+        console.log('⚠️  Model selection timed out after 10 seconds');
+        console.log('💡 Consider running "cc models --list" first to check model availability.');
+        return;
+      } else if (!selectionResult.success) {
+        throw new Error(selectionResult.error || 'Model selection failed');
+      }
+
+      const selection = selectionResult.result;
+      if (selection && selection.selectedModel) {
+        console.log(`\n🎯 Model selected: ${selection.selectedModel.name}`);
+        console.log('💾 This selection will be used for the current session.');
+        console.log('\n💡 Restart CodeCrucible to select a different model.');
+      } else {
+        console.log('❌ No model was selected.');
+      }
     } catch (error) {
-      logger.error('Model selection failed:', error);
-      console.log('❌ Model selection failed. Please try again.');
+      // Use enterprise error handler for graceful model selection failure
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
+        error as Error,
+        {
+          operation: 'model_selection',
+          resource: 'user_interaction',
+          context: { command: 'models --select' }
+        }
+      );
+      
+      console.log(`❌ ${structuredError.userMessage}`);
+      
+      if (structuredError.retryable) {
+        console.log('🔄 This operation can be retried. Please try again.');
+      }
+      
+      if (structuredError.suggestedActions && structuredError.suggestedActions.length > 0) {
+        console.log('💡 Suggested actions:');
+        structuredError.suggestedActions.forEach(action => {
+          console.log(`  • ${action}`);
+        });
+      }
     }
   }
 
@@ -139,7 +227,19 @@ export class ModelsCommand {
    * Get discovered models for programmatic use
    */
   async getModels() {
-    return await this.modelSelector.discoverModels();
+    const modelsResult = await createCliTimeout(
+      this.modelSelector.discoverModels(),
+      'model discovery (programmatic)',
+      5000, // 5 second timeout for programmatic use
+      []
+    );
+
+    if (modelsResult.success) {
+      return modelsResult.result || [];
+    } else {
+      logger.warn('Model discovery timed out or failed:', modelsResult.error);
+      return [];
+    }
   }
 }
 

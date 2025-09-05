@@ -17,11 +17,17 @@ import {
 } from '../../domain/interfaces/workflow-orchestrator.js';
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
-import { IModelClient, ModelRequest, ModelTool, ModelResponse, StreamToken } from '../../domain/interfaces/model-client.js';
+import {
+  IModelClient,
+  ModelRequest,
+  ModelTool,
+  ModelResponse,
+  StreamToken,
+} from '../../domain/interfaces/model-client.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import { randomUUID } from 'crypto';
-import { unifiedToolRegistry, ToolDefinition } from '../../infrastructure/tools/unified-tool-registry.js';
+import { createDefaultToolRegistry } from '../../infrastructure/tools/default-tool-registry.js';
 import { RequestExecutionManager } from '../../infrastructure/execution/request-execution-manager.js';
 import fs from 'fs';
 import yaml from 'js-yaml';
@@ -120,15 +126,24 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
           maxConcurrentRequests: 3,
           defaultTimeout: 30000,
           complexityTimeouts: { simple: 10000, medium: 30000, complex: 60000 },
-          memoryThresholds: { low: 100, medium: 500, high: 1000 }
+          memoryThresholds: { low: 100, medium: 500, high: 1000 },
         };
-        const { HardwareAwareModelSelector } = await import('../../infrastructure/performance/hardware-aware-model-selector.js');
+        const { HardwareAwareModelSelector } = await import(
+          '../../infrastructure/performance/hardware-aware-model-selector.js'
+        );
         const hardwareSelector = new HardwareAwareModelSelector();
-        const processManager = new (await import('../../infrastructure/performance/active-process-manager.js')).ActiveProcessManager(hardwareSelector);
+        const processManager = new (
+          await import('../../infrastructure/performance/active-process-manager.js')
+        ).ActiveProcessManager(hardwareSelector);
         this.requestExecutionManager = new RequestExecutionManager(config, processManager, null);
-        logger.info('  - requestExecutionManager: ✅ Initialized with advanced execution strategies');
+        logger.info(
+          '  - requestExecutionManager: ✅ Initialized with advanced execution strategies'
+        );
       } catch (error) {
-        logger.warn('Failed to initialize RequestExecutionManager, falling back to direct ModelClient:', error);
+        logger.warn(
+          'Failed to initialize RequestExecutionManager, falling back to direct ModelClient:',
+          error
+        );
         this.requestExecutionManager = undefined;
       }
 
@@ -231,7 +246,6 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     }
   }
 
-
   /**
    * Analyze code or files
    */
@@ -261,277 +275,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
    * Initialize tool registry cache once to avoid rebuilding static definitions
    */
   private initializeToolRegistry(): Map<string, ModelTool> {
-    if (this.toolRegistryCache) {
-      return this.toolRegistryCache;
+    if (!this.toolRegistryCache) {
+      this.toolRegistryCache = createDefaultToolRegistry({ mcpManager: this.mcpManager });
     }
-
-    const registry = new Map<string, ModelTool>();
-
-    // Filesystem tools
-    registry.set('filesystem_list', {
-      type: 'function',
-      function: {
-        name: 'filesystem_list_directory',
-        description: 'List files and directories in a specified path',
-        parameters: {
-          type: 'object',
-          properties: {
-            path: { type: 'string', description: 'The directory path to list contents for' },
-          },
-          required: ['path'],
-        },
-      },
-    });
-
-    registry.set('filesystem_read', {
-      type: 'function',
-      function: {
-        name: 'filesystem_read_file',
-        description: 'Read the contents of a file from the filesystem',
-        parameters: {
-          type: 'object',
-          properties: {
-            file_path: { type: 'string', description: 'The path to the file to read' },
-          },
-          required: ['file_path'],
-        },
-      },
-    });
-
-    registry.set('filesystem_write', {
-      type: 'function',
-      function: {
-        name: 'filesystem_write_file',
-        description: 'Write content to a file on the filesystem',
-        parameters: {
-          type: 'object',
-          properties: {
-            file_path: { type: 'string', description: 'The path where to write the file' },
-            content: { type: 'string', description: 'The content to write to the file' },
-          },
-          required: ['file_path', 'content'],
-        },
-      },
-    });
-
-    registry.set('filesystem_stats', {
-      type: 'function',
-      function: {
-        name: 'filesystem_get_stats',
-        description: 'Get file or directory statistics (size, modified time, etc.)',
-        parameters: {
-          type: 'object',
-          properties: {
-            file_path: { type: 'string', description: 'The path to get statistics for' },
-          },
-          required: ['file_path'],
-        },
-      },
-    });
-
-    // Git tools
-    registry.set('git_status', {
-      type: 'function',
-      function: {
-        name: 'git_status',
-        description: 'Check the git repository status',
-        parameters: { type: 'object', properties: {}, required: [] },
-      },
-    });
-
-    registry.set('git_add', {
-      type: 'function',
-      function: {
-        name: 'git_add',
-        description: 'Stage files for commit',
-        parameters: {
-          type: 'object',
-          properties: {
-            files: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'List of file paths to stage',
-            },
-          },
-          required: ['files'],
-        },
-      },
-    });
-
-    registry.set('git_commit', {
-      type: 'function',
-      function: {
-        name: 'git_commit',
-        description: 'Commit staged changes with a message',
-        parameters: {
-          type: 'object',
-          properties: {
-            message: { type: 'string', description: 'The commit message' },
-          },
-          required: ['message'],
-        },
-      },
-    });
-
-    // Terminal tools
-    registry.set('execute_command', {
-      type: 'function',
-      function: {
-        name: 'execute_command',
-        description: 'Execute a terminal command safely',
-        parameters: {
-          type: 'object',
-          properties: {
-            command: { type: 'string', description: 'The command to execute' },
-            args: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Command arguments',
-              default: [],
-            },
-          },
-          required: ['command'],
-        },
-      },
-    });
-
-    // Package manager tools
-    registry.set('npm_install', {
-      type: 'function',
-      function: {
-        name: 'npm_install',
-        description: 'Install an npm package',
-        parameters: {
-          type: 'object',
-          properties: {
-            packageName: { type: 'string', description: 'The package name to install' },
-            dev: { type: 'boolean', description: 'Install as dev dependency', default: false },
-          },
-          required: ['packageName'],
-        },
-      },
-    });
-
-    registry.set('npm_run', {
-      type: 'function',
-      function: {
-        name: 'npm_run',
-        description: 'Run an npm script',
-        parameters: {
-          type: 'object',
-          properties: {
-            scriptName: { type: 'string', description: 'The npm script name to run' },
-          },
-          required: ['scriptName'],
-        },
-      },
-    });
-
-    // Smithery tools
-    registry.set('smithery_status', {
-      type: 'function',
-      function: {
-        name: 'smithery_status',
-        description: 'Get Smithery registry status and available tools',
-        parameters: { type: 'object', properties: {}, required: [] },
-      },
-    });
-
-    registry.set('smithery_refresh', {
-      type: 'function',
-      function: {
-        name: 'smithery_refresh',
-        description: 'Refresh Smithery servers and tools',
-        parameters: { type: 'object', properties: {}, required: [] },
-      },
-    });
-
-    // Register tools with UnifiedToolRegistry to fix "Unknown tool requested" errors
-    this.registerToolsWithUnifiedRegistry(registry);
-    
-    this.toolRegistryCache = registry;
-    logger.info(`🔧 Tool registry initialized with ${registry.size} tools`);
-    return registry;
-  }
-
-  /**
-   * Register tools with UnifiedToolRegistry to ensure they can be found by tool execution
-   * This fixes the "Unknown tool requested" error for execute_command and other tools
-   */
-  private registerToolsWithUnifiedRegistry(toolRegistry: Map<string, ModelTool>): void {
-    for (const [toolId, modelTool] of toolRegistry.entries()) {
-      try {
-        const toolDefinition: ToolDefinition = {
-          id: toolId,
-          name: modelTool.function?.name || toolId,
-          description: modelTool.function?.description || `Execute ${toolId}`,
-          category: this.determineToolCategory(toolId),
-          aliases: [modelTool.function?.name || toolId],
-          inputSchema: modelTool.function?.parameters || { type: 'object', properties: {} },
-          handler: async (args: Readonly<Record<string, unknown>>) => {
-            // Delegate to MCP manager for actual execution
-            if (this.mcpManager && typeof this.mcpManager.executeTool === 'function') {
-              return await this.mcpManager.executeTool(toolId, args);
-            } else {
-              throw new Error(`MCP manager not available for tool execution: ${toolId}`);
-            }
-          },
-          security: {
-            requiresApproval: this.requiresApproval(toolId),
-            riskLevel: this.getRiskLevel(toolId),
-            allowedOrigins: ['*'], // TODO: Make configurable
-          },
-          performance: {
-            estimatedDuration: this.getEstimatedDuration(toolId),
-            memoryUsage: 'medium',
-            cpuIntensive: toolId.includes('execute_command'),
-          },
-        };
-
-        unifiedToolRegistry.registerTool(toolDefinition);
-        logger.debug(`Registered tool with UnifiedToolRegistry: ${toolId}`);
-      } catch (error) {
-        logger.warn(`Failed to register tool ${toolId} with UnifiedToolRegistry:`, error);
-      }
-    }
-  }
-
-  /**
-   * Determine tool category based on tool ID
-   */
-  private determineToolCategory(toolId: string): ToolDefinition['category'] {
-    if (toolId.startsWith('filesystem_')) return 'filesystem';
-    if (toolId.startsWith('git_')) return 'git';
-    if (toolId === 'execute_command') return 'terminal';
-    if (toolId.startsWith('npm_')) return 'package';
-    if (toolId.includes('smithery')) return 'external';
-    return 'system';
-  }
-
-  /**
-   * Determine if tool requires approval based on risk assessment
-   */
-  private requiresApproval(toolId: string): boolean {
-    // TEMPORARY FIX: Force disable approval for testing
-    return false;
-  }
-
-  /**
-   * Determine risk level for tool execution
-   */
-  private getRiskLevel(toolId: string): 'low' | 'medium' | 'high' | 'critical' {
-    if (toolId === 'execute_command') return 'high';
-    if (toolId.includes('write') || toolId.includes('commit')) return 'medium';
-    return 'low';
-  }
-
-  /**
-   * Get estimated execution duration for tool
-   */
-  private getEstimatedDuration(toolId: string): number {
-    if (toolId === 'execute_command') return 5000; // 5 seconds
-    if (toolId.includes('npm_')) return 30000; // 30 seconds for npm operations
-    return 1000; // 1 second default
+    return this.toolRegistryCache;
   }
 
   /**
@@ -626,29 +373,29 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       },
 
       // TypeScript operations and diagnostics
-      { 
-        pattern: /\b(typescript?|ts)\s+(errors?|issues?|problems?|check|compile)\b/i, 
-        tools: ['execute_command', 'filesystem_read'] 
+      {
+        pattern: /\b(typescript?|ts)\s+(errors?|issues?|problems?|check|compile)\b/i,
+        tools: ['execute_command', 'filesystem_read'],
       },
-      { 
-        pattern: /\b(type|typing)\s+(errors?|issues?|problems?|check)\b/i, 
-        tools: ['execute_command', 'filesystem_read'] 
+      {
+        pattern: /\b(type|typing)\s+(errors?|issues?|problems?|check)\b/i,
+        tools: ['execute_command', 'filesystem_read'],
       },
-      { 
-        pattern: /\b(diagnose|troubleshoot|investigate)\s+(?:.*\b)?(ts|typescript|type)\b/i, 
-        tools: ['execute_command', 'filesystem_read', 'filesystem_list'] 
+      {
+        pattern: /\b(diagnose|troubleshoot|investigate)\s+(?:.*\b)?(ts|typescript|type)\b/i,
+        tools: ['execute_command', 'filesystem_read', 'filesystem_list'],
       },
-      { 
-        pattern: /\btsc\b/i, 
-        tools: ['execute_command'] 
+      {
+        pattern: /\btsc\b/i,
+        tools: ['execute_command'],
       },
-      { 
-        pattern: /\b(npm|yarn)\s+(run\s+)?(typecheck|type-check|tsc)\b/i, 
-        tools: ['execute_command', 'npm_run'] 
+      {
+        pattern: /\b(npm|yarn)\s+(run\s+)?(typecheck|type-check|tsc)\b/i,
+        tools: ['execute_command', 'npm_run'],
       },
       {
         pattern: /\b(lint|linting|eslint|tslint)\b/i,
-        tools: ['execute_command', 'npm_run', 'filesystem_read']
+        tools: ['execute_command', 'npm_run', 'filesystem_read'],
       },
     ];
 
@@ -671,15 +418,23 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     }
 
     // TypeScript/diagnostic context additions
-    if (normalizedQuery.includes('diagnose') || normalizedQuery.includes('diagnostic') || normalizedQuery.includes('troubleshoot')) {
+    if (
+      normalizedQuery.includes('diagnose') ||
+      normalizedQuery.includes('diagnostic') ||
+      normalizedQuery.includes('troubleshoot')
+    ) {
       selectedTools.add('execute_command'); // For running diagnostic commands
       selectedTools.add('filesystem_read'); // For reading log files, config files
       selectedTools.add('filesystem_list'); // For exploring project structure
     }
 
     // TypeScript-specific context
-    if (normalizedQuery.includes('typescript') || normalizedQuery.includes('ts') || 
-        normalizedQuery.includes('type error') || normalizedQuery.includes('tsc')) {
+    if (
+      normalizedQuery.includes('typescript') ||
+      normalizedQuery.includes('ts') ||
+      normalizedQuery.includes('type error') ||
+      normalizedQuery.includes('tsc')
+    ) {
       selectedTools.add('execute_command'); // For running tsc, npm run typecheck
       selectedTools.add('filesystem_read'); // For reading tsconfig.json, .ts files
       if (!selectedTools.has('npm_run')) {
@@ -710,9 +465,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
 
     if (this.modelClient) {
       // Get MCP tools for AI model with smart selection (unless disabled)
-      const mcpTools = payload.options?.useTools !== false 
-        ? await this.getMCPToolsForModel(payload.input || payload.prompt)
-        : [];
+      const mcpTools =
+        payload.options?.useTools !== false
+          ? await this.getMCPToolsForModel(payload.input || payload.prompt)
+          : [];
 
       const modelRequest: ModelRequest = {
         id: request.id,
@@ -727,50 +483,50 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
         num_ctx: parseInt(process.env.OLLAMA_NUM_CTX || '131072'),
         options: payload.options,
       };
-      
+
       // Log when tools are disabled for simple questions
       if (payload.options?.useTools === false) {
         logger.info('🚫 Tools disabled for simple question to enable pure streaming');
       }
 
       let response: ModelResponse;
-      
+
       // CRITICAL FIX: Use streaming when enabled
       if (payload.options?.stream) {
         logger.info('🌊 Using streaming response for Ollama');
-        
+
         try {
           // Use streaming with real-time token display
           let displayedContent = '';
           let tokenCount = 0;
-          
-          response = await this.modelClient.streamRequest(
-            modelRequest,
-            (token: StreamToken) => {
-              tokenCount++;
-              logger.debug(`📝 Token ${tokenCount}: "${token.content}" (complete: ${token.isComplete})`);
-              
-              // Display streaming tokens in real-time
-              if (token.content && !token.isComplete) {
-                process.stdout.write(token.content);
-                displayedContent += token.content;
-              }
+
+          response = await this.modelClient.streamRequest(modelRequest, (token: StreamToken) => {
+            tokenCount++;
+            logger.debug(
+              `📝 Token ${tokenCount}: "${token.content}" (complete: ${token.isComplete})`
+            );
+
+            // Display streaming tokens in real-time
+            if (token.content && !token.isComplete) {
+              process.stdout.write(token.content);
+              displayedContent += token.content;
             }
-          );
-          
+          });
+
           // Complete the response with final newline
           if (displayedContent) {
             process.stdout.write('\n');
           }
-          
-          logger.info(`✅ Streaming response completed: ${tokenCount} tokens, ${displayedContent.length} chars total, final content length: ${response.content?.length || 0}`);
-          
+
+          logger.info(
+            `✅ Streaming response completed: ${tokenCount} tokens, ${displayedContent.length} chars total, final content length: ${response.content?.length || 0}`
+          );
+
           // IMPORTANT: Ensure response content is preserved
           if (!response.content && displayedContent) {
             logger.info('🔧 Fixing response content from displayed content');
             response.content = displayedContent;
           }
-          
         } catch (streamError) {
           logger.error('❌ Streaming failed, falling back to standard request:', streamError);
           // Fallback to standard request if streaming fails
@@ -782,13 +538,19 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       }
 
       // Handle any tool calls from the AI model
-      console.log('DEBUG ConcreteWorkflowOrchestrator: Checking for tool calls');
-      console.log('DEBUG ConcreteWorkflowOrchestrator: response keys:', Object.keys(response));
-      console.log('DEBUG ConcreteWorkflowOrchestrator: response.toolCalls exists:', !!response.toolCalls);
-      console.log('DEBUG ConcreteWorkflowOrchestrator: response.toolCalls length:', response.toolCalls?.length);
-      
+      logger.debug('ConcreteWorkflowOrchestrator: Checking for tool calls');
+      logger.debug('ConcreteWorkflowOrchestrator: response keys:', Object.keys(response));
+      logger.debug(
+        'ConcreteWorkflowOrchestrator: response.toolCalls exists:',
+        !!response.toolCalls
+      );
+      logger.debug(
+        'ConcreteWorkflowOrchestrator: response.toolCalls length:',
+        response.toolCalls?.length
+      );
+
       if (response.toolCalls && response.toolCalls.length > 0) {
-        console.log('DEBUG ConcreteWorkflowOrchestrator: ENTERING TOOL EXECUTION');
+        logger.debug('ConcreteWorkflowOrchestrator: entering tool execution');
         logger.info(`🔧 AI model made ${response.toolCalls.length} tool calls`);
 
         // Execute all tool calls and collect results

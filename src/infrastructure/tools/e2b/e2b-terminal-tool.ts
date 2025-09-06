@@ -7,6 +7,7 @@ import { TerminalMCPServer } from '../../../mcp-servers/terminal-server.js';
 import { AdvancedProcessTool } from '../process-management-tools.js';
 import { createLogger } from '../../logging/logger-adapter.js';
 import { SecurityValidator } from './security-validator.js';
+import { validateCommand } from '../../../utils/command-security.js';
 
 export interface TerminalCommand {
   command: string;
@@ -122,21 +123,22 @@ export class E2BTerminalTool {
         ? `${command.command} ${command.args.join(' ')}`
         : command.command;
 
+      const commandValidation = validateCommand(fullCommand);
+      if (!commandValidation.isValid) {
+        return {
+          success: false,
+          stdout: '',
+          stderr: `Security validation failed: ${commandValidation.reason}`,
+          exitCode: 1,
+          executionTime: Date.now() - startTime,
+        };
+      }
+
       const validationResult = await this.securityValidator.validateCode({
         code: fullCommand,
         language: 'bash',
         environment: 'e2b_sandbox',
       });
-
-      if (!validationResult.isValid) {
-        return {
-          success: false,
-          stdout: '',
-          stderr: `Security validation failed: ${validationResult.reason}`,
-          exitCode: 1,
-          executionTime: Date.now() - startTime,
-        };
-      }
 
       // Execute via the process manager for interactive commands
       if (command.interactive) {

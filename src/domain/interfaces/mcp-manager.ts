@@ -12,6 +12,15 @@ import {
   ToolExecutionResult,
 } from '../../infrastructure/types/tool-execution-types.js';
 
+export interface McpServerStatus {
+  id: string;
+  status: 'stopped' | 'starting' | 'running' | 'error' | 'reconnecting';
+  health: 'healthy' | 'degraded' | 'unhealthy' | 'circuit_open';
+  capabilities: string[];
+  uptime?: number;
+  lastSeen: Date;
+}
+
 export interface IMcpManager {
   // Core Lifecycle Methods
   initialize(): Promise<void>;
@@ -42,7 +51,7 @@ export interface IMcpManager {
 
   // Server Management
   listServers(): Promise<string[]>;
-  getServerStatus(serverId: string): any;
+  getServerStatus(serverId: string): McpServerStatus;
 
   // Health and Monitoring
   getHealthStatus(): Promise<{
@@ -83,4 +92,3 @@ export interface IMcpManager {
     lastActivity?: Date;
   };
 }
-

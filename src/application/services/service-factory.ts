@@ -63,6 +63,11 @@ export class ServiceFactory {
     this.runtimeContext = createRuntimeContext({
       eventBus: new EventBus(),
     });
+
+    // Initialize Rust backend asynchronously; log but don't block constructor
+    this.ensureRustBackend().catch(err => {
+      this.logger.warn('Failed to initialize RustExecutionBackend', err);
+    });
   }
 
   /**

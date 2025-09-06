@@ -799,7 +799,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
    * Enhanced: Generate unique block ID for streaming blocks
    */
   private generateBlockId(): string {
-    return `block_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    return `block_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   }
 
   /**

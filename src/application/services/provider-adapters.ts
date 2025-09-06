@@ -1,6 +1,7 @@
 import { ModelRequest, ModelResponse, StreamToken } from '../../domain/interfaces/model-client.js';
 import { OllamaProvider } from '../../providers/hybrid/ollama-provider.js';
 import { LMStudioProvider } from '../../providers/hybrid/lm-studio-provider.js';
+import { HuggingFaceProvider } from '../../providers/hybrid/huggingface-provider.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 
 export interface ProviderAdapter {
@@ -38,7 +39,7 @@ export class OllamaAdapter implements ProviderAdapter {
                  '';
       }
       
-      // Log if we're getting empty content
+      // Validate response content - fail fast instead of returning empty content
       if (!content) {
         logger.warn('OllamaAdapter received empty content from provider', {
           responseType: typeof providerResponse,
@@ -49,7 +50,11 @@ export class OllamaAdapter implements ProviderAdapter {
         // If we have tool calls but no content, that might be intentional
         if (!providerResponse?.toolCalls?.length) {
           logger.error('No content and no tool calls in Ollama response');
+          throw new Error('Ollama returned empty response with no content and no tool calls. This indicates a provider failure.');
         }
+        
+        // If we have tool calls, empty content might be acceptable
+        logger.debug('Empty content but tool calls present - proceeding');
       }
       
       // Transform OllamaProvider response to ModelResponse format
@@ -215,5 +220,63 @@ export class ClaudeAdapter implements ProviderAdapter {
           }
         : undefined,
     };
+  }
+}
+
+export class HuggingFaceAdapter implements ProviderAdapter {
+  readonly name = 'huggingface';
+  private provider: HuggingFaceProvider;
+
+  constructor(apiKey: string, defaultModel: string, endpoint?: string) {
+    this.provider = new HuggingFaceProvider({
+      apiKey,
+      endpoint,
+      defaultModel,
+      timeout: 60_000,
+      maxRetries: 2,
+    });
+  }
+
+  async request(req: ModelRequest): Promise<ModelResponse> {
+    logger.debug('HuggingFaceAdapter.request', { model: req.model });
+    const cfg = (this.provider as any).config;
+    
+    try {
+      const providerResponse = await this.provider.generateCode(req.prompt, {
+        model: req.model || cfg.defaultModel,
+        maxTokens: req.maxTokens,
+        temperature: req.temperature,
+        context: req.context,
+      });
+      
+      // Transform HuggingFaceProvider response to ModelResponse format
+      return {
+        id: `hf_${Date.now()}`,
+        content: providerResponse.content,
+        model: providerResponse.model,
+        provider: this.name,
+        usage: {
+          promptTokens: providerResponse.metadata?.promptTokens || 0,
+          completionTokens: providerResponse.metadata?.completionTokens || 0,
+          totalTokens: providerResponse.metadata?.tokens || 0,
+        },
+        responseTime: providerResponse.responseTime,
+        finishReason: providerResponse.metadata?.finishReason || 'stop',
+      };
+    } catch (error) {
+      logger.error('HuggingFaceAdapter request failed:', error);
+      throw new Error(`HuggingFace request failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async getModels(): Promise<string[]> {
+    // HuggingFace has thousands of models, return common ones
+    return [
+      'microsoft/CodeGPT-small-py',
+      'microsoft/DialoGPT-medium',
+      'gpt2',
+      'google/flan-t5-base',
+      'facebook/blenderbot-400M-distill',
+    ];
   }
 }

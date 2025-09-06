@@ -57,14 +57,24 @@ export class BasicResponseHandler implements ResponseHandler {
       content = String(raw || '');
     }
     
-    // Validate that we have meaningful content
+    // Validate that we have meaningful content - but allow empty content if tool calls are present
     if (!content || content.trim().length === 0) {
-      logger.error('ResponseHandler could not extract content from response', {
-        provider,
-        responseType: typeof raw,
-        responseKeys: raw && typeof raw === 'object' ? Object.keys(raw) : 'N/A',
-      });
-      throw new Error(`${provider} returned no usable content. Check service availability and model configuration.`);
+      const hasToolCalls = raw?.toolCalls?.length > 0;
+      
+      if (hasToolCalls) {
+        logger.debug('ResponseHandler: empty content but tool calls present - proceeding', {
+          provider,
+          toolCallCount: raw.toolCalls.length,
+        });
+        content = ''; // Explicitly set to empty string for tool-only responses
+      } else {
+        logger.error('ResponseHandler could not extract content from response', {
+          provider,
+          responseType: typeof raw,
+          responseKeys: raw && typeof raw === 'object' ? Object.keys(raw) : 'N/A',
+        });
+        throw new Error(`${provider} returned no usable content. Check service availability and model configuration.`);
+      }
     }
     
     logger.debug('ResponseHandler extracted content', {

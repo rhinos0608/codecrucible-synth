@@ -3,11 +3,25 @@ export interface VoiceOutput {
   content: string;
 }
 
+export interface SynthesisResult {
+  consensus: { content: string; voices: string[] }[];
+  divergences: { content: string; voices: string[] }[];
+  totalVoices: number;
+  consensusLevel: number; // 0-1, percentage of voices in consensus
+}
+
 /**
- * Combine multiple voice outputs into a single synthesized perspective.
+ * Combine multiple voice outputs into structured synthesis data.
  */
-export function synthesizePerspectives(outputs: VoiceOutput[]): string {
-  if (outputs.length === 0) return '';
+export function synthesizePerspectives(outputs: VoiceOutput[]): SynthesisResult {
+  if (outputs.length === 0) {
+    return {
+      consensus: [],
+      divergences: [],
+      totalVoices: 0,
+      consensusLevel: 0,
+    };
+  }
 
   // Group outputs by content
   const contentMap: Map<string, string[]> = new Map();
@@ -32,19 +46,35 @@ export function synthesizePerspectives(outputs: VoiceOutput[]): string {
     }
   }
 
-  let result = '';
-  if (consensus.length > 0) {
-    result += 'Consensus:\n';
-    for (const c of consensus) {
-      result += `- (${c.voices.join(', ')}) ${c.content}\n`;
+  // Calculate consensus level
+  const voicesInConsensus = consensus.reduce((sum, c) => sum + c.voices.length, 0);
+  const consensusLevel = outputs.length > 0 ? voicesInConsensus / outputs.length : 0;
+
+  return {
+    consensus,
+    divergences,
+    totalVoices: outputs.length,
+    consensusLevel,
+  };
+}
+
+/**
+ * Convert synthesis result to formatted string for backwards compatibility.
+ */
+export function formatSynthesisResult(result: SynthesisResult): string {
+  let output = '';
+  if (result.consensus.length > 0) {
+    output += 'Consensus:\n';
+    for (const c of result.consensus) {
+      output += `- (${c.voices.join(', ')}) ${c.content}\n`;
     }
   }
-  if (divergences.length > 0) {
-    if (result.length > 0) result += '\n';
-    result += 'Divergences:\n';
-    for (const d of divergences) {
-      result += `- (${d.voices[0]}) ${d.content}\n`;
+  if (result.divergences.length > 0) {
+    if (output.length > 0) output += '\n';
+    output += 'Divergences:\n';
+    for (const d of result.divergences) {
+      output += `- (${d.voices[0]}) ${d.content}\n`;
     }
   }
-  return result.trim();
+  return output.trim();
 }

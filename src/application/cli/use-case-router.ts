@@ -351,8 +351,8 @@ export class UseCaseRouter {
         originalInput: request.input,
         options: {
           ...options,
-          // CRITICAL FIX: Enable streaming for Ollama responses
-          stream: options.stream || true,
+          // CRITICAL FIX: Default to streaming for Ollama responses, but respect explicit false
+          stream: options.stream !== false,
         },
       },
       context: request.session?.context,
@@ -395,8 +395,8 @@ export class UseCaseRouter {
         originalInput: request.input,
         options: {
           ...options,
-          // CRITICAL FIX: Enable streaming for Ollama responses
-          stream: options.stream || true,
+          // CRITICAL FIX: Default to streaming for Ollama responses, but respect explicit false
+          stream: options.stream !== false,
           // CRITICAL: Disable tools for simple questions to enable pure streaming
           useTools: false,
         },

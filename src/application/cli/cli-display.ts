@@ -5,7 +5,7 @@
 
 import chalk from 'chalk';
 // import ora from 'ora';
-import { SynthesisResult } from '../../voices/voice-system-coordinator.js';
+import { VoiceCoordinatorResult } from '../../voices/voice-system-coordinator.js';
 
 export interface VoiceResponse {
   readonly voice: string;
@@ -17,7 +17,7 @@ export class CLIDisplay {
    * Display synthesis results with proper formatting
    */
   public static displayResults(
-    synthesis: Readonly<SynthesisResult>,
+    synthesis: Readonly<VoiceCoordinatorResult>,
     responses: readonly VoiceResponse[]
   ): void {
     console.log(chalk.green('\n🎯 Synthesis Complete!'));

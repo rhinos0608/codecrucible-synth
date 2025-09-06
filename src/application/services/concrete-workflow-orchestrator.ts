@@ -699,11 +699,18 @@ User Request: ${userPrompt}`;
    * between IModelClient and RequestExecutionManager expectations
    */
   private createProviderRepositoryAdapter(modelClient: IModelClient): any {
+    // Define which providers are actually available/implemented
+    const availableProviders = new Set(['ollama', 'lm-studio', 'claude', 'huggingface']);
+    
     return {
       getProvider: (providerType: string) => {
-        // The RequestExecutionManager expects specific provider names
-        // Map these to the modelClient which handles provider routing internally
         logger.debug(`Provider repository adapter: requested provider ${providerType}`);
+        
+        // Check if provider is actually available before returning adapter
+        if (!availableProviders.has(providerType)) {
+          logger.warn(`Provider ${providerType} is not implemented or available`);
+          return null; // Return null instead of falling back silently
+        }
         
         // Return an adapter that delegates to the modelClient for actual requests
         return {

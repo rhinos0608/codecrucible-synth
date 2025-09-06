@@ -6,6 +6,7 @@
 import { VoiceArchetypeSystem } from './voice-archetype-system.js';
 import { logger } from '../infrastructure/logging/logger.js';
 import { CouncilMode } from './collaboration/council-decision-engine.js';
+import { type IModelClient } from '../domain/interfaces/model-client.js';
 
 export interface VoiceSystemConfig {
   useOptimizedSystem?: boolean;
@@ -31,12 +32,22 @@ export interface VoiceSynthesisOptions {
   timeout?: number;
 }
 
+export interface VoiceMetadata {
+  reasoning?: string;
+  supportingEvidence?: string[];
+  concerns?: string[];
+  alternatives?: string[];
+  modelUsed?: string;
+  tokensUsed?: number;
+  options?: any; // Voice-specific options
+}
+
 export interface VoiceResult {
   voice: string;
   content: string;
   confidence: number;
   processingTime?: number;
-  metadata?: Record<string, unknown>;
+  metadata?: VoiceMetadata;
 }
 
 export interface SynthesisResult {
@@ -57,7 +68,7 @@ export class VoiceSystemIntegration2025 {
   private readonly config: VoiceSystemConfig;
   private initialized: boolean = false;
 
-  public constructor(modelClient: unknown = null, config: Readonly<VoiceSystemConfig> = {}) {
+  public constructor(modelClient: IModelClient | null = null, config: Readonly<VoiceSystemConfig> = {}) {
     this.config = {
       useOptimizedSystem: true,
       fallbackToLegacy: true,
@@ -89,7 +100,7 @@ export class VoiceSystemIntegration2025 {
     // Initialize with the actual voice archetype system
     // Removed unused _voiceConfig declaration
 
-    this.voiceArchetypeSystem = new VoiceArchetypeSystem(modelClient, simpleLogger);
+    this.voiceArchetypeSystem = new VoiceArchetypeSystem(modelClient || undefined, simpleLogger);
   }
 
   public async initialize(): Promise<void> {

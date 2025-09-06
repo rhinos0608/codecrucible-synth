@@ -5,6 +5,7 @@
  */
 
 import { EnterpriseSystemPromptBuilder } from './enterprise-system-prompt-builder.js';
+import { VOICE_GROUPS } from './voice-constants.js';
 
 export interface EnterpriseVoicePrompt {
   identity: string;
@@ -259,17 +260,6 @@ Knowledge Cutoff: ${context.knowledgeCutoff}`;
   }
 
   static getAvailableVoices(): string[] {
-    return [
-      'explorer',
-      'maintainer',
-      'analyzer',
-      'developer',
-      'implementor',
-      'security',
-      'architect',
-      'designer',
-      'optimizer',
-      'guardian',
-    ];
+    return [...VOICE_GROUPS.ALL];
   }
 }

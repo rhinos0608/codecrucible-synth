@@ -63,10 +63,11 @@ export class RequestTimeoutOptimizer {
     requestId: string,
     type: 'regular' | 'streaming' | 'batch' | 'tool_execution',
     provider: string,
-    customTimeout?: number
+    customTimeout?: number,
+    executionMode?: 'fast' | 'quality' | 'balanced'
   ): { abortController: AbortController; timeout: number } {
     const abortController = new AbortController();
-    const optimizedTimeout = customTimeout || this.calculateOptimalTimeout(type, provider);
+    const optimizedTimeout = customTimeout || this.calculateOptimalTimeout(type, provider, executionMode);
 
     const requestData: RequestTimeoutData = {
       requestId,
@@ -103,11 +104,12 @@ export class RequestTimeoutOptimizer {
   }
 
   /**
-   * Calculate optimal timeout based on historical data
+   * Calculate optimal timeout based on historical data and execution mode
    */
   private calculateOptimalTimeout(
     type: 'regular' | 'streaming' | 'batch' | 'tool_execution',
-    provider: string
+    provider: string,
+    executionMode?: 'fast' | 'quality' | 'balanced'
   ): number {
     // Get historical data for this type/provider combination
     const relevantHistory = this.timeoutHistory
@@ -130,6 +132,21 @@ export class RequestTimeoutOptimizer {
         baseTimeout = this.config.defaultTimeout;
     }
 
+    // Adjust base timeout based on execution mode priority
+    if (executionMode) {
+      switch (executionMode) {
+        case 'fast':
+          baseTimeout = Math.floor(baseTimeout * 0.8); // 20% faster timeout for fast mode
+          break;
+        case 'quality':
+          baseTimeout = Math.floor(baseTimeout * 1.5); // 50% more time for quality mode
+          break;
+        case 'balanced':
+          // Keep base timeout as-is for balanced mode
+          break;
+      }
+    }
+
     if (relevantHistory.length < 5) {
       // Not enough data, use base timeout
       return baseTimeout;
@@ -147,6 +164,7 @@ export class RequestTimeoutOptimizer {
     logger.debug('Calculated adaptive timeout', {
       type,
       provider,
+      executionMode,
       historySize: relevantHistory.length,
       avgDuration: avg.toFixed(0),
       p95Duration: p95.toFixed(0),

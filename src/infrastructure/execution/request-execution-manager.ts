@@ -295,7 +295,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   ): Promise<ModelResponse> {
     const fallbackChain =
       strategy.provider === 'auto'
-        ? ['ollama', 'lm-studio', 'huggingface'] // Default fallback chain
+        ? ['ollama', 'lm-studio', 'huggingface'] // Default fallback chain - huggingface now implemented
         : [strategy.provider, 'ollama', 'lm-studio', 'huggingface'].filter(
             (p, i, arr) => arr.indexOf(p) === i
           );
@@ -420,7 +420,9 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           requestTimeoutOptimizer.createOptimizedTimeout(
             requestId,
             requestType,
-            providerType === 'fast' ? 'low' : providerType === 'quality' ? 'high' : 'medium'
+            providerType, // Provider type for historical data lookup
+            undefined, // No custom timeout
+            strategy.mode // Execution mode for timeout priority adjustments
           );
 
         // Add abort signal to request
@@ -432,16 +434,18 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         // Route to streaming or regular processing based on request.stream flag
         let response;
         if (request.stream && request.onStreamingToken) {
-          // For streaming requests, check if provider has streamRequest method
+          // For streaming requests, check if provider has stream method (per ProviderAdapter interface)
           const modelClient = provider as any;
-          if (modelClient.streamRequest && typeof modelClient.streamRequest === 'function') {
+          if (modelClient.stream && typeof modelClient.stream === 'function') {
+            logger.debug(`Provider ${providerType} supports streaming, using stream method`);
+            // Use the streaming interface properly
             response = await Promise.race([
-              modelClient.streamRequest(requestWithAbort, request.onStreamingToken, context),
+              this.handleStreamingRequest(modelClient, requestWithAbort, request.onStreamingToken),
               this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
             ]);
           } else {
             // Fallback to regular processing if provider doesn't support streaming
-            logger.warn('Provider does not support streaming, falling back to regular processing');
+            logger.warn(`Provider ${providerType} does not support streaming (no stream method), falling back to regular processing`);
             response = await Promise.race([
               provider.processRequest(requestWithAbort, context),
               this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
@@ -731,6 +735,56 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         reject(new Error(`Request timed out after ${timeoutMs}ms`));
       }, timeoutMs);
     });
+  }
+
+  /**
+   * Handle streaming request using provider adapter's stream method
+   */
+  private async handleStreamingRequest(
+    provider: any,
+    request: ModelRequest,
+    onStreamingToken: (token: any) => void
+  ): Promise<ModelResponse> {
+    let fullContent = '';
+    let lastToken: any = null;
+
+    try {
+      // Use the provider adapter's stream method
+      const streamIterator = provider.stream(request);
+      
+      for await (const token of streamIterator) {
+        lastToken = token;
+        if (token.content) {
+          fullContent += token.content;
+        }
+        
+        // Call the streaming callback
+        onStreamingToken(token);
+        
+        // Break if we receive a completion token
+        if (token.isComplete) {
+          break;
+        }
+      }
+
+      // Return a complete response based on the streaming data
+      return {
+        id: `stream_${Date.now()}`,
+        content: fullContent,
+        model: request.model || 'unknown',
+        provider: provider.name || 'unknown',
+        usage: {
+          promptTokens: 0, // Could be estimated
+          completionTokens: fullContent.split(/\s+/).length,
+          totalTokens: fullContent.split(/\s+/).length,
+        },
+        responseTime: Date.now(),
+        finishReason: 'stop',
+      };
+    } catch (error) {
+      logger.error('Streaming request failed:', error);
+      throw new Error(`Streaming failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**

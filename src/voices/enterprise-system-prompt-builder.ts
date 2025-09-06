@@ -4,6 +4,8 @@
  * Structure: IDENTITY → SECURITY → INSTRUCTIONS → TONE → PROACTIVENESS → CONVENTIONS → TASK MANAGEMENT → TOOL POLICIES → ENVIRONMENT
  */
 
+import { VOICE_GROUPS } from './voice-constants.js';
+
 export interface SystemPromptComponents {
   identity: string;
   security: string;
@@ -32,8 +34,18 @@ export interface RuntimeContext {
   isCodingOperation?: boolean;
 }
 
+interface CacheEntry {
+  value: string;
+  timestamp: number;
+  accessCount: number;
+}
+
 export class EnterpriseSystemPromptBuilder {
-  private static readonly CACHE = new Map<string, string>();
+  private static readonly CACHE = new Map<string, CacheEntry>();
+  private static readonly MAX_CACHE_SIZE = 100; // Maximum number of cached prompts
+  private static readonly CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes TTL
+  private static lastCleanup = 0;
+  private static readonly CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Clean every 5 minutes
 
   /**
    * Main entry point - builds complete system prompt following Claude Code patterns
@@ -47,17 +59,20 @@ export class EnterpriseSystemPromptBuilder {
     }> = {}
   ): string {
     const cacheKey = this.getCacheKey(context, options);
-    if (this.CACHE.has(cacheKey)) {
-      const cached = this.CACHE.get(cacheKey);
-      if (cached !== undefined) {
-        return cached;
-      }
+    
+    // Clean expired cache entries periodically
+    this.cleanupExpiredEntries();
+    
+    // Check cache for valid entry
+    const cached = this.getCachedEntry(cacheKey);
+    if (cached) {
+      return cached;
     }
 
     const components = this.assembleComponents(context, options);
     const prompt = this.assemblePrompt(components);
 
-    this.CACHE.set(cacheKey, prompt);
+    this.setCacheEntry(cacheKey, prompt);
     return prompt;
   }
 
@@ -582,28 +597,132 @@ You are Guardian Voice, a specialized enterprise CLI agent focused on quality ga
   }
 
   /**
-   * Clear cache (for testing or updates)
+   * Get cached entry if valid and not expired
+   */
+  private static getCachedEntry(key: string): string | null {
+    const entry = this.CACHE.get(key);
+    if (!entry) return null;
+    
+    const now = Date.now();
+    if (now - entry.timestamp > this.CACHE_TTL_MS) {
+      this.CACHE.delete(key);
+      return null;
+    }
+    
+    // Update access count and timestamp for LRU tracking
+    entry.accessCount++;
+    entry.timestamp = now;
+    
+    return entry.value;
+  }
+  
+  /**
+   * Set cache entry with size limit enforcement
+   */
+  private static setCacheEntry(key: string, value: string): void {
+    const now = Date.now();
+    
+    // If at capacity, remove least recently used entries
+    if (this.CACHE.size >= this.MAX_CACHE_SIZE && !this.CACHE.has(key)) {
+      this.evictLeastRecentlyUsed();
+    }
+    
+    this.CACHE.set(key, {
+      value,
+      timestamp: now,
+      accessCount: 1,
+    });
+  }
+  
+  /**
+   * Remove least recently used entries to make space
+   */
+  private static evictLeastRecentlyUsed(): void {
+    // Find the least recently used entry (oldest timestamp, lowest access count)
+    let lruKey: string | null = null;
+    let lruEntry: CacheEntry | null = null;
+    
+    for (const [key, entry] of this.CACHE.entries()) {
+      if (!lruEntry || 
+          entry.timestamp < lruEntry.timestamp ||
+          (entry.timestamp === lruEntry.timestamp && entry.accessCount < lruEntry.accessCount)) {
+        lruKey = key;
+        lruEntry = entry;
+      }
+    }
+    
+    if (lruKey) {
+      this.CACHE.delete(lruKey);
+    }
+  }
+  
+  /**
+   * Clean up expired cache entries periodically
+   */
+  private static cleanupExpiredEntries(): void {
+    const now = Date.now();
+    
+    // Only run cleanup if enough time has passed
+    if (now - this.lastCleanup < this.CLEANUP_INTERVAL_MS) {
+      return;
+    }
+    
+    this.lastCleanup = now;
+    
+    // Remove expired entries
+    const expiredKeys: string[] = [];
+    for (const [key, entry] of this.CACHE.entries()) {
+      if (now - entry.timestamp > this.CACHE_TTL_MS) {
+        expiredKeys.push(key);
+      }
+    }
+    
+    for (const key of expiredKeys) {
+      this.CACHE.delete(key);
+    }
+  }
+
+  /**
+   * Clear cache (for testing or updates) 
    */
   public static clearCache(): void {
     this.CACHE.clear();
+    this.lastCleanup = 0;
+  }
+  
+  /**
+   * Get cache statistics for monitoring
+   */
+  public static getCacheStats(): {
+    size: number;
+    maxSize: number;
+    hitRate: number;
+    oldestEntryAge: number;
+  } {
+    const now = Date.now();
+    let totalAccess = 0;
+    let oldestTimestamp = now;
+    
+    for (const entry of this.CACHE.values()) {
+      totalAccess += entry.accessCount;
+      if (entry.timestamp < oldestTimestamp) {
+        oldestTimestamp = entry.timestamp;
+      }
+    }
+    
+    return {
+      size: this.CACHE.size,
+      maxSize: this.MAX_CACHE_SIZE,
+      hitRate: totalAccess > 0 ? this.CACHE.size / totalAccess : 0,
+      oldestEntryAge: now - oldestTimestamp,
+    };
   }
 
   /**
    * Get available voice IDs
    */
   public static getAvailableVoices(): string[] {
-    return [
-      'explorer',
-      'maintainer',
-      'security',
-      'architect',
-      'developer',
-      'analyzer',
-      'implementor',
-      'designer',
-      'optimizer',
-      'guardian',
-    ];
+    return [...VOICE_GROUPS.ALL];
   }
 
   /**

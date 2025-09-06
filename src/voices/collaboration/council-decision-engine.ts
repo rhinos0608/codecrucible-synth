@@ -44,6 +44,7 @@ export enum CouncilMode {
   WEIGHTED = 'weighted', // Weight opinions by expertise
   DEBATE = 'debate', // Allow structured argument
   SYNTHESIS = 'synthesis', // Merge complementary aspects
+  COLLABORATIVE = 'collaborative', // Combine perspectives collaboratively
 }
 
 export interface CouncilConfig {
@@ -70,35 +71,161 @@ export class CouncilDecisionEngine extends EventEmitter {
   public async conductCouncilSession(
     prompt: string,
     voices: readonly string[],
-    _config: Readonly<CouncilConfig>
+    config: Readonly<CouncilConfig>
   ): Promise<CouncilDecision> {
     const sessionId = this.generateSessionId();
-    this.logger.info(`Starting council session ${sessionId} with ${voices.length} voices`);
+    this.logger.info(`Starting council session ${sessionId} with ${voices.length} voices`, {
+      mode: config.mode,
+      maxRounds: config.maxRounds,
+      consensusThreshold: config.consensusThreshold,
+      timeoutMs: config.timeoutMs,
+    });
 
-    const perspectives: VoicePerspective[] = [];
+    // Apply timeout from configuration
+    const sessionTimeout = setTimeout(() => {
+      this.logger.warn(`Council session ${sessionId} timed out after ${config.timeoutMs}ms`);
+    }, config.timeoutMs);
 
-    // Collect perspectives from each voice
-    for (const voiceId of voices) {
-      try {
-        const perspective = (await this.voiceSystem.getVoicePerspective(
-          voiceId,
-          prompt
-        )) as VoicePerspective;
-        perspectives.push(perspective);
-      } catch (error) {
-        this.logger.warn(`Failed to get perspective from voice ${voiceId}:`, error);
+    try {
+      // Collect perspectives from all voices in parallel with timeout
+      this.logger.debug(`Collecting perspectives from ${voices.length} voices in parallel`);
+      
+      const perspectivePromises = voices.map(voiceId =>
+        Promise.race([
+          this.voiceSystem.getVoicePerspective(voiceId, prompt)
+            .then(perspective => perspective as VoicePerspective),
+          new Promise<null>((_, reject) => 
+            setTimeout(() => reject(new Error(`Voice ${voiceId} timed out`)), config.timeoutMs / voices.length)
+          )
+        ])
+        .catch(error => {
+          this.logger.warn(`Failed to get perspective from voice ${voiceId}:`, error);
+          return null; // Return null for failed perspectives, filter out later
+        })
+      );
+
+      const perspectiveResults = await Promise.all(perspectivePromises);
+      const perspectives = perspectiveResults.filter(p => p !== null) as VoicePerspective[];
+
+      // Apply consensus threshold from configuration
+      const consensusLevel = this.calculateConsensus(perspectives);
+      
+      if (consensusLevel < config.consensusThreshold) {
+        this.logger.warn(`Council session ${sessionId} failed to meet consensus threshold`, {
+          achieved: consensusLevel,
+          required: config.consensusThreshold,
+        });
       }
+
+      // Apply configuration-based decision synthesis
+      const finalDecision = this.synthesizeDecisionWithConfig(perspectives, config);
+      
+      // Handle dissent based on configuration
+      const dissent = config.allowDissent 
+        ? this.extractDissent(perspectives, consensusLevel, config.consensusThreshold)
+        : [];
+
+      // Generate explanations if required
+      const decisionRationale = config.requireExplanations
+        ? this.generateExplanation(perspectives, config)
+        : 'Multi-voice synthesis decision';
+
+      return {
+        finalDecision,
+        consensusLevel,
+        participatingVoices: Array.from(voices),
+        perspectives,
+        conflictsResolved: [],
+        decisionRationale,
+        dissent,
+      };
+
+    } finally {
+      clearTimeout(sessionTimeout);
+    }
+  }
+
+  private synthesizeDecisionWithConfig(
+    perspectives: VoicePerspective[], 
+    config: CouncilConfig
+  ): string {
+    switch (config.mode) {
+      case CouncilMode.COLLABORATIVE:
+        return this.synthesizeCollaboratively(perspectives);
+      case CouncilMode.DEBATE:
+        return this.synthesizeFromDebate(perspectives);
+      case CouncilMode.CONSENSUS:
+        return this.synthesizeWithConsensus(perspectives, config.consensusThreshold);
+      default:
+        return this.synthesizeDecision(perspectives); // Fallback to simple synthesis
+    }
+  }
+
+  private synthesizeCollaboratively(perspectives: VoicePerspective[]): string {
+    // Combine perspectives in a collaborative manner - enhance with better synthesis logic
+    const positions = perspectives.map(p => p.position);
+    const reasoning = perspectives.map(p => p.reasoning).filter(r => r.trim().length > 0);
+    
+    if (reasoning.length > 0) {
+      return `Collaborative approach incorporating ${positions.length} perspectives: ${positions.join('; ')}. Combined reasoning: ${reasoning.slice(0, 2).join('; ')}.`;
+    }
+    return `Collaborative synthesis: ${positions.join('; ')}.`;
+  }
+
+  private synthesizeFromDebate(perspectives: VoicePerspective[]): string {
+    // Highlight different viewpoints and conflicts with structured debate format
+    const highConfidence = perspectives.filter(p => p.confidence > 0.7);
+    const positions = highConfidence.length > 0 ? highConfidence : perspectives;
+    
+    const debates = positions.map(p => {
+      const concerns = p.concerns.length > 0 ? ` (concerns: ${p.concerns.slice(0, 2).join(', ')})` : '';
+      return `${p.voiceId}: ${p.position}${concerns}`;
+    });
+    
+    return `Structured debate synthesis: ${debates.join('; ')}.`;
+  }
+
+  private synthesizeWithConsensus(perspectives: VoicePerspective[], threshold: number): string {
+    // Only include perspectives that meet consensus threshold with detailed analysis
+    const consensusViews = perspectives.filter(p => p.confidence >= threshold);
+    
+    if (consensusViews.length === 0) {
+      const fallback = perspectives.sort((a, b) => b.confidence - a.confidence)[0];
+      return `No consensus reached (threshold: ${threshold}). Highest confidence perspective from ${fallback?.voiceId || 'unknown'}: ${fallback?.position || 'No perspectives available'}`;
+    }
+    
+    const avgConfidence = consensusViews.reduce((sum, v) => sum + v.confidence, 0) / consensusViews.length;
+    return `Strong consensus (${consensusViews.length}/${perspectives.length} voices, avg confidence: ${avgConfidence.toFixed(2)}): ${consensusViews.map(p => p.position).join('; ')}.`;
+  }
+
+  private extractDissent(
+    perspectives: VoicePerspective[], 
+    consensusLevel: number, 
+    threshold: number
+  ): string[] {
+    if (consensusLevel >= threshold) return [];
+    
+    // Find perspectives that significantly differ from the majority
+    const lowConfidence = perspectives.filter(p => p.confidence < 0.5);
+    return lowConfidence.map(p => `${p.voiceId} dissents: ${p.concerns?.join(', ') || 'General disagreement'}`);
+  }
+
+  private generateExplanation(perspectives: VoicePerspective[], config: CouncilConfig): string {
+    const explanationParts = [
+      `Council mode: ${config.mode}`,
+      `Perspectives considered: ${perspectives.length}`,
+      `Consensus threshold: ${config.consensusThreshold}`,
+    ];
+
+    const reasoning = perspectives
+      .map(p => p.reasoning)
+      .filter(r => r && r.trim().length > 0);
+    
+    if (reasoning.length > 0) {
+      explanationParts.push(`Key reasoning: ${reasoning.slice(0, 3).join('; ')}`);
     }
 
-    return {
-      finalDecision: this.synthesizeDecision(perspectives),
-      consensusLevel: this.calculateConsensus(perspectives),
-      participatingVoices: Array.from(voices),
-      perspectives,
-      conflictsResolved: [],
-      decisionRationale: 'Multi-voice synthesis decision',
-      dissent: [],
-    };
+    return explanationParts.join('. ');
   }
 
   private synthesizeDecision(perspectives: VoicePerspective[]): string {

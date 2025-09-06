@@ -13,7 +13,7 @@ import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { StreamToken } from '../../domain/types/core-types.js';
 import { ModelRequest } from '../../domain/interfaces/model-client.js';
-import { ProviderAdapter } from './provider-adapters.js';
+import { ProviderAdapter } from './provider-adapters/index.js';
 
 // Enhanced: AI SDK v5.0 Compatible Streaming Interfaces
 export interface StreamChunk {
@@ -164,10 +164,7 @@ export interface IStreamingManager {
   cleanup(): Promise<void>;
 
   // Adapter-based streaming
-  stream(
-    adapter: ProviderAdapter,
-    request: ModelRequest
-  ): AsyncIterable<StreamToken>;
+  stream(adapter: ProviderAdapter, request: ModelRequest): AsyncIterable<StreamToken>;
 }
 
 /**
@@ -421,14 +418,11 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   /**
    * Adapter-based streaming compatible with ModelClient
    */
-  async *stream(
-    adapter: ProviderAdapter,
-    request: ModelRequest
-  ): AsyncIterable<StreamToken> {
+  async *stream(adapter: ProviderAdapter, request: ModelRequest): AsyncIterable<StreamToken> {
     // CRITICAL FIX: Skip native streaming for tool-enabled requests
     // Many providers (like Ollama) have separate endpoints for simple prompts vs tool-enabled chat
     const hasTools = request.tools && Array.isArray(request.tools) && request.tools.length > 0;
-    
+
     if (adapter.stream && !hasTools) {
       logger.debug(`Using native ${adapter.name} streaming (no tools provided)`);
       for await (const token of adapter.stream(request)) {
@@ -440,9 +434,13 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     // For tool-enabled requests or adapters without native streaming,
     // use non-streaming request and simulate streaming
     if (hasTools) {
-      logger.info(`🔧 Tool-enabled request detected for ${adapter.name} - using non-streaming with simulated streaming`);
+      logger.info(
+        `🔧 Tool-enabled request detected for ${adapter.name} - using non-streaming with simulated streaming`
+      );
     } else {
-      logger.debug(`${adapter.name} adapter has no native streaming - using non-streaming with simulated streaming`);
+      logger.debug(
+        `${adapter.name} adapter has no native streaming - using non-streaming with simulated streaming`
+      );
     }
 
     const result = await adapter.request(request);

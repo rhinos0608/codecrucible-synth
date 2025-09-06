@@ -84,4 +84,3 @@ export interface IMcpManager {
   };
 }
 
-export type McpManager = IMcpManager;

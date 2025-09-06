@@ -73,8 +73,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
         }
 
         async fetchUser(id: number): Promise<User> {
-          if (this.cache.has(id)) {
-            return this.cache.get(id)!;
+          const cachedUser = this.cache.get(id);
+          if (cachedUser !== undefined) {
+            return cachedUser;
           }
           try {
             const response = await axios.get(\`\${this.baseUrl}/users/\${id}\`);

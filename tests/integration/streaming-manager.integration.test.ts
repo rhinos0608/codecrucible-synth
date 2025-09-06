@@ -10,7 +10,7 @@ import {
   StreamToken,
   StreamConfig,
   StreamMetrics,
-} from '../../src/core/streaming/streaming-manager.js';
+} from '../../src/application/services/streaming-manager.js';
 import { EventEmitter } from 'events';
 import { join } from 'path';
 import { tmpdir } from 'os';

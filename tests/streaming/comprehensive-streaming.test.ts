@@ -5,14 +5,13 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
-import { StreamingManager } from '../../src/core/streaming/streaming-manager.js';
 import {
+  StreamingManager,
   StreamToken,
   StreamConfig,
   StreamSession,
   StreamMetrics,
-  StreamingResponse,
-} from '../../src/core/streaming/streaming-manager.js';
+} from '../../src/application/services/streaming-manager.js';
 import { UnifiedModelClient, createDefaultUnifiedClientConfig } from '../../src/core/client.js';
 import { EventEmitter } from 'events';
 import { join } from 'path';

@@ -13,15 +13,21 @@
 import { EventEmitter } from 'events';
 import { logger } from '../infrastructure/logging/logger.js';
 import { PerformanceMonitor } from '../utils/performance.js';
+import { ProviderRegistry } from './provider-registry.js';
+import type { IProviderCapabilityDiscovery } from './provider-capability-discovery.js';
 
 export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
 export type ExecutionMode = 'fast' | 'quality' | 'balanced';
 
 export interface ProviderSelectionConfig {
-  fallbackChain: ProviderType[];
   selectionStrategy: 'fastest' | 'most-capable' | 'balanced' | 'adaptive';
   timeoutMs: number;
   maxRetries: number;
+  /**
+   * @deprecated This property is deprecated and will be removed in a future release.
+   * Use the fallback logic in the selection strategy instead.
+   */
+  fallbackChain?: ProviderType[];
 }
 
 export interface SelectionContext {
@@ -50,13 +56,22 @@ export interface IProviderSelectionStrategy {
 }
 
 export class ProviderSelectionStrategy extends EventEmitter implements IProviderSelectionStrategy {
-  private config: ProviderSelectionConfig;
-  private performanceMonitor: PerformanceMonitor;
+  private readonly config: ProviderSelectionConfig;
+  private readonly performanceMonitor: PerformanceMonitor;
+  private readonly registry: ProviderRegistry;
+  private readonly capabilityDiscovery: IProviderCapabilityDiscovery;
 
-  constructor(config: ProviderSelectionConfig, performanceMonitor: PerformanceMonitor) {
+  constructor(
+    config: ProviderSelectionConfig,
+    performanceMonitor: PerformanceMonitor,
+    registry: ProviderRegistry,
+    capabilityDiscovery: IProviderCapabilityDiscovery
+  ) {
     super();
     this.config = config;
     this.performanceMonitor = performanceMonitor;
+    this.registry = registry;
+    this.capabilityDiscovery = capabilityDiscovery;
   }
 
   /**
@@ -110,7 +125,7 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
           break;
 
         default:
-          selectedProvider = this.config.fallbackChain[0];
+          selectedProvider = this.registry.getFallbackChain()[0];
           reason = 'Default fallback provider';
           confidence = 0.6;
       }
@@ -135,10 +150,11 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
    * Create fallback chain prioritizing the selected provider
    */
   createFallbackChain(primaryProvider: ProviderType, context: SelectionContext): ProviderType[] {
+    const baseChain = this.registry.getFallbackChain();
     const fallbackChain =
       primaryProvider === 'auto'
-        ? [...this.config.fallbackChain]
-        : [primaryProvider, ...this.config.fallbackChain.filter(p => p !== primaryProvider)];
+        ? [...baseChain]
+        : [primaryProvider, ...baseChain.filter(p => p !== primaryProvider)];
 
     // Filter out providers that don't support the required context
     return fallbackChain.filter(provider => this.validateProviderForContext(provider, context));
@@ -149,8 +165,11 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
    */
   validateProviderForContext(provider: ProviderType, context: SelectionContext): boolean {
     // Check tool support requirement
-    if (context.requiresTools && !this.modelSupportsTools(provider, context.model)) {
-      return false;
+    if (context.requiresTools) {
+      const caps = this.capabilityDiscovery.getCapabilities(provider, context.model);
+      if (!caps.supportsToolCalling) {
+        return false;
+      }
     }
 
     // Add other validation logic as needed
@@ -166,7 +185,7 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
       ([, a], [, b]) => a.averageLatency - b.averageLatency
     );
 
-    return (sortedBySpeed[0]?.[0] as ProviderType) || this.config.fallbackChain[0];
+    return (sortedBySpeed[0]?.[0] as ProviderType) || this.registry.getFallbackChain()[0];
   }
 
   /**
@@ -178,7 +197,7 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
       ([, a], [, b]) => b.successRate - a.successRate
     );
 
-    return (sortedByQuality[0]?.[0] as ProviderType) || this.config.fallbackChain[0];
+    return (sortedByQuality[0]?.[0] as ProviderType) || this.registry.getFallbackChain()[0];
   }
 
   /**
@@ -192,7 +211,7 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
     }));
 
     scored.sort((a, b) => b.score - a.score);
-    return (scored[0]?.provider as ProviderType) || this.config.fallbackChain[0];
+    return (scored[0]?.provider as ProviderType) || this.registry.getFallbackChain()[0];
   }
 
   /**
@@ -233,9 +252,9 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
    * Find provider capable of handling tools
    */
   private selectToolCapableProvider(model?: string): ProviderType | null {
-    // Check each provider for tool support
-    for (const provider of this.config.fallbackChain) {
-      if (this.modelSupportsTools(provider, model)) {
+    for (const provider of this.registry.getFallbackChain()) {
+      const caps = this.capabilityDiscovery.getCapabilities(provider, model);
+      if (caps.supportsToolCalling) {
         return provider;
       }
     }
@@ -243,51 +262,12 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
   }
 
   /**
-   * Check if provider/model combination supports tools
-   */
-  private modelSupportsTools(provider: ProviderType, model?: string): boolean {
-    if (provider === 'lm-studio') {
-      return true; // LM Studio generally supports OpenAI-compatible function calling
-    }
-
-    if (provider === 'ollama') {
-      // If no specific model provided, assume auto-selection will pick a supported model
-      if (!model) {
-        logger.debug(
-          'No specific model provided, assuming auto-selection will pick supported model'
-        );
-        return true; // Trust that auto-selection picks qwen2.5-coder which supports tools
-      }
-
-      // Only certain Ollama models support function calling
-      const model_name = model.toLowerCase();
-      const supportedModels = [
-        'llama3',
-        'llama3.1',
-        'llama3.2',
-        'qwen2.5',
-        'qwq',
-        'mistral',
-        'codellama',
-      ];
-
-      const isSupported = supportedModels.some(supportedModel =>
-        model_name.includes(supportedModel)
-      );
-      logger.debug('Model tool support check', { model: model_name, isSupported });
-      return isSupported;
-    }
-
-    return false; // Conservative default - no tools for unknown providers
-  }
-
-  /**
    * Get current selection metrics
    */
-  getSelectionMetrics(): any {
+  getSelectionMetrics(): unknown {
     return {
       strategy: this.config.selectionStrategy,
-      fallbackChain: this.config.fallbackChain,
+      fallbackChain: this.registry.getFallbackChain(),
       providerMetrics: this.performanceMonitor.getProviderMetrics(),
     };
   }
@@ -306,7 +286,7 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
    */
   updateFallbackChain(fallbackChain: ProviderType[]): void {
     logger.info(`Updating fallback chain to: ${fallbackChain.join(' -> ')}`);
-    this.config.fallbackChain = fallbackChain;
+    this.registry.setFallbackChain(fallbackChain);
     this.emit('fallbackChainUpdated', { fallbackChain });
   }
 }

@@ -6,8 +6,10 @@
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { createDefaultToolRegistry, createLegacyToolRegistry } from './default-tool-registry.js';
 import { createLogger } from '../logging/logger-adapter.js';
-import { unifiedToolRegistry, ToolDefinition } from './unified-tool-registry.js';
-import { PathUtilities } from '../../utils/path-utilities.js';
+import { ToolDefinition, unifiedToolRegistry } from './unified-tool-registry.js';
+import { normalizePath } from './path-normalizer.js';
+import { inferDuration, inferRiskLevel } from './risk-scorer.js';
+import { createToolAliasMapping, mapToMcpToolName, resolveToolName } from './tool-mapper.js';
 
 export interface LLMFunction {
   type: 'function';
@@ -30,7 +32,7 @@ export interface ToolCall {
 }
 
 export class ToolIntegration {
-  private mcpManager: MCPServerManager;
+  private readonly mcpManager: MCPServerManager;
   protected availableTools: Map<string, any> = new Map();
   private initializationPromise: Promise<void> | null = null;
   private isInitialized = false;
@@ -47,42 +49,6 @@ export class ToolIntegration {
   }
 
   /**
-   * Normalize file paths using centralized PathUtilities
-   */
-  private normalizePath(filePath: string): string {
-    if (typeof filePath !== 'string') {
-      this.logger.debug(`[PATH DEBUG] Non-string path, using as-is:`, filePath);
-      return filePath;
-    }
-    
-    this.logger.debug(`[PATH DEBUG] Original path: "${filePath}"`);
-    
-    // Handle special AI placeholders first
-    if (filePath === '/project' || filePath === '/project/' || filePath === 'codecrucible') {
-      this.logger.debug(`[PATH DEBUG] Repository root placeholder detected, converting to "."`);
-      return '.';
-    }
-    
-    // Handle placeholder paths like /project/nested/file.txt by extracting the relative part
-    if (filePath.startsWith('/project/') && filePath.length > 9) {
-      const relativePath = filePath.substring(9); // Remove '/project/' prefix
-      this.logger.debug(`[PATH DEBUG] Extracted relative path from placeholder: "${filePath}" → "${relativePath}"`);
-      filePath = relativePath; // Continue with extracted path
-    }
-    
-    // Use centralized path normalization
-    const normalizedPath = PathUtilities.normalizeAIPath(filePath, {
-      allowAbsolute: true,
-      allowRelative: true,
-      allowTraversal: false,
-      basePath: process.cwd()
-    });
-    
-    this.logger.debug(`[PATH DEBUG] Normalized: "${filePath}" → "${normalizedPath}"`);
-    return normalizedPath;
-  }
-
-  /**
    * Infer tool category from function name
    */
   private inferCategory(functionName: string): ToolDefinition['category'] {
@@ -93,118 +59,6 @@ export class ToolIntegration {
     if (functionName.includes('smithery')) return 'external';
     return 'system';
   }
-  
-  /**
-   * Infer risk level from function name  
-   */
-  private inferRiskLevel(functionName: string): 'low' | 'medium' | 'high' | 'critical' {
-    if (functionName.includes('write') || functionName.includes('execute') || functionName.includes('command')) {
-      return 'high';
-    }
-    if (functionName.includes('git') || functionName.includes('npm')) {
-      return 'medium';
-    }
-    return 'low';
-  }
-  
-  /**
-   * Infer estimated duration from function name
-   */
-  private inferDuration(functionName: string): number {
-    if (functionName.includes('npm') || functionName.includes('execute')) return 5000; // 5 seconds
-    if (functionName.includes('git')) return 2000; // 2 seconds  
-    return 1000; // 1 second default
-  }
-
-  /**
-   * Map AI-facing function names to actual MCP tool names
-   */
-  private mapToMcpToolName(functionName: string): string {
-    const mapping: Record<string, string> = {
-      // Filesystem tools
-      'filesystem_read_file': 'read_file',
-      'filesystem_write_file': 'write_file', 
-      'filesystem_list_directory': 'list_directory',
-      'filesystem_get_stats': 'get_stats',
-      // Git tools
-      'git_status': 'git_status',
-      'git_add': 'git_add',
-      'git_commit': 'git_commit',
-      // System tools  
-      'execute_command': 'execute_command',
-      // Package manager tools
-      'npm_install': 'npm_install',
-      'npm_run': 'npm_run',
-      // Smithery tools
-      'smithery_status': 'smithery_status',
-      'smithery_refresh': 'smithery_refresh',
-    };
-
-    return mapping[functionName] || functionName;
-  }
-
-  /**
-   * Create reverse mapping and aliases for tool resolution
-   */
-  private createToolAliasMapping(): Record<string, string> {
-    const aliases: Record<string, string> = {};
-    
-    // Standard aliases for filesystem tools
-    aliases['filesystem_read_file'] = 'filesystem_read_file';
-    aliases['read_file'] = 'filesystem_read_file';
-    
-    aliases['filesystem_write_file'] = 'filesystem_write_file';
-    aliases['write_file'] = 'filesystem_write_file';
-    
-    aliases['filesystem_list_directory'] = 'filesystem_list_directory';
-    aliases['list_directory'] = 'filesystem_list_directory';
-    
-    aliases['filesystem_get_stats'] = 'filesystem_get_stats';
-    aliases['get_stats'] = 'filesystem_get_stats';
-    
-    // Add aliases for all registered tools
-    for (const [toolId] of this.availableTools) {
-      aliases[toolId] = toolId; // Self-mapping
-      
-      // Create short aliases by removing prefixes
-      if (toolId.includes('_')) {
-        const shortName = toolId.split('_').slice(1).join('_');
-        if (shortName) {
-          aliases[shortName] = toolId;
-        }
-      }
-    }
-    
-    return aliases;
-  }
-
-  /**
-   * Resolve tool name through alias mapping
-   */
-  private resolveToolName(functionName: string): string | null {
-    // First check direct match
-    if (this.availableTools.has(functionName)) {
-      return functionName;
-    }
-    
-    // Create and check alias mapping
-    const aliasMapping = this.createToolAliasMapping();
-    const resolvedName = aliasMapping[functionName];
-    
-    if (resolvedName && this.availableTools.has(resolvedName)) {
-      return resolvedName;
-    }
-    
-    // Try the MCP mapping as a fallback
-    const mcpName = this.mapToMcpToolName(functionName);
-    for (const [toolId] of this.availableTools) {
-      if (this.mapToMcpToolName(toolId) === mcpName) {
-        return toolId;
-      }
-    }
-    
-    return null; // Tool not found
-  }
 
   /**
    * Map AI-facing parameter names to MCP server parameter names
@@ -212,47 +66,47 @@ export class ToolIntegration {
   private mapArgsForMcpTool(functionName: string, args: any): any {
     this.logger.info(`[ARGS DEBUG] Mapping args for ${functionName}:`, args);
     const mappedArgs = { ...args };
-    
+
     // Parameter name mappings for different tools
     switch (functionName) {
       case 'filesystem_read_file':
         if (mappedArgs.file_path !== undefined) {
-          mappedArgs.path = this.normalizePath(mappedArgs.file_path);
+          mappedArgs.path = normalizePath(mappedArgs.file_path, this.logger);
           delete mappedArgs.file_path;
         }
         break;
-        
+
       case 'filesystem_write_file':
         if (mappedArgs.file_path !== undefined) {
-          mappedArgs.path = this.normalizePath(mappedArgs.file_path);
+          mappedArgs.path = normalizePath(mappedArgs.file_path, this.logger);
           delete mappedArgs.file_path;
         }
         break;
-        
+
       case 'filesystem_list_directory':
         if (mappedArgs.directory !== undefined) {
-          mappedArgs.path = this.normalizePath(mappedArgs.directory);
+          mappedArgs.path = normalizePath(mappedArgs.directory, this.logger);
           delete mappedArgs.directory;
         }
         break;
-        
+
       case 'filesystem_get_stats':
         if (mappedArgs.file_path !== undefined) {
-          mappedArgs.path = this.normalizePath(mappedArgs.file_path);
+          mappedArgs.path = normalizePath(mappedArgs.file_path, this.logger);
           delete mappedArgs.file_path;
         }
         break;
-        
+
       // Git tools
       case 'git_status':
       case 'git_add':
       case 'git_commit':
         if (mappedArgs.path !== undefined) {
-          mappedArgs.path = this.normalizePath(mappedArgs.path);
+          mappedArgs.path = normalizePath(mappedArgs.path, this.logger);
         }
         break;
     }
-    
+
     this.logger.info(`[ARGS DEBUG] Final mapped args for ${functionName}:`, mappedArgs);
     return mappedArgs;
   }
@@ -268,7 +122,7 @@ export class ToolIntegration {
     // If previous initialization failed, provide clear error message
     if (this.initializationFailed && this.lastInitializationError) {
       this.logger.warn('Previous initialization failed, attempting retry', {
-        previousError: this.lastInitializationError.message
+        previousError: this.lastInitializationError.message,
       });
       // Allow retry by resetting the failure flags
       this.initializationFailed = false;
@@ -299,7 +153,7 @@ export class ToolIntegration {
       const toolRegistry = createLegacyToolRegistry({
         mcpManager: this.mcpManager,
         allowedOrigins: process.env.TOOL_ALLOWED_ORIGINS?.split(',') || ['local'],
-        autoApproveTools: process.env.AUTO_APPROVE_TOOLS === 'true'
+        autoApproveTools: process.env.AUTO_APPROVE_TOOLS === 'true',
       });
 
       // Convert registry to our internal format
@@ -318,13 +172,13 @@ export class ToolIntegration {
           handler: null, // Will be resolved during execution
           // Add the missing execute method that delegates to MCP manager
           execute: async (args: any, context: any) => {
-            const mcpToolName = this.mapToMcpToolName(tool.function.name);
+            const mcpToolName = mapToMcpToolName(tool.function.name);
             const mappedArgs = this.mapArgsForMcpTool(tool.function.name, args);
-            return await this.mcpManager.executeTool(mcpToolName, mappedArgs, context);
+            return this.mcpManager.executeTool(mcpToolName, mappedArgs, context);
           },
         };
         this.availableTools.set(internalTool.id, internalTool);
-        
+
         // DISABLED: Do not register with unified registry to prevent circular dependency
         // MCPServerManager already handles unified registry registration
         // The circular dependency was: ToolIntegration -> unifiedRegistry -> MCPManager -> unifiedRegistry -> loop
@@ -337,20 +191,20 @@ export class ToolIntegration {
           aliases: [], // Could add category prefixes later
           inputSchema: internalTool.inputSchema,
           handler: async (args, context) => {
-            const mcpToolName = this.mapToMcpToolName(internalTool.name);
+              const mcpToolName = mapToMcpToolName(internalTool.name);
             const mappedArgs = this.mapArgsForMcpTool(internalTool.name, args);
             return await this.mcpManager.executeTool(mcpToolName, mappedArgs, context);
           },
           security: {
             requiresApproval: false,
-            riskLevel: this.inferRiskLevel(internalTool.name),
-            allowedOrigins: ['local'],
-          },
-          performance: {
-            estimatedDuration: this.inferDuration(internalTool.name),
-            memoryUsage: 'low',
-            cpuIntensive: false,
-          },
+              riskLevel: inferRiskLevel(internalTool.name),
+              allowedOrigins: ['local'],
+            },
+            performance: {
+              estimatedDuration: inferDuration(internalTool.name),
+              memoryUsage: 'low',
+              cpuIntensive: false,
+            },
         };
         unifiedToolRegistry.registerTool(toolDefinition);
         */
@@ -439,41 +293,49 @@ export class ToolIntegration {
 
     try {
       const functionName = toolCall.function.name;
-      
+
       // Debug the arguments type and value
       this.logger.info(`[DEBUG] Raw arguments:`, {
         type: typeof toolCall.function.arguments,
         value: toolCall.function.arguments,
-        isString: typeof toolCall.function.arguments === 'string'
+        isString: typeof toolCall.function.arguments === 'string',
       });
-      
+
       // Handle both string and object arguments with robust parsing
       let args: any;
       if (typeof toolCall.function.arguments === 'string') {
         try {
           args = JSON.parse(toolCall.function.arguments);
-          
+
           // Check for multiple levels of JSON encoding (common with AI providers)
           let parseAttempts = 0;
           while (typeof args === 'string' && parseAttempts < 3) {
             parseAttempts++;
-            this.logger.debug(`[ARGS DEBUG] Detected level-${parseAttempts} encoded JSON, parsing again`);
-            
+            this.logger.debug(
+              `[ARGS DEBUG] Detected level-${parseAttempts} encoded JSON, parsing again`
+            );
+
             try {
               const parsed = JSON.parse(args);
               args = parsed;
             } catch (innerError) {
-              this.logger.warn(`[ARGS DEBUG] Failed to parse level-${parseAttempts} JSON, using previous level`);
+              this.logger.warn(
+                `[ARGS DEBUG] Failed to parse level-${parseAttempts} JSON, using previous level`
+              );
               break; // Use the previous level if parsing fails
             }
           }
-          
+
           if (parseAttempts > 0) {
-            this.logger.info(`[ARGS DEBUG] Successfully decoded ${parseAttempts}-level JSON encoding`);
+            this.logger.info(
+              `[ARGS DEBUG] Successfully decoded ${parseAttempts}-level JSON encoding`
+            );
           }
         } catch (parseError) {
           this.logger.error(`Failed to parse arguments JSON:`, parseError);
-          throw new Error(`Invalid JSON in tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+          throw new Error(
+            `Invalid JSON in tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+          );
         }
       } else {
         // Arguments are already an object
@@ -482,19 +344,23 @@ export class ToolIntegration {
 
       // Validate that args is an object (not a primitive)
       if (args === null || (typeof args !== 'object' && typeof args !== 'undefined')) {
-        this.logger.warn(`[ARGS DEBUG] Arguments resolved to primitive type: ${typeof args}, wrapping in object`);
+        this.logger.warn(
+          `[ARGS DEBUG] Arguments resolved to primitive type: ${typeof args}, wrapping in object`
+        );
         args = { value: args }; // Wrap primitive values
       }
 
       this.logger.info(`Executing tool: ${functionName} with args:`, args);
 
       // Resolve tool name through alias mapping
-      const resolvedToolName = this.resolveToolName(functionName);
+      const resolvedToolName = resolveToolName(functionName, this.availableTools);
       if (!resolvedToolName) {
         const availableTools = Array.from(this.availableTools.keys());
-        const aliasMapping = this.createToolAliasMapping();
-        const availableAliases = Object.keys(aliasMapping).filter(alias => alias !== aliasMapping[alias]);
-        
+        const aliasMapping = createToolAliasMapping(this.availableTools);
+        const availableAliases = Object.keys(aliasMapping).filter(
+          alias => alias !== aliasMapping[alias]
+        );
+
         throw new Error(
           `Unknown tool: ${functionName}. Available tools: ${availableTools.join(', ')}${
             availableAliases.length > 0 ? `. Available aliases: ${availableAliases.join(', ')}` : ''
@@ -518,18 +384,21 @@ export class ToolIntegration {
 
       // Log based on actual execution result status
       if (result.success !== false) {
-        this.logger.info(`Tool ${functionName} (resolved: ${resolvedToolName}) executed successfully`, {
-          success: result.success,
-          executionTime: result.metadata?.executionTime,
-          hasOutput: !!result.output,
-          outputType: typeof result.output
-        });
+        this.logger.info(
+          `Tool ${functionName} (resolved: ${resolvedToolName}) executed successfully`,
+          {
+            success: result.success,
+            executionTime: result.metadata?.executionTime,
+            hasOutput: !!result.output,
+            outputType: typeof result.output,
+          }
+        );
       } else {
         this.logger.warn(`Tool ${functionName} (resolved: ${resolvedToolName}) execution failed`, {
           success: result.success,
           error: result.error || 'Unknown error',
           executionTime: result.metadata?.executionTime,
-          details: result.details
+          details: result.details,
         });
       }
 

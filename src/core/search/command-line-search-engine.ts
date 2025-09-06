@@ -1,20 +1,19 @@
 import { promisify } from 'util';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import type { RAGQuery, RAGResult, Document } from './types.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class CommandLineSearchEngine {
   constructor(private workspace: string) {}
 
   async search(query: RAGQuery): Promise<RAGResult> {
-    const flags = ['-n'];
+    const flags = ['-n', '--json'];
     if (!query.useRegex) {
       flags.push('-F');
     }
-    const cmd = `rg ${flags.join(' ')} "${query.query}"`;
     try {
-      const { stdout } = await execAsync(cmd, {
+      const { stdout } = await execFileAsync('rg', [...flags, query.query], {
         cwd: this.workspace,
         maxBuffer: 1024 * 1024,
       });
@@ -22,9 +21,27 @@ export class CommandLineSearchEngine {
         .split('\n')
         .filter(Boolean)
         .map(line => {
-          const [filePath, , ...contentParts] = line.split(':');
-          return { filePath, content: contentParts.join(':') };
-        });
+          try {
+            const parsed = JSON.parse(line);
+            if (
+              parsed.type === 'match' &&
+              parsed.data &&
+              parsed.data.path &&
+              typeof parsed.data.path.text === 'string' &&
+              parsed.data.lines &&
+              typeof parsed.data.lines.text === 'string'
+            ) {
+              return {
+                filePath: parsed.data.path.text,
+                content: parsed.data.lines.text,
+              } as Document;
+            }
+          } catch {
+            return null;
+          }
+          return null;
+        })
+        .filter((doc): doc is Document => doc !== null);
       return {
         documents,
         metadata: {

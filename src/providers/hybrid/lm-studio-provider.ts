@@ -82,6 +82,7 @@ export class LMStudioProvider implements LLMProvider {
         responseTime,
         model: response.model || this.config.defaultModel,
         provider: this.name,
+        toolCalls: response.toolCalls, // FIXED: Include tool calls in response
         metadata: {
           tokens: response.usage?.total_tokens,
           promptTokens: response.usage?.prompt_tokens,
@@ -89,6 +90,128 @@ export class LMStudioProvider implements LLMProvider {
           finishReason: response.choices?.[0]?.finish_reason,
         },
       };
+    } catch (error) {
+      this.errorCount++;
+      this.lastError = (error as Error).message;
+      throw error;
+    } finally {
+      this.currentLoad--;
+    }
+  }
+
+  /**
+   * Make a request with full OpenAI-compatible API support including tools
+   * This is the preferred method for tool-enabled requests
+   */
+  async request(requestOptions: any): Promise<any> {
+    const startTime = Date.now();
+    this.currentLoad++;
+    this.requestCount++;
+
+    try {
+      // Build messages from either messages array or prompt
+      let messages;
+      if (requestOptions.messages && Array.isArray(requestOptions.messages)) {
+        messages = requestOptions.messages;
+      } else if (requestOptions.prompt) {
+        messages = [
+          {
+            role: 'system',
+            content: this.getSystemPrompt(requestOptions.taskType),
+          },
+          {
+            role: 'user',
+            content: requestOptions.prompt,
+          },
+        ];
+      } else {
+        throw new Error('Either messages array or prompt string must be provided');
+      }
+
+      const payload: any = {
+        model: requestOptions.model || this.config.defaultModel,
+        messages: messages,
+        temperature: requestOptions.temperature ?? this.getTemperature(requestOptions.taskType),
+        max_tokens: requestOptions.maxTokens ?? this.getMaxTokens(requestOptions.taskType),
+        stream: false,
+      };
+
+      // FIXED: Add tools to payload if provided
+      if (requestOptions.tools && Array.isArray(requestOptions.tools) && requestOptions.tools.length > 0) {
+        payload.tools = requestOptions.tools;
+        payload.tool_choice = requestOptions.tool_choice || 'auto';
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), requestOptions.timeout || this.config.timeout);
+
+      try {
+        const response = await fetch(`${this.endpoint}/v1/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`LM Studio API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.choices || data.choices.length === 0) {
+          throw new Error('No response choices returned from LM Studio');
+        }
+
+        const choice = data.choices[0];
+        const responseTime = Date.now() - startTime;
+
+        // FIXED: Extract tool calls if present with correct structure
+        let toolCalls = undefined;
+        if (choice.message?.tool_calls && Array.isArray(choice.message.tool_calls)) {
+          toolCalls = choice.message.tool_calls.map((tc: any) => ({
+            id: tc.id,
+            type: tc.type || 'function',
+            function: {
+              name: tc.function?.name || '',
+              arguments: tc.function?.arguments || '{}',
+            },
+          }));
+        }
+
+        // Calculate confidence based on response quality indicators
+        const confidence = this.calculateConfidence(
+          choice.message?.content || '', 
+          responseTime, 
+          requestOptions.taskType
+        );
+
+        return {
+          id: data.id || `lms_${Date.now()}`,
+          content: choice.message?.content || '',
+          confidence,
+          responseTime,
+          model: data.model || this.config.defaultModel,
+          provider: this.name,
+          toolCalls: toolCalls,
+          usage: {
+            promptTokens: data.usage?.prompt_tokens || 0,
+            completionTokens: data.usage?.completion_tokens || 0,
+            totalTokens: data.usage?.total_tokens || 0,
+          },
+          finishReason: choice.finish_reason || 'stop',
+          metadata: {
+            tokens: data.usage?.total_tokens,
+            promptTokens: data.usage?.prompt_tokens,
+            completionTokens: data.usage?.completion_tokens,
+            finishReason: choice.finish_reason,
+          },
+        };
+      } finally {
+        clearTimeout(timeout);
+      }
     } catch (error) {
       this.errorCount++;
       this.lastError = (error as Error).message;

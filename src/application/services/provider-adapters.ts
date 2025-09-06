@@ -124,30 +124,82 @@ export class LMStudioAdapter implements ProviderAdapter {
   }
 
   async request(req: ModelRequest): Promise<ModelResponse> {
-    logger.debug('LMStudioAdapter.request', { model: req.model });
+    logger.debug('LMStudioAdapter.request', { 
+      model: req.model, 
+      hasTools: req.tools && req.tools.length > 0,
+      toolCount: req.tools?.length || 0 
+    });
     const cfg = (this.provider as any).config;
 
-    // LMStudioProvider doesn't have request method, use generateCode instead
-    if ('request' in this.provider && typeof this.provider.request === 'function') {
-      return this.provider.request({ ...req, model: req.model || cfg.defaultModel });
-    } else {
-      // Fallback to generateCode method
-      const response = await this.provider.generateCode(req.prompt, {
+    try {
+      // FIXED: Use the new request method that supports tools
+      const requestOptions = {
         model: req.model || cfg.defaultModel,
-      });
+        messages: req.messages,
+        prompt: req.prompt,
+        maxTokens: req.maxTokens,
+        temperature: req.temperature,
+        tools: req.tools, // FIXED: Pass tools through to provider
+        tool_choice: req.tool_choice,
+        timeout: req.timeout,
+      };
+
+      // Use the proper request method with tools support
+      const response = await this.provider.request(requestOptions);
+      
+      // FIXED: Transform response properly with tool calls support
       return {
-        id: `${this.name}_${Date.now()}`,
-        content: response.content,
+        id: response.id || `${this.name}_${Date.now()}`,
+        content: response.content || '',
         model: response.model || req.model || cfg.defaultModel,
         provider: this.name,
-        usage: {
+        usage: response.usage || {
           promptTokens: response.metadata?.promptTokens || 0,
           completionTokens: response.metadata?.completionTokens || 0,
           totalTokens: response.metadata?.tokens || 0,
         },
         responseTime: response.responseTime,
-        finishReason: response.metadata?.finishReason || 'stop',
+        finishReason: response.finishReason || response.metadata?.finishReason || 'stop',
+        toolCalls: response.toolCalls, // FIXED: Include tool calls in adapter response
       };
+    } catch (error) {
+      logger.error('LMStudioAdapter request failed:', error);
+      
+      // FIXED: Fallback to generateCode if request method fails (for backward compatibility)
+      logger.warn('Falling back to generateCode method due to request failure');
+      try {
+        const response = await this.provider.generateCode(req.prompt || '', {
+          model: req.model || cfg.defaultModel,
+          maxTokens: req.maxTokens,
+          temperature: req.temperature,
+        });
+        
+        return {
+          id: `${this.name}_${Date.now()}`,
+          content: response.content,
+          model: response.model || req.model || cfg.defaultModel,
+          provider: this.name,
+          usage: {
+            promptTokens: response.metadata?.promptTokens || 0,
+            completionTokens: response.metadata?.completionTokens || 0,
+            totalTokens: response.metadata?.tokens || 0,
+          },
+          responseTime: response.responseTime,
+          finishReason: response.metadata?.finishReason || 'stop',
+          // FIXED: Transform LLM tool calls to ModelResponse format
+          toolCalls: response.toolCalls ? response.toolCalls.map(tc => ({
+            id: tc.id,
+            type: tc.type as 'function',
+            function: {
+              name: tc.name,
+              arguments: tc.arguments,
+            },
+          })) : undefined,
+        };
+      } catch (fallbackError) {
+        logger.error('LMStudioAdapter fallback also failed:', fallbackError);
+        throw new Error(`LM Studio request failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
 

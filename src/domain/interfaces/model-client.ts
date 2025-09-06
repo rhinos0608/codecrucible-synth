@@ -24,6 +24,9 @@ export interface ModelRequest {
     tool_calls?: any[];
     tool_call_id?: string;
   }>;
+  // FIXED: Add missing properties for LM Studio adapter
+  tool_choice?: string | 'auto' | 'none';
+  timeout?: number;
   // Ollama-specific parameters
   num_ctx?: number;
   options?: Record<string, any>;

@@ -96,6 +96,13 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   private rustBackend: RustExecutionBackend | null;
   private isShuttingDown = false;
   private queueProcessor: NodeJS.Timeout | null = null;
+  
+  // FIXED: Add Rust backend readiness tracking
+  private rustBackendInitialized = false;
+  private rustBackendInitializationPromise: Promise<void> | null = null;
+  
+  // FIXED: Track signal listener registration to prevent duplicates
+  private static signalListenersRegistered = false;
 
   constructor(
     config: ExecutionConfig,
@@ -110,32 +117,53 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     // Domain orchestrator removed - AI now intelligently selects tools
     this.rustBackend = rustBackend ?? null;
 
-    // If no injected backend, lazily create one
+    // FIXED: Initialize Rust backend synchronously with proper tracking
     if (!this.rustBackend) {
-      // Initialize Rust backend asynchronously
-      this.initializeRustBackend().catch((e) => {
-        logger.warn('RequestExecutionManager: Failed to initialize Rust backend', e);
-      });
+      // Start initialization but track it properly
+      this.rustBackendInitializationPromise = this.initializeRustBackend();
+      
+      this.rustBackendInitializationPromise
+        .then(() => {
+          this.rustBackendInitialized = true;
+          logger.info('✅ RequestExecutionManager: Rust backend ready for requests');
+        })
+        .catch((e) => {
+          logger.warn('⚠️ RequestExecutionManager: Rust backend initialization failed, will proceed without it', e);
+          this.rustBackendInitialized = false; // Mark as failed but continue
+        });
     } else {
-      // If an injected backend exists, we may optionally initialize/verify it
-      try {
-        if (typeof (this.rustBackend as any).initialize === 'function') {
-          // Fire-and-forget initialization
-          (this.rustBackend as any)
-            .initialize()
-            .catch((err: any) => logger.warn('Injected rustBackend failed to initialize', err));
-        }
-      } catch (err) {
-        logger.warn('Error while initializing injected rustBackend', err);
-      }
+      // If an injected backend exists, initialize it synchronously
+      this.rustBackendInitializationPromise = this.initializeInjectedRustBackend();
+      
+      this.rustBackendInitializationPromise
+        .then(() => {
+          this.rustBackendInitialized = true;
+          logger.info('✅ RequestExecutionManager: Injected Rust backend ready for requests');
+        })
+        .catch((err: any) => {
+          logger.warn('⚠️ RequestExecutionManager: Injected Rust backend initialization failed', err);
+          this.rustBackendInitialized = false; // Mark as failed but continue
+        });
     }
 
     // Start event-driven queue processor instead of infinite loop
     this.scheduleQueueProcessor();
 
-    // Handle shutdown gracefully
-    process.once('SIGTERM', async () => this.shutdown());
-    process.once('SIGINT', async () => this.shutdown());
+    // FIXED: Handle shutdown gracefully with duplicate listener prevention
+    if (!RequestExecutionManager.signalListenersRegistered) {
+      process.once('SIGTERM', async () => {
+        logger.info('Received SIGTERM, initiating graceful shutdown...');
+        await this.shutdown();
+      });
+      process.once('SIGINT', async () => {
+        logger.info('Received SIGINT, initiating graceful shutdown...');
+        await this.shutdown();
+      });
+      RequestExecutionManager.signalListenersRegistered = true;
+      logger.debug('Process signal listeners registered for graceful shutdown');
+    } else {
+      logger.debug('Process signal listeners already registered, skipping duplicate registration');
+    }
   }
 
   private async initializeRustBackend(): Promise<void> {
@@ -178,9 +206,60 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   }
 
   /**
+   * FIXED: Wait for Rust backend to be ready before processing requests
+   */
+  private async ensureRustBackendReady(): Promise<void> {
+    if (this.rustBackendInitializationPromise && !this.rustBackendInitialized) {
+      logger.debug('⏳ Waiting for Rust backend initialization to complete...');
+      try {
+        await this.rustBackendInitializationPromise;
+      } catch (error) {
+        logger.warn('⚠️ Rust backend initialization failed, continuing without it:', error);
+        // Continue without Rust backend - don't block requests
+      }
+    }
+  }
+
+  /**
+   * FIXED: Initialize injected Rust backend with proper error handling
+   */
+  private async initializeInjectedRustBackend(): Promise<void> {
+    if (!this.rustBackend) {
+      throw new Error('No injected Rust backend available');
+    }
+
+    try {
+      if (typeof (this.rustBackend as any).initialize === 'function') {
+        const initialized = await (this.rustBackend as any).initialize();
+        if (initialized === true) {
+          logger.info('🚀 RequestExecutionManager: Injected Rust backend initialized', {
+            available: this.rustBackend.isAvailable(),
+            strategy: this.rustBackend.getStrategy?.(),
+          });
+        } else {
+          logger.warn('RequestExecutionManager: Injected Rust backend initialized but reports not ready', {
+            initialized,
+            isAvailable: this.rustBackend?.isAvailable?.(),
+          });
+          throw new Error('Injected Rust backend initialized but not ready');
+        }
+      } else {
+        // If no initialize method, assume it's ready
+        logger.info('RequestExecutionManager: Injected Rust backend has no initialize method, assuming ready');
+      }
+    } catch (error) {
+      logger.error('RequestExecutionManager: Failed to initialize injected Rust backend', error);
+      throw error;
+    }
+  }
+
+  /**
    * Main request processing method
    */
   async processRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse> {
+    // FIXED: Ensure Rust backend is ready before processing requests
+    await this.ensureRustBackendReady();
+    
     const requestId = this.generateRequestId();
     const strategy = this.determineExecutionStrategy(request, context);
     const startTime = Date.now();
@@ -478,16 +557,17 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
               this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
             ]);
           } else {
-            // Fallback to regular processing if provider doesn't support streaming
-            logger.warn(`Provider ${providerType} does not support streaming, falling back to regular processing`);
+            // FIXED: Fallback to regular processing if provider doesn't support streaming
+            logger.warn(`Provider ${providerType} does not support streaming, falling back to regular request method`);
             response = await Promise.race([
-              provider.processRequest(requestWithAbort, context),
+              provider.request(requestWithAbort), // FIXED: Use correct method name from ProviderAdapter interface
               this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
             ]);
           }
         } else {
+          // FIXED: Use correct method name for regular processing
           response = await Promise.race([
-            provider.processRequest(requestWithAbort, context),
+            provider.request(requestWithAbort), // FIXED: Use correct method name from ProviderAdapter interface
             this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
           ]);
         }
@@ -969,40 +1049,129 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
    * Check if provider/model combination supports tools
    */
   private modelSupportsTools(provider: ProviderType, model?: string): boolean {
-    if (provider === 'lm-studio') {
-      return true; // LM Studio generally supports OpenAI-compatible function calling
+    // FIXED: Implement precise capability detection instead of optimistic assumptions
+    
+    if (provider === 'claude') {
+      return true; // Claude models support tool calling
+    }
+    
+    if (provider === 'huggingface') {
+      // Most HuggingFace models don't support function calling
+      // Only specific instruction-tuned models do
+      const supportedHFModels = [
+        'microsoft/DialoGPT',
+        'microsoft/CodeGPT',
+        'facebook/blenderbot',
+      ];
+      
+      if (model) {
+        const modelLower = model.toLowerCase();
+        const isSupported = supportedHFModels.some(supported => 
+          modelLower.includes(supported.toLowerCase())
+        );
+        logger.debug('🔍 HuggingFace tool capability check', { 
+          model: modelLower,
+          isSupported,
+          reason: isSupported ? 'Model in known supported list' : 'Model not in supported list'
+        });
+        return isSupported;
+      }
+      return false; // Conservative default for HF
     }
 
-    if (provider === 'ollama') {
-      // If no specific model provided, assume auto-selection will pick a supported model
+    if (provider === 'lm-studio') {
+      // FIXED: Not all LM Studio models support function calling
+      // Check if the loaded model is function-calling capable
       if (!model) {
-        logger.debug(
-          'No specific model provided, will attempt tool use with auto-selected model'
-        );
-        return true; // Optimistically attempt tool use - system handles failures gracefully
+        logger.warn('🔍 LM Studio tool capability: No model specified, assuming no tool support for safety');
+        return false;
       }
-
-      // Dynamic capability detection - no hardcoded model lists
-      const model_name = model.toLowerCase();
       
-      // Extract model size for capability assessment (e.g., "8b", "7b", "32b")
-      const sizeMatch = model_name.match(/(\d+(?:\.\d+)?)b/);
-      const modelSize = sizeMatch ? parseFloat(sizeMatch[1]) : 0;
+      const modelLower = model.toLowerCase();
       
-      // Always attempt tool use - the system will handle failures gracefully
-      // This allows us to discover new models' capabilities dynamically
-      const isSupported = true;
+      // LM Studio models that commonly support function calling
+      const supportedPatterns = [
+        'llama',        // Most llama models
+        'mistral',      // Mistral models
+        'qwen',         // Qwen models
+        'hermes',       // OpenHermes models
+        'openai',       // OpenAI-compatible models
+        'gpt',          // GPT-based models
+        'functionary',  // Functionary models (designed for function calling)
+        'nexusraven',   // NexusRaven models
+      ];
       
-      logger.info('🔍 Dynamic tool capability detection', { 
-        model: model_name,
-        detectedSize: modelSize || 'unknown',
-        strategy: 'Optimistic - will attempt tool use and handle failures gracefully',
-        rationale: 'Avoiding hardcoded lists to support new models dynamically'
+      const isSupported = supportedPatterns.some(pattern => modelLower.includes(pattern));
+      
+      logger.debug('🔍 LM Studio tool capability check', { 
+        model: modelLower,
+        isSupported,
+        reason: isSupported ? 'Model matches known function-calling pattern' : 'Model does not match known patterns'
       });
+      
       return isSupported;
     }
 
-    return false; // Conservative default - no tools for unknown providers
+    if (provider === 'ollama') {
+      // FIXED: Implement precise model-specific capability detection for Ollama
+      if (!model) {
+        logger.warn('🔍 Ollama tool capability: No model specified, assuming no tool support for safety');
+        return false;
+      }
+      
+      const modelLower = model.toLowerCase();
+      
+      // Known Ollama models that support function calling
+      const supportedModelFamilies = [
+        'llama3',       // llama3, llama3.1, llama3.2
+        'qwen2',        // qwen2, qwen2.5
+        'qwq',          // QwQ models
+        'mistral',      // Mistral models
+        'codellama',    // CodeLlama models
+        'hermes',       // OpenHermes models
+        'nexusraven',   // NexusRaven function calling models
+        'functionary',  // Functionary models
+      ];
+      
+      // Extract model size for additional validation
+      const sizeMatch = modelLower.match(/(\d+(?:\.\d+)?)b/);
+      const modelSize = sizeMatch ? parseFloat(sizeMatch[1]) : 0;
+      
+      // Check if model family supports tools
+      const familySupported = supportedModelFamilies.some(family => 
+        modelLower.includes(family)
+      );
+      
+      // Additional size-based heuristic: very small models may not support complex function calling
+      const sizeAppropriate = !modelSize || modelSize >= 1.0; // At least 1B parameters
+      
+      const isSupported = familySupported && sizeAppropriate;
+      
+      logger.debug('🔍 Ollama tool capability check', { 
+        model: modelLower,
+        detectedSize: modelSize || 'unknown',
+        familySupported,
+        sizeAppropriate,
+        isSupported,
+        reason: isSupported 
+          ? 'Model family supports tools and size is appropriate' 
+          : familySupported 
+            ? 'Model family supports tools but size may be too small'
+            : 'Model family does not support function calling'
+      });
+      
+      return isSupported;
+    }
+
+    // Conservative default - no tools for unknown providers
+    logger.debug('🔍 Unknown provider tool capability', { 
+      provider,
+      model: model || 'unknown',
+      isSupported: false,
+      reason: 'Unknown provider, defaulting to no tool support'
+    });
+    
+    return false;
   }
 
   /**

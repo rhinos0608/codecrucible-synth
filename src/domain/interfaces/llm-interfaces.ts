@@ -9,6 +9,13 @@ export interface LLMResponse {
   responseTime: number;
   model: string;
   provider: string;
+  // FIXED: Add tool calls support for function calling models
+  toolCalls?: Array<{
+    id: string;
+    type: string;
+    name: string;
+    arguments: string;
+  }>;
   metadata?: {
     tokens?: number;
     promptTokens?: number;

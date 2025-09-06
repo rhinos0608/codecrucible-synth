@@ -481,6 +481,38 @@ export class UnifiedResultFormatter {
     highlightErrors: boolean,
     warnings: string[]
   ): { content: string; strategy: string; warnings: string[] } | null {
+    // OpenAI-compatible API patterns (LM Studio, OpenAI, etc.)
+    if (record.choices && Array.isArray(record.choices) && record.choices.length > 0) {
+      const choice = record.choices[0] as any;
+      
+      // Handle message.content pattern
+      if (choice.message && typeof choice.message === 'object' && choice.message.content) {
+        const content = typeof choice.message.content === 'string' 
+          ? choice.message.content 
+          : String(choice.message.content);
+        return { content, strategy: 'openai-message-content', warnings };
+      }
+      
+      // Handle direct text in choice
+      if (typeof choice.text === 'string' && choice.text.trim()) {
+        return { content: choice.text, strategy: 'openai-choice-text', warnings };
+      }
+      
+      // Handle delta content (streaming responses)
+      if (choice.delta && typeof choice.delta === 'object' && choice.delta.content) {
+        const content = typeof choice.delta.content === 'string' 
+          ? choice.delta.content 
+          : String(choice.delta.content);
+        return { content, strategy: 'openai-delta-content', warnings };
+      }
+      
+      // Fallback: extract from the choice object
+      const choiceResult = this.extractContent(choice, maxDepth - 1, maxLength, highlightErrors);
+      if (choiceResult.content && choiceResult.content.trim()) {
+        return { content: choiceResult.content, strategy: 'openai-choice-fallback', warnings: [...warnings, ...choiceResult.warnings] };
+      }
+    }
+
     // REST API patterns
     if (record.data && typeof record.data === 'object') {
       const dataResult = this.extractContent(record.data, maxDepth - 1, maxLength, highlightErrors);

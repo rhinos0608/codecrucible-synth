@@ -50,9 +50,9 @@ export interface SelectionResult {
 }
 
 export interface IProviderSelectionStrategy {
-  selectProvider: (context: SelectionContext) => SelectionResult;
-  createFallbackChain: (primaryProvider: ProviderType, context: SelectionContext) => ProviderType[];
-  validateProviderForContext: (provider: ProviderType, context: SelectionContext) => boolean;
+  selectProvider(context: SelectionContext): SelectionResult;
+  createFallbackChain(primaryProvider: ProviderType, context: SelectionContext): ProviderType[];
+  validateProviderForContext(provider: ProviderType, context: SelectionContext): boolean;
 }
 
 export class ProviderSelectionStrategy extends EventEmitter implements IProviderSelectionStrategy {

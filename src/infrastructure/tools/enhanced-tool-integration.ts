@@ -5,9 +5,11 @@
 
 import { ToolIntegration, LLMFunction, ToolCall } from './tool-integration.js';
 import { DomainAwareToolOrchestrator } from './domain-aware-tool-orchestrator.js';
-import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 import { EventEmitter } from 'events';
+import { ExecutionCache, shouldCacheResult } from './execution-cache.js';
+import { PerformanceMonitor, ToolExecutionMetrics } from './performance-monitor.js';
+import { createMcpServerManager } from '../../mcp-servers/mcp-bootstrap.js';
 
 export interface EnhancedToolConfig {
   enableCaching: boolean;
@@ -18,15 +20,6 @@ export interface EnhancedToolConfig {
   timeout: number;
   retryAttempts: number;
   enableIntelligentRouting: boolean;
-}
-
-export interface ToolExecutionMetrics {
-  executionTime: number;
-  success: boolean;
-  toolName: string;
-  timestamp: number;
-  cacheHit?: boolean;
-  retryCount?: number;
 }
 
 export interface ToolExecutionContext {
@@ -41,8 +34,8 @@ export class EnhancedToolIntegration extends EventEmitter {
   private baseToolIntegration: ToolIntegration;
   private orchestrator: DomainAwareToolOrchestrator;
   private config: EnhancedToolConfig;
-  private executionCache: Map<string, { result: any; timestamp: number; ttl: number }> = new Map();
-  private metrics: ToolExecutionMetrics[] = [];
+  private executionCache: ExecutionCache = new ExecutionCache();
+  private performanceMonitor: PerformanceMonitor = new PerformanceMonitor();
   private activeExecutions: Set<string> = new Set();
   private cacheCleanupInterval?: NodeJS.Timeout;
 
@@ -65,43 +58,13 @@ export class EnhancedToolIntegration extends EventEmitter {
     if (baseToolIntegration) {
       this.baseToolIntegration = baseToolIntegration;
     } else {
-      // FIXED: Create minimal MCP manager with ALL tools enabled (not disabled)
-      const mcpConfig = {
-        filesystem: {
-          enabled: true,
-          restrictedPaths: [] as string[],
-          allowedPaths: [process.cwd()],
-        },
-        git: {
-          enabled: true, // FIXED: Enable git tools
-          autoCommitMessages: true,
-          safeModeEnabled: true,
-        },
-        terminal: {
-          enabled: true, // FIXED: Enable terminal tools
-          allowedCommands: ['ls', 'cat', 'pwd', 'echo', 'grep', 'find', 'git', 'npm', 'node'] as string[],
-          blockedCommands: ['rm', 'del', 'rmdir', 'sudo', 'su'],
-        },
-        packageManager: {
-          enabled: true, // FIXED: Enable package manager tools
-          autoInstall: false,
-          securityScan: true,
-        },
-        smithery: {
-          enabled: !!process.env.SMITHERY_API_KEY,
-          apiKey: process.env.SMITHERY_API_KEY,
-          enabledServers: [] as string[],
-          autoDiscovery: true,
-        },
-      };
-      const mcpManager = new MCPServerManager(mcpConfig);
+      const mcpManager = createMcpServerManager();
       this.baseToolIntegration = new ToolIntegration(mcpManager, rustBackend);
-      
       logger.warn('⚠️ Created fallback MCP manager in EnhancedToolIntegration - prefer passing baseToolIntegration');
     }
     this.orchestrator = new DomainAwareToolOrchestrator();
 
-    this.setupCacheCleanup();
+    this.cacheCleanupInterval = this.executionCache.startCleanup();
   }
 
   async executeToolCall(
@@ -121,9 +84,10 @@ export class EnhancedToolIntegration extends EventEmitter {
 
       // Check cache first
       if (this.config.enableCaching) {
-        const cached = this.getCachedResult(toolCall);
+        const cacheKey = this.generateCacheKey(toolCall);
+        const cached = this.executionCache.getValid(cacheKey);
         if (cached) {
-          this.recordMetrics(toolCall.function.name, startTime, true, true);
+          this.performanceMonitor.record(toolCall.function.name, startTime, true, true);
           return cached;
         }
       }
@@ -147,14 +111,15 @@ export class EnhancedToolIntegration extends EventEmitter {
       }
 
       // Cache result if caching is enabled
-      if (this.config.enableCaching && this.shouldCacheResult(result)) {
-        this.cacheResult(toolCall, result);
+      if (this.config.enableCaching && shouldCacheResult(result)) {
+        const cacheKey = this.generateCacheKey(toolCall);
+        this.executionCache.setResult(cacheKey, result, this.config.cacheTTL);
       }
 
-      this.recordMetrics(toolCall.function.name, startTime, true, false);
+      this.performanceMonitor.record(toolCall.function.name, startTime, true, false);
       return result;
     } catch (error) {
-      this.recordMetrics(toolCall.function.name, startTime, false);
+      this.performanceMonitor.record(toolCall.function.name, startTime, false);
       logger.error(`Enhanced tool execution failed for ${toolCall.function.name}:`, error);
       throw error;
     } finally {
@@ -199,7 +164,7 @@ export class EnhancedToolIntegration extends EventEmitter {
   }
 
   getExecutionMetrics(): ToolExecutionMetrics[] {
-    return [...this.metrics];
+    return this.performanceMonitor.getMetrics();
   }
 
   getPerformanceStats(): any {
@@ -207,7 +172,8 @@ export class EnhancedToolIntegration extends EventEmitter {
       return { enabled: false };
     }
 
-    const recentMetrics = this.metrics.filter(
+    const allMetrics = this.performanceMonitor.getMetrics();
+    const recentMetrics = allMetrics.filter(
       m => Date.now() - m.timestamp < 3600000 // Last hour
     );
 
@@ -279,86 +245,8 @@ export class EnhancedToolIntegration extends EventEmitter {
     return `${toolCall.function.name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private getCachedResult(toolCall: ToolCall): any | null {
-    const cacheKey = this.generateCacheKey(toolCall);
-    const cached = this.executionCache.get(cacheKey);
-
-    if (cached && Date.now() - cached.timestamp < cached.ttl) {
-      return cached.result;
-    }
-
-    if (cached) {
-      this.executionCache.delete(cacheKey);
-    }
-
-    return null;
-  }
-
-  private cacheResult(toolCall: ToolCall, result: any): void {
-    if (this.executionCache.size >= this.config.cacheSize) {
-      // Remove oldest entry
-      const oldestKey = this.executionCache.keys().next().value;
-      if (oldestKey !== undefined) {
-        this.executionCache.delete(oldestKey);
-      }
-    }
-
-    const cacheKey = this.generateCacheKey(toolCall);
-    this.executionCache.set(cacheKey, {
-      result,
-      timestamp: Date.now(),
-      ttl: this.config.cacheTTL,
-    });
-  }
-
   private generateCacheKey(toolCall: ToolCall): string {
     return `${toolCall.function.name}_${this.hashString(toolCall.function.arguments)}`;
-  }
-
-  private shouldCacheResult(result: any): boolean {
-    // Don't cache error results or very large results
-    if (result instanceof Error || JSON.stringify(result).length > 100000) {
-      return false;
-    }
-    return true;
-  }
-
-  private recordMetrics(
-    toolName: string,
-    startTime: number,
-    success: boolean,
-    cacheHit: boolean = false
-  ): void {
-    if (!this.config.enablePerformanceMonitoring) return;
-
-    const metric: ToolExecutionMetrics = {
-      toolName,
-      executionTime: Date.now() - startTime,
-      success,
-      timestamp: Date.now(),
-      cacheHit,
-    };
-
-    this.metrics.push(metric);
-
-    // Keep only last 10000 metrics
-    if (this.metrics.length > 10000) {
-      this.metrics.shift();
-    }
-
-    this.emit('toolExecuted', metric);
-  }
-
-  private setupCacheCleanup(): void {
-    // Clean up expired cache entries every 10 minutes
-    this.cacheCleanupInterval = setInterval(() => {
-      const now = Date.now();
-      for (const [key, cached] of this.executionCache.entries()) {
-        if (now - cached.timestamp > cached.ttl) {
-          this.executionCache.delete(key);
-        }
-      }
-    }, 600000);
   }
 
   dispose(): void {

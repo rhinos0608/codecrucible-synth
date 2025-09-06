@@ -233,7 +233,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
         resultText = result.message.content;
       } else {
         // If no standard content field found, try to stringify but log for debugging
-        console.error('Unexpected result format in generate-code-use-case:', result);
+        logger.error('Unexpected result format in generate-code-use-case', { result });
         resultText = JSON.stringify(result, null, 2);
       }
     } else {
@@ -364,8 +364,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
         console.log(`🐛 [DEBUG] Successfully wrote file: ${file.path}`);
         logger.info(`Generated file saved: ${file.path}`);
       } catch (error) {
-        console.error(`🐛 [DEBUG] Error saving file ${file.path}:`, error);
-        logger.error(`Failed to save file ${file.path}:`, error);
+        logger.error(`Failed to save file ${file.path}`, { error, filePath: file.path });
         throw new Error(`Failed to save file ${file.path}: ${error}`);
       }
     }

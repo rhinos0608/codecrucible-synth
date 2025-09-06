@@ -30,6 +30,22 @@ export async function executeWithStreaming(
     process.stdout.write('\n');
   }
 
+  // CRITICAL DEBUG: Log the complete response structure to understand tool calls preservation
+  logger.info('🔍 DEBUGGING: Streaming handler received response:', {
+    responseKeys: Object.keys(response || {}),
+    hasToolCalls: !!response.toolCalls,
+    toolCallsLength: response.toolCalls?.length || 0,
+    responseContent: response.content || 'NO CONTENT',
+    responseContentLength: (response.content || '').length,
+    displayedContentLength: displayedContent.length,
+  });
+
+  if (response.toolCalls && response.toolCalls.length > 0) {
+    logger.info('🔧 DEBUGGING: Tool calls detected in streaming response:', {
+      toolCalls: response.toolCalls.map(tc => ({ id: tc.id, functionName: tc.function?.name }))
+    });
+  }
+
   logger.info(
     `✅ Streaming response completed: ${tokenCount} tokens, ${displayedContent.length} chars total, final content length: ${response.content?.length || 0}`
   );

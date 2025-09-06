@@ -32,7 +32,7 @@ export class OllamaAdapter implements ProviderAdapter {
         content =
           providerResponse.content ||
           providerResponse.response ||
-          providerResponse.message?.content ||
+          providerResponse.message ||
           providerResponse.output ||
           providerResponse.text ||
           '';
@@ -71,7 +71,14 @@ export class OllamaAdapter implements ProviderAdapter {
         },
         responseTime: providerResponse?.total_duration || undefined,
         finishReason: providerResponse?.done ? 'stop' : undefined,
-        toolCalls: providerResponse?.toolCalls,
+        toolCalls: providerResponse?.toolCalls ? providerResponse.toolCalls.map(tc => ({
+          id: tc.id,
+          type: tc.type as 'function',
+          function: {
+            name: tc.name,
+            arguments: tc.arguments,
+          },
+        })) : undefined,
       };
     } catch (error) {
       logger.error('OllamaAdapter request failed:', error);

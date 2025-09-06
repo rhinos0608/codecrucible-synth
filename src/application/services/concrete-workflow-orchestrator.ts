@@ -80,6 +80,25 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     super();
     // Register default provider capabilities (now configurable)
     providerCapabilityRegistry.register('default', providerCapabilities);
+    
+    // CRITICAL FIX: Register all supported providers with their capabilities
+    // This fixes the tool execution issue where providers weren't recognized for tool calling
+    providerCapabilityRegistry.register('ollama', { 
+      streaming: true, 
+      toolCalling: true  // Ollama supports tool calling
+    });
+    providerCapabilityRegistry.register('lm-studio', { 
+      streaming: true, 
+      toolCalling: true  // LM Studio supports tool calling
+    });
+    providerCapabilityRegistry.register('claude', { 
+      streaming: false,  // Claude API typically doesn't support streaming in our implementation
+      toolCalling: true  // Claude strongly supports tool calling
+    });
+    providerCapabilityRegistry.register('huggingface', { 
+      streaming: false,  // HuggingFace typically doesn't support streaming
+      toolCalling: false // Most HuggingFace models don't support tool calling
+    });
   }
 
   /**
@@ -92,7 +111,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     if (this.requestExecutionManager && this.modelClient) {
       // Use RequestExecutionManager for advanced execution strategies
       logger.debug('Routing model request through RequestExecutionManager');
-      return await this.requestExecutionManager.processRequest(request, context);
+      return await this.requestExecutionManager.processRequest(request, context as any);
     } else if (this.modelClient) {
       // Fallback to direct ModelClient
       logger.debug('Using direct ModelClient for request');
@@ -352,10 +371,11 @@ User Request: ${userPrompt}`;
     enhancedPrompt: string;
   }> {
     const { payload } = request;
-    const originalPrompt = payload.input || payload.prompt;
+    const payloadAny = payload as any; // Type assertion to access dynamic properties
+    const originalPrompt = payloadAny.input || payloadAny.prompt;
 
     // Get MCP tools for AI model with smart selection (unless disabled)
-    const mcpTools = payload.options?.useTools !== false
+    const mcpTools = payloadAny.options?.useTools !== false
       ? await this.getMCPToolsForModel(originalPrompt)
       : [];
 
@@ -369,7 +389,7 @@ User Request: ${userPrompt}`;
       );
     }
 
-    if (payload.options?.useTools === false) {
+    if (payloadAny.options?.useTools === false) {
       logger.info('🚫 Tools disabled for simple question to enable pure streaming');
     }
 
@@ -385,20 +405,21 @@ User Request: ${userPrompt}`;
     mcpTools: ModelTool[]
   ): ModelRequest {
     const { payload } = request;
+    const payloadAny = payload as any; // Type assertion to access dynamic properties
 
     return {
       id: request.id,
       prompt: enhancedPrompt,
-      model: payload.options?.model,
+      model: payloadAny.options?.model,
       // Let ModelClient use its properly configured defaultProvider from model selection
-      temperature: payload.options?.temperature,
-      maxTokens: payload.options?.maxTokens,
-      stream: payload.options?.stream ?? true,
+      temperature: payloadAny.options?.temperature,
+      maxTokens: payloadAny.options?.maxTokens,
+      stream: payloadAny.options?.stream ?? true,
       tools: mcpTools,
       context: request.context,
       // Always include num_ctx to override Ollama's 4096 default
       num_ctx: parseInt(process.env.OLLAMA_NUM_CTX || '131072'),
-      options: payload.options,
+      options: payloadAny.options,
     };
   }
 
@@ -456,7 +477,8 @@ User Request: ${userPrompt}`;
   // Tool execution handler
   private async handleToolExecution(request: WorkflowRequest): Promise<any> {
     const { payload } = request;
-    const { toolName, args } = payload;
+    const payloadAny = payload as any; // Type assertion to access dynamic properties
+    const { toolName, args } = payloadAny;
 
     if (this.mcpManager) {
       return await this.mcpManager.executeTool(toolName, args, request.context);
@@ -471,17 +493,18 @@ User Request: ${userPrompt}`;
 
   private async handleModelRequest(request: WorkflowRequest): Promise<any> {
     const { payload } = request;
+    const payloadAny = payload as any; // Type assertion to access dynamic properties
 
     // Convert WorkflowPayload to ModelRequest format
     const modelRequest: any = {
-      prompt: payload.prompt || payload.input || payload.messages?.[0]?.content || '',
-      model: payload.model,
-      temperature: payload.temperature,
-      maxTokens: payload.maxTokens,
-      stream: payload.stream,
-      provider: payload.provider,
-      context: payload.context,
-      ...payload // Spread any additional properties
+      prompt: payloadAny.prompt || payloadAny.input || payloadAny.messages?.[0]?.content || '',
+      model: payloadAny.model,
+      temperature: payloadAny.temperature,
+      maxTokens: payloadAny.maxTokens,
+      stream: payloadAny.stream,
+      provider: payloadAny.provider,
+      context: payloadAny.context,
+      ...payloadAny // Spread any additional properties
     };
 
     return await this.processModelRequest(modelRequest);
@@ -489,6 +512,7 @@ User Request: ${userPrompt}`;
 
   private async handleAnalysisRequest(request: WorkflowRequest): Promise<any> {
     const { payload } = request;
+    const payloadAny = payload as any; // Type assertion to access dynamic properties
 
     // DEBUG: Check if modelClient is available
     if (!this.modelClient) {
@@ -501,14 +525,14 @@ User Request: ${userPrompt}`;
 
     // Construct analysis prompt
     let analysisPrompt: string;
-    if (payload.filePath) {
-      analysisPrompt = payload.prompt || `Analyze the following file: ${payload.filePath}`;
-    } else if (payload.content) {
-      analysisPrompt = payload.prompt || `Analyze the following content: ${payload.content}`;
-    } else if (payload.input) {
-      analysisPrompt = payload.prompt || payload.input;
+    if (payloadAny.filePath) {
+      analysisPrompt = payloadAny.prompt || `Analyze the following file: ${payloadAny.filePath}`;
+    } else if (payloadAny.content) {
+      analysisPrompt = payloadAny.prompt || `Analyze the following content: ${payloadAny.content}`;
+    } else if (payloadAny.input) {
+      analysisPrompt = payloadAny.prompt || payloadAny.input;
     } else {
-      analysisPrompt = payload.prompt || 'Please provide analysis.';
+      analysisPrompt = payloadAny.prompt || 'Please provide analysis.';
     }
 
     logger.info(
@@ -524,9 +548,9 @@ User Request: ${userPrompt}`;
     const modelRequest: ModelRequest = {
       id: request.id,
       prompt: enhancedAnalysisPrompt,
-      model: payload.options?.model,
-      temperature: payload.options?.temperature || 0.3, // Lower temperature for analysis
-      maxTokens: payload.options?.maxTokens || 32768, // Increased from 2000 for comprehensive responses
+      model: payloadAny.options?.model,
+      temperature: payloadAny.options?.temperature || 0.3, // Lower temperature for analysis
+      maxTokens: payloadAny.options?.maxTokens || 32768, // Increased from 2000 for comprehensive responses
       tools: mcpTools, // Include MCP tools for analysis too
       context: request.context,
     };

@@ -20,6 +20,7 @@ import { CLIContext } from '../application/cli/cli-types.js';
 import { createLogger } from '../infrastructure/logging/logger-adapter.js';
 import chalk from 'chalk';
 
+// Create logger instance for server mode
 const logger = createLogger('ServerMode');
 
 export interface ServerOptions {
@@ -54,6 +55,7 @@ export class ServerMode implements ServerModeInterface {
     context: Readonly<CLIContext>,
     options: Readonly<ServerOptions>
   ): Promise<void> {
+    logger.warn('ServerMode is deprecated, use UnifiedServerSystem instead');
     console.warn('⚠️ ServerMode is deprecated. Use UnifiedServerSystem instead.');
 
     // Validate context initialization (removed unnecessary checks)
@@ -117,18 +119,23 @@ export class ServerMode implements ServerModeInterface {
       // Create a logger for the server system
       const serverLogger = {
         info: (msg: string): void => {
+          logger.info(msg);
           console.log(`[ServerSystem] ${msg}`);
         },
         error: (msg: string, error?: unknown): void => {
+          logger.error(msg, { error });
           console.error(`[ServerSystem] ${msg}`, error);
         },
         warn: (msg: string): void => {
+          logger.warn(msg);
           console.warn(`[ServerSystem] ${msg}`);
         },
         debug: (msg: string): void => {
+          logger.debug(msg);
           console.debug(`[ServerSystem] ${msg}`);
         },
         trace: (msg: string): void => {
+          logger.debug(msg);
           console.trace(`[ServerSystem] ${msg}`);
         },
       };
@@ -183,7 +190,8 @@ export class ServerMode implements ServerModeInterface {
 
       // Setup graceful shutdown
       process.on('SIGINT', async () => {
-        console.log(chalk.yellow('\n🛑 Shutting down server...'));
+        logger.info('Server shutdown initiated via SIGINT');
+      console.log(chalk.yellow('\n🛑 Shutting down server...'));
         if (this.unifiedServer) {
           await this.unifiedServer.stopAllServers();
         }
@@ -191,6 +199,7 @@ export class ServerMode implements ServerModeInterface {
       });
 
       process.on('SIGTERM', async () => {
+        logger.info('Server shutdown initiated via SIGTERM');
         console.log(chalk.yellow('\n🛑 Received SIGTERM, shutting down server...'));
         if (this.unifiedServer) {
           await this.unifiedServer.stopAllServers();
@@ -198,6 +207,7 @@ export class ServerMode implements ServerModeInterface {
         process.exit(0);
       });
     } catch (error) {
+      logger.error('Failed to start server mode', { error });
       console.error(chalk.red('❌ Failed to start server mode:'), error);
       throw error;
     }

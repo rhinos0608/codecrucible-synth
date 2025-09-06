@@ -345,7 +345,7 @@ export class HybridLLMRouter extends EventEmitter {
         reasoning: `Forced to ${routing.defaultProvider} by configuration`,
         fallbackStrategy: routing.defaultProvider === 'lm-studio' ? 'ollama' : 'lm-studio',
         estimatedResponseTime: this.estimateResponseTime(
-          routing.defaultProvider as any,
+          routing.defaultProvider as 'lm-studio' | 'ollama',
           complexity
         ),
       };

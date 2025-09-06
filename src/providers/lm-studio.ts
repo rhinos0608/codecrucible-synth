@@ -9,6 +9,68 @@ export interface LMStudioConfig {
   apiKey?: string;
 }
 
+export interface LLMOptions {
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  topK?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  stop?: string | string[];
+  stream?: boolean;
+  maxSteps?: number;
+  [key: string]: unknown;
+}
+
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant' | 'function';
+  content: string;
+  name?: string;
+  function_call?: {
+    name: string;
+    arguments: string;
+  };
+}
+
+export interface LLMTool {
+  type: string;
+  function: {
+    name: string;
+    description?: string;
+    parameters?: {
+      type: string;
+      properties?: Record<string, unknown>;
+      required?: string[];
+    };
+  };
+}
+
+export interface LLMRequest {
+  prompt?: string;
+  messages?: ChatMessage[];
+  options?: LLMOptions;
+}
+
+export interface LLMResponse {
+  content: string;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+  model?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgenticResponse {
+  result: unknown;
+  steps: Array<{
+    action: string;
+    result: unknown;
+  }>;
+  metadata?: Record<string, unknown>;
+}
+
 export class LMStudioProvider {
   private client: LMStudioClient;
   private config: LMStudioConfig;
@@ -76,7 +138,7 @@ export class LMStudioProvider {
     }
   }
 
-  async generateText(prompt: string, options: any = {}): Promise<string> {
+  async generateText(prompt: string, options: LLMOptions = {}): Promise<string> {
     try {
       logger.debug('LMStudioProvider generateText called', {
         promptLength: prompt.length,
@@ -117,7 +179,7 @@ export class LMStudioProvider {
     }
   }
 
-  async generateTextStreaming(prompt: string, options: any = {}): Promise<AsyncIterable<string>> {
+  async generateTextStreaming(prompt: string, options: LLMOptions = {}): Promise<AsyncIterable<string>> {
     try {
       logger.debug('LMStudioProvider generateTextStreaming called', {
         promptLength: prompt.length,
@@ -157,7 +219,7 @@ export class LMStudioProvider {
     }
   }
 
-  async chat(messages: any[], options: any = {}): Promise<string> {
+  async chat(messages: ChatMessage[], options: LLMOptions = {}): Promise<string> {
     try {
       logger.debug('LMStudioProvider chat called', {
         messageCount: messages.length,
@@ -196,7 +258,7 @@ export class LMStudioProvider {
   }
 
   // Advanced LM Studio feature - agentic workflows
-  async act(task: string, tools: any[] = [], options: any = {}): Promise<any> {
+  async act(task: string, tools: LLMTool[] = [], options: LLMOptions = {}): Promise<AgenticResponse> {
     try {
       logger.debug('LMStudioProvider act called', {
         taskLength: task.length,
@@ -225,7 +287,11 @@ export class LMStudioProvider {
         responseType: typeof response,
       });
 
-      return response;
+      return {
+        result: response,
+        steps: [], // LM Studio doesn't provide step details in current version
+        metadata: { model: modelToUse, task }
+      };
     } catch (error) {
       logger.error('LMStudioProvider act failed', {
         error: getErrorMessage(error),
@@ -318,15 +384,25 @@ export class LMStudioProvider {
   }
 
   // Legacy compatibility methods
-  async processRequest(request: any): Promise<any> {
+  async processRequest(request: LLMRequest): Promise<LLMResponse | string> {
     logger.debug('LMStudioProvider processRequest called (legacy compatibility)');
 
     if (request.messages) {
-      return this.chat(request.messages, request.options || {});
+      const content = await this.chat(request.messages, request.options || {});
+      return {
+        content,
+        model: this.model,
+        metadata: { requestType: 'chat' }
+      };
     } else if (request.prompt) {
-      return this.generateText(request.prompt, request.options || {});
+      const content = await this.generateText(request.prompt, request.options || {});
+      return {
+        content,
+        model: this.model,
+        metadata: { requestType: 'completion' }
+      };
     } else {
-      throw new Error('Invalid request format');
+      throw new Error('Invalid request format: must include either messages or prompt');
     }
   }
 

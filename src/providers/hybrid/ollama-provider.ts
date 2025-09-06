@@ -12,6 +12,141 @@ import {
 } from '../../domain/interfaces/llm-interfaces.js';
 import { generateSystemPrompt, generateContextualSystemPrompt } from '../../domain/prompts/system-prompt.js';
 
+// Ollama-specific interfaces to replace unsafe 'any' types
+export interface OllamaOptions {
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  num_ctx?: number;
+  num_predict?: number;
+  repeat_penalty?: number;
+  seed?: number;
+  stop?: string | string[];
+  stream?: boolean;
+  tools?: OllamaTool[];
+  format?: 'json';
+  raw?: boolean;
+  [key: string]: unknown; // Allow additional options
+}
+
+export interface OllamaRequest {
+  model?: string;
+  prompt?: string;
+  messages?: OllamaMessage[];
+  options?: OllamaOptions;
+  tools?: OllamaTool[];
+  format?: 'json';
+  stream?: boolean;
+  id?: string;
+  onStreamingToken?: (token: string, metadata?: any) => void;
+  taskType?: string;
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  num_ctx?: number;
+  timeout?: number;
+}
+
+export interface OllamaMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string;
+  images?: string[];
+  tool_calls?: OllamaToolCall[];
+}
+
+export interface OllamaToolCall {
+  id?: string;
+  type?: 'function';
+  function: {
+    name: string;
+    arguments: string | Record<string, unknown>;
+  };
+}
+
+export interface OllamaTool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters?: {
+      type: string;
+      properties: Record<string, unknown>;
+      required?: string[];
+    };
+  };
+  // Legacy properties for backward compatibility  
+  name?: string;
+  description?: string;
+  inputSchema?: any;
+  parameters?: any;
+}
+
+export interface OllamaResponse {
+  model: string;
+  created_at: string;
+  message?: {
+    role: string;
+    content: string;
+    tool_calls?: OllamaToolCall[];
+  };
+  response?: string;
+  done: boolean;
+  context?: number[];
+  total_duration?: number;
+  load_duration?: number;
+  prompt_eval_count?: number;
+  prompt_eval_duration?: number;
+  eval_count?: number;
+  eval_duration?: number;
+}
+
+export interface OllamaStreamingMetadata {
+  model?: string;
+  totalDuration?: number;
+  loadDuration?: number;
+  promptEvalCount?: number;
+  promptEvalDuration?: number;
+  evalCount?: number;
+  evalDuration?: number;
+  context?: number[];
+  [key: string]: unknown;
+}
+
+export interface ParsedToolCall {
+  id: string;
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+export interface FunctionSpec {
+  name: string;
+  description: string;
+  parameters?: {
+    type: string;
+    properties: Record<string, unknown>;
+    required?: string[];
+  };
+}
+
+export interface OllamaModel {
+  name: string;
+  modified_at?: string;
+  size?: number;
+  digest?: string;
+  details?: {
+    format?: string;
+    family?: string;
+    parameter_size?: string;
+    quantization_level?: string;
+  };
+}
+
+export interface OllamaModelList {
+  models: OllamaModel[];
+}
+
 export interface OllamaConfig {
   endpoint: string;
   defaultModel: string;
@@ -141,7 +276,7 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Generate code using Ollama
    */
-  async generateCode(prompt: string, options: any = {}): Promise<LLMResponse> {
+  async generateCode(prompt: string, options: OllamaOptions = {}): Promise<LLMResponse> {
     this.checkRateLimit();
     this.validateInputLength(prompt);
     
@@ -160,10 +295,11 @@ export class OllamaProvider implements LLMProvider {
       }
 
       // Calculate confidence based on response quality indicators
-      const confidence = this.calculateConfidence(response.content, responseTime, options.taskType);
+      const content = response.message?.content || response.response || '';
+      const confidence = this.calculateConfidence(content, responseTime, options.taskType || 'default');
 
       return {
-        content: response.content,
+        content: content,
         confidence,
         responseTime,
         model: response.model || this.config.defaultModel,
@@ -188,7 +324,7 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Make HTTP request to Ollama API with full tool and context support
    */
-  private async makeRequest(prompt: string, options: any): Promise<any> {
+  private async makeRequest(prompt: string, options: OllamaOptions): Promise<OllamaResponse> {
     // If tools are provided, delegate to the request method for function calling
     if (options.tools && options.tools.length > 0) {
       logger.debug('makeRequest delegating to request method for tool support', {
@@ -632,8 +768,8 @@ export class OllamaProvider implements LLMProvider {
         throw new Error(`Failed to fetch models: ${response.statusText}`);
       }
 
-      const data = await response.json();
-      return data.models?.map((model: any) => model.name) || [];
+      const data = await response.json() as OllamaModelList;
+      return data.models?.map((model: OllamaModel) => model.name) || [];
     } catch (error) {
       logger.error('Failed to get available Ollama models:', error);
       return [];
@@ -644,7 +780,7 @@ export class OllamaProvider implements LLMProvider {
    * CRITICAL FIX: Implement IModelProvider interface with proper tool support
    * This method is called by UnifiedModelClient and must handle function calling
    */
-  async request(request: any): Promise<any> {
+  async request(request: OllamaRequest): Promise<LLMResponse> {
     // Check rate limiting and validate input before processing
     this.checkRateLimit();
     if (request.prompt) {
@@ -786,8 +922,8 @@ export class OllamaProvider implements LLMProvider {
           const decoder = new TextDecoder();
           let buffer = '';
           let accumulatedContent = '';
-          let toolCalls: any[] = [];
-          let lastMetadata: any = {};
+          let toolCalls: ParsedToolCall[] = [];
+          let lastMetadata: OllamaStreamingMetadata = {};
           
           while (true) {
             const { done, value } = await reader.read();
@@ -923,7 +1059,7 @@ export class OllamaProvider implements LLMProvider {
         // First, try structured tool_calls from result.message.tool_calls
         if (result.message?.tool_calls && Array.isArray(result.message.tool_calls) && result.message.tool_calls.length > 0) {
           logger.debug('Using structured tool_calls from Ollama response');
-          extractedToolCalls = result.message.tool_calls.map((toolCall: any) => ({
+          extractedToolCalls = result.message.tool_calls.map((toolCall: OllamaToolCall) => ({
             id: toolCall.function?.name || `tool_${Date.now()}`,
             function: {
               name: toolCall.function?.name,
@@ -939,7 +1075,7 @@ export class OllamaProvider implements LLMProvider {
           logger.debug('No structured tool_calls found, trying to parse from content field');
           const contentToolCalls = this.parseToolCallsFromContent(finalContent);
           if (contentToolCalls.length > 0) {
-            extractedToolCalls = contentToolCalls.map((toolCall: any) => ({
+            extractedToolCalls = contentToolCalls.map((toolCall: ParsedToolCall) => ({
               id: toolCall.function?.name || `tool_${Date.now()}`,
               function: {
                 name: toolCall.function?.name,
@@ -951,9 +1087,14 @@ export class OllamaProvider implements LLMProvider {
           }
         }
 
+        const responseTime = Date.now() - startTime;
+        const confidence = this.calculateConfidence(finalContent || '', responseTime, request.taskType || 'default');
+        
         return {
-          id: request.id,
+          id: request.id || `ollama_${Date.now()}`,
           content: finalContent || '',
+          confidence,
+          responseTime,
           toolCalls: extractedToolCalls,
           usage: {
             promptTokens: result.prompt_eval_count || 0,
@@ -977,7 +1118,7 @@ export class OllamaProvider implements LLMProvider {
    * CRITICAL FIX: Parse tool calls from content field
    * Ollama often returns tool calls as JSON text in content instead of structured tool_calls
    */
-  private parseToolCallsFromContent(content: string): any[] {
+  private parseToolCallsFromContent(content: string): ParsedToolCall[] {
     if (!content || typeof content !== 'string') {
       return [];
     }
@@ -1011,6 +1152,7 @@ export class OllamaProvider implements LLMProvider {
               const parsed = JSON.parse(match);
               if (parsed.name) {
                 toolCalls.push({
+                  id: `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                   function: {
                     name: parsed.name,
                     arguments: parsed.arguments || parsed.parameters || {}
@@ -1035,7 +1177,7 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Validate and normalize tool calls to prevent double-encoded JSON
    */
-  private validateAndNormalizeToolCalls(toolCalls: any[]): any[] {
+  private validateAndNormalizeToolCalls(toolCalls: ParsedToolCall[]): ParsedToolCall[] {
     if (!Array.isArray(toolCalls)) {
       return toolCalls; // Return as-is if not an array (could be undefined/null)
     }
@@ -1088,20 +1230,20 @@ export class OllamaProvider implements LLMProvider {
    * Validate and transform tools to prevent runtime errors
    * Fixes the issue where invalid tool shapes can produce runtime errors
    */
-  private validateAndTransformTools(tools: any[]): any[] {
+  private validateAndTransformTools(tools: OllamaTool[]): OllamaTool[] {
     if (!Array.isArray(tools)) {
       logger.warn('Tools parameter is not an array, returning empty array');
       return [];
     }
 
-    const validTools: any[] = [];
+    const validTools: OllamaTool[] = [];
 
     for (let i = 0; i < tools.length; i++) {
       const tool = tools[i];
 
       try {
         // Validate tool structure - handle both ModelTool and ToolInfo formats
-        let transformedTool: any;
+        let transformedTool: OllamaTool;
 
         if (tool && typeof tool === 'object') {
           // Handle ModelTool format (with nested function object)
@@ -1152,7 +1294,7 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Check if a function specification is valid
    */
-  private isValidFunctionSpec(func: any): boolean {
+  private isValidFunctionSpec(func: FunctionSpec): boolean {
     return (
       func &&
       typeof func === 'object' &&
@@ -1166,7 +1308,7 @@ export class OllamaProvider implements LLMProvider {
    * Sanitize options to only include Ollama-supported parameters
    * Prevents CLI-specific options from being sent to Ollama API
    */
-  private sanitizeOllamaOptions(options: any): any {
+  private sanitizeOllamaOptions(options: OllamaOptions): OllamaOptions {
     const validOllamaOptions = new Set([
       'temperature',
       'top_p', 
@@ -1194,7 +1336,7 @@ export class OllamaProvider implements LLMProvider {
       'num_batch',
     ]);
 
-    const sanitized: any = {};
+    const sanitized: OllamaOptions = {};
     for (const [key, value] of Object.entries(options)) {
       if (validOllamaOptions.has(key)) {
         sanitized[key] = value;
@@ -1350,8 +1492,8 @@ export class OllamaProvider implements LLMProvider {
         // Check if this looks like streaming response (multiple JSON objects)
         if (lines.length > 1) {
           let accumulatedContent = '';
-          let toolCalls: any[] = [];
-          let lastMetadata: any = {};
+          let toolCalls: ParsedToolCall[] = [];
+          let lastMetadata: OllamaStreamingMetadata = {};
           
           for (const line of lines) {
             try {
@@ -1600,7 +1742,7 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Stream method for OllamaAdapter compatibility
    */
-  async *stream(request: any): AsyncIterable<any> {
+  async *stream(request: OllamaRequest): AsyncIterable<string> {
     this.checkRateLimit();
     if (request.prompt) {
       this.validateInputLength(request.prompt);

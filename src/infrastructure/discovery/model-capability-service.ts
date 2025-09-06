@@ -102,7 +102,8 @@ export class ModelCapabilityService {
       return capabilities;
       
     } catch (error) {
-      logger.warn(`Failed to detect capabilities for ${modelName}, using inference:`, error);
+      // Use debug instead of warn since falling back to inference is expected behavior
+      logger.debug(`Capability detection failed for ${modelName}, using inference fallback:`, error);
       capabilities = this.inferCapabilitiesFromName(modelName);
       this.capabilityCache.set(cacheKey, capabilities);
       return capabilities;

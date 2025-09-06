@@ -227,18 +227,36 @@ export class ModelClient extends EventEmitter implements IModelClient {
     context?: any
   ): Promise<ModelResponse> {
     const tokens: StreamToken[] = [];
-    for await (const token of this.stream(request)) {
-      tokens.push(token);
-      onToken(token);
+    
+    // CRITICAL FIX: We need to get the full response including tool calls
+    // First, make a non-streaming request to get the complete response with tool calls
+    const fullResponse = await this.request({ ...request, stream: false });
+    
+    // Then stream the tokens for display
+    if (request.stream && fullResponse.content) {
+      // If there's content to stream, simulate streaming for UX
+      const chunks = fullResponse.content.split(' ');
+      for (let i = 0; i < chunks.length; i++) {
+        const token: StreamToken = {
+          content: chunks[i] + (i < chunks.length - 1 ? ' ' : ''),
+          isComplete: i === chunks.length - 1,
+          index: i,
+          timestamp: Date.now(),
+        };
+        tokens.push(token);
+        onToken(token);
+        // Add small delay to simulate streaming
+        if (i < chunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      }
     }
 
-    // Reconstruct response from tokens
-    const content = tokens.map(t => t.content).join('');
+    // Return the full response (including tool calls) but with any streamed content updates
+    const streamedContent = tokens.map(t => t.content).join('');
     return {
-      id: `stream_${Date.now()}`,
-      content,
-      model: request.model || 'unknown',
-      provider: 'stream',
+      ...fullResponse, // Preserve tool calls, usage, etc.
+      content: streamedContent || fullResponse.content, // Use streamed content if available
     };
   }
 

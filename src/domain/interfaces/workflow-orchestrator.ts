@@ -14,7 +14,7 @@ import { IUnifiedConfigurationManager } from '../services/unified-configuration-
 import {
   ToolExecutionArgs,
   ToolExecutionResult,
-} from '../../infrastructure/types/tool-execution-types.js';
+} from './tool-execution.js';
 
 // Specific workflow payload types
 export interface PromptPayload {

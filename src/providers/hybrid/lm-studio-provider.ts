@@ -19,6 +19,100 @@ export interface LMStudioConfig {
   maxRetries: number;
 }
 
+// LM Studio-specific interfaces to replace unsafe 'any' types
+export interface LMStudioOptions {
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  max_tokens?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  stop?: string | string[];
+  stream?: boolean;
+  tools?: LMStudioTool[];
+  tool_choice?: string | { type: string; function?: { name: string; } };
+  [key: string]: unknown;
+}
+
+export interface LMStudioRequest {
+  model?: string;
+  messages?: LMStudioMessage[];
+  prompt?: string;
+  options?: LMStudioOptions;
+  tools?: LMStudioTool[];
+  tool_choice?: string | { type: string; function?: { name: string; } };
+  stream?: boolean;
+  temperature?: number;
+  max_tokens?: number;
+  maxTokens?: number;
+  taskType?: string;
+  timeout?: number;
+}
+
+export interface LMStudioMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string;
+  name?: string;
+  tool_calls?: LMStudioToolCall[];
+}
+
+export interface LMStudioToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+export interface LMStudioTool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters?: {
+      type: string;
+      properties: Record<string, unknown>;
+      required?: string[];
+    };
+  };
+}
+
+export interface LMStudioResponse {
+  id?: string;
+  object?: string;
+  created?: number;
+  model?: string;
+  choices: Array<{
+    index: number;
+    message: {
+      role: string;
+      content: string;
+      tool_calls?: LMStudioToolCall[];
+    };
+    finish_reason?: string;
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export interface LMStudioPayload {
+  model: string;
+  messages: LMStudioMessage[];
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  stop?: string | string[];
+  stream?: boolean;
+  tools?: LMStudioTool[];
+  tool_choice?: string | { type: string; function?: { name: string; } };
+}
+
 export class LMStudioProvider implements LLMProvider {
   readonly name = 'lm-studio';
   readonly endpoint: string;
@@ -58,7 +152,7 @@ export class LMStudioProvider implements LLMProvider {
   /**
    * Generate code using LM Studio
    */
-  async generateCode(prompt: string, options: any = {}): Promise<LLMResponse> {
+  async generateCode(prompt: string, options: LMStudioOptions = {}): Promise<LLMResponse> {
     const startTime = Date.now();
     this.currentLoad++;
     this.requestCount++;
@@ -73,16 +167,25 @@ export class LMStudioProvider implements LLMProvider {
         this.responseTimeHistory = this.responseTimeHistory.slice(-50);
       }
 
+      // Extract content from LM Studio response structure
+      const content = response.choices?.[0]?.message?.content || '';
+      const toolCalls = response.choices?.[0]?.message?.tool_calls;
+
       // Calculate confidence based on response quality indicators
-      const confidence = this.calculateConfidence(response.content, responseTime, options.taskType);
+      const confidence = this.calculateConfidence(content, responseTime, options.taskType || 'default');
 
       return {
-        content: response.content,
+        content,
         confidence,
         responseTime,
         model: response.model || this.config.defaultModel,
         provider: this.name,
-        toolCalls: response.toolCalls, // FIXED: Include tool calls in response
+        toolCalls: toolCalls ? toolCalls.map(tc => ({
+          id: tc.id || `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: 'function' as const,
+          name: tc.function?.name || 'unknown',
+          arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function?.arguments || {})
+        })) : undefined
         metadata: {
           tokens: response.usage?.total_tokens,
           promptTokens: response.usage?.prompt_tokens,
@@ -103,24 +206,24 @@ export class LMStudioProvider implements LLMProvider {
    * Make a request with full OpenAI-compatible API support including tools
    * This is the preferred method for tool-enabled requests
    */
-  async request(requestOptions: any): Promise<any> {
+  async request(requestOptions: LMStudioRequest): Promise<LLMResponse> {
     const startTime = Date.now();
     this.currentLoad++;
     this.requestCount++;
 
     try {
       // Build messages from either messages array or prompt
-      let messages;
+      let messages: LMStudioMessage[];
       if (requestOptions.messages && Array.isArray(requestOptions.messages)) {
         messages = requestOptions.messages;
       } else if (requestOptions.prompt) {
         messages = [
           {
-            role: 'system',
-            content: this.getSystemPrompt(requestOptions.taskType),
+            role: 'system' as const,
+            content: this.getSystemPrompt(requestOptions.taskType || 'default');
           },
           {
-            role: 'user',
+            role: 'user' as const,
             content: requestOptions.prompt,
           },
         ];
@@ -128,11 +231,11 @@ export class LMStudioProvider implements LLMProvider {
         throw new Error('Either messages array or prompt string must be provided');
       }
 
-      const payload: any = {
+      const payload: LMStudioPayload = {
         model: requestOptions.model || this.config.defaultModel,
         messages: messages,
-        temperature: requestOptions.temperature ?? this.getTemperature(requestOptions.taskType),
-        max_tokens: requestOptions.maxTokens ?? this.getMaxTokens(requestOptions.taskType),
+        temperature: requestOptions.temperature ?? this.getTemperature(requestOptions.taskType || 'default');
+        max_tokens: requestOptions.maxTokens ?? this.getMaxTokens(requestOptions.taskType || 'default');
         stream: false,
       };
 
@@ -143,7 +246,7 @@ export class LMStudioProvider implements LLMProvider {
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), requestOptions.timeout || this.config.timeout);
+      const timeout = setTimeout(() => controller.abort(), requestOptions.timeout || this.config.timeout || 60000);
 
       try {
         const response = await fetch(`${this.endpoint}/v1/chat/completions`, {
@@ -171,7 +274,7 @@ export class LMStudioProvider implements LLMProvider {
         // FIXED: Extract tool calls if present with correct structure
         let toolCalls = undefined;
         if (choice.message?.tool_calls && Array.isArray(choice.message.tool_calls)) {
-          toolCalls = choice.message.tool_calls.map((tc: any) => ({
+          toolCalls = choice.message.tool_calls.map((tc: LMStudioToolCall) => ({
             id: tc.id,
             type: tc.type || 'function',
             function: {
@@ -224,7 +327,7 @@ export class LMStudioProvider implements LLMProvider {
   /**
    * Make HTTP request to LM Studio API
    */
-  private async makeRequest(prompt: string, options: any): Promise<any> {
+  private async makeRequest(prompt: string, options: LMStudioOptions): Promise<LMStudioResponse> {
     const payload = {
       model: options.model || this.config.defaultModel,
       messages: [

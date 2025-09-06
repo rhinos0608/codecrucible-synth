@@ -223,7 +223,7 @@ export async function initialize(
       userInteraction,
       eventBus,
       modelClient,
-      mcpManager: mcpServerManager,
+      mcpManager: mcpServerManager || undefined, // Handle null case
       runtimeContext,
     });
 
@@ -236,6 +236,13 @@ export async function initialize(
 
     // Display system capabilities
     if (cliOptions.verbose) {
+      logger.info('System capabilities display', {
+        capabilities: 'Context Intelligence, Performance Optimization, Error Resilience',
+        architecture: 'Dependency Injection, Event-Driven, Circular Dependencies Eliminated',
+        complexity: 'Reduced by 90% through unified coordination'
+      });
+      
+      // For CLI users, still show the output
       console.log(
         '🧠 Capabilities: Context Intelligence, Performance Optimization, Error Resilience'
       );
@@ -302,6 +309,7 @@ async function runCLI(
     const cleanup = async () => {
       if (cleanedUp) return;
       cleanedUp = true;
+      logger.info('Application shutdown initiated');
       console.log('\n🔄 Shutting down gracefully...');
       await cli.shutdown();
       // Dispose ServiceFactory and all its managed resources
@@ -339,6 +347,13 @@ async function runCLI(
       );
       
       // Display user-friendly error message
+      logger.error('Application error occurred', {
+        userMessage: structuredError.userMessage,
+        suggestedActions: structuredError.suggestedActions,
+        category: structuredError.category,
+        severity: structuredError.severity
+      });
+      
       console.error('❌ Application Error:', structuredError.userMessage);
       
       if (structuredError.suggestedActions && structuredError.suggestedActions.length > 0) {
@@ -353,6 +368,13 @@ async function runCLI(
       
     } catch (handlerError) {
       // Fallback to basic error handling if enterprise handler fails
+      logger.fatal('Fatal error with handler failure', {
+        message: 'Handler failure during error processing',
+        details: {
+          originalError: getErrorMessage(error),
+          handlerError: getErrorMessage(handlerError)
+        }
+      });
       console.error('❌ Fatal error:', getErrorMessage(error));
       console.error('⚠️ Error handler also failed:', getErrorMessage(handlerError));
       process.exitCode = 1;
@@ -505,6 +527,7 @@ program
 // Auto-run when directly executed
 if (process.argv[1]?.includes('index.js') || process.argv[1]?.includes('index.ts')) {
   main().catch(error => {
+    logger.fatal('Fatal startup error', getErrorMessage(error));
     console.error('❌ Fatal error:', getErrorMessage(error));
     process.exit(1);
   });

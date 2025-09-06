@@ -9,6 +9,23 @@ export interface LLMResponse {
   responseTime: number;
   model: string;
   provider: string;
+  // Properties used by provider adapters
+  id?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  finishReason?: string;
+  // Provider-specific properties
+  response?: string;
+  message?: any;
+  output?: string;
+  text?: string;
+  prompt_eval_count?: number;
+  eval_count?: number;
+  total_duration?: number;
+  done?: boolean;
   // FIXED: Add tool calls support for function calling models
   toolCalls?: Array<{
     id: string;

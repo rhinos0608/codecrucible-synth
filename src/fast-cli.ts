@@ -4,6 +4,7 @@
  */
 
 import { getVersion } from './utils/version.js';
+import { logger } from './infrastructure/logging/logger.js';
 
 function showBasicHelp() {
   console.log('Usage:');
@@ -188,6 +189,7 @@ export async function fastMain() {
     const { main } = await import('./index.js');
     return main();
   } catch (error) {
+    logger.error('Fast CLI error occurred', { error });
     console.error('❌ Error:', error);
     process.exitCode = 1;
     return;
@@ -200,6 +202,7 @@ if (
   (process.argv[1].includes('fast-cli.js') || process.argv[1].endsWith('fast-cli.ts'))
 ) {
   fastMain().catch(error => {
+    logger.fatal('Fast CLI fatal error', { message: error.message || String(error) });
     console.error('Fatal error:', error);
     process.exitCode = 1;
   });

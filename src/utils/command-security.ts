@@ -6,7 +6,8 @@ const allowlistPath = path.resolve(process.cwd(), 'shared/command-allowlist.json
 try {
   const data = fs.readFileSync(allowlistPath, 'utf-8');
   allowedCommands = JSON.parse(data);
-} catch {
+} catch (err) {
+  console.error(`Failed to load allowlist from ${allowlistPath}:`, err);
   allowedCommands = [];
 }
 

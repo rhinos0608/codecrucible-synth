@@ -12,7 +12,7 @@
 
 import { readFile, stat } from 'fs/promises';
 import { Stats } from 'fs';
-import { extname, relative, dirname, join } from 'path';
+import { dirname, extname, join, relative } from 'path';
 import { glob } from 'glob';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 
@@ -60,27 +60,27 @@ export interface CodebaseAnalysisResult {
  * Advanced Context Window Manager for large codebase analysis
  */
 export class ContextWindowManager {
-  private maxContextTokens: number;
-  private tokenBuffer: number; // Reserve tokens for response
-  private supportedExtensions: Set<string>;
-  private excludePatterns: string[];
-  private tokenCache: Map<string, number> = new Map();
-  private analysisCache: Map<string, FileAnalysisResult> = new Map();
+  private readonly maxContextTokens: number;
+  private readonly tokenBuffer: number; // Reserve tokens for response
+  private readonly supportedExtensions: Set<string>;
+  private readonly excludePatterns: string[];
+  private readonly tokenCache: Map<string, number> = new Map();
+  private readonly analysisCache: Map<string, FileAnalysisResult> = new Map();
 
-  constructor(
+  public constructor(
     options: {
-      maxContextTokens?: number;
-      tokenBuffer?: number;
-      supportedExtensions?: string[];
-      excludePatterns?: string[];
+      readonly maxContextTokens?: number;
+      readonly tokenBuffer?: number;
+      readonly supportedExtensions?: readonly string[];
+      readonly excludePatterns?: readonly string[];
     } = {}
   ) {
     // Match Ollama configuration: 256K context window
-    this.maxContextTokens = options.maxContextTokens || 256000;
-    this.tokenBuffer = options.tokenBuffer || 16000; // Reasonable buffer for model response
+    this.maxContextTokens = options.maxContextTokens ?? 256000;
+    this.tokenBuffer = options.tokenBuffer ?? 16000; // Reasonable buffer for model response
 
     this.supportedExtensions = new Set(
-      options.supportedExtensions || [
+      options.supportedExtensions ?? [
         '.js',
         '.ts',
         '.jsx',
@@ -127,7 +127,7 @@ export class ContextWindowManager {
       ]
     );
 
-    this.excludePatterns = options.excludePatterns || [
+    this.excludePatterns = options.excludePatterns ? Array.from(options.excludePatterns) : [
       'node_modules/**',
       '.git/**',
       'dist/**',
@@ -147,16 +147,16 @@ export class ContextWindowManager {
   /**
    * Analyze entire codebase with intelligent context window utilization
    */
-  async analyzeCodebase(
+  public async analyzeCodebase(
     basePath: string,
     query: string,
-    options: {
+    options: Readonly<{
       maxDepth?: number;
       prioritizeRecent?: boolean;
       includeTests?: boolean;
       includeDocs?: boolean;
       chunkStrategy?: 'priority' | 'hierarchical' | 'semantic';
-    } = {}
+    }> = {}
   ): Promise<CodebaseAnalysisResult> {
     const startTime = Date.now();
     const availableTokens = this.maxContextTokens - this.tokenBuffer;
@@ -167,7 +167,7 @@ export class ContextWindowManager {
 
     // Phase 1: Discover all relevant files
     const allFiles = await this.discoverFiles(basePath, {
-      maxDepth: options.maxDepth || 5,
+      maxDepth: options.maxDepth ?? 5,
       includeTests: options.includeTests ?? true,
       includeDocs: options.includeDocs ?? true,
     });
@@ -181,7 +181,7 @@ export class ContextWindowManager {
     const chunks = await this.createContextChunks(
       analyzedFiles,
       availableTokens,
-      options.chunkStrategy || 'priority'
+      options.chunkStrategy ?? 'priority'
     );
 
     // Phase 4: Generate analysis statistics
@@ -567,8 +567,16 @@ export class ContextWindowManager {
         if (target) {
           if (!graph.has(file.path)) graph.set(file.path, new Set());
           if (!graph.has(target)) graph.set(target, new Set());
-          graph.get(file.path)!.add(target);
-          graph.get(target)!.add(file.path);
+          if (!graph.has(file.path)) graph.set(file.path, new Set());
+          if (!graph.has(target)) graph.set(target, new Set());
+          const filePathSet = graph.get(file.path);
+          if (filePathSet) {
+            filePathSet.add(target);
+          }
+          const targetSet = graph.get(target);
+          if (targetSet) {
+            targetSet.add(file.path);
+          }
         }
       }
     }
@@ -580,7 +588,10 @@ export class ContextWindowManager {
       const queue = [file.path];
       const group: FileAnalysisResult[] = [];
       while (queue.length > 0) {
-        const current = queue.shift()!;
+        const current = queue.shift();
+        if (current === undefined) {
+          continue;
+        }
         if (visited.has(current)) continue;
         visited.add(current);
         const result = fileMap.get(current);
@@ -814,7 +825,7 @@ export class ContextWindowManager {
   /**
    * Clear analysis caches
    */
-  clearCache(): void {
+  public clearCache(): void {
     this.tokenCache.clear();
     this.analysisCache.clear();
   }
@@ -822,7 +833,7 @@ export class ContextWindowManager {
   /**
    * Get current context window utilization stats
    */
-  getContextStats(): ContextWindow {
+  public getContextStats(): ContextWindow {
     const usedTokens = Array.from(this.tokenCache.values()).reduce(
       (sum, tokens) => sum + tokens,
       0

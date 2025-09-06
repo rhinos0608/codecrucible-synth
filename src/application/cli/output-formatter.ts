@@ -6,25 +6,37 @@ import { unifiedResultFormatter } from '../../infrastructure/formatting/unified-
  * Centralized output formatting using UnifiedResultFormatter
  * Replaces scattered formatting logic with consistent, comprehensive formatting
  */
+interface OutputLike {
+  message?: { content?: unknown };
+  content?: string;
+  response?: string;
+  text?: string;
+}
+
+function isOutputLike(obj: unknown): obj is OutputLike {
+  return typeof obj === 'object' && obj !== null;
+}
+
 export function formatOutput(result: unknown): string {
   // Handle objects that might have response or content properties
-  if (result && typeof result === 'object' && !Array.isArray(result)) {
-    const obj = result as any;
-    
+  if (isOutputLike(result) && !Array.isArray(result)) {
     // Check for nested message.content pattern
-    if (obj.message && typeof obj.message === 'object' && obj.message.content) {
-      return formatOutput(obj.message.content);
+    if (
+      typeof result.message === 'object' &&
+      'content' in result.message
+    ) {
+      return formatOutput((result.message as { content?: unknown }).content);
     }
-    
+
     // Check for direct content/response/text properties
-    if (obj.content && typeof obj.content === 'string') {
-      return obj.content;
+    if (typeof result.content === 'string') {
+      return result.content;
     }
-    if (obj.response && typeof obj.response === 'string') {
-      return obj.response;
+    if (typeof result.response === 'string') {
+      return result.response;
     }
-    if (obj.text && typeof obj.text === 'string') {
-      return obj.text;
+    if (typeof result.text === 'string') {
+      return result.text;
     }
   }
   
@@ -54,7 +66,7 @@ export function formatOutput(result: unknown): string {
     }
     
     // If result is an object but content is empty, try to show something meaningful
-    if (result && typeof result === 'object') {
+    if (typeof result === 'object') {
       const str = JSON.stringify(result, null, 2);
       if (str !== '{}') {
         return str;

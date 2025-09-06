@@ -53,9 +53,11 @@ async function showQuickStatus() {
   // Quick Ollama check with 1 second timeout
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1000);
+    const healthCheckTimeout = parseInt(process.env.HEALTH_CHECK_TIMEOUT || '3000', 10);
+    const timeoutId = setTimeout(() => controller.abort(), healthCheckTimeout);
 
-    const response = await fetch('http://localhost:11434/api/tags', {
+    const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || 'http://localhost:11434';
+    const response = await fetch(`${ollamaEndpoint}/api/tags`, {
       signal: controller.signal,
     });
 
@@ -73,9 +75,11 @@ async function showQuickStatus() {
   // Quick LM Studio check with 1 second timeout
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1000);
+    const healthCheckTimeout = parseInt(process.env.HEALTH_CHECK_TIMEOUT || '3000', 10);
+    const timeoutId = setTimeout(() => controller.abort(), healthCheckTimeout);
 
-    const response = await fetch('http://localhost:1234/v1/models', {
+    const lmStudioEndpoint = process.env.LM_STUDIO_ENDPOINT || 'http://localhost:1234';
+    const response = await fetch(`${lmStudioEndpoint}/v1/models`, {
       signal: controller.signal,
     });
 
@@ -101,9 +105,11 @@ async function showAvailableModels() {
   // Quick Ollama models check
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const modelListTimeout = parseInt(process.env.MODEL_LIST_TIMEOUT || '5000', 10);
+    const timeoutId = setTimeout(() => controller.abort(), modelListTimeout);
 
-    const response = await fetch('http://localhost:11434/api/tags', {
+    const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || 'http://localhost:11434';
+    const response = await fetch(`${ollamaEndpoint}/api/tags`, {
       signal: controller.signal,
     });
 
@@ -127,9 +133,11 @@ async function showAvailableModels() {
   // Quick LM Studio models check
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const modelListTimeout = parseInt(process.env.MODEL_LIST_TIMEOUT || '5000', 10);
+    const timeoutId = setTimeout(() => controller.abort(), modelListTimeout);
 
-    const response = await fetch('http://localhost:1234/v1/models', {
+    const lmStudioEndpoint = process.env.LM_STUDIO_ENDPOINT || 'http://localhost:1234';
+    const response = await fetch(`${lmStudioEndpoint}/v1/models`, {
       signal: controller.signal,
     });
 
@@ -188,8 +196,9 @@ export async function fastMain() {
     console.log('🔄 Loading full system for complex operations...');
     const { main } = await import('./index.js');
     return main();
-  } catch (error) {
-    logger.error('Fast CLI error occurred', { error });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('Fast CLI error occurred', { error: errorMessage });
     console.error('❌ Error:', error);
     process.exitCode = 1;
     return;
@@ -201,8 +210,10 @@ if (
   process.argv[1] &&
   (process.argv[1].includes('fast-cli.js') || process.argv[1].endsWith('fast-cli.ts'))
 ) {
-  fastMain().catch(error => {
-    logger.fatal('Fast CLI fatal error', { message: error.message || String(error) });
+  fastMain().catch((error: unknown) => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.fatal('Fast CLI fatal error', errorMessage);
+    // Error already logged by logger.fatal above
     console.error('Fatal error:', error);
     process.exitCode = 1;
   });

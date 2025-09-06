@@ -185,7 +185,7 @@ export class LMStudioProvider implements LLMProvider {
           type: 'function' as const,
           name: tc.function?.name || 'unknown',
           arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function?.arguments || {})
-        })) : undefined
+        })) : undefined,
         metadata: {
           tokens: response.usage?.total_tokens,
           promptTokens: response.usage?.prompt_tokens,
@@ -220,7 +220,7 @@ export class LMStudioProvider implements LLMProvider {
         messages = [
           {
             role: 'system' as const,
-            content: this.getSystemPrompt(requestOptions.taskType || 'default');
+            content: this.getSystemPrompt(requestOptions.taskType || 'default'),
           },
           {
             role: 'user' as const,
@@ -234,8 +234,8 @@ export class LMStudioProvider implements LLMProvider {
       const payload: LMStudioPayload = {
         model: requestOptions.model || this.config.defaultModel,
         messages: messages,
-        temperature: requestOptions.temperature ?? this.getTemperature(requestOptions.taskType || 'default');
-        max_tokens: requestOptions.maxTokens ?? this.getMaxTokens(requestOptions.taskType || 'default');
+        temperature: requestOptions.temperature ?? this.getTemperature(requestOptions.taskType || 'default'),
+        max_tokens: requestOptions.maxTokens ?? this.getMaxTokens(requestOptions.taskType || 'default'),
         stream: false,
       };
 
@@ -369,7 +369,9 @@ export class LMStudioProvider implements LLMProvider {
       }
 
       return {
-        content: data.choices[0].message.content,
+        id: data.id,
+        object: data.object,
+        created: data.created,
         model: data.model,
         usage: data.usage,
         choices: data.choices,

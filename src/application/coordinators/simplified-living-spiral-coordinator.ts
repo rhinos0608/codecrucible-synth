@@ -24,9 +24,9 @@ export interface SimplifiedSpiralConfig {
 }
 
 export interface SimplifiedSpiralInput {
-  initialPrompt: string;
-  config?: Partial<SimplifiedSpiralConfig>;
-  context?: Record<string, unknown>;
+  readonly initialPrompt: string;
+  readonly config?: Partial<SimplifiedSpiralConfig>;
+  readonly context?: Readonly<Record<string, unknown>>;
 }
 
 export interface SimplifiedSpiralOutput {
@@ -49,7 +49,7 @@ export interface SimplifiedSpiralOutput {
  * Single responsibility: High-level process orchestration
  */
 export class SimplifiedLivingSpiralCoordinator {
-  private phaseExecutor: SpiralPhaseExecutor;
+  private readonly phaseExecutor: SpiralPhaseExecutor;
   private convergenceAnalyzer: SpiralConvergenceAnalyzer;
   private defaultConfig: SimplifiedSpiralConfig = {
     maxIterations: 3,
@@ -59,9 +59,9 @@ export class SimplifiedLivingSpiralCoordinator {
     phases: ['collapse', 'council', 'synthesis', 'rebirth', 'reflection'],
   };
 
-  constructor(
-    voiceOrchestrationService: IVoiceOrchestrationService,
-    modelSelectionService: IModelSelectionService
+  public constructor(
+    public readonly voiceOrchestrationService: Readonly<IVoiceOrchestrationService>,
+    public readonly modelSelectionService: Readonly<IModelSelectionService>
   ) {
     this.phaseExecutor = new SpiralPhaseExecutor(voiceOrchestrationService, modelSelectionService);
     this.convergenceAnalyzer = new SpiralConvergenceAnalyzer();

@@ -60,9 +60,10 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
       // Parse and structure the generation result
       const generatedFiles = this.parseGenerationResult(workflowResponse.result, request);
 
-      console.log(
-        `🐛 [DEBUG] dryRun option: ${request.options?.dryRun}, will save files: ${!request.options?.dryRun}`
-      );
+      logger.debug('Dry run mode configuration', {
+        dryRun: request.options?.dryRun,
+        willSaveFiles: !request.options?.dryRun
+      });
 
       // Check if AI chose inline display
       const inlineFiles = generatedFiles.filter(f => f.path.startsWith('__INLINE_DISPLAY__'));
@@ -71,21 +72,21 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
       let smartFiles: GenerationResponse['generated']['files'] = [];
 
       if (inlineFiles.length > 0) {
-        console.log(`🧠 [AI-GUIDED] AI chose inline display - skipping file creation`);
+        logger.debug('AI chose inline display mode', { filesSkipped: true });
         smartFiles = []; // Empty array indicates inline display
       } else if (actualFiles.length > 0) {
-        console.log(`🧠 [AI-GUIDED] AI chose file creation - using provided paths`);
+        logger.debug('AI chose file creation mode', { filesProvided: smartFiles?.length || 0 });
         smartFiles = actualFiles; // Use AI-provided file paths directly
       }
 
       // Save files if not dry run and files were intended to be saved
       if (!request.options?.dryRun && smartFiles.length > 0) {
-        console.log(`🧠 [AI-GUIDED] Saving ${smartFiles.length} AI-placed files`);
+        logger.info('Saving AI-generated files', { fileCount: smartFiles.length });
         await this.saveGeneratedFiles(smartFiles);
       } else if (inlineFiles.length > 0 || smartFiles.length === 0) {
-        console.log(`🧠 [AI-GUIDED] Content will be displayed inline - no files to save`);
+        logger.debug('Content displayed inline, no files saved', { mode: 'inline' });
       } else {
-        console.log(`🐛 [DEBUG] Skipping file save due to dryRun=true`);
+        logger.debug('Skipping file save in dry run mode', { dryRun: true });
       }
 
       const metadata = {
@@ -241,10 +242,11 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
     }
 
     // DEBUG: Log the result being parsed
-    console.log('🐛 [DEBUG] parseGenerationResult input:');
-    console.log('🐛 Result type:', typeof result);
-    console.log('🐛 Result text length:', resultText.length);
-    console.log('🐛 First 500 chars of resultText:', resultText.substring(0, 500));
+    logger.debug('Parsing generation result', {
+      resultType: typeof result,
+      textLength: resultText.length,
+      preview: resultText.substring(0, 500)
+    });
 
     // Check if AI chose INLINE_DISPLAY format (code blocks without filename headers)
     const inlineCodeRegex = /```(\w+)?\n([\s\S]*?)```/g;
@@ -255,13 +257,13 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
 
     if (hasFileHeaders) {
       // AI chose FILE format - extract files with explicit paths
-      console.log('🧠 [AI-GUIDED] AI chose FILE format - extracting files with explicit paths');
+      logger.debug('AI chose FILE format for output', { extractionMode: 'explicit_paths' });
       let match;
       while ((match = fileCodeRegex.exec(resultText)) !== null) {
         const filePath = match[1]?.trim();
         const content = match[2]?.trim();
 
-        console.log(`🧠 [AI-GUIDED] Found file: ${filePath} (${content?.length} chars)`);
+        logger.debug('Found generated file', { filePath, contentLength: content?.length });
 
         if (content && filePath) {
           const fileType = this.determineFileType(filePath, content);
@@ -274,15 +276,16 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
       }
     } else {
       // AI chose INLINE_DISPLAY format - extract code blocks without filenames
-      console.log('🧠 [AI-GUIDED] AI chose INLINE_DISPLAY format - code will be displayed inline');
+      logger.debug('AI chose INLINE_DISPLAY format', { displayMode: 'inline' });
       let match;
       while ((match = inlineCodeRegex.exec(resultText)) !== null) {
         const language = match[1] || 'typescript';
         const content = match[2]?.trim();
 
-        console.log(
-          `🧠 [AI-GUIDED] Found inline code block: ${language} (${content?.length} chars)`
-        );
+        logger.debug('Found inline code block', {
+          language,
+          contentLength: content?.length
+        });
 
         if (content) {
           // Mark as inline display by using special path
@@ -297,7 +300,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
 
     // Fallback: if no code blocks found, treat entire result as inline display
     if (files.length === 0 && resultText.trim()) {
-      console.log('🧠 [AI-GUIDED] No code blocks found, treating entire result as inline display');
+      logger.debug('No code blocks found, using inline display', { fallback: true });
       files.push({
         path: '__INLINE_DISPLAY__.txt',
         content: resultText.trim(),
@@ -305,10 +308,10 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
       });
     }
 
-    console.log(
-      `🧠 [AI-GUIDED] Parsed ${files.length} files:`,
-      files.map(f => ({ path: f.path, type: f.type, contentLength: f.content.length }))
-    );
+    logger.debug('Files parsed successfully', {
+      fileCount: files.length,
+      files: files.map(f => ({ path: f.path, type: f.type, contentLength: f.content.length }))
+    });
 
     return files;
   }
@@ -345,30 +348,30 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
   }
 
   private async saveGeneratedFiles(files: GenerationResponse['generated']['files']): Promise<void> {
-    console.log(`🐛 [DEBUG] saveGeneratedFiles called with ${files.length} files`);
+    logger.debug('Starting file save operation', { fileCount: files.length });
 
     for (const file of files) {
       try {
-        console.log(`🐛 [DEBUG] Saving file: ${file.path} (${file.content.length} chars)`);
+        logger.debug('Saving generated file', { path: file.path, contentLength: file.content.length });
 
         // Ensure directory exists
         const dir = dirname(file.path);
-        console.log(`🐛 [DEBUG] Directory: ${dir}, exists: ${existsSync(dir)}`);
+        logger.debug('Directory check', { directory: dir, exists: existsSync(dir) });
         if (!existsSync(dir)) {
           mkdirSync(dir, { recursive: true });
-          console.log(`🐛 [DEBUG] Created directory: ${dir}`);
+          logger.debug('Created directory', { directory: dir });
         }
 
         // Write file
         writeFileSync(file.path, file.content, 'utf-8');
-        console.log(`🐛 [DEBUG] Successfully wrote file: ${file.path}`);
+        logger.debug('File written successfully', { path: file.path });
         logger.info(`Generated file saved: ${file.path}`);
       } catch (error) {
         logger.error(`Failed to save file ${file.path}`, { error, filePath: file.path });
         throw new Error(`Failed to save file ${file.path}: ${error}`);
       }
     }
-    console.log(`🐛 [DEBUG] saveGeneratedFiles completed`);
+    logger.debug('File save operation completed', { filesProcessed: files.length });
   }
 
   private buildSummary(

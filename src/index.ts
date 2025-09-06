@@ -354,6 +354,7 @@ async function runCLI(
         severity: structuredError.severity
       });
       
+      // User error message already logged by enterprise error handler
       console.error('❌ Application Error:', structuredError.userMessage);
       
       if (structuredError.suggestedActions && structuredError.suggestedActions.length > 0) {
@@ -368,13 +369,11 @@ async function runCLI(
       
     } catch (handlerError) {
       // Fallback to basic error handling if enterprise handler fails
-      logger.fatal('Fatal error with handler failure', {
-        message: 'Handler failure during error processing',
-        details: {
-          originalError: getErrorMessage(error),
-          handlerError: getErrorMessage(handlerError)
-        }
+      logger.fatal('Fatal error with handler failure', undefined, {
+        originalError: getErrorMessage(error),
+        handlerError: getErrorMessage(handlerError)
       });
+      // Errors already logged by structured logger above
       console.error('❌ Fatal error:', getErrorMessage(error));
       console.error('⚠️ Error handler also failed:', getErrorMessage(handlerError));
       process.exitCode = 1;
@@ -527,7 +526,8 @@ program
 // Auto-run when directly executed
 if (process.argv[1]?.includes('index.js') || process.argv[1]?.includes('index.ts')) {
   main().catch(error => {
-    logger.fatal('Fatal startup error', getErrorMessage(error));
+    logger.fatal('Fatal startup error', error instanceof Error ? error : new Error(String(error)));
+    // Error already logged by structured logger above
     console.error('❌ Fatal error:', getErrorMessage(error));
     process.exit(1);
   });

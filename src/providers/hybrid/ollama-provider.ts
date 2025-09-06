@@ -942,15 +942,15 @@ export class OllamaProvider implements LLMProvider {
                 // Emit streaming token if content is present
                 if (chunk.message?.content) {
                   accumulatedContent += chunk.message.content;
-                  request.onStreamingToken({
-                    content: chunk.message.content,
+                  request.onStreamingToken(chunk.message.content, {
                     isComplete: false,
+                    model: chunk.model
                   });
                 } else if (chunk.response) {
                   accumulatedContent += chunk.response;
-                  request.onStreamingToken({
-                    content: chunk.response,
+                  request.onStreamingToken(chunk.response, {
                     isComplete: false,
+                    model: chunk.model
                   });
                 }
                 
@@ -963,9 +963,9 @@ export class OllamaProvider implements LLMProvider {
                 if (chunk.done) {
                   lastMetadata = chunk;
                   // Emit final token
-                  request.onStreamingToken({
-                    content: '',
+                  request.onStreamingToken('', {
                     isComplete: true,
+                    model: result.model
                   });
                 }
               } catch (e) {

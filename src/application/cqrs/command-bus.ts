@@ -17,7 +17,7 @@ export class CommandBus {
   private readonly handlers = new Map<string, CommandHandler>();
   private readonly middleware: CommandMiddleware[] = [];
 
-  public register(handler: Readonly<CommandHandler<unknown, unknown>>): void {
+  public register(handler: Readonly<CommandHandler>): void {
     this.handlers.set(handler.type, handler as CommandHandler);
   }
 
@@ -32,7 +32,7 @@ export class CommandBus {
     }
 
     // Compose middleware pipeline
-    const invoke: () => Promise<unknown> = async (): Promise<unknown> => handler.handle(command);
+    const invoke: () => Promise<unknown> = (): Promise<unknown> => Promise.resolve(handler.handle(command));
     let pipeline: () => Promise<unknown> = invoke;
     for (let i = this.middleware.length - 1; i >= 0; i--) {
       const mw = this.middleware[i];

@@ -36,7 +36,7 @@ export class ModernInputSanitizer implements ModernInputSanitizerInterface {
     };
   }
 
-  public validateAndSanitize(
+  public async validateAndSanitize(
     input: string,
     context?: Readonly<Record<string, unknown>>
   ): Promise<SecurityValidation> {
@@ -46,15 +46,15 @@ export class ModernInputSanitizer implements ModernInputSanitizerInterface {
     if ((context as { requireStrict?: boolean } | undefined)?.requireStrict) {
       // More strict validation for certain contexts
       if (input.includes('eval') || input.includes('Function')) {
-        return Promise.resolve({
+        return {
           isValid: false,
           reason: 'Potentially dangerous code detected',
           riskLevel: 'high',
-        });
+        };
       }
     }
 
-    return Promise.resolve(result);
+    return result;
   }
 
   public isSecure(input: string): boolean {

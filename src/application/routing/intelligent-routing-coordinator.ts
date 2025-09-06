@@ -18,25 +18,29 @@
  */
 
 import { EventEmitter } from 'events';
-import { ProviderType } from '../../providers/provider-selection-strategy.js';
+import {
+  IProviderSelectionStrategy,
+  ProviderType,
+  SelectionResult,
+} from '../../providers/provider-selection-strategy.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 
 // Domain imports
 import {
   IModelSelectionService,
   ModelSelection,
+  RoutingStrategy,
 } from '../../domain/services/model-selection-service.js';
 import {
   IVoiceOrchestrationService,
+  SynthesisMode,
   VoiceSelection,
 } from '../../domain/services/voice-orchestration-service.js';
 import { ProcessingRequest } from '../../domain/entities/request.js';
+import { Model } from '../../domain/entities/model.js';
+import { Voice } from '../../domain/entities/voice.js';
 
 // Core imports
-import {
-  IProviderSelectionStrategy,
-  SelectionResult,
-} from '../../providers/provider-selection-strategy.js';
 import {
   HybridLLMRouter,
   RoutingDecision,
@@ -137,10 +141,10 @@ export interface RoutingAnalytics {
 }
 
 export interface IIntelligentRoutingCoordinator {
-  routeRequest(context: RoutingContext): Promise<IntelligentRoutingDecision>;
-  recordPerformance(routingId: string, performance: RoutingPerformance): void;
-  getAnalytics(): RoutingAnalytics;
-  optimizeRouting(): Promise<void>;
+  routeRequest: (context: Readonly<RoutingContext>) => Promise<IntelligentRoutingDecision>;
+  recordPerformance: (routingId: string, performance: Readonly<RoutingPerformance>) => void;
+  getAnalytics: () => RoutingAnalytics;
+  optimizeRouting: () => Promise<void>;
 }
 
 export interface RoutingPerformance {
@@ -160,36 +164,27 @@ export class IntelligentRoutingCoordinator
   extends EventEmitter
   implements IIntelligentRoutingCoordinator
 {
-  private modelSelectionService: IModelSelectionService;
-  private voiceOrchestrationService: IVoiceOrchestrationService;
-  private providerSelectionStrategy: IProviderSelectionStrategy;
-  private hybridRouter: HybridLLMRouter;
-  private performanceMonitor: PerformanceMonitor;
+  private readonly voiceOrchestrationService: IVoiceOrchestrationService;
 
   // Analytics and learning
-  private routingHistory: Map<string, IntelligentRoutingDecision> = new Map();
-  private performanceHistory: Map<string, RoutingPerformance> = new Map();
-  private routingCache: Map<string, { decision: IntelligentRoutingDecision; timestamp: number }> =
+  private readonly routingHistory: Map<string, IntelligentRoutingDecision> = new Map();
+  private readonly performanceHistory: Map<string, RoutingPerformance> = new Map();
+  private readonly routingCache: Map<string, { decision: IntelligentRoutingDecision; timestamp: number }> =
     new Map();
 
   // Configuration
   private readonly CACHE_TTL = 300000; // 5 minutes
   private readonly MAX_HISTORY_SIZE = 10000;
-  private readonly LEARNING_ENABLED = true;
 
-  constructor(
-    modelSelectionService: IModelSelectionService,
-    voiceOrchestrationService: IVoiceOrchestrationService,
-    providerSelectionStrategy: IProviderSelectionStrategy,
-    hybridRouter: HybridLLMRouter,
-    performanceMonitor: PerformanceMonitor
+  public constructor(
+    private readonly modelSelectionService: Readonly<IModelSelectionService>,
+    voiceOrchestrationService: Readonly<IVoiceOrchestrationService>,
+    private readonly providerSelectionStrategy: Readonly<IProviderSelectionStrategy>,
+    private readonly hybridRouter: Readonly<HybridLLMRouter>,
+    private readonly performanceMonitor: Readonly<PerformanceMonitor>
   ) {
     super();
-    this.modelSelectionService = modelSelectionService;
     this.voiceOrchestrationService = voiceOrchestrationService;
-    this.providerSelectionStrategy = providerSelectionStrategy;
-    this.hybridRouter = hybridRouter;
-    this.performanceMonitor = performanceMonitor;
 
     this.setupEventHandlers();
   }
@@ -198,7 +193,7 @@ export class IntelligentRoutingCoordinator
    * Main routing coordination method
    * Orchestrates intelligent routing across all systems
    */
-  async routeRequest(context: RoutingContext): Promise<IntelligentRoutingDecision> {
+  public async routeRequest(context: Readonly<RoutingContext>): Promise<IntelligentRoutingDecision> {
     const startTime = Date.now();
     const routingId = this.generateRoutingId();
 
@@ -219,9 +214,7 @@ export class IntelligentRoutingCoordinator
       const decision = await this.executeRoutingStrategy(routingStrategy, context, routingId);
 
       // Apply learning and optimization
-      if (this.LEARNING_ENABLED) {
-        this.applyLearningOptimizations(decision, context);
-      }
+      this.applyLearningOptimizations(decision, context);
 
       // Cache decision
       this.cacheDecision(context, decision);
@@ -250,7 +243,7 @@ export class IntelligentRoutingCoordinator
   /**
    * Record actual performance for learning and optimization
    */
-  recordPerformance(routingId: string, performance: RoutingPerformance): void {
+  public recordPerformance(routingId: string, performance: Readonly<RoutingPerformance>): void {
     this.performanceHistory.set(routingId, performance);
 
     const decision = this.routingHistory.get(routingId);
@@ -271,7 +264,7 @@ export class IntelligentRoutingCoordinator
   /**
    * Get comprehensive routing analytics
    */
-  getAnalytics(): RoutingAnalytics {
+  public getAnalytics(): RoutingAnalytics {
     const allDecisions = Array.from(this.routingHistory.values());
     const allPerformance = Array.from(this.performanceHistory.values());
 
@@ -291,7 +284,7 @@ export class IntelligentRoutingCoordinator
   /**
    * Optimize routing based on historical performance
    */
-  async optimizeRouting(): Promise<void> {
+  public async optimizeRouting(): Promise<void> {
     logger.info('Starting routing optimization');
 
     const analytics = this.getAnalytics();
@@ -314,7 +307,7 @@ export class IntelligentRoutingCoordinator
 
   // Private implementation methods
 
-  private determineRoutingStrategy(context: RoutingContext): string {
+  private determineRoutingStrategy(context: Readonly<RoutingContext>): string {
     const { request, preferences, phase } = context;
 
     // Phase-specific routing for Living Spiral
@@ -330,6 +323,8 @@ export class IntelligentRoutingCoordinator
           return 'hybrid-implementation'; // Implementor with hybrid model routing
         case 'reflection':
           return 'single-voice-analytical'; // Guardian archetype, analytical review
+        default:
+          return 'single-model-fast'; // Default routing strategy
       }
     }
 
@@ -347,7 +342,7 @@ export class IntelligentRoutingCoordinator
 
   private async executeRoutingStrategy(
     strategy: string,
-    context: RoutingContext,
+    context: Readonly<RoutingContext>,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     switch (strategy) {
@@ -378,7 +373,7 @@ export class IntelligentRoutingCoordinator
   }
 
   private async executeSingleVoiceFastStrategy(
-    context: RoutingContext,
+    context: Readonly<RoutingContext>,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request } = context;
@@ -415,7 +410,7 @@ export class IntelligentRoutingCoordinator
   }
 
   private async executeSingleVoiceQualityStrategy(
-    context: RoutingContext,
+    context: Readonly<RoutingContext>,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request } = context;
@@ -452,7 +447,7 @@ export class IntelligentRoutingCoordinator
   }
 
   private async executeSingleVoiceAnalyticalStrategy(
-    context: RoutingContext,
+    context: Readonly<RoutingContext>,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request } = context;
@@ -489,7 +484,7 @@ export class IntelligentRoutingCoordinator
   }
 
   private async executeMultiVoiceCollaborativeStrategy(
-    context: RoutingContext,
+    context: Readonly<RoutingContext>,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request } = context;
@@ -509,7 +504,7 @@ export class IntelligentRoutingCoordinator
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: 3,
       minVoices: 2,
-      synthesisMode: 'COLLABORATIVE' as any,
+      synthesisMode: SynthesisMode.COLLABORATIVE,
       diversityWeight: 0.7,
     });
 
@@ -527,7 +522,7 @@ export class IntelligentRoutingCoordinator
   }
 
   private async executeMultiVoiceBalancedStrategy(
-    context: RoutingContext,
+    context: Readonly<RoutingContext>,
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request, preferences } = context;
@@ -544,7 +539,7 @@ export class IntelligentRoutingCoordinator
     // Select optimal voice set for balanced approach
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: preferences?.maxVoices || 2,
-      synthesisMode: 'WEIGHTED' as any,
+      synthesisMode: SynthesisMode.WEIGHTED,
     });
 
     return this.buildRoutingDecision(
@@ -837,6 +832,9 @@ export class IntelligentRoutingCoordinator
       case 'load-balanced':
         baseLatency *= 0.9; // Better resource utilization
         break;
+      default:
+        // No adjustment for unknown strategies
+        break;
     }
 
     return Math.round(baseLatency);
@@ -906,7 +904,7 @@ export class IntelligentRoutingCoordinator
     });
 
     // Voice fallbacks (supporting voices can be fallbacks for primary)
-    voiceSelection.supportingVoices.forEach((voice, index) => {
+    (voiceSelection.supportingVoices as readonly typeof voiceSelection.supportingVoices[0][]).forEach((voice) => {
       fallbackChain.push({
         type: 'voice',
         option: voice.id,
@@ -964,6 +962,7 @@ export class IntelligentRoutingCoordinator
       ...decision,
       routingId: newRoutingId,
       timestamp: Date.now(),
+      context: decision.context,
     };
   }
 
@@ -972,26 +971,50 @@ export class IntelligentRoutingCoordinator
     routingId: string
   ): IntelligentRoutingDecision {
     // Simple failsafe decision using defaults
+    const primaryModel = new Model(
+      new ModelName('fallback-model'),
+      'ollama' as ProviderType,
+      [],
+      {
+        maxTokens: 2048,
+        contextWindow: 2048,
+        isMultimodal: false,
+        estimatedLatency: 30000,
+        qualityRating: 0.5,
+      }
+    );
+
+    const primaryVoice = new Voice(
+      'default',
+      'Default Voice',
+      VoiceStyle.DEFAULT,
+      VoiceTemperature.DEFAULT,
+      1.0,
+      [],
+      'neutral', // personality: string
+      0.5 // Add additional argument(s) as required by the Voice constructor signature
+    );
+
     return {
       modelSelection: {
-        primaryModel: { name: { value: 'fallback-model' } } as any,
+        primaryModel,
         fallbackModels: [],
         selectionReason: 'Failsafe selection due to routing error',
-        routingStrategy: 'SHARED' as any,
+        routingStrategy: RoutingStrategy.SHARED,
         estimatedCost: 0.02,
         estimatedLatency: 30000,
       },
       voiceSelection: {
-        primaryVoice: { id: 'default', name: 'Default Voice' } as any,
+        primaryVoice,
         supportingVoices: [],
-        synthesisMode: 'SINGLE' as any,
+        synthesisMode: SynthesisMode.SINGLE,
         reasoning: 'Failsafe voice selection',
       },
       providerSelection: {
-        provider: 'ollama' as any,
+        provider: 'ollama' as ProviderType,
         reason: 'Failsafe provider selection',
         confidence: 0.5,
-        fallbackChain: ['lm-studio' as any],
+        fallbackChain: ['lm-studio' as ProviderType],
       },
       routingStrategy: 'single-model',
       confidence: 0.3,
@@ -1179,10 +1202,10 @@ export class IntelligentRoutingCoordinator
     return phasePerformance;
   }
 
-  private async optimizeProviderStrategy(analytics: RoutingAnalytics): Promise<void> {
+  private optimizeProviderStrategy(analytics: { readonly strategyPerformance: ReadonlyMap<string, { readonly successRate: number; readonly avgLatency: number; readonly avgCost: number; requests: number }> }): void {
     // Analyze provider performance and update strategy
     const bestStrategy = Array.from(analytics.strategyPerformance.entries()).sort(
-      ([, a], [, b]) => b.successRate - a.successRate
+      ([strategyA, a], [strategyB, b]) => b.successRate - a.successRate
     )[0];
 
     if (bestStrategy && bestStrategy[1].successRate > 0.85) {
@@ -1307,24 +1330,36 @@ export class IntelligentRoutingCoordinator
    * Integration method for SystemIntegrationCoordinator
    * Decides routing strategy based on content and context
    */
-  async decideRoutingStrategy(content: string, context: any): Promise<IntelligentRoutingDecision> {
+  public async decideRoutingStrategy(
+    content: string,
+    context: {
+      requestId?: string;
+      priority?: 'low' | 'medium' | 'high' | 'critical';
+      phase?: 'collapse' | 'council' | 'synthesis' | 'rebirth' | 'reflection';
+      prioritizeSpeed?: boolean;
+      prioritizeQuality?: boolean;
+      enableHybridRouting?: boolean;
+      enableMultiVoice?: boolean;
+      maxLatency?: number;
+    }
+  ): Promise<IntelligentRoutingDecision> {
     try {
       // Convert parameters to internal format
       const routingContext: RoutingContext = {
         request: {
-          id: context.requestId || `integration-${Date.now()}`,
+          id: context?.requestId ?? `integration-${Date.now()}`,
           content,
-          priority: context.priority || 'medium',
+          priority: context?.priority ?? 'medium',
           calculateComplexity: () => this.calculateContentComplexity(content),
         } as unknown as ProcessingRequest,
-        priority: context.priority || 'medium',
-        phase: context.phase,
+        priority: context?.priority ?? 'medium',
+        phase: context?.phase,
         preferences: {
-          prioritizeSpeed: context.prioritizeSpeed || false,
-          prioritizeQuality: context.prioritizeQuality || true,
-          enableHybridRouting: context.enableHybridRouting !== false,
-          enableMultiVoice: context.enableMultiVoice !== false,
-          maxLatency: context.maxLatency || 30000,
+          prioritizeSpeed: context?.prioritizeSpeed ?? false,
+          prioritizeQuality: context?.prioritizeQuality ?? true,
+          enableHybridRouting: context?.enableHybridRouting !== false,
+          enableMultiVoice: context?.enableMultiVoice !== false,
+          maxLatency: context?.maxLatency ?? 30000,
           learningEnabled: true,
         },
       };
@@ -1382,26 +1417,59 @@ export class IntelligentRoutingCoordinator
   /**
    * Create fallback routing decision when primary routing fails
    */
-  private createFallbackRoutingDecision(content: string, context: any): IntelligentRoutingDecision {
+  private createFallbackRoutingDecision(content: string, context: {
+    requestId?: string;
+    phase?: 'collapse' | 'council' | 'synthesis' | 'rebirth' | 'reflection';
+  }): IntelligentRoutingDecision {
     const routingId = `fallback-${Date.now()}`;
 
     return {
       modelSelection: {
-        primaryModel: { name: 'default' as any, capabilities: [] } as any,
+        primaryModel: new Model(
+          new ModelName('default'),
+          'ollama',
+          [],
+          {
+            maxTokens: 2048,
+            contextWindow: 2048,
+            isMultimodal: false,
+            estimatedLatency: 5000,
+            qualityRating: 0.6,
+          }
+        ),
         fallbackModels: [],
         selectionReason: 'Fallback model selection',
-        routingStrategy: 'single' as any,
+        routingStrategy: RoutingStrategy.SHARED,
         estimatedCost: 0.01,
         estimatedLatency: 5000,
       },
       voiceSelection: {
-        primaryVoice: { id: 'maintainer', name: 'Maintainer', style: 'maintainer' as any } as any,
+        primaryVoice: new Voice(
+          'maintainer',
+          'Maintainer',
+          'maintainer',
+          0.7,
+          1.0,
+          [],
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ),
         supportingVoices: [],
-        synthesisMode: 'single' as any,
+        synthesisMode: SynthesisMode.SINGLE,
         reasoning: 'Fallback to stable voice',
       },
       providerSelection: {
-        provider: 'ollama' as any,
+        provider: ProviderType.OLLAMA,
         confidence: 0.5,
         reason: 'Fallback provider selection',
         fallbackChain: [],

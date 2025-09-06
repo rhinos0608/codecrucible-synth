@@ -15,7 +15,7 @@ interface SafeCommandRegistry {
 }
 
 export class PluginDispatchHandler
-  implements CommandHandler<Readonly<PluginExecutePayload>, PluginExecuteResult>
+  implements CommandHandler<Readonly<PluginExecutePayload>>
 {
   public readonly type = 'plugin:execute';
 

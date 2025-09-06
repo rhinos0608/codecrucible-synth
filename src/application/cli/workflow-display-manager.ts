@@ -27,7 +27,7 @@ export interface WorkflowStep {
   progress: number;
   startTime: number;
   endTime?: number;
-  data?: any;
+  data?: unknown;
   error?: string;
 }
 
@@ -39,7 +39,7 @@ export interface WorkflowSession {
   endTime?: number;
   steps: WorkflowStep[];
   status: 'running' | 'completed' | 'failed';
-  result?: any;
+  result?: unknown;
   error?: string;
 }
 
@@ -54,24 +54,24 @@ export interface WorkflowDisplayOptions {
  * Manages workflow display and progress tracking for CLI operations
  */
 export class WorkflowDisplayManager extends EventEmitter {
-  private activeSessions: Map<string, WorkflowSession> = new Map();
-  private options: Required<WorkflowDisplayOptions>;
+  private readonly activeSessions: Map<string, WorkflowSession> = new Map();
+  private readonly options: Required<WorkflowDisplayOptions>;
 
-  constructor(options: WorkflowDisplayOptions = {}) {
+  public constructor(options: Readonly<WorkflowDisplayOptions> = {}) {
     super();
 
     this.options = {
-      enableRealTimeUpdates: options.enableRealTimeUpdates || true,
-      enableStreamingDisplay: options.enableStreamingDisplay || true,
-      showProgressBars: options.showProgressBars || true,
-      verboseLogging: options.verboseLogging || false,
+      enableRealTimeUpdates: options.enableRealTimeUpdates ?? true,
+      enableStreamingDisplay: options.enableStreamingDisplay ?? true,
+      showProgressBars: options.showProgressBars ?? true,
+      verboseLogging: options.verboseLogging ?? false,
     };
   }
 
   /**
    * Start a new workflow session
    */
-  startSession(
+  public startSession(
     input: string,
     complexity: 'simple' | 'medium' | 'complex' = 'medium'
   ): string {
@@ -99,7 +99,7 @@ export class WorkflowDisplayManager extends EventEmitter {
   /**
    * Add a step to a workflow session
    */
-  addStep(
+  public addStep(
     sessionId: string,
     phase: 'planning' | 'executing' | 'testing' | 'iterating',
     title: string,
@@ -137,19 +137,19 @@ export class WorkflowDisplayManager extends EventEmitter {
   /**
    * Update step progress
    */
-  updateStepProgress(
+  public updateStepProgress(
     sessionId: string,
     stepId: string,
     progress: number,
     message?: string
   ): void {
-    const session = this.activeSessions.get(sessionId);
+    const session = this.activeSessions.get(sessionId) as Readonly<WorkflowSession> | undefined;
     if (!session) {
       logger.warn(`Attempted to update progress for non-existent session: ${sessionId}`);
       return;
     }
 
-    const step = session.steps.find(s => s.id === stepId);
+    const step = (session.steps as ReadonlyArray<WorkflowStep>).find(s => s.id === stepId);
     if (!step) {
       logger.warn(`Attempted to update progress for non-existent step: ${stepId}`);
       return;
@@ -172,14 +172,14 @@ export class WorkflowDisplayManager extends EventEmitter {
   /**
    * Complete a workflow step
    */
-  completeStep(sessionId: string, stepId: string, data?: any): void {
+  public completeStep(sessionId: string, stepId: string, data?: Record<string, unknown>): void {
     const session = this.activeSessions.get(sessionId);
     if (!session) {
       logger.warn(`Attempted to complete step for non-existent session: ${sessionId}`);
       return;
     }
 
-    const step = session.steps.find(s => s.id === stepId);
+    const step = session.steps.find((s: Readonly<WorkflowStep>) => s.id === stepId);
     if (!step) {
       logger.warn(`Attempted to complete non-existent step: ${stepId}`);
       return;
@@ -204,14 +204,14 @@ export class WorkflowDisplayManager extends EventEmitter {
   /**
    * Fail a workflow step
    */
-  failStep(sessionId: string, stepId: string, error: string): void {
+  public failStep(sessionId: string, stepId: string, error: string): void {
     const session = this.activeSessions.get(sessionId);
     if (!session) {
       logger.warn(`Attempted to fail step for non-existent session: ${sessionId}`);
       return;
     }
 
-    const step = session.steps.find(s => s.id === stepId);
+    const step = session.steps.find((s: Readonly<WorkflowStep>) => s.id === stepId);
     if (!step) {
       logger.warn(`Attempted to fail non-existent step: ${stepId}`);
       return;
@@ -232,14 +232,14 @@ export class WorkflowDisplayManager extends EventEmitter {
   /**
    * Complete a workflow session
    */
-  completeSession(sessionId: string, result: {
+  public completeSession(sessionId: string, result: Readonly<{
     success: boolean;
     qualityScore?: number;
     operationType?: string;
     tokensUsed?: number;
     confidenceScore?: number;
     error?: string;
-  }): void {
+  }>): void {
     const session = this.activeSessions.get(sessionId);
     if (!session) {
       logger.warn(`Attempted to complete non-existent session: ${sessionId}`);
@@ -259,7 +259,7 @@ export class WorkflowDisplayManager extends EventEmitter {
     
     logger.info(
       `${successSymbol} Workflow session ${sessionId} ${session.status} in ${duration.toFixed(2)}ms. ` +
-      `Steps: ${session.steps.length}, Quality: ${((result.qualityScore || 0) * 100).toFixed(0)}%`
+      `Steps: ${session.steps.length}, Quality: ${((result.qualityScore ?? 0) * 100).toFixed(0)}%`
     );
 
     this.emit('session:completed', { session, result });
@@ -268,7 +268,7 @@ export class WorkflowDisplayManager extends EventEmitter {
   /**
    * Execute with streaming display for real-time progress
    */
-  async executeWithStreaming<T>(
+  public async executeWithStreaming<T>(
     sessionId: string,
     stepId: string,
     operation: () => Promise<T>,
@@ -276,7 +276,7 @@ export class WorkflowDisplayManager extends EventEmitter {
   ): Promise<T> {
     if (!this.options.enableStreamingDisplay) {
       // Fall back to regular execution
-      return await operation();
+      return operation();
     }
 
     try {
@@ -304,7 +304,7 @@ export class WorkflowDisplayManager extends EventEmitter {
   /**
    * Determine if an operation should use streaming display
    */
-  shouldUseStreaming(operationType: string): boolean {
+  public shouldUseStreaming(operationType: string): boolean {
     if (!this.options.enableStreamingDisplay) {
       return false;
     }
@@ -325,21 +325,21 @@ export class WorkflowDisplayManager extends EventEmitter {
   /**
    * Get active workflow sessions
    */
-  getActiveSessions(): WorkflowSession[] {
-    return Array.from(this.activeSessions.values()).filter(s => s.status === 'running');
+  public getActiveSessions(): WorkflowSession[] {
+    return Array.from(this.activeSessions.values()).filter((s: Readonly<WorkflowSession>) => s.status === 'running');
   }
 
   /**
    * Get session by ID
    */
-  getSession(sessionId: string): WorkflowSession | undefined {
+  public getSession(sessionId: string): WorkflowSession | undefined {
     return this.activeSessions.get(sessionId);
   }
 
   /**
    * Get workflow statistics
    */
-  getWorkflowStats(): {
+  public getWorkflowStats(): {
     totalSessions: number;
     activeSessions: number;
     completedSessions: number;
@@ -348,16 +348,16 @@ export class WorkflowDisplayManager extends EventEmitter {
     averageStepsPerSession: number;
   } {
     const sessions = Array.from(this.activeSessions.values());
-    const completed = sessions.filter(s => s.status === 'completed');
-    const failed = sessions.filter(s => s.status === 'failed');
-    const active = sessions.filter(s => s.status === 'running');
+    const completed = sessions.filter((s: Readonly<WorkflowSession>) => s.status === 'completed');
+    const failed = sessions.filter((s: Readonly<WorkflowSession>) => s.status === 'failed');
+    const active = sessions.filter((s: Readonly<WorkflowSession>) => s.status === 'running');
 
     const averageDuration = completed.length > 0
-      ? completed.reduce((sum, s) => sum + ((s.endTime || 0) - s.startTime), 0) / completed.length
+      ? completed.reduce((sum: number, s: Readonly<WorkflowSession>) => sum + ((s.endTime ?? 0) - s.startTime), 0) / completed.length
       : 0;
 
     const averageStepsPerSession = sessions.length > 0
-      ? sessions.reduce((sum, s) => sum + s.steps.length, 0) / sessions.length
+      ? sessions.reduce((sum: number, s: Readonly<WorkflowSession>) => sum + s.steps.length, 0) / sessions.length
       : 0;
 
     return {
@@ -373,7 +373,7 @@ export class WorkflowDisplayManager extends EventEmitter {
   /**
    * Clean up completed sessions to prevent memory leaks
    */
-  cleanupCompletedSessions(olderThanMs: number = 300000): void {
+  public cleanupCompletedSessions(olderThanMs: number = 300000): void {
     const now = performance.now();
     const sessionsToRemove: string[] = [];
 
@@ -397,12 +397,12 @@ export class WorkflowDisplayManager extends EventEmitter {
   /**
    * Shutdown and cleanup all resources
    */
-  async shutdown(): Promise<void> {
+  public shutdown(): void {
     logger.info('Shutting down WorkflowDisplayManager');
 
     // Complete any running sessions
     const runningSessions = Array.from(this.activeSessions.values())
-      .filter(s => s.status === 'running');
+      .filter((s: Readonly<WorkflowSession>) => s.status === 'running');
 
     for (const session of runningSessions) {
       this.completeSession(session.id, {

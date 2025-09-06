@@ -42,7 +42,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
         }
         
         getUserById(id: number): UserData | undefined {
-          return this.data.find(user => user.id === id) || null;
+          return this.data.find(user => user.id === id);
         }
       }
     `,

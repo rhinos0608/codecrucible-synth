@@ -338,12 +338,29 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           provider.getModelName?.()
         );
 
+        // FIXED: Add provider capability check for tool support
+        if (!supportsTools && request.tools) {
+          logger.warn('⚠️ Model does not support tool calling but tools were requested', {
+            provider: providerType,
+            model: provider.getModelName?.() || 'unknown',
+            requestedTools: request.tools?.length || 0,
+            fallbackStrategy: 'proceeding_without_tools'
+          });
+          
+          // Notify user about tool limitations
+          this.emit('toolCapabilityWarning', {
+            provider: providerType,
+            model: provider.getModelName?.() || 'unknown',
+            message: `The selected model (${provider.getModelName?.() || 'unknown'}) does not support tool calls. Proceeding with natural language response only.`
+          });
+        }
+
         // CONTEXTUAL TOOL FILTERING: Smart filtering based on request analysis
         let tools: any[] = [];
         let domainInfo = '';
         let filterReasoning = '';
 
-        if (toolIntegration) {
+        if (toolIntegration && supportsTools) {
           const allTools = await toolIntegration.getLLMFunctions();
 
           // Build context for tool filtering
@@ -375,6 +392,22 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
             reasoning: filterReasoning,
             approach: 'contextual-intelligent-filtering',
           });
+        } else {
+          // FIXED: Log fallback behavior when tools are not available
+          if (!supportsTools) {
+            logger.info('🚫 REQUEST-EXECUTION-MANAGER: Model does not support tools, proceeding with natural language only', {
+              provider: providerType,
+              model: provider.getModelName?.() || 'unknown',
+              toolIntegration: !!toolIntegration,
+              fallbackStrategy: 'natural_language_only'
+            });
+          } else if (!toolIntegration) {
+            logger.info('⚠️ REQUEST-EXECUTION-MANAGER: No tool integration available, proceeding with natural language only', {
+              provider: providerType,
+              model: provider.getModelName?.() || 'unknown',
+              fallbackStrategy: 'natural_language_only'
+            });
+          }
         }
 
         // ENHANCED DEBUG: Show contextual tool filtering status

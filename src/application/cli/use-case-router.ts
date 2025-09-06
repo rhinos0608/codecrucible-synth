@@ -423,32 +423,73 @@ export class UseCaseRouter {
 
   /**
    * Check if this is a simple question that should go directly to AI
+   * FIXED: Allow filesystem and tool-related questions to use tools
    */
   private isSimpleQuestion(input: string): boolean {
     if (typeof input !== 'string') return false;
 
     const inputLower = input.toLowerCase().trim();
 
-    // Simple math questions
+    // Simple math questions (these don't need tools)
     if (/^\s*\d+\s*[+\-*\/]\s*\d+[\s?]*$/.test(inputLower)) return true;
 
-    // Simple "what is" questions
-    if (inputLower.startsWith('what is') && inputLower.length < 50) return true;
+    // FIXED: Exclude filesystem-related questions from simple question routing
+    const filesystemKeywords = [
+      'folder', 'directory', 'file', 'files', 'dirs', 'folders',
+      'path', 'paths', 'contents', 'list', 'ls', 'find', 'search',
+      'src', 'docs', 'test', 'tests', 'build', 'dist', 'bin',
+      'config', 'package.json', 'tsconfig', 'readme', '.env',
+      'node_modules', '.git', '.github', 'scripts'
+    ];
+    
+    const hasFilesystemKeywords = filesystemKeywords.some(keyword => inputLower.includes(keyword));
+    if (hasFilesystemKeywords) {
+      logger.debug('Question contains filesystem keywords, enabling tools', { input: inputLower });
+      return false; // Allow tools for filesystem questions
+    }
+
+    // FIXED: Exclude command/tool execution questions
+    const toolKeywords = [
+      'run', 'execute', 'command', 'cmd', 'terminal', 'shell',
+      'npm', 'node', 'git', 'install', 'build', 'test', 'lint',
+      'compile', 'deploy', 'start', 'stop'
+    ];
+    
+    const hasToolKeywords = toolKeywords.some(keyword => inputLower.includes(keyword));
+    if (hasToolKeywords) {
+      logger.debug('Question contains tool keywords, enabling tools', { input: inputLower });
+      return false; // Allow tools for tool-related questions
+    }
+
+    // Simple "what is" questions (conceptual only, not filesystem)
+    if (inputLower.startsWith('what is') && inputLower.length < 50 && !hasFilesystemKeywords) return true;
 
     // Simple questions with question words
     const questionWords = ['what', 'who', 'when', 'where', 'why', 'how'];
     const startsWithQuestion = questionWords.some(word => inputLower.startsWith(`${word} `));
 
-    // Direct questions under 100 characters that don't mention files or code
+    // Direct questions under 100 characters that don't mention files, paths, or code
     const isShort = inputLower.length < 100;
-    const noFileReferences =
-      !inputLower.includes('.') && !inputLower.includes('/') && !inputLower.includes('\\');
+    const noExplicitPaths = !inputLower.includes('./') && !inputLower.includes('../') && !inputLower.includes('C:\\');
     const noCodeKeywords =
       !inputLower.includes('function') &&
       !inputLower.includes('class') &&
-      !inputLower.includes('import');
+      !inputLower.includes('import') &&
+      !inputLower.includes('export') &&
+      !inputLower.includes('const') &&
+      !inputLower.includes('let') &&
+      !inputLower.includes('var');
 
-    return startsWithQuestion && isShort && noFileReferences && noCodeKeywords;
+    // Only route as simple if it's clearly conceptual/theoretical
+    const isConceptual = startsWithQuestion && isShort && noExplicitPaths && noCodeKeywords && !hasFilesystemKeywords && !hasToolKeywords;
+    
+    if (isConceptual) {
+      logger.debug('Question identified as simple conceptual question, disabling tools', { input: inputLower });
+    } else {
+      logger.debug('Question requires tools for proper response', { input: inputLower });
+    }
+    
+    return isConceptual;
   }
 
   /**

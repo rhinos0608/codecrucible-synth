@@ -29,6 +29,7 @@ import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { getVersion } from './utils/version.js';
+import type { ServiceFactory } from './application/services/service-factory.js';
 
 // Export unified architecture components
 export { UnifiedCLI as CLI } from './application/interfaces/unified-cli.js';
@@ -81,7 +82,7 @@ async function _getPackageVersion(): Promise<string> {
 export async function initialize(
   cliOptions: CLIOptions,
   isInteractive: boolean
-): Promise<{ cli: UnifiedCLI; serviceFactory: any }> {
+): Promise<{ cli: UnifiedCLI; serviceFactory: ServiceFactory }> {
   try {
     logger.info('🚀 Initializing CodeCrucible Synth with Unified Architecture...');
     const startTime = Date.now();

@@ -205,7 +205,8 @@ export function loadRustExecutor(baseDir?: string): any {
   try {
     return loadPrebuiltBinding('codecrucible-rust-executor');
   } catch (prebuiltError) {
-    logger.warn(
+    // FIXED: Reduce noise - use debug level instead of warn for expected fallback behavior
+    logger.debug(
       'Prebuilt binary not available, falling back to local build:',
       (prebuiltError as Error).message
     );
@@ -308,7 +309,8 @@ export function loadRustExecutorSafely(baseDir?: string): {
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.warn('Rust executor not available:', errorMessage);
+    // FIXED: Reduce noise - use debug level for expected missing binaries in development
+    logger.debug('Rust executor not available:', errorMessage);
 
     return {
       module: null,

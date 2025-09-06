@@ -50,7 +50,7 @@ export interface MultiToolFormattedResult extends FormattedResult {
  * Centralized formatter for all tool results and responses
  */
 export class UnifiedResultFormatter {
-  private readonly maxDepthDefault = 10;
+  private readonly maxDepthDefault = 25; // FIXED: Increased from 10 to 25 for deeper extraction
   private readonly maxLengthDefault = 50000;
 
   /**
@@ -274,9 +274,26 @@ export class UnifiedResultFormatter {
   ): { content: string; strategy: string; warnings: string[] } {
     const warnings: string[] = [];
 
-    // Prevent infinite recursion
+    // FIXED: Better handling when depth limit is reached
     if (maxDepth <= 0) {
-      return { content: '[Max depth reached]', strategy: 'depth-limited', warnings: ['Maximum extraction depth reached'] };
+      // Try to extract at least basic information even at max depth
+      if (typeof result === 'string') {
+        return { content: result.substring(0, 200) + (result.length > 200 ? '...' : ''), strategy: 'depth-limited-string', warnings: ['Maximum extraction depth reached'] };
+      }
+      if (typeof result === 'number' || typeof result === 'boolean') {
+        return { content: String(result), strategy: 'depth-limited-primitive', warnings: ['Maximum extraction depth reached'] };
+      }
+      if (result === null || result === undefined) {
+        return { content: '', strategy: 'depth-limited-null', warnings: ['Maximum extraction depth reached'] };
+      }
+      if (Array.isArray(result)) {
+        return { content: `[Array with ${result.length} items]`, strategy: 'depth-limited-array', warnings: ['Maximum extraction depth reached'] };
+      }
+      if (typeof result === 'object' && result !== null) {
+        const keys = Object.keys(result).slice(0, 5);
+        return { content: `{Object with keys: ${keys.join(', ')}${Object.keys(result).length > 5 ? '...' : ''}}`, strategy: 'depth-limited-object', warnings: ['Maximum extraction depth reached'] };
+      }
+      return { content: '[Max depth reached - complex structure]', strategy: 'depth-limited-fallback', warnings: ['Maximum extraction depth reached'] };
     }
 
     // Strategy 1: Handle primitives with enhanced type detection

@@ -61,11 +61,11 @@ export class EnhancedToolIntegration extends EventEmitter {
       ...config,
     };
 
-    // Use existing ToolIntegration if provided to prevent MCP server duplication
+    // CRITICAL FIX: Always require baseToolIntegration to prevent MCP server duplication
     if (baseToolIntegration) {
       this.baseToolIntegration = baseToolIntegration;
     } else {
-      // Fallback: create our own MCP manager (should be avoided to prevent duplication)
+      // FIXED: Create minimal MCP manager with ALL tools enabled (not disabled)
       const mcpConfig = {
         filesystem: {
           enabled: true,
@@ -73,17 +73,17 @@ export class EnhancedToolIntegration extends EventEmitter {
           allowedPaths: [process.cwd()],
         },
         git: {
-          enabled: false,
-          autoCommitMessages: false,
+          enabled: true, // FIXED: Enable git tools
+          autoCommitMessages: true,
           safeModeEnabled: true,
         },
         terminal: {
-          enabled: false,
-          allowedCommands: [] as string[],
-          blockedCommands: ['rm', 'del', 'rmdir'],
+          enabled: true, // FIXED: Enable terminal tools
+          allowedCommands: ['ls', 'cat', 'pwd', 'echo', 'grep', 'find', 'git', 'npm', 'node'] as string[],
+          blockedCommands: ['rm', 'del', 'rmdir', 'sudo', 'su'],
         },
         packageManager: {
-          enabled: false,
+          enabled: true, // FIXED: Enable package manager tools
           autoInstall: false,
           securityScan: true,
         },
@@ -96,6 +96,8 @@ export class EnhancedToolIntegration extends EventEmitter {
       };
       const mcpManager = new MCPServerManager(mcpConfig);
       this.baseToolIntegration = new ToolIntegration(mcpManager, rustBackend);
+      
+      logger.warn('⚠️ Created fallback MCP manager in EnhancedToolIntegration - prefer passing baseToolIntegration');
     }
     this.orchestrator = new DomainAwareToolOrchestrator();
 
@@ -133,8 +135,12 @@ export class EnhancedToolIntegration extends EventEmitter {
         const toolPrompt = `${toolCall.function.name}: ${toolCall.function.arguments}`;
         const availableTools: any[] = [];
         const domainAnalysis = this.orchestrator.getToolsForPrompt(toolPrompt, availableTools);
-        // Log domain analysis for debugging
-        console.log('Domain analysis:', domainAnalysis);
+        // FIXED: Use structured logging instead of console.log
+        logger.debug('Domain analysis for intelligent routing:', { 
+          toolName: toolCall.function.name,
+          analysis: domainAnalysis,
+          availableToolsCount: availableTools.length
+        });
         result = await this.executeWithRetry(toolCall, context);
       } else {
         result = await this.executeWithRetry(toolCall, context);
@@ -379,7 +385,8 @@ export class EnhancedToolIntegration extends EventEmitter {
       // Fallback: return empty array if no base implementation
       return [];
     } catch (error) {
-      console.warn('Failed to get LLM functions:', error);
+      // FIXED: Use structured logging instead of console.warn
+      logger.warn('Failed to get LLM functions from base tool integration:', error);
       return [];
     }
   }

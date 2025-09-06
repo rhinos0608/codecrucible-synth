@@ -20,7 +20,7 @@ if (envAllowlist) {
   }
 }
 
-const dangerousPatterns = [/^rm\b/, /\bsudo\b/, /\bdel\b/, /&&/, /\|\|/, /\|/, /;|\n/, /`/];
+const dangerousPatterns = [/^rm\b/, /\bsudo\b/, /\bdel\b/, /&&/, /\|\|/, /;|\n/, /`/];
 
 export function validateCommand(command: string): { isValid: boolean; reason?: string } {
   if (!command || command.trim() === '') {

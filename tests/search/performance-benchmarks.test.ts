@@ -4,16 +4,16 @@
  * Tests real-world performance characteristics of hybrid search system
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { HybridSearchCoordinator } from '../../src/core/search/hybrid-search-coordinator.js';
 import { CommandLineSearchEngine } from '../../src/core/search/command-line-search-engine.js';
 import { PerformanceMonitor } from '../../src/core/search/performance-monitor.js';
 import { AdvancedSearchCacheManager } from '../../src/core/search/advanced-search-cache.js';
 import { HybridSearchFactory } from '../../src/core/search/hybrid-search-factory.js';
-import type { RAGQuery, BenchmarkComparison } from '../../src/core/search/types.js';
+import type { BenchmarkComparison, RAGQuery } from '../../src/core/search/types.js';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { mkdtemp, rm, writeFile, mkdir } from 'fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 
 // Performance test configuration
 interface PerformanceTestConfig {
@@ -75,8 +75,9 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
           
           async getData${i}(id: number): Promise<DataType${i}> {
             this.logger.info(\`Fetching data \${id} for Service${i}\`);
-            if (this.cache.has(id)) {
-              return this.cache.get(id)!;
+            const cached = this.cache.get(id);
+            if (cached !== undefined) {
+              return cached;
             }
             const result = await this.repository.findById(id);
             const processed = await this.processData${i}(result);
@@ -194,8 +195,9 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
           const cache = new Map<string, T>();
           for (const item of items) {
             const key = JSON.stringify(item);
-            if (cache.has(key)) {
-              results.push(cache.get(key)!);
+            const cached = cache.get(key);
+            if (cached !== undefined) {
+              results.push(cached);
             } else {
               const processed = await processor(item);
               cache.set(key, processed);
@@ -608,7 +610,7 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
         const result = await hybridCoordinator.search({
           query: test.query,
           queryType: 'pattern',
-          useRegex: test.useRegex || false,
+          useRegex: test.useRegex ?? false,
           maxResults: 20,
         });
         const responseTime = Date.now() - startTime;
@@ -737,8 +739,7 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
 
       const scenarioResults: Array<{ scenario: string; time: number; results: number }> = [];
 
-      for (let i = 0; i < workflowScenarios.length; i++) {
-        const scenario = workflowScenarios[i];
+      for (const scenario of workflowScenarios) {
         const startTime = Date.now();
 
         const result = await hybridCoordinator.search({

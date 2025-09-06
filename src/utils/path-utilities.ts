@@ -323,6 +323,52 @@ export class PathUtilities {
       return pathSegments[pathSegments.length - 1] || '.';
     }
   }
+
+  /**
+   * Resolve directory path with case-insensitive fallback for common directories
+   */
+  static resolveCaseInsensitivePath(basePath: string, targetDir: string): string | null {
+    try {
+      // First try exact match
+      const exactPath = path.join(basePath, targetDir);
+      if (this.pathExists(exactPath)) {
+        return exactPath;
+      }
+
+      // Common directory variations to check
+      const variations = [
+        targetDir.toLowerCase(),
+        targetDir.toUpperCase(),
+        targetDir.charAt(0).toUpperCase() + targetDir.slice(1).toLowerCase(),
+        targetDir.charAt(0).toLowerCase() + targetDir.slice(1).toUpperCase()
+      ];
+
+      for (const variation of variations) {
+        const testPath = path.join(basePath, variation);
+        if (this.pathExists(testPath)) {
+          logger.debug(`Case-insensitive match found: ${targetDir} -> ${variation}`);
+          return testPath;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      logger.warn(`Error resolving case-insensitive path for ${targetDir}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if path exists synchronously (helper for case resolution)
+   */
+  private static pathExists(filePath: string): boolean {
+    try {
+      const fs = require('fs');
+      return fs.existsSync(filePath);
+    } catch {
+      return false;
+    }
+  }
 }
 
 // Export convenient functions for common operations

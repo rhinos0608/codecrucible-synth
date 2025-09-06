@@ -20,7 +20,7 @@ export class CLICoordinator {
    */
   async run(argv: string[]): Promise<void> {
     const { command } = CommandParser.parseArgs(argv);
-    const session = this.sessions.createSession();
+    const session = await Promise.resolve(this.sessions.createSession());
 
     if (!command) {
       await this.repl(session);

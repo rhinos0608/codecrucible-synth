@@ -39,6 +39,8 @@ export interface ModelRequest {
   maxTokens?: number;
   systemPrompt?: string;
   context?: string[];
+  stream?: boolean;
+  onStreamingToken?: (token: string, metadata?: any) => void;
 }
 
 export interface ModelResponse {

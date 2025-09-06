@@ -129,7 +129,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         }));
       },
       showStatus: () => this.showStatus(),
-      execCommand: (name: string, args: any[]) => this.execCommand(name, args),
+      execCommand: (name: string, args: readonly unknown[]) => this.execCommand(name, Array.from(args)),
     });
     
     this.setupEventHandlers();

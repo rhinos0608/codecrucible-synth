@@ -360,11 +360,31 @@ User Request: ${userPrompt}`;
         // Set streaming flag in model request
         modelRequest.stream = true;
         
-        // TODO: Implement streaming token callback in RequestExecutionManager
-        // For now, route through unified pipeline which will handle tools correctly
+        // Implement streaming token callback for real-time observability
+        const streamingMetrics = {
+          tokensGenerated: 0,
+          startTime: Date.now(),
+          chunkCount: 0
+        };
+
+        // Set up streaming callback for token-level observability
+        modelRequest.onStreamingToken = (token: string, metadata?: any) => {
+          streamingMetrics.tokensGenerated++;
+          streamingMetrics.chunkCount++;
+          
+          // Log streaming progress periodically
+          if (streamingMetrics.tokensGenerated % 50 === 0) {
+            const elapsed = Date.now() - streamingMetrics.startTime;
+            const tokensPerSecond = streamingMetrics.tokensGenerated / (elapsed / 1000);
+            logger.debug(`🌊 Streaming progress: ${streamingMetrics.tokensGenerated} tokens, ${tokensPerSecond.toFixed(1)} tokens/sec`);
+          }
+        };
+
         response = await this.processModelRequest(modelRequest);
         
-        logger.info('✅ Streaming completed via unified pipeline');
+        const finalElapsed = Date.now() - streamingMetrics.startTime;
+        const finalRate = streamingMetrics.tokensGenerated / (finalElapsed / 1000);
+        logger.info(`✅ Streaming completed: ${streamingMetrics.tokensGenerated} tokens in ${finalElapsed}ms (${finalRate.toFixed(1)} tokens/sec)`);
 
       } else {
         response = await this.processModelRequest(modelRequest);

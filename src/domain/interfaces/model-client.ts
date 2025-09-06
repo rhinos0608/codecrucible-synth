@@ -15,6 +15,8 @@ export interface ModelRequest {
   stream?: boolean;
   tools?: ModelTool[];
   context?: RequestContext;
+  // Streaming callback for token-level observability
+  onStreamingToken?: (token: string, metadata?: any) => void;
   // Structured message format for tool results
   messages?: Array<{
     role: 'user' | 'assistant' | 'tool';

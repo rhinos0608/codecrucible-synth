@@ -529,13 +529,27 @@ export class MCPServerManager {
     const smitheryTools = smitheryEnabled ? this.smitheryServer!.getAvailableTools().length : 0;
     const smitheryServers = smitheryEnabled ? 1 : 0;
     
+    // Get actual registry status based on server registrations
+    const registryStats = mcpServerRegistry.getRegistrationStatus();
+    const hasActiveServers = registryStats.ready > 0;
+    const hasErrors = registryStats.failed > 0;
+    
+    let registryStatus: 'active' | 'degraded' | 'inactive';
+    if (hasActiveServers && !hasErrors) {
+      registryStatus = 'active';
+    } else if (hasActiveServers && hasErrors) {
+      registryStatus = 'degraded';
+    } else {
+      registryStatus = 'inactive';
+    }
+    
     return {
       overall,
       servers,
       capabilities: {
         totalTools: capabilities.toolCount,
         totalServers: totalCount,
-        registryStatus: 'active', // TODO: Get actual registry status
+        registryStatus,
         smitheryEnabled,
         smitheryTools,
         smitheryServers

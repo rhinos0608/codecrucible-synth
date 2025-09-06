@@ -218,8 +218,8 @@ export class OllamaProvider implements LLMProvider {
         prompt_eval_count: result.prompt_eval_count,
         eval_count: result.eval_count,
         eval_duration: result.eval_duration,
-        // Map tool_calls to toolCalls for consistency with orchestrator
-        toolCalls: result.tool_calls,
+        // Validate and normalize tool calls to prevent double-encoded JSON issues
+        toolCalls: this.validateAndNormalizeToolCalls(result.tool_calls),
       };
     }
 
@@ -305,7 +305,19 @@ export class OllamaProvider implements LLMProvider {
       const finalContent = data.response || data.content || '';
       
       if (finalContent.length === 0) {
-        logger.warn('Ollama returned zero-length content, model may be initializing');
+        const errorMessage = `Ollama returned zero-length content from model ${payload.model}. Model may be initializing or prompt may be inappropriate.`;
+        logger.error(errorMessage, {
+          model: payload.model,
+          promptLength: builtPrompt.length,
+          hasToolCalls: !!data.tool_calls || (data.message && data.message.tool_calls)
+        });
+        
+        // Only allow zero-length content if there are tool calls
+        if (!data.tool_calls && !(data.message && data.message.tool_calls)) {
+          throw new Error(errorMessage);
+        } else {
+          logger.debug('Empty content allowed due to tool calls being present');
+        }
       }
 
       return {
@@ -787,6 +799,58 @@ export class OllamaProvider implements LLMProvider {
 
     // Fallback to regular generateCode for non-tool requests
     return await this.generateCode(request.prompt, request.options || {});
+  }
+
+  /**
+   * Validate and normalize tool calls to prevent double-encoded JSON
+   */
+  private validateAndNormalizeToolCalls(toolCalls: any[]): any[] {
+    if (!Array.isArray(toolCalls)) {
+      return toolCalls; // Return as-is if not an array (could be undefined/null)
+    }
+
+    return toolCalls.map(toolCall => {
+      if (!toolCall || typeof toolCall !== 'object') {
+        logger.warn('Invalid tool call structure:', toolCall);
+        return toolCall;
+      }
+
+      const normalizedCall = { ...toolCall };
+
+      // Validate and normalize arguments if present
+      if (normalizedCall.function && normalizedCall.function.arguments) {
+        const args = normalizedCall.function.arguments;
+        
+        // Handle double-encoded JSON arguments
+        if (typeof args === 'string') {
+          try {
+            let parsedArgs = JSON.parse(args);
+            
+            // Check for additional levels of encoding
+            let parseAttempts = 0;
+            while (typeof parsedArgs === 'string' && parseAttempts < 3) {
+              parseAttempts++;
+              try {
+                parsedArgs = JSON.parse(parsedArgs);
+              } catch {
+                break; // Stop if parsing fails
+              }
+            }
+            
+            normalizedCall.function.arguments = parsedArgs;
+            
+            if (parseAttempts > 0) {
+              logger.debug(`Normalized ${parseAttempts}-level JSON encoded tool arguments for ${normalizedCall.function.name}`);
+            }
+          } catch (error) {
+            logger.warn(`Failed to parse tool call arguments for ${normalizedCall.function.name}:`, error);
+            // Keep original arguments if parsing fails
+          }
+        }
+      }
+
+      return normalizedCall;
+    });
   }
 
   /**

@@ -2,6 +2,7 @@ import type { CLIOperationRequest } from '../services/unified-cli-coordinator.js
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
+import { PathUtilities } from '../../utils/path-utilities.js';
 
 interface Enriched {
   context?: {
@@ -129,9 +130,17 @@ function listCommandNames(root: string) {
 }
 
 function gatherDocs(root: string) {
-  const docsDir = ['docs', 'Docs', 'documentation']
-    .map(d => path.join(root, d))
-    .find(p => fs.existsSync(p) && fs.statSync(p).isDirectory());
+  // Use case-insensitive path resolution for better cross-platform compatibility
+  const docsDirCandidates = ['docs', 'Docs', 'documentation'];
+  let docsDir: string | null = null;
+  
+  for (const candidate of docsDirCandidates) {
+    docsDir = PathUtilities.resolveCaseInsensitivePath(root, candidate);
+    if (docsDir) {
+      break;
+    }
+  }
+  
   if (!docsDir) {
     return { summaries: [], totalFiles: 0 };
   }

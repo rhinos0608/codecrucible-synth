@@ -13,3 +13,4 @@ export * from './user-interaction.js';
 export * from './model-client.js';
 export * from './tool-system.js';
 export * from './configuration.js';
+export * from './provider-capability-registry.js';

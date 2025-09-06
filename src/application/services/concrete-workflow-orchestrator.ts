@@ -29,8 +29,10 @@ import { randomUUID } from 'crypto';
 import { RequestExecutionManager } from '../../infrastructure/execution/request-execution-manager.js';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
-import { executeWithStreaming } from './orchestrator/streaming-handler.js';
 import { ToolRegistry } from './orchestrator/tool-registry.js';
+import { StreamingManager } from './orchestrator/streaming-manager.js';
+import { ToolExecutionRouter } from './orchestrator/tool-execution-router.js';
+import { providerCapabilityRegistry } from './provider-capability-registry.js';
 
 export interface WorkflowMetrics {
   totalRequests: number;
@@ -51,6 +53,8 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   private requestExecutionManager?: RequestExecutionManager;
   private isInitialized = false;
   private toolRegistry?: ToolRegistry;
+  private streamingManager = new StreamingManager();
+  private toolExecutionRouter?: ToolExecutionRouter;
 
   // Request tracking
   private activeRequests: Map<
@@ -73,6 +77,8 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
 
   constructor() {
     super();
+    // Register default provider capabilities
+    providerCapabilityRegistry.register('default', { streaming: true, toolCalling: true });
   }
 
   /**
@@ -107,6 +113,9 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       this.modelClient = dependencies.modelClient;
       this.mcpManager = dependencies.mcpManager;
       this.toolRegistry = new ToolRegistry(this.mcpManager);
+      if (this.mcpManager) {
+        this.toolExecutionRouter = new ToolExecutionRouter(this.mcpManager);
+      }
 
       // DEBUG: Verify critical dependencies
       logger.info('🔧 ConcreteWorkflowOrchestrator dependency injection:');
@@ -352,40 +361,19 @@ User Request: ${userPrompt}`;
 
       let response: ModelResponse;
 
-
-      // CRITICAL FIX: Unified request path for both streaming and non-streaming
-      // This ensures tool integration works consistently for both modes
       if (payload.options?.stream) {
-        logger.info('🌊 Using streaming response through unified pipeline');
-        // Set streaming flag in model request
-        modelRequest.stream = true;
-        
-        // Implement streaming token callback for real-time observability
-        const streamingMetrics = {
-          tokensGenerated: 0,
-          startTime: Date.now(),
-          chunkCount: 0
-        };
-
-        // Set up streaming callback for token-level observability
-        modelRequest.onStreamingToken = (token: string, metadata?: any) => {
-          streamingMetrics.tokensGenerated++;
-          streamingMetrics.chunkCount++;
-          
-          // Log streaming progress periodically
-          if (streamingMetrics.tokensGenerated % 50 === 0) {
-            const elapsed = Date.now() - streamingMetrics.startTime;
-            const tokensPerSecond = streamingMetrics.tokensGenerated / (elapsed / 1000);
-            logger.debug(`🌊 Streaming progress: ${streamingMetrics.tokensGenerated} tokens, ${tokensPerSecond.toFixed(1)} tokens/sec`);
-          }
-        };
-
-        response = await this.processModelRequest(modelRequest);
-        
-        const finalElapsed = Date.now() - streamingMetrics.startTime;
-        const finalRate = streamingMetrics.tokensGenerated / (finalElapsed / 1000);
-        logger.info(`✅ Streaming completed: ${streamingMetrics.tokensGenerated} tokens in ${finalElapsed}ms (${finalRate.toFixed(1)} tokens/sec)`);
-
+        if (
+          modelRequest.provider &&
+          !providerCapabilityRegistry.supports(modelRequest.provider, 'streaming')
+        ) {
+          logger.warn(
+            `Provider ${modelRequest.provider} does not support streaming; falling back to non-streaming`
+          );
+          response = await this.processModelRequest(modelRequest);
+        } else {
+          modelRequest.stream = true;
+          response = await this.streamingManager.stream(this.modelClient!, modelRequest);
+        }
       } else {
         response = await this.processModelRequest(modelRequest);
       }
@@ -402,82 +390,19 @@ User Request: ${userPrompt}`;
         response.toolCalls?.length
       );
 
-      if (response.toolCalls && response.toolCalls.length > 0) {
-        logger.debug('ConcreteWorkflowOrchestrator: entering tool execution');
-        logger.info(`🔧 AI model made ${response.toolCalls.length} tool calls`);
-
-        // Execute all tool calls and collect results
-        const toolResults: Array<{ id: string; result: any; error?: string }> = [];
-
-        if (!this.mcpManager) {
-          throw new Error('MCP manager not available');
-        }
-
-        for (const toolCall of response.toolCalls) {
-          try {
-            const toolResult = await this.mcpManager.executeTool(
-              toolCall.function.name,
-              JSON.parse(toolCall.function.arguments),
-              request.context
-            );
-            logger.info(`✅ Tool call ${toolCall.function.name} executed successfully`);
-
-            toolResults.push({
-              id: toolCall.id || toolCall.function.name,
-              result: toolResult,
-            });
-          } catch (error) {
-            logger.error(`❌ Tool call ${toolCall.function.name} failed:`, error);
-            toolResults.push({
-              id: toolCall.id || toolCall.function.name,
-              result: null,
-              error: getErrorMessage(error),
-            });
-          }
-        }
-
-        // CRITICAL FIX: Send tool results back to AI model using structured messages
-        if (toolResults.length > 0) {
-          logger.info(
-            `🔄 Sending ${toolResults.length} tool results back to AI model for synthesis (STRUCTURED)`
-          );
-
-          // IMPROVED: Use structured message format instead of plain text embedding
-          const structuredMessages = [
-            {
-              role: 'user' as const,
-              content: payload.input || payload.prompt,
-            },
-            {
-              role: 'assistant' as const,
-              content: response.content || 'I need to use tools to help with this request.',
-              tool_calls: response.toolCalls,
-            },
-            {
-              role: 'tool' as const,
-              content: JSON.stringify(toolResults, null, 2),
-              tool_call_id: 'batch_results',
-            },
-          ];
-
-          // Create structured follow-up request WITHOUT tools to force text synthesis
-          const followUpRequest: ModelRequest = {
-            id: `${request.id}-structured-followup`,
-            prompt: `User request: ${payload.input || payload.prompt}\n\nTool execution results are provided in the conversation history. Please provide a comprehensive, well-formatted response based on these results. Do not make any additional tool calls - just synthesize the information provided.`,
-            model: modelRequest.model,
-            temperature: modelRequest.temperature,
-            maxTokens: modelRequest.maxTokens,
-            // CRITICAL FIX: Remove tools to prevent infinite tool calling
-            tools: [],
-            messages: structuredMessages,
-            context: request.context,
-          };
-
-          const finalResponse = await this.processModelRequest(followUpRequest);
-          logger.info(`✅ AI model synthesized structured tool results into final response`);
-
-          return finalResponse;
-        }
+      if (
+        response.toolCalls &&
+        response.toolCalls.length > 0 &&
+        this.toolExecutionRouter &&
+        (!modelRequest.provider ||
+          providerCapabilityRegistry.supports(modelRequest.provider, 'toolCalling'))
+      ) {
+        response = await this.toolExecutionRouter.handleToolCalls(
+          response,
+          request,
+          modelRequest,
+          req => this.processModelRequest(req)
+        );
       }
 
       return response;

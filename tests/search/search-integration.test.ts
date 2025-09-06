@@ -4,7 +4,7 @@
  * Provides comprehensive test coverage report for hybrid search system
  */
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { HybridSearchCoordinator } from '../../src/core/search/hybrid-search-coordinator.js';
 import { CommandLineSearchEngine } from '../../src/core/search/command-line-search-engine.js';
 import { AdvancedSearchCacheManager } from '../../src/core/search/advanced-search-cache.js';
@@ -18,7 +18,7 @@ import type { RAGQuery, SearchResult } from '../../src/core/search/types.js';
 import type { CLIContext } from '../../src/core/cli/cli-types.js';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { mkdtemp, rm, writeFile, mkdir } from 'fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 import * as os from 'os';
 
 describe('Search Integration Test Suite - Master Test Runner', () => {
@@ -93,8 +93,9 @@ describe('Search Integration Test Suite - Master Test Runner', () => {
         }
 
         async findUserById(id: string): Promise<User | null> {
-          if (this.cache.has(id)) {
-            return this.cache.get(id) ?? null;
+          const cachedUser = this.cache.get(id);
+          if (cachedUser !== undefined) {
+            return cachedUser;
           }
           const user = await this.repository.findById(id);
           if (user) {
@@ -258,8 +259,8 @@ describe('Search Integration Test Suite - Master Test Runner', () => {
 
   afterAll(async () => {
     // Cleanup all components
-    await hybridCoordinator?.shutdown();
-    await cacheManager?.shutdown();
+    await hybridCoordinator.shutdown();
+    await cacheManager.shutdown();
     await cliIntegration?.shutdown();
 
     // Remove test workspace
@@ -623,7 +624,7 @@ describe('Search Integration Test Suite - Master Test Runner', () => {
   });
 
   describe('Integration Test Summary', () => {
-    it('should report comprehensive test coverage', async () => {
+    it('should report comprehensive test coverage', () => {
       console.log('\n📊 Search Integration Test Summary:');
 
       // Component initialization status

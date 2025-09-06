@@ -4,13 +4,13 @@
  * Validates cross-platform compatibility and performance claims
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { CommandLineSearchEngine } from '../../src/core/search/command-line-search-engine.js';
 import { CodePatternGenerator } from '../../src/core/search/code-pattern-generator.js';
 import type { SearchOptions, SearchResult } from '../../src/core/search/types.js';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { mkdtemp, rm, writeFile, mkdir } from 'fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 import * as os from 'os';
 
 describe('Command Line Search Engine - Cross-Platform Tests', () => {
@@ -36,11 +36,12 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       
       export class DataProcessor {
         private data: UserData[] = [];
-        
+
         async processUsers(users: UserData[]): Promise<void> {
           this.data = users;
         }
-        
+
+        // edge case: return undefined when user is missing
         getUserById(id: number): UserData | undefined {
           return this.data.find(user => user.id === id);
         }
@@ -67,6 +68,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
         }
 
         applyDiscount(rate) {
+          // apply discount for clearance
           return this.getTotal() * (1 - rate);
         }
       }
@@ -417,7 +419,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       const results = await searchEngine.searchInFiles(options);
 
       expect(results.length).toBeGreaterThan(0);
-      const match = results[0];
+      const [match] = results;
 
       expect(match.content).toBeDefined();
       expect(match.content.length).toBeGreaterThan(0);
@@ -446,7 +448,7 @@ describe('Command Line Search Engine - Cross-Platform Tests', () => {
       const results = await searchEngine.searchInFiles(options);
 
       expect(results.length).toBeGreaterThan(0);
-      const match = results[0];
+      const [match] = results;
 
       expect(match.line).toBeGreaterThan(0);
       expect(match.column).toBeGreaterThanOrEqual(0);

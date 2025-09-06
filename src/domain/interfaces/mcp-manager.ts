@@ -14,38 +14,38 @@ import {
 
 export interface IMcpManager {
   // Core Lifecycle Methods
-  initialize(): Promise<void>;
-  startServers(): Promise<void>;
-  startServer(serverName: string): Promise<void>;
-  shutdown(): Promise<void>;
+  initialize: () => Promise<void>;
+  startServers: () => Promise<void>;
+  startServer: (serverName: string) => Promise<void>;
+  shutdown: () => Promise<void>;
 
   // Tool Execution (Primary Interface)
-  executeTool(
+  executeTool: (
     toolName: string,
-    args: ToolExecutionArgs,
-    context?: ToolExecutionContext,
-    options?: ToolExecutionOptions
-  ): Promise<ToolExecutionResult>;
+    args: Readonly<ToolExecutionArgs>,
+    context?: Readonly<ToolExecutionContext>,
+    options?: Readonly<ToolExecutionOptions>
+  ) => Promise<ToolExecutionResult>;
 
   // Convenient File System Methods
-  readFileSecure(filePath: string): Promise<string>;
-  writeFileSecure(filePath: string, content: string): Promise<void>;
-  listDirectorySecure(directoryPath: string): Promise<string[]>;
-  getFileStats(filePath: string): Promise<{
+  readFileSecure: (filePath: string) => Promise<string>;
+  writeFileSecure: (filePath: string, content: string) => Promise<void>;
+  listDirectorySecure: (directoryPath: string) => Promise<string[]>;
+  getFileStats: (filePath: string) => Promise<{
     exists: boolean;
     size?: number;
     modified?: Date;
   }>;
 
   // Command Execution
-  executeCommandSecure(command: string, args?: string[]): Promise<string>;
+  executeCommandSecure: (command: string, args?: ReadonlyArray<string>) => Promise<string>;
 
   // Server Management
-  listServers(): Promise<string[]>;
-  getServerStatus(serverId: string): any;
+  listServers: () => Promise<string[]>;
+  getServerStatus: (serverId: string) => unknown;
 
   // Health and Monitoring
-  getHealthStatus(): Promise<{
+  getHealthStatus: () => Promise<{
     overall: 'healthy' | 'degraded' | 'critical';
     servers: Array<{
       serverId: string;
@@ -64,7 +64,7 @@ export interface IMcpManager {
     };
   }>;
 
-  healthCheck(): Promise<{
+  healthCheck: () => Promise<{
     status: string;
     servers: Array<{
       serverId: string;
@@ -74,7 +74,7 @@ export interface IMcpManager {
     }>;
   }>;
 
-  getMonitoringSummary(): {
+  getMonitoringSummary: () => {
     totalRequests: number;
     successCount: number;
     errorCount: number;

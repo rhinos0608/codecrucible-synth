@@ -14,8 +14,8 @@ import {
 } from '../interfaces/tool-system.js';
 
 export class UnifiedGitTool extends BaseTool {
-  constructor(context?: { workingDirectory?: string }) {
-    const workingDirectory = context?.workingDirectory || process.cwd();
+  public constructor(context?: Readonly<{ workingDirectory?: string }>) {
+    const workingDirectory = context?.workingDirectory ?? process.cwd();
 
     const parameters: ToolParameterSchema = {
       type: 'object',
@@ -71,13 +71,20 @@ export class UnifiedGitTool extends BaseTool {
     });
   }
 
-  async execute(
-    args: Record<string, any>,
-    context: ToolExecutionContext
+  public async execute(
+    args: Readonly<{
+      operation?: 'status' | 'log' | 'diff' | 'branch' | 'remote' | 'add' | 'commit' | 'push' | 'pull' | 'stash';
+      args?: readonly string[];
+      files?: readonly string[];
+      message?: string;
+      branch?: string;
+    }>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<ToolExecutionResult> {
     const startTime = Date.now();
     try {
-      const operation = args.operation || 'status';
+      const operation: 'status' | 'log' | 'diff' | 'branch' | 'remote' | 'add' | 'commit' | 'push' | 'pull' | 'stash' =
+        args.operation ?? 'status';
       const gitArgs = this.buildGitArgs(operation, args);
       const result = await this.runGitCommand(gitArgs, context);
 
@@ -103,24 +110,32 @@ export class UnifiedGitTool extends BaseTool {
     }
   }
 
-  private buildGitArgs(operation: string, args: any): string[] {
+  private buildGitArgs(
+    operation: 'status' | 'log' | 'diff' | 'branch' | 'remote' | 'add' | 'commit' | 'push' | 'pull' | 'stash',
+    args: Readonly<{
+      args?: readonly string[];
+      files?: readonly string[];
+      message?: string;
+      branch?: string;
+    }>
+  ): string[] {
     const gitArgs: string[] = [operation];
 
     switch (operation) {
       case 'add':
-        if (args.files && Array.isArray(args.files)) {
-          gitArgs.push(...args.files);
+        if (Array.isArray(args.files) && args.files.length > 0) {
+          gitArgs.push(...(args.files as readonly string[]));
         } else {
           gitArgs.push('.');
         }
         break;
       case 'commit':
-        if (args.message) {
+        if (typeof args.message === 'string') {
           gitArgs.push('-m', args.message);
         }
         break;
       case 'branch':
-        if (args.branch) {
+        if (typeof args.branch === 'string') {
           gitArgs.push(args.branch);
         }
         break;
@@ -128,31 +143,37 @@ export class UnifiedGitTool extends BaseTool {
         gitArgs.push('--oneline', '--max-count=10'); // Sensible defaults
         break;
       case 'diff':
-        if (args.files && Array.isArray(args.files)) {
-          gitArgs.push(...args.files);
+        if (Array.isArray(args.files) && args.files.length > 0) {
+          gitArgs.push(...(args.files as readonly string[]));
         }
+        break;
+      default:
+        // No additional arguments for other operations
         break;
     }
 
     // Add additional arguments
-    if (args.args && Array.isArray(args.args)) {
-      gitArgs.push(...args.args);
+    if (Array.isArray(args.args) && args.args.length > 0) {
+      gitArgs.push(...(args.args as readonly string[]));
     }
 
     return gitArgs;
   }
 
-  private async runGitCommand(args: string[], context: ToolExecutionContext): Promise<string> {
+  private async runGitCommand(
+    args: ReadonlyArray<string>,
+    context: Readonly<ToolExecutionContext>
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       const git = spawn('git', args, { cwd: context.workingDirectory });
       let stdout = '';
       let stderr = '';
 
-      git.stdout.on('data', data => {
+      git.stdout.on('data', (data: Readonly<Buffer>) => {
         stdout += data.toString();
       });
 
-      git.stderr.on('data', data => {
+      git.stderr.on('data', (data: Readonly<Buffer>) => {
         stderr += data.toString();
       });
 
@@ -164,7 +185,7 @@ export class UnifiedGitTool extends BaseTool {
         }
       });
 
-      git.on('error', error => {
+      git.on('error', (error: Readonly<Error>) => {
         reject(new Error(`Failed to spawn git: ${error.message}`));
       });
     });

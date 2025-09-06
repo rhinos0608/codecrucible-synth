@@ -33,49 +33,49 @@ export interface IVoiceOrchestrationService {
   /**
    * Get available voices
    */
-  getAvailableVoices(): Voice[];
+  getAvailableVoices: () => Voice[];
 
   /**
    * Select appropriate voices for a given context
    */
-  selectVoicesForContext(context: string, maxVoices?: number): Promise<Voice[]>;
+  selectVoicesForContext: (context: string, maxVoices?: number) => Promise<Voice[]>;
 
   /**
    * Execute a council session with multiple voices
    */
-  executeCouncil(topic: string, voices: Voice[]): Promise<CouncilSession>;
+  executeCouncil: (topic: string, voices: ReadonlyArray<Voice>) => Promise<CouncilSession>;
 
   /**
    * Get a single voice response
    */
-  getSingleVoiceResponse(voice: Voice, prompt: string): Promise<VoiceResponse>;
+  getSingleVoiceResponse: (voice: Readonly<Voice>, prompt: string) => Promise<VoiceResponse>;
 
   /**
    * Generate multi-voice solutions (legacy compatibility method)
    */
-  generateMultiVoiceSolutions(
-    voices: string[],
+  generateMultiVoiceSolutions: (
+    voices: ReadonlyArray<string>,
     prompt: string,
-    context?: any
-  ): Promise<VoiceResponse[]>;
+    context?: unknown
+  ) => Promise<VoiceResponse[]>;
 
   /**
    * Generate single voice response (legacy compatibility method)
    */
-  generateSingleVoiceResponse(voice: string, prompt: string, client?: any): Promise<VoiceResponse>;
+  generateSingleVoiceResponse: (voice: string, prompt: string, client?: unknown) => Promise<VoiceResponse>;
 
   /**
    * Get a voice response by name
    */
-  getVoiceResponse(voiceName: string, prompt: string): Promise<VoiceResponse>;
+  getVoiceResponse: (voiceName: string, prompt: string) => Promise<VoiceResponse>;
 
   /**
    * Synthesize multiple voice responses into consensus
    */
-  synthesizeResponses(responses: VoiceResponse[]): Promise<string>;
+  synthesizeResponses: (responses: ReadonlyArray<VoiceResponse>) => Promise<string>;
 
   /**
    * Evaluate voice response quality
    */
-  evaluateResponseQuality(response: VoiceResponse): Promise<number>;
+  evaluateResponseQuality: (response: Readonly<VoiceResponse>) => Promise<number>;
 }

@@ -10,7 +10,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { spawn, ChildProcess } from 'child_process';
+import { ChildProcess, spawn } from 'child_process';
 
 export interface MCPConnectionConfig {
   serverCommand: string;
@@ -38,19 +38,19 @@ export interface MCPMessage {
   jsonrpc: '2.0';
   id?: string | number;
   method?: string;
-  params?: any;
-  result?: any;
+  params?: unknown;
+  result?: unknown;
   error?: {
     code: number;
     message: string;
-    data?: any;
+    data?: unknown;
   };
 }
 
 export interface MCPTool {
   name: string;
   description: string;
-  inputSchema: any;
+  inputSchema: unknown;
 }
 
 export interface MCPResource {
@@ -95,21 +95,21 @@ export interface MCPConnectionStatus {
 export class MCPConnectionClient extends EventEmitter {
   private config: MCPConnectionConfig;
   private serverProcess?: ChildProcess;
-  private serverInfo: MCPServerInfo;
-  private connectionStatus: MCPConnectionStatus;
+  private readonly serverInfo: MCPServerInfo;
+  private readonly connectionStatus: MCPConnectionStatus;
   private messageId: number = 1;
-  private pendingRequests: Map<
+  private readonly pendingRequests: Map<
     string | number,
     {
-      resolve: (value: any) => void;
-      reject: (error: Error) => void;
+      resolve: (value: unknown) => void;
+      reject: (error: Readonly<Error>) => void;
       timeout: NodeJS.Timeout;
     }
   > = new Map();
   private heartbeatTimer?: NodeJS.Timeout;
   private reconnectTimer?: NodeJS.Timeout;
 
-  constructor(serverInfo: MCPServerInfo, config: MCPConnectionConfig) {
+  public constructor(serverInfo: Readonly<MCPServerInfo>, config: Readonly<MCPConnectionConfig>) {
     super();
     this.serverInfo = serverInfo;
     this.config = config;
@@ -127,7 +127,7 @@ export class MCPConnectionClient extends EventEmitter {
   /**
    * Connect to MCP server
    */
-  async connect(): Promise<void> {
+  public async connect(): Promise<void> {
     if (this.connectionStatus.status === MCPServerStatus.CONNECTED) {
       return;
     }
@@ -159,7 +159,7 @@ export class MCPConnectionClient extends EventEmitter {
 
       this.emit('connectionError', {
         server: this.serverInfo.name,
-        error,
+        error: error instanceof Error ? error : new Error(String(error)),
       });
 
       throw error;
@@ -169,7 +169,7 @@ export class MCPConnectionClient extends EventEmitter {
   /**
    * Disconnect from MCP server
    */
-  async disconnect(): Promise<void> {
+  public async disconnect(): Promise<void> {
     this.connectionStatus.status = MCPServerStatus.SHUTTING_DOWN;
 
     // Clear timers
@@ -184,7 +184,7 @@ export class MCPConnectionClient extends EventEmitter {
     }
 
     // Reject pending requests
-    for (const [id, request] of this.pendingRequests) {
+    for (const [_, request] of this.pendingRequests) {
       clearTimeout(request.timeout);
       request.reject(new Error('Connection closed'));
     }
@@ -200,12 +200,13 @@ export class MCPConnectionClient extends EventEmitter {
     this.connectionStatus.connected = false;
 
     this.emit('disconnected', { server: this.serverInfo.name });
+    return Promise.resolve();
   }
 
   /**
    * Send MCP request and wait for response
    */
-  async sendRequest(method: string, params?: any): Promise<any> {
+  public async sendRequest(method: string, params?: unknown): Promise<unknown> {
     if (!this.isConnected()) {
       throw new Error('MCP server not connected');
     }
@@ -236,7 +237,7 @@ export class MCPConnectionClient extends EventEmitter {
   /**
    * Send MCP notification (no response expected)
    */
-  async sendNotification(method: string, params?: any): Promise<void> {
+  public sendNotification(method: string, params?: unknown): void {
     if (!this.isConnected()) {
       throw new Error('MCP server not connected');
     }
@@ -255,7 +256,7 @@ export class MCPConnectionClient extends EventEmitter {
   /**
    * Initialize MCP connection
    */
-  async initialize(clientInfo: { name: string; version: string }): Promise<any> {
+  public async initialize(clientInfo: Readonly<{ name: string; version: string }>): Promise<unknown> {
     return this.sendRequest('initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {
@@ -269,15 +270,18 @@ export class MCPConnectionClient extends EventEmitter {
   /**
    * List available tools
    */
-  async listTools(): Promise<MCPTool[]> {
+  public async listTools(): Promise<MCPTool[]> {
     const response = await this.sendRequest('tools/list');
-    return response.tools || [];
+    if (typeof response === 'object' && response !== null && 'tools' in response) {
+      return (response as { tools?: MCPTool[] }).tools ?? [];
+    }
+    return [];
   }
 
   /**
    * Call a tool
    */
-  async callTool(name: string, arguments_: any): Promise<any> {
+  public async callTool(name: string, arguments_: Readonly<Record<string, unknown>>): Promise<unknown> {
     return this.sendRequest('tools/call', {
       name,
       arguments: arguments_,
@@ -287,40 +291,50 @@ export class MCPConnectionClient extends EventEmitter {
   /**
    * List available resources
    */
-  async listResources(): Promise<MCPResource[]> {
+  public async listResources(): Promise<MCPResource[]> {
     const response = await this.sendRequest('resources/list');
-    return response.resources || [];
+    if (typeof response === 'object' && response !== null && 'resources' in response) {
+      return (response as { resources?: MCPResource[] }).resources ?? [];
+    }
+    return [];
   }
 
   /**
    * Read a resource
    */
-  async readResource(uri: string): Promise<any> {
-    return this.sendRequest('resources/read', { uri });
+  public async readResource(uri: string): Promise<MCPResource | null> {
+    const response = await this.sendRequest('resources/read', { uri });
+    if (typeof response === 'object' && response !== null) {
+      return response as MCPResource;
+    }
+    return null;
   }
 
   /**
    * List available prompts
    */
-  async listPrompts(): Promise<MCPPrompt[]> {
+  public async listPrompts(): Promise<MCPPrompt[]> {
     const response = await this.sendRequest('prompts/list');
-    return response.prompts || [];
+    if (typeof response === 'object' && response !== null && 'prompts' in response) {
+      return (response as { prompts?: MCPPrompt[] }).prompts ?? [];
+    }
+    return [];
   }
 
   /**
-   * Get a prompt
-   */
-  async getPrompt(name: string, arguments_?: any): Promise<any> {
-    return this.sendRequest('prompts/get', {
-      name,
-      arguments: arguments_,
-    });
-  }
+     * Get a prompt
+     */
+    public async getPrompt(name: string, arguments_?: Readonly<Record<string, unknown>>): Promise<unknown> {
+      return this.sendRequest('prompts/get', {
+        name,
+        arguments: arguments_ ?? {},
+      });
+    }
 
   /**
    * Set logging level
    */
-  async setLoggingLevel(
+  public async setLoggingLevel(
     level: 'debug' | 'info' | 'notice' | 'warning' | 'error' | 'critical' | 'alert' | 'emergency'
   ): Promise<void> {
     await this.sendRequest('logging/setLevel', { level });
@@ -331,14 +345,14 @@ export class MCPConnectionClient extends EventEmitter {
   /**
    * Check if connected to server
    */
-  isConnected(): boolean {
+  public isConnected(): boolean {
     return this.connectionStatus.status === MCPServerStatus.CONNECTED;
   }
 
   /**
    * Get connection status
    */
-  getConnectionStatus(): MCPConnectionStatus {
+  public getConnectionStatus(): MCPConnectionStatus {
     return {
       ...this.connectionStatus,
       uptime: this.connectionStatus.uptime > 0 ? Date.now() - this.connectionStatus.uptime : 0,
@@ -348,21 +362,21 @@ export class MCPConnectionClient extends EventEmitter {
   /**
    * Get server information
    */
-  getServerInfo(): MCPServerInfo {
+  public getServerInfo(): MCPServerInfo {
     return { ...this.serverInfo };
   }
 
   /**
    * Get connection configuration
    */
-  getConfig(): MCPConnectionConfig {
+  public getConfig(): MCPConnectionConfig {
     return { ...this.config };
   }
 
   /**
    * Update configuration
    */
-  updateConfig(newConfig: Partial<MCPConnectionConfig>): void {
+  public updateConfig(newConfig: Readonly<Partial<MCPConnectionConfig>>): void {
     this.config = { ...this.config, ...newConfig };
     this.emit('configUpdated', this.config);
   }
@@ -444,7 +458,7 @@ export class MCPConnectionClient extends EventEmitter {
 
   private handleIncomingMessage(messageStr: string): void {
     try {
-      const message: MCPMessage = JSON.parse(messageStr);
+      const message: MCPMessage = JSON.parse(messageStr) as MCPMessage;
       this.connectionStatus.messagesReceived++;
       this.connectionStatus.lastMessage = new Date();
 
@@ -476,7 +490,7 @@ export class MCPConnectionClient extends EventEmitter {
       });
     } catch (error) {
       this.emit('messageParseError', {
-        error,
+        error: error instanceof Error ? error : new Error(String(error)),
         messageStr,
         server: this.serverInfo.name,
       });
@@ -511,13 +525,14 @@ export class MCPConnectionClient extends EventEmitter {
       });
 
       // Extract server capabilities
-      this.serverInfo.capabilities = initResult.capabilities
-        ? Object.keys(initResult.capabilities)
+      const result = initResult as { capabilities?: Record<string, unknown>; serverInfo?: { version?: string } };
+      this.serverInfo.capabilities = result.capabilities
+        ? Object.keys(result.capabilities)
         : [];
-      this.serverInfo.version = initResult.serverInfo?.version;
+      this.serverInfo.version = result.serverInfo?.version;
 
       // Send initialized notification
-      await this.sendNotification('notifications/initialized');
+      this.sendNotification('notifications/initialized');
     } catch (error) {
       throw new Error(`Handshake failed: ${error}`);
     }
@@ -526,15 +541,13 @@ export class MCPConnectionClient extends EventEmitter {
   private startHeartbeat(): void {
     if (this.config.heartbeatIntervalMs <= 0) return;
 
-    this.heartbeatTimer = setInterval(async () => {
-      try {
-        await this.sendRequest('ping');
-      } catch (error) {
+    this.heartbeatTimer = setInterval(() => {
+      this.sendRequest('ping').catch((error: unknown) => {
         this.emit('heartbeatFailed', {
           server: this.serverInfo.name,
-          error,
+          error: error instanceof Error ? error : new Error(String(error)),
         });
-      }
+      });
     }, this.config.heartbeatIntervalMs);
   }
 
@@ -570,16 +583,18 @@ export class MCPConnectionClient extends EventEmitter {
   private scheduleReconnect(): void {
     if (this.reconnectTimer) return;
 
-    this.reconnectTimer = setTimeout(async () => {
+    this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = undefined;
-      try {
-        await this.connect();
-      } catch (error) {
-        this.emit('reconnectFailed', {
-          server: this.serverInfo.name,
-          error,
-        });
-      }
+      (async (): Promise<void> => {
+        try {
+          await this.connect();
+        } catch (error) {
+          this.emit('reconnectFailed', {
+            server: this.serverInfo.name,
+            error,
+          });
+        }
+      })().catch(() => {});
     }, this.config.retryDelayMs);
   }
 

@@ -31,8 +31,23 @@ function getExaSearchInstance(): ExaSearchTool {
 }
 
 // Basic web search fallback when Exa is not available
-async function basicWebSearch(query: string, numResults: number = 5): Promise<any> {
+async function basicWebSearch(
+  query: string,
+  _numResults: number = 5
+): Promise<{
+  success: boolean;
+  query: string;
+  results: Array<{ title: string; url: string; snippet: string; type: string }>;
+  source: string;
+  error?: string;
+}> {
   try {
+    // Define the expected DuckDuckGo API response type
+    interface DuckDuckGoResponse {
+      AbstractText?: string;
+      AbstractURL?: string;
+    }
+
     // Use a basic search API or web scraping as fallback
     const response = await axios.get(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
@@ -44,13 +59,15 @@ async function basicWebSearch(query: string, numResults: number = 5): Promise<an
       }
     );
 
-    const results = response.data?.AbstractText
+    const data = response.data as DuckDuckGoResponse;
+
+    const results = data?.AbstractText
       ? [
           {
             title: `Search Results for: ${query}`,
             url:
-              response.data.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
-            snippet: response.data.AbstractText,
+              data.AbstractURL ?? `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
+            snippet: data.AbstractText,
             type: 'web',
           },
         ]
@@ -69,13 +86,14 @@ async function basicWebSearch(query: string, numResults: number = 5): Promise<an
       query,
       error: 'Search service temporarily unavailable',
       results: [],
+      source: 'duckduckgo-fallback',
     };
   }
 }
 
 // Ref Documentation Tool
 export class RefDocumentationTool extends BaseTool {
-  constructor(private _agentContext: { workingDirectory: string }) {
+  public constructor() {
     super({
       name: 'refDocumentationSearch',
       description: 'Search programming documentation and API references',
@@ -86,12 +104,17 @@ export class RefDocumentationTool extends BaseTool {
     });
   }
 
-  async execute(params: { query: string }): Promise<any> {
+  public async execute(params: Readonly<{ query: string }>): Promise<{
+    success: true;
+    query: string;
+    results: Array<{ title: string; url: string; snippet: string; type: string }>;
+    source: string;
+  } | {
+    error: string;
+    query: string;
+  }> {
     try {
       logger.info(`📚 MCP Ref Documentation Search: ${params.query}`);
-
-      // Simulate documentation search using web search as fallback
-      const searchQuery = `${params.query} documentation API reference`;
 
       return {
         success: true,
@@ -118,7 +141,7 @@ export class RefDocumentationTool extends BaseTool {
 
 // Exa Web Search Tool
 export class ExaWebSearchTool extends BaseTool {
-  constructor(private _agentContext: { workingDirectory: string }) {
+  public constructor() {
     super({
       name: 'exaWebSearch',
       description: 'Perform advanced web search using Exa AI',
@@ -130,7 +153,22 @@ export class ExaWebSearchTool extends BaseTool {
     });
   }
 
-  async execute(params: { query: string; numResults?: number }): Promise<any> {
+  public async execute(params: Readonly<{ query: string; numResults?: number }>): Promise<{
+    success: boolean;
+    query: string;
+    results?: Array<{
+      title: string;
+      url: string;
+      snippet: string;
+      type: string;
+      score?: number;
+      publishedDate?: string;
+    }>;
+    totalResults?: number;
+    searchTime?: number;
+    source?: string;
+    error?: string;
+  }> {
     try {
       logger.info(`🔍 MCP Exa Web Search: ${params.query}`);
 
@@ -140,7 +178,7 @@ export class ExaWebSearchTool extends BaseTool {
       if (exaSearch.getUsageStats().isEnabled && exaSearch.getUsageStats().hasApiKey) {
         try {
           const searchResult = await exaSearch.search(params.query, {
-            numResults: params.numResults || 5,
+            numResults: params.numResults ?? 5,
             includeText: true,
             useAutoprompt: true,
           });
@@ -148,10 +186,16 @@ export class ExaWebSearchTool extends BaseTool {
           return {
             success: true,
             query: searchResult.query,
-            results: searchResult.results.map(result => ({
+            results: searchResult.results.map((result: Readonly<{
+              title: string;
+              url: string;
+              content: string;
+              score?: number;
+              publishedDate?: string;
+            }>) => ({
               title: result.title,
               url: result.url,
-              snippet: result.content.substring(0, 300) + '...',
+              snippet: `${result.content.substring(0, 300)}...`,
               type: 'web',
               score: result.score,
               publishedDate: result.publishedDate,
@@ -180,8 +224,23 @@ export class ExaWebSearchTool extends BaseTool {
 }
 
 // Exa Deep Research Tool
+export interface ExaResearchResult {
+  title: string;
+  url: string;
+  content: string;
+  score?: number;
+  publishedDate?: string;
+}
+
+export interface ExaResearchSearchResult {
+  results: ExaResearchResult[];
+  query: string;
+  totalResults?: number;
+  searchTime?: number;
+}
+
 export class ExaDeepResearchTool extends BaseTool {
-  constructor(private _agentContext: { workingDirectory: string }) {
+  public constructor(private readonly _agentContext: Readonly<{ workingDirectory: string }>) {
     super({
       name: 'exaDeepResearch',
       description: 'Conduct comprehensive research on complex topics',
@@ -193,7 +252,17 @@ export class ExaDeepResearchTool extends BaseTool {
     });
   }
 
-  async execute(params: { topic: string; depth?: string }): Promise<any> {
+  public async execute(params: Readonly<{ topic: string; depth?: 'basic' | 'detailed' | 'comprehensive' }>): Promise<{
+    success: boolean;
+    topic: string;
+    depth?: string;
+    findings: string[];
+    sources: string[];
+    totalResults: number;
+    researchStrategy: string;
+    source: string;
+    error?: string;
+  }> {
     try {
       logger.info(`🔬 MCP Exa Deep Research: ${params.topic}`);
 
@@ -202,7 +271,7 @@ export class ExaDeepResearchTool extends BaseTool {
       // Perform comprehensive research using multiple search strategies
       if (exaSearch.getUsageStats().isEnabled && exaSearch.getUsageStats().hasApiKey) {
         try {
-          const depth = params.depth || 'detailed';
+          const depth = params.depth ?? 'detailed';
           const numResults = depth === 'comprehensive' ? 20 : depth === 'detailed' ? 12 : 5;
 
           // Multi-faceted research approach
@@ -229,16 +298,18 @@ export class ExaDeepResearchTool extends BaseTool {
             }),
           ]);
 
-          const allResults: any[] = [];
+          const allResults: ExaResearchResult[] = [];
           const sources: string[] = [];
           const findings: string[] = [];
 
           // Process general search results
           if (generalSearch.status === 'fulfilled') {
-            generalSearch.value.results.forEach((result: any) => {
+            (generalSearch.value.results as ExaResearchResult[]).forEach((result) => {
               allResults.push(result);
-              sources.push(result.url);
-              if (result.content) {
+              if (typeof result.url === 'string') {
+                sources.push(result.url);
+              }
+              if (typeof result.content === 'string') {
                 findings.push(`General Research: ${result.content.substring(0, 200)}...`);
               }
             });
@@ -246,10 +317,12 @@ export class ExaDeepResearchTool extends BaseTool {
 
           // Process academic results
           if (academicSearch.status === 'fulfilled') {
-            academicSearch.value.results.forEach((result: any) => {
+            (academicSearch.value.results as ExaResearchResult[]).forEach((result: ExaResearchResult) => {
               allResults.push(result);
-              sources.push(result.url);
-              if (result.content) {
+              if (typeof result.url === 'string') {
+                sources.push(result.url);
+              }
+              if (typeof result.content === 'string') {
                 findings.push(`Academic Research: ${result.content.substring(0, 200)}...`);
               }
             });
@@ -257,10 +330,12 @@ export class ExaDeepResearchTool extends BaseTool {
 
           // Process news results
           if (newsSearch.status === 'fulfilled') {
-            newsSearch.value.results.forEach((result: any) => {
+            (newsSearch.value.results as ExaResearchResult[]).forEach((result: ExaResearchResult) => {
               allResults.push(result);
-              sources.push(result.url);
-              if (result.content) {
+              if (typeof result.url === 'string') {
+                sources.push(result.url);
+              }
+              if (typeof result.content === 'string') {
                 findings.push(`Recent Development: ${result.content.substring(0, 200)}...`);
               }
             });
@@ -285,12 +360,19 @@ export class ExaDeepResearchTool extends BaseTool {
       try {
         const basicResult = await basicWebSearch(`${params.topic} research analysis`, 5);
 
+        interface BasicSearchResult {
+          title: string;
+          url: string;
+          snippet: string;
+          type: string;
+        }
+
         return {
           success: true,
           topic: params.topic,
           depth: params.depth || 'basic',
-          findings: basicResult.results.map((r: any) => `Research Finding: ${r.snippet}`),
-          sources: basicResult.results.map((r: any) => r.url),
+          findings: basicResult.results.map((r: BasicSearchResult) => `Research Finding: ${r.snippet}`),
+          sources: basicResult.results.map((r: BasicSearchResult) => r.url),
           totalResults: basicResult.results.length,
           researchStrategy: 'basic-web-search',
           source: 'basic-research-fallback',
@@ -300,9 +382,12 @@ export class ExaDeepResearchTool extends BaseTool {
         return {
           success: false,
           topic: params.topic,
+          depth: params.depth,
           error: 'Research services temporarily unavailable',
           findings: [`Unable to research ${params.topic} - external search services unavailable`],
           sources: [],
+          totalResults: 0,
+          researchStrategy: 'none',
           source: 'research-unavailable',
         };
       }
@@ -312,6 +397,12 @@ export class ExaDeepResearchTool extends BaseTool {
         error: `Deep research failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         topic: params.topic,
         success: false,
+        depth: params.depth,
+        findings: [],
+        sources: [],
+        totalResults: 0,
+        researchStrategy: 'none',
+        source: 'error',
       };
     }
   }
@@ -319,7 +410,7 @@ export class ExaDeepResearchTool extends BaseTool {
 
 // Exa Company Research Tool
 export class ExaCompanyResearchTool extends BaseTool {
-  constructor(private _agentContext: { workingDirectory: string }) {
+  public constructor() {
     super({
       name: 'exaCompanyResearch',
       description: 'Research companies, startups, and business information',
@@ -331,12 +422,28 @@ export class ExaCompanyResearchTool extends BaseTool {
     });
   }
 
-  async execute(params: { company: string; aspects?: string[] }): Promise<any> {
+  public async execute(params: Readonly<{ company: string; aspects?: string[] }>): Promise<{
+    success: boolean;
+    company: string;
+    research: {
+      overview: string;
+      financials: string;
+      products: string;
+      news: string;
+      market_position: string;
+    };
+    aspects_researched: string[];
+    sources: string[];
+    totalSources?: number;
+    researchStrategy: string;
+    source: string;
+    error?: string;
+  }> {
     try {
       logger.info(`🏢 MCP Company Research: ${params.company}`);
 
       const exaSearch = getExaSearchInstance();
-      const aspects = params.aspects || [
+      const aspects = params.aspects ?? [
         'overview',
         'financials',
         'products',
@@ -386,51 +493,80 @@ export class ExaCompanyResearchTool extends BaseTool {
 
           const searchResults = await Promise.allSettled(searchPromises);
 
-          const research: any = {};
+          interface ResearchResult {
+            title: string;
+            url: string;
+            content?: string;
+            score?: number;
+            publishedDate?: string;
+          }
+
+
+          const research: {
+            overview: string;
+            financials: string;
+            products: string;
+            news: string;
+            market_position: string;
+          } = {
+            overview: '',
+            financials: '',
+            products: '',
+            news: '',
+            market_position: '',
+          };
           const sources: string[] = [];
 
           // Process overview results
           if (searchResults[0].status === 'fulfilled') {
-            const overviewResults = searchResults[0].value.results;
+            const overviewResults = searchResults[0].value.results as ResearchResult[];
             research.overview = overviewResults
-              .map((r: any) => r.content?.substring(0, 300))
-              .filter(Boolean)
-              .join(' ');
-            overviewResults.forEach((r: any) => sources.push(r.url));
+              .map((r: ResearchResult) => r.content?.substring(0, 300))
+              .filter((snippet): snippet is string => Boolean(snippet))
+              .join(' ') || '';
+            overviewResults.forEach((r: ResearchResult) => sources.push(r.url));
+          } else {
+            research.overview = '';
           }
 
           // Process financial results
           if (searchResults[1].status === 'fulfilled') {
-            const financialResults = searchResults[1].value.results;
+            const financialResults = searchResults[1].value.results as ResearchResult[];
             research.financials = financialResults
-              .map((r: any) => r.content?.substring(0, 300))
-              .filter(Boolean)
-              .join(' ');
-            financialResults.forEach((r: any) => sources.push(r.url));
+              .map((r: ResearchResult) => r.content?.substring(0, 300))
+              .filter((snippet): snippet is string => Boolean(snippet))
+              .join(' ') || '';
+            financialResults.forEach((r: ResearchResult) => sources.push(r.url));
+          } else {
+            research.financials = '';
           }
 
           // Process products results
           if (searchResults[2].status === 'fulfilled') {
-            const productResults = searchResults[2].value.results;
+            const productResults = searchResults[2].value.results as ResearchResult[];
             research.products = productResults
-              .map((r: any) => r.content?.substring(0, 300))
-              .filter(Boolean)
-              .join(' ');
-            productResults.forEach((r: any) => sources.push(r.url));
+              .map((r: ResearchResult) => r.content?.substring(0, 300))
+              .filter((snippet): snippet is string => Boolean(snippet))
+              .join(' ') || '';
+            productResults.forEach((r: ResearchResult) => sources.push(r.url));
+          } else {
+            research.products = '';
           }
 
           // Process news results
           if (searchResults[3].status === 'fulfilled') {
-            const newsResults = searchResults[3].value.results;
+            const newsResults = searchResults[3].value.results as ResearchResult[];
             research.news = newsResults
-              .map((r: any) => r.content?.substring(0, 200))
-              .filter(Boolean)
-              .join(' ');
-            newsResults.forEach((r: any) => sources.push(r.url));
+              .map((r: ResearchResult) => r.content?.substring(0, 200))
+              .filter((snippet): snippet is string => Boolean(snippet))
+              .join(' ') || '';
+            newsResults.forEach((r: ResearchResult) => sources.push(r.url));
+          } else {
+            research.news = '';
           }
 
           // Add market position analysis based on collected data
-          research.market_position = `Market analysis based on available data: ${research.overview?.substring(0, 200) || 'Limited market data available'}`;
+          research.market_position = `Market analysis based on available data: ${research.overview.substring(0, 200) || 'Limited market data available'}`;
 
           return {
             success: true,
@@ -451,6 +587,14 @@ export class ExaCompanyResearchTool extends BaseTool {
       try {
         const basicResult = await basicWebSearch(`${params.company} company information`, 5);
 
+        interface BasicSearchResult { title: string; url: string; snippet: string; type: string }
+
+        const sources: string[] = Array.isArray(basicResult.results)
+          ? basicResult.results
+              .map((r: BasicSearchResult) => r.url)
+              .filter((url): url is string => typeof url === 'string')
+          : [];
+
         return {
           success: true,
           company: params.company,
@@ -465,7 +609,7 @@ export class ExaCompanyResearchTool extends BaseTool {
               basicResult.results[4]?.snippet || `Market position of ${params.company}`,
           },
           aspects_researched: aspects,
-          sources: basicResult.results.map((r: any) => r.url),
+          sources,
           researchStrategy: 'basic-web-search',
           source: 'basic-company-research-fallback',
         };
@@ -484,6 +628,7 @@ export class ExaCompanyResearchTool extends BaseTool {
           },
           aspects_researched: aspects,
           sources: [],
+          researchStrategy: 'none',
           source: 'research-unavailable',
         };
       }
@@ -493,6 +638,17 @@ export class ExaCompanyResearchTool extends BaseTool {
         error: `Company research failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         company: params.company,
         success: false,
+        research: {
+          overview: '',
+          financials: '',
+          products: '',
+          news: '',
+          market_position: '',
+        },
+        aspects_researched: [],
+        sources: [],
+        researchStrategy: 'none',
+        source: 'error',
       };
     }
   }
@@ -500,7 +656,7 @@ export class ExaCompanyResearchTool extends BaseTool {
 
 // MCP Server Manager Tool
 export class MCPServerTool extends BaseTool {
-  constructor(private _agentContext: { workingDirectory: string }) {
+  public constructor() {
     super({
       name: 'mcpServer',
       description: 'Manage and interact with MCP servers',
@@ -514,12 +670,27 @@ export class MCPServerTool extends BaseTool {
     });
   }
 
-  async execute(params: {
+  public async execute(params: Readonly<{
     action: string;
     server?: string;
     method?: string;
-    params?: any;
-  }): Promise<any> {
+    params?: Readonly<Record<string, unknown>>;
+  }>): Promise<{
+    success?: boolean;
+    servers?: Array<{ name: string; status: string; description: string }>;
+    server?: string;
+    status?: string;
+    uptime?: string;
+    connections?: number;
+    action?: string;
+    message?: string;
+    method?: string;
+    result?: string;
+    params?: Readonly<Record<string, unknown>>;
+    error?: string;
+    available_actions?: string[];
+  }> {
+    // No await needed, but keeping async for interface compatibility
     try {
       logger.info(`🔧 MCP Server Action: ${params.action}`);
 
@@ -538,7 +709,7 @@ export class MCPServerTool extends BaseTool {
         case 'status':
           return {
             success: true,
-            server: params.server || 'all',
+            server: params.server ?? 'all',
             status: 'running',
             uptime: '2h 15m',
             connections: 3,

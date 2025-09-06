@@ -30,10 +30,10 @@ export interface ToolExecutionArgs {
   includeHidden?: boolean;
 
   // Generic extensibility for tool-specific args
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-export interface ToolExecutionResult<T = any> {
+export interface ToolExecutionResult<T = unknown> {
   success: boolean;
   data?: T;
   output?: {
@@ -44,7 +44,7 @@ export interface ToolExecutionResult<T = any> {
   error?: {
     code: string;
     message: string;
-    details?: Record<string, any>;
+    details?: Record<string, unknown>;
     stack?: string;
   };
   metadata?: {

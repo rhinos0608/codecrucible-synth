@@ -62,12 +62,12 @@ export class E2BCodeExecutionTool {
   ];
 
   private rustBackend: RustExecutionBackend | null;
-  private securityValidator: SecurityValidator;
-  private terminalServer: TerminalMCPServer;
-  private environments: Map<string, ExecutionEnvironment> = new Map();
+  private readonly securityValidator: SecurityValidator;
+  private readonly terminalServer: TerminalMCPServer;
+  private readonly environments: Map<string, ExecutionEnvironment> = new Map();
   private environmentCounter = 0;
 
-  constructor(workingDirectory: string = process.cwd(), rustBackend?: RustExecutionBackend | null) {
+  public constructor(workingDirectory: Readonly<string> = process.cwd(), rustBackend?: RustExecutionBackend | null) {
     this.rustBackend = rustBackend ?? null;
 
     this.securityValidator = new SecurityValidator();
@@ -81,18 +81,20 @@ export class E2BCodeExecutionTool {
     logger.info('E2BCodeExecutionTool initialized with production backend');
   }
 
-  setRustBackend(backend: RustExecutionBackend): void {
+  public setRustBackend(backend: RustExecutionBackend): void {
     this.rustBackend = backend;
   }
 
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     try {
       // SecurityValidator doesn't need initialization
       
       // Initialize Rust backend if available
       try {
-        await this.rustBackend.initialize();
-        logger.info('Rust execution backend initialized successfully');
+        if (this.rustBackend) {
+          await this.rustBackend.initialize();
+          logger.info('Rust execution backend initialized successfully');
+        }
       } catch (error) {
         logger.warn('Rust backend not available, falling back to terminal execution:', error);
       }
@@ -104,7 +106,7 @@ export class E2BCodeExecutionTool {
     }
   }
 
-  async executeCode(request: CodeExecutionRequest): Promise<CodeExecutionResult> {
+  public async executeCode(request: Readonly<CodeExecutionRequest>): Promise<CodeExecutionResult> {
     const startTime = Date.now();
     const language = request.language.toLowerCase();
 
@@ -169,7 +171,7 @@ export class E2BCodeExecutionTool {
     }
   }
 
-  async validateCode(code: string, language: string): Promise<boolean> {
+  public async validateCode(code: string, language: string): Promise<boolean> {
     try {
       const securityReport = await this.performSecurityValidation(code, language);
       return securityReport.validated;
@@ -188,8 +190,8 @@ export class E2BCodeExecutionTool {
   }> {
     // Use the existing SecurityValidator for comprehensive validation
     const validationResult = await this.securityValidator.validateCode({
-      code: code,
-      language: language,
+      code,
+      language,
       environment: 'e2b_sandbox',
     });
 
@@ -279,11 +281,9 @@ export class E2BCodeExecutionTool {
   }
 
   private async executeViaRustBackend(
-    request: CodeExecutionRequest,
-    environment: ExecutionEnvironment
+    request: Readonly<CodeExecutionRequest>,
+    environment: Readonly<ExecutionEnvironment>
   ): Promise<CodeExecutionResult> {
-    const startTime = Date.now();
-
     try {
       logger.info(`Executing ${request.language} code via Rust backend`);
 
@@ -291,6 +291,9 @@ export class E2BCodeExecutionTool {
       const tempFile = await this.createTemporaryFile(request.code, request.language, environment);
 
       // Execute via Rust backend
+      if (!this.rustBackend) {
+        throw new Error('Rust backend is not available');
+      }
       const result = await this.rustBackend.execute({
         toolId: 'code_execution',
         arguments: {
@@ -315,11 +318,11 @@ export class E2BCodeExecutionTool {
 
       return {
         success: result.success,
-        output: result.result || '',
+        output: typeof result.result === 'string' ? result.result : JSON.stringify(result.result ?? ''),
         error: result.error?.message,
         executionTime: result.executionTimeMs,
-        memoryUsed: result.metadata?.memoryUsage,
-        exitCode: result.metadata?.exitCode,
+        memoryUsed: typeof result.metadata?.memoryUsage === 'number' ? result.metadata.memoryUsage : undefined,
+        exitCode: typeof result.metadata?.exitCode === 'number' ? result.metadata.exitCode : undefined,
       };
     } catch (error) {
       logger.error('Rust backend execution failed:', error);
@@ -328,8 +331,8 @@ export class E2BCodeExecutionTool {
   }
 
   private async executeViaTerminalServer(
-    request: CodeExecutionRequest,
-    environment: ExecutionEnvironment
+    request: Readonly<CodeExecutionRequest>,
+    environment: Readonly<ExecutionEnvironment>
   ): Promise<CodeExecutionResult> {
     const startTime = Date.now();
 
@@ -365,14 +368,25 @@ export class E2BCodeExecutionTool {
         };
       }
 
-      const executionResult = JSON.parse(result.content[0]?.text || '{}');
+      interface TerminalExecutionResult {
+        stdout?: string;
+        stderr?: string;
+        exitCode?: number;
+      }
+
+      const parsed: unknown = JSON.parse(result.content[0]?.text || '{}');
+      const executionResult: TerminalExecutionResult =
+        typeof parsed === 'object' && parsed !== null &&
+        ('stdout' in parsed || 'stderr' in parsed || 'exitCode' in parsed)
+          ? parsed as TerminalExecutionResult
+          : {};
 
       return {
         success: executionResult.exitCode === 0,
-        output: executionResult.stdout,
-        error: executionResult.stderr,
+        output: typeof executionResult.stdout === 'string' ? executionResult.stdout : undefined,
+        error: typeof executionResult.stderr === 'string' ? executionResult.stderr : undefined,
         executionTime: Date.now() - startTime,
-        exitCode: executionResult.exitCode,
+        exitCode: typeof executionResult.exitCode === 'number' ? executionResult.exitCode : undefined,
       };
     } catch (error) {
       logger.error('Terminal server execution failed:', error);
@@ -381,8 +395,8 @@ export class E2BCodeExecutionTool {
   }
 
   private async prepareExecutionCommand(
-    request: CodeExecutionRequest,
-    environment: ExecutionEnvironment
+    request: Readonly<CodeExecutionRequest>,
+    environment: Readonly<ExecutionEnvironment>
   ): Promise<{ command: string; tempFile?: string }> {
     const language = request.language.toLowerCase();
 
@@ -402,15 +416,16 @@ export class E2BCodeExecutionTool {
       case 'node':
         return { command: `node -e "${request.code.replace(/"/g, '\\"')}"` };
 
-      case 'typescript':
+      case 'typescript': {
         const tempFile = await this.createTemporaryFile(request.code, language, environment);
         return { command: `npx tsx "${tempFile}"`, tempFile };
+      }
 
       case 'bash':
       case 'sh':
         return { command: request.code };
 
-      case 'rust':
+      case 'rust': {
         const rustFile = await this.createTemporaryFile(request.code, language, environment);
         const executableName = rustFile.replace('.rs', '');
         return {
@@ -418,6 +433,7 @@ export class E2BCodeExecutionTool {
           tempFile: rustFile,
         };
 
+      }
       case 'go': {
         const goFile = await this.createTemporaryFile(request.code, language, environment);
         // Prefer go run for simplicity to avoid binary cleanup complexity
@@ -463,7 +479,7 @@ export class E2BCodeExecutionTool {
   private async createTemporaryFile(
     code: string,
     language: string,
-    environment: ExecutionEnvironment
+    environment: Readonly<ExecutionEnvironment>
   ): Promise<string> {
     const extension = this.getFileExtension(language);
     const filename = `temp_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
@@ -516,15 +532,15 @@ export class E2BCodeExecutionTool {
     return extensions[language.toLowerCase()] || 'txt';
   }
 
-  getSupportedLanguages(): string[] {
+  public getSupportedLanguages(): string[] {
     return [...this.supportedLanguages];
   }
 
-  async getEnvironmentInfo(environmentId: string): Promise<ExecutionEnvironment | undefined> {
+  public getEnvironmentInfo(environmentId: string): ExecutionEnvironment | undefined {
     return this.environments.get(environmentId);
   }
 
-  async cleanupEnvironment(environmentId: string): Promise<void> {
+  public async cleanupEnvironment(environmentId: string): Promise<void> {
     const environment = this.environments.get(environmentId);
     if (!environment) return;
 
@@ -543,11 +559,11 @@ export class E2BCodeExecutionTool {
     }
   }
 
-  async cleanup(): Promise<void> {
+  public async cleanup(): Promise<void> {
     logger.info('Cleaning up E2B code execution environments...');
 
     const environmentIds = Array.from(this.environments.keys());
-    const cleanupPromises = environmentIds.map(id => this.cleanupEnvironment(id));
+    const cleanupPromises = environmentIds.map(async id => this.cleanupEnvironment(id));
 
     await Promise.allSettled(cleanupPromises);
 
@@ -565,24 +581,26 @@ export class E2BCodeExecutionTool {
   }
 
   // Health check method for monitoring
-  async healthCheck(): Promise<{
+  public async healthCheck(): Promise<{
     isHealthy: boolean;
     activeEnvironments: number;
     rustBackendAvailable: boolean;
-    details: Record<string, any>;
+    details: Record<string, unknown>;
   }> {
     const now = Date.now();
     const staleThreshold = 60 * 60 * 1000; // 1 hour
 
     // Check for stale environments
     const staleEnvironments = Array.from(this.environments.values()).filter(
-      env => now - env.lastUsed > staleThreshold
+      (env: Readonly<ExecutionEnvironment>) => now - env.lastUsed > staleThreshold
     );
 
     // Clean up stale environments
     if (staleEnvironments.length > 0) {
       logger.info(`Cleaning up ${staleEnvironments.length} stale execution environments`);
-      await Promise.allSettled(staleEnvironments.map(env => this.cleanupEnvironment(env.id)));
+      await Promise.allSettled(
+        staleEnvironments.map(async (env: Readonly<ExecutionEnvironment>) => this.cleanupEnvironment(env.id))
+      );
     }
 
     // Check Rust backend health

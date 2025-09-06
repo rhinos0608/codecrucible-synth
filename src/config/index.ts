@@ -13,29 +13,31 @@ if (!nodeEnvParsed.success) {
   process.exit(1);
 }
 
-const NODE_ENV = nodeEnvParsed.data.NODE_ENV;
+const { NODE_ENV } = nodeEnvParsed.data;
 
 // Build the rest of the schema based on NODE_ENV
-const EnvSchema = z
-  .object({
-    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-    PORT: z.coerce.number().default(3000),
-    DATABASE_URL:
-      NODE_ENV === 'production'
-        ? z.string().url({ message: 'DATABASE_URL must be a valid URL in production' })
-        : z.string().url().optional(),
-    REDIS_URL:
-      NODE_ENV === 'production'
-        ? z.string().url({ message: 'REDIS_URL must be a valid URL in production' })
-        : z.string().url().optional(),
-    LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
-    // Authentication configuration - required in production
-    REQUIRE_AUTHENTICATION: z
-      .string()
-      .transform(val => val === 'true')
-      .default(NODE_ENV === 'production' ? 'true' : 'false'),
-  })
-  .superRefine((env, ctx) => {
+const EnvSchemaBase = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().default(3000),
+  DATABASE_URL:
+    NODE_ENV === 'production'
+      ? z.string().url({ message: 'DATABASE_URL must be a valid URL in production' })
+      : z.string().url().optional(),
+  REDIS_URL:
+    NODE_ENV === 'production'
+      ? z.string().url({ message: 'REDIS_URL must be a valid URL in production' })
+      : z.string().url().optional(),
+  LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
+  // Authentication configuration - required in production
+  REQUIRE_AUTHENTICATION: z
+    .string()
+    .transform(val => val === 'true')
+    .default(NODE_ENV === 'production' ? 'true' : 'false'),
+});
+
+const EnvSchema = EnvSchemaBase.superRefine(
+  (envUnknown: Readonly<unknown>, ctx: z.RefinementCtx): void => {
+    const env = envUnknown as Readonly<Env>;
     if (env.NODE_ENV !== 'test') {
       if (!env.DATABASE_URL) {
         ctx.addIssue({
@@ -61,12 +63,15 @@ const EnvSchema = z
         path: ['REQUIRE_AUTHENTICATION'],
       });
     }
-  });
+  }
+);
+
+type Env = z.infer<typeof EnvSchema>;
 
 const parsed = EnvSchema.safeParse(process.env as Record<string, string | undefined>);
 if (!parsed.success) {
-  logger.error('Invalid environment configuration:', parsed.error.format());
+  logger.error('Invalid environment configuration:', (parsed.error as z.ZodError).format());
   process.exit(1);
 }
 
-export const config = parsed.data;
+export const config: Env = parsed.data;

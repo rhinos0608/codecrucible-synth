@@ -48,7 +48,7 @@ export interface LMStudioCompletionRequest {
     presencePenalty?: number;
     stop?: string[];
     seed?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -59,7 +59,7 @@ export interface LMStudioChatRequest {
     content: string;
   }>;
   stream?: boolean;
-  options?: Record<string, any>;
+  options?: Record<string, unknown>;
 }
 
 export interface LMStudioAgentRequest {
@@ -68,12 +68,12 @@ export interface LMStudioAgentRequest {
   tools?: Array<{
     name: string;
     description: string;
-    parameters: Record<string, any>;
+    parameters: Record<string, unknown>;
   }>;
   options?: {
     maxSteps?: number;
     temperature?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -108,6 +108,16 @@ export interface LMStudioConnectionStatus {
   websocketConnected?: boolean;
 }
 
+// Define a type for loaded models (moved from inside the class)
+interface LoadedModel {
+  path: string;
+  identifier?: string;
+  architecture?: string;
+  size?: string;
+  quantization?: string;
+  [key: string]: unknown;
+}
+
 /**
  * Pure LM Studio SDK Client
  * Handles only connection management and API communication
@@ -116,15 +126,15 @@ export class LMStudioClient extends EventEmitter {
   private client: SDK;
   private config: LMStudioConnectionConfig;
   private healthCheckTimer?: NodeJS.Timeout;
-  private connectionStatus: LMStudioConnectionStatus;
+  private readonly connectionStatus: LMStudioConnectionStatus;
   private reconnectTimer?: NodeJS.Timeout;
 
-  constructor(config: LMStudioConnectionConfig) {
+  public constructor(config: Readonly<LMStudioConnectionConfig>) {
     super();
     this.config = config;
 
     // Initialize SDK client
-    const baseUrl = config.baseUrl || `http://${config.host || 'localhost'}:${config.port || 1234}`;
+    const baseUrl = config.baseUrl ?? `http://${config.host ?? 'localhost'}:${config.port ?? 1234}`;
     this.client = new SDK({
       baseUrl,
     });
@@ -146,6 +156,21 @@ export class LMStudioClient extends EventEmitter {
       this.startHealthMonitoring();
     }
   }
+
+  /**
+     * Start periodic health monitoring
+     */
+    private startHealthMonitoring(): void {
+      if (this.healthCheckTimer) {
+        clearInterval(this.healthCheckTimer);
+      }
+      this.healthCheckTimer = setInterval(() => {
+        // Call the async function but don't return the Promise
+        this.testConnection().catch((error) => {
+          logger.error('Health check failed:', error);
+        });
+      }, this.config.healthCheckInterval);
+    }
 
   /**
    * Initialize the LM Studio SDK client
@@ -175,23 +200,32 @@ export class LMStudioClient extends EventEmitter {
     // Note: LM Studio SDK may not expose these events directly
     // These are placeholders for when they become available
 
+    // Define a minimal EventEmitter-like interface for type safety
+    interface SDKEventEmitter {
+      on: (event: 'connect' | 'disconnect' | 'error', listener: (...args: readonly unknown[]) => void) => this;
+    }
+
     try {
-      // Check if client has event handling capabilities
-      if (typeof (this.client as any).on === 'function') {
-        (this.client as any).on('connect', () => {
+      const sdkClient = this.client as unknown;
+      if (
+        sdkClient &&
+        typeof (sdkClient as SDKEventEmitter).on === 'function'
+      ) {
+        (sdkClient as SDKEventEmitter).on('connect', () => {
           this.connectionStatus.connected = true;
           this.connectionStatus.consecutiveFailures = 0;
           this.emit('connected', this.connectionStatus);
         });
 
-        (this.client as any).on('disconnect', () => {
+        (sdkClient as SDKEventEmitter).on('disconnect', () => {
           this.connectionStatus.connected = false;
           this.emit('disconnected');
           this.scheduleReconnect();
         });
 
-        (this.client as any).on('error', (error: Error) => {
+        (sdkClient as SDKEventEmitter).on('error', (...args: readonly unknown[]) => {
           this.connectionStatus.consecutiveFailures++;
+          const [error] = args;
           this.emit('connectionError', error);
         });
       }
@@ -201,16 +235,16 @@ export class LMStudioClient extends EventEmitter {
     }
   }
 
+
+  /**
+   * Helper to add a timeout to a promise
+   */
+
   /**
    * Test connection to LM Studio
    */
-  async testConnection(): Promise<boolean> {
+  public async testConnection(): Promise<boolean> {
     try {
-      // Test basic SDK connectivity
-      if (!this.client.llm) {
-        throw new Error('LM Studio SDK not properly initialized');
-      }
-
       // Try to list models as a connection test
       const models = await this.withTimeout(this.getModelList(), this.config.connectionTimeout);
 
@@ -241,20 +275,28 @@ export class LMStudioClient extends EventEmitter {
   /**
    * Helper method to get model list with proper error handling
    */
-  private async getModelList(): Promise<any[]> {
+  private async getModelList(): Promise<Record<string, unknown>[]> {
     try {
+      // Define minimal interfaces for type safety
+      interface LLMClient {
+        list: () => Promise<Record<string, unknown>[]>;
+      }
+      interface ModelsClient {
+        list: () => Promise<Record<string, unknown>[]>;
+      }
       // Try the expected API first
-      if ((this.client as any).llm && typeof (this.client as any).llm.list === 'function') {
-        return await (this.client as any).llm.list();
+      const { llm } = this.client as unknown as { llm?: LLMClient };
+      if (llm && typeof llm.list === 'function') {
+        return await llm.list();
       }
 
       // Fallback to alternative API patterns
-      if ((this.client as any).models && typeof (this.client as any).models.list === 'function') {
-        return await (this.client as any).models.list();
+      const { models } = this.client as unknown as { models?: ModelsClient };
+      if (models && typeof models.list === 'function') {
+        return await models.list();
       }
 
       // If no list method is available, return empty array
-      logger.warn('No model listing method available in LM Studio SDK');
       return [];
     } catch (error) {
       logger.error('Error listing models from LM Studio:', error);
@@ -262,19 +304,19 @@ export class LMStudioClient extends EventEmitter {
     }
   }
 
-  /**
-   * Helper method to get loaded model list with proper error handling
-   */
-  private async getLoadedModelList(): Promise<any[]> {
+  private async getLoadedModelList(): Promise<LoadedModel[]> {
     try {
       // Try the expected API first
-      if (this.client.llm && typeof this.client.llm.listLoaded === 'function') {
-        return await this.client.llm.listLoaded();
+      if (typeof this.client.llm?.listLoaded === 'function') {
+        const result = await this.client.llm.listLoaded();
+        return Array.isArray(result) ? (result as unknown as LoadedModel[]) : [];
       }
 
       // Fallback to alternative API patterns
-      if (this.client.llm && typeof (this.client.llm as any).getLoadedModels === 'function') {
-        return await (this.client.llm as any).getLoadedModels();
+      const llmAny = this.client.llm as unknown as { getLoadedModels?: () => Promise<LoadedModel[]> };
+      if (typeof llmAny?.getLoadedModels === 'function') {
+        const result = await llmAny.getLoadedModels();
+        return Array.isArray(result) ? result : [];
       }
 
       // If no loaded model method is available, return empty array
@@ -289,17 +331,25 @@ export class LMStudioClient extends EventEmitter {
   /**
    * List all available models
    */
-  async listAllModels(): Promise<LMStudioModelInfo[]> {
-    const operation = async () => {
+  public async listAllModels(): Promise<LMStudioModelInfo[]> {
+    const operation = async (): Promise<LMStudioModelInfo[]> => {
       const models = await this.getModelList();
-      return models.map(model => ({
-        path: model.path || 'unknown',
-        identifier: model.identifier || model.path || 'unknown',
-        isLoaded: false, // Will be determined by listLoadedModels
-        architecture: (model as any).architecture || 'unknown',
-        size: (model as any).size || 'unknown',
-        quantization: (model as any).quantization || 'unknown',
-      }));
+      return models.map((model: Readonly<Record<string, unknown>>) => {
+        // Use type assertion or type guard to ensure safe property access
+        const m = model as Partial<LMStudioModelInfo>;
+        return {
+          path: typeof m.path === 'string' ? m.path : 'unknown',
+          identifier: typeof m.identifier === 'string'
+            ? m.identifier
+            : typeof m.path === 'string'
+            ? m.path
+            : 'unknown',
+          isLoaded: false, // Will be determined by listLoadedModels
+          architecture: typeof m.architecture === 'string' ? m.architecture : 'unknown',
+          size: typeof m.size === 'string' ? m.size : 'unknown',
+          quantization: typeof m.quantization === 'string' ? m.quantization : 'unknown',
+        };
+      });
     };
 
     return this.executeWithRetry(operation);
@@ -308,12 +358,12 @@ export class LMStudioClient extends EventEmitter {
   /**
    * List currently loaded models
    */
-  async listLoadedModels(): Promise<LMStudioModelInfo[]> {
-    const operation = async () => {
+  public async listLoadedModels(): Promise<LMStudioModelInfo[]> {
+    const operation = async (): Promise<LMStudioModelInfo[]> => {
       const models = await this.getLoadedModelList();
-      return models.map(model => ({
+      return models.map((model: Readonly<LoadedModel>) => ({
         path: model.path,
-        identifier: model.identifier || model.path,
+        identifier: model.identifier ?? model.path,
         isLoaded: true,
         loadProgress: 100,
         architecture: model.architecture,
@@ -328,13 +378,25 @@ export class LMStudioClient extends EventEmitter {
   /**
    * Complete text using specified model
    */
-  async complete(request: LMStudioCompletionRequest): Promise<LMStudioCompletionResponse> {
-    const operation = async () => {
+  public async complete(
+    request: Readonly<LMStudioCompletionRequest>
+  ): Promise<LMStudioCompletionResponse> {
+    interface SDKCompletionResponse {
+      content: string;
+      finishReason?: string;
+      usage?: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+      };
+    }
+
+    const operation = async (): Promise<LMStudioCompletionResponse> => {
       const model = await this.client.llm.model(request.modelPath);
 
-      const response = await model.complete(request.prompt, {
-        temperature: request.options?.temperature || 0.7,
-        maxTokens: request.options?.maxTokens || 1000,
+      const response: SDKCompletionResponse = await model.complete(request.prompt, {
+        temperature: request.options?.temperature ?? 0.7,
+        maxTokens: request.options?.maxTokens ?? 1000,
         topP: request.options?.topP,
         topK: request.options?.topK,
         frequencyPenalty: request.options?.frequencyPenalty,
@@ -346,12 +408,12 @@ export class LMStudioClient extends EventEmitter {
 
       return {
         content: response.content,
-        finishReason: (response as any).finishReason,
-        usage: (response as any).usage
+        finishReason: response.finishReason,
+        usage: response.usage
           ? {
-              promptTokens: (response as any).usage.promptTokens,
-              completionTokens: (response as any).usage.completionTokens,
-              totalTokens: (response as any).usage.totalTokens,
+              promptTokens: response.usage.promptTokens,
+              completionTokens: response.usage.completionTokens,
+              totalTokens: response.usage.totalTokens,
             }
           : undefined,
       };
@@ -363,15 +425,15 @@ export class LMStudioClient extends EventEmitter {
   /**
    * Stream text completion using specified model
    */
-  async completeStream(
-    request: LMStudioCompletionRequest
+  public async completeStream(
+    request: Readonly<LMStudioCompletionRequest>
   ): Promise<AsyncIterable<LMStudioCompletionResponse>> {
-    const operation = async () => {
+    const operation = async (): Promise<AsyncIterable<LMStudioCompletionResponse>> => {
       const model = await this.client.llm.model(request.modelPath);
 
       const stream = model.complete(request.prompt, {
-        temperature: request.options?.temperature || 0.7,
-        maxTokens: request.options?.maxTokens || 1000,
+        temperature: request.options?.temperature ?? 0.7,
+        maxTokens: request.options?.maxTokens ?? 1000,
         ...request.options,
       });
 
@@ -384,25 +446,44 @@ export class LMStudioClient extends EventEmitter {
   /**
    * Chat with specified model
    */
-  async chat(request: LMStudioChatRequest): Promise<LMStudioChatResponse> {
-    const operation = async () => {
+  public async chat(request: Readonly<LMStudioChatRequest>): Promise<LMStudioChatResponse> {
+    interface SDKChatResponse {
+      content: string;
+      finishReason?: string;
+      usage?: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+      };
+    }
+
+    const operation = async (): Promise<LMStudioChatResponse> => {
       const model = await this.client.llm.model(request.modelPath);
 
-      const response = await model.respond(request.messages, {
-        temperature: request.options?.temperature || 0.7,
-        maxTokens: request.options?.maxTokens || 1000,
+      const temperature =
+        typeof request.options?.temperature === 'number'
+          ? request.options.temperature
+          : 0.7;
+      const maxTokens =
+        typeof request.options?.maxTokens === 'number'
+          ? request.options.maxTokens
+          : 1000;
+
+      const response: SDKChatResponse = await model.respond(request.messages, {
+        temperature,
+        maxTokens,
         ...request.options,
       });
 
       return {
         content: response.content,
         role: 'assistant',
-        finishReason: (response as any).finishReason,
-        usage: (response as any).usage
+        finishReason: response.finishReason,
+        usage: response.usage
           ? {
-              promptTokens: (response as any).usage.promptTokens,
-              completionTokens: (response as any).usage.completionTokens,
-              totalTokens: (response as any).usage.totalTokens,
+              promptTokens: response.usage.promptTokens,
+              completionTokens: response.usage.completionTokens,
+              totalTokens: response.usage.totalTokens,
             }
           : undefined,
       };
@@ -414,13 +495,24 @@ export class LMStudioClient extends EventEmitter {
   /**
    * Stream chat with specified model
    */
-  async chatStream(request: LMStudioChatRequest): Promise<AsyncIterable<LMStudioChatResponse>> {
-    const operation = async () => {
+  public async chatStream(
+    request: Readonly<LMStudioChatRequest>
+  ): Promise<AsyncIterable<LMStudioChatResponse>> {
+    const operation = async (): Promise<AsyncIterable<LMStudioChatResponse>> => {
       const model = await this.client.llm.model(request.modelPath);
 
+      const temperature =
+        typeof request.options?.temperature === 'number'
+          ? request.options.temperature
+          : 0.7;
+      const maxTokens =
+        typeof request.options?.maxTokens === 'number'
+          ? request.options.maxTokens
+          : 1000;
+
       const stream = model.respond(request.messages, {
-        temperature: request.options?.temperature || 0.7,
-        maxTokens: request.options?.maxTokens || 1000,
+        temperature,
+        maxTokens,
         ...request.options,
       });
 
@@ -433,17 +525,40 @@ export class LMStudioClient extends EventEmitter {
   /**
    * Use model for autonomous agent tasks (if supported)
    */
-  async performAgentTask(request: LMStudioAgentRequest): Promise<any> {
-    const operation = async () => {
+  public async performAgentTask(
+    request: Readonly<LMStudioAgentRequest>
+  ): Promise<unknown> {
+    // Define an interface for models supporting act with readonly parameters
+    interface AgentCapableModel {
+      act: (
+        task: string,
+        tools: ReadonlyArray<{
+          readonly name: string;
+          readonly description: string;
+          readonly parameters: Readonly<Record<string, unknown>>;
+        }>,
+        options: Readonly<{ maxSteps?: number; temperature?: number; [key: string]: unknown }>
+      ) => Promise<unknown>;
+    }
+
+    const operation = async (): Promise<unknown> => {
       const model = await this.client.llm.model(request.modelPath);
 
-      // Check if model supports .act() method
-      if (typeof (model as any).act === 'function') {
-        return await (model as any).act(request.task, request.tools || [], {
-          maxSteps: request.options?.maxSteps || 10,
-          temperature: request.options?.temperature || 0.7,
-          ...request.options,
-        });
+      const maybeAgentModel = model as unknown as AgentCapableModel;
+      if (typeof maybeAgentModel.act === 'function') {
+        return maybeAgentModel.act(
+          request.task,
+          (request.tools ?? []) as ReadonlyArray<{
+            readonly name: string;
+            readonly description: string;
+            readonly parameters: Readonly<Record<string, unknown>>;
+          }>,
+          {
+            maxSteps: request.options?.maxSteps ?? 10,
+            temperature: request.options?.temperature ?? 0.7,
+            ...request.options,
+          }
+        );
       } else {
         throw new Error('Model does not support agent tasks');
       }
@@ -455,15 +570,20 @@ export class LMStudioClient extends EventEmitter {
   /**
    * Load a model
    */
-  async loadModel(modelPath: string): Promise<void> {
-    const operation = async () => {
-      const model = await this.client.llm.model(modelPath);
+  public async loadModel(modelPath: string): Promise<void> {
+    interface LoadableModel {
+      load?: () => Promise<void>;
+      loadModel?: () => Promise<void>;
+    }
+
+    const operation = async (): Promise<void> => {
+      const model = await this.client.llm.model(modelPath) as LoadableModel;
 
       // Try different load methods based on what's available
-      if (typeof (model as any).load === 'function') {
-        await (model as any).load();
-      } else if (typeof (model as any).loadModel === 'function') {
-        await (model as any).loadModel();
+      if (typeof model.load === 'function') {
+        await model.load();
+      } else if (typeof model.loadModel === 'function') {
+        await model.loadModel();
       } else {
         logger.warn(`No load method available for model: ${modelPath}`);
       }
@@ -475,10 +595,10 @@ export class LMStudioClient extends EventEmitter {
   /**
    * Unload a model
    */
-  async unloadModel(modelPath: string): Promise<void> {
-    const operation = async () => {
+  public async unloadModel(modelPath: string): Promise<void> {
+    const operation = async (): Promise<void> => {
       const model = await this.client.llm.model(modelPath);
-      await model.unload?.();
+      await model.unload();
     };
 
     await this.executeWithRetry(operation);
@@ -487,21 +607,21 @@ export class LMStudioClient extends EventEmitter {
   /**
    * Get current connection status
    */
-  getConnectionStatus(): LMStudioConnectionStatus {
+  public getConnectionStatus(): LMStudioConnectionStatus {
     return { ...this.connectionStatus };
   }
 
   /**
    * Get client configuration
    */
-  getConfig(): LMStudioConnectionConfig {
+  public getConfig(): LMStudioConnectionConfig {
     return { ...this.config };
   }
 
   /**
    * Close connection and cleanup resources
    */
-  async close(): Promise<void> {
+  public close(): void {
     if (this.healthCheckTimer) {
       clearInterval(this.healthCheckTimer);
       this.healthCheckTimer = undefined;
@@ -519,7 +639,7 @@ export class LMStudioClient extends EventEmitter {
   /**
    * Update connection configuration
    */
-  updateConfig(newConfig: Partial<LMStudioConnectionConfig>): void {
+  public updateConfig(newConfig: Readonly<Partial<LMStudioConnectionConfig>>): void {
     this.config = { ...this.config, ...newConfig };
 
     // Reinitialize client if baseUrl changed
@@ -581,9 +701,9 @@ export class LMStudioClient extends EventEmitter {
     throw lastError;
   }
 
-  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  private async withTimeout<T>(promise: Readonly<Promise<T>>, timeoutMs: number): Promise<T> {
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+      setTimeout(() => { reject(new Error(`Operation timed out after ${timeoutMs}ms`)); }, timeoutMs);
     });
 
     return Promise.race([promise, timeoutPromise]);
@@ -592,13 +712,9 @@ export class LMStudioClient extends EventEmitter {
   private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
-
-  private startHealthMonitoring(): void {
-    this.healthCheckTimer = setInterval(async () => {
-      await this.testConnection();
-    }, this.config.healthCheckInterval);
-  }
-
+  /**
+   * Schedule a reconnect attempt after a delay
+   */
   private scheduleReconnect(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -609,39 +725,89 @@ export class LMStudioClient extends EventEmitter {
     }, this.config.websocketReconnectDelay);
   }
 
+  /**
+   * Transform a completion stream to LMStudioCompletionResponse
+   */
   private async *transformStream(
-    stream: AsyncIterable<any>
+    stream: Readonly<AsyncIterable<{
+      content?: string;
+      delta?: string;
+      finishReason?: string;
+      usage?: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+      };
+    }>>
   ): AsyncIterable<LMStudioCompletionResponse> {
     for await (const chunk of stream) {
-      yield {
-        content: chunk.content || chunk.delta || '',
-        finishReason: chunk.finishReason,
-        usage: chunk.usage
+      const content = typeof chunk.content === 'string'
+        ? chunk.content
+        : typeof chunk.delta === 'string'
+        ? chunk.delta
+        : '';
+      const finishReason = typeof chunk.finishReason === 'string' ? chunk.finishReason : undefined;
+      const usage =
+        chunk.usage &&
+        typeof chunk.usage.promptTokens === 'number' &&
+        typeof chunk.usage.completionTokens === 'number' &&
+        typeof chunk.usage.totalTokens === 'number'
           ? {
               promptTokens: chunk.usage.promptTokens,
               completionTokens: chunk.usage.completionTokens,
               totalTokens: chunk.usage.totalTokens,
             }
-          : undefined,
+          : undefined;
+
+      yield {
+        content,
+        finishReason,
+        usage,
       };
     }
   }
 
+  /**
+   * Transform a chat stream to LMStudioChatResponse
+   */
   private async *transformChatStream(
-    stream: AsyncIterable<any>
+    stream: Readonly<AsyncIterable<{
+      readonly content?: string;
+      readonly delta?: string;
+      readonly finishReason?: string;
+      readonly usage?: {
+        readonly promptTokens: number;
+        readonly completionTokens: number;
+        readonly totalTokens: number;
+      };
+    }>>
   ): AsyncIterable<LMStudioChatResponse> {
     for await (const chunk of stream) {
-      yield {
-        content: chunk.content || chunk.delta || '',
-        role: 'assistant',
-        finishReason: chunk.finishReason,
-        usage: chunk.usage
+      const content =
+        typeof chunk.content === 'string'
+          ? chunk.content
+          : typeof chunk.delta === 'string'
+          ? chunk.delta
+          : '';
+      const finishReason =
+        typeof chunk.finishReason === 'string' ? chunk.finishReason : undefined;
+      const usage =
+        chunk.usage &&
+        typeof chunk.usage.promptTokens === 'number' &&
+        typeof chunk.usage.completionTokens === 'number' &&
+        typeof chunk.usage.totalTokens === 'number'
           ? {
               promptTokens: chunk.usage.promptTokens,
               completionTokens: chunk.usage.completionTokens,
               totalTokens: chunk.usage.totalTokens,
             }
-          : undefined,
+          : undefined;
+
+      yield {
+        content,
+        role: 'assistant',
+        finishReason,
+        usage,
       };
     }
   }
@@ -649,7 +815,7 @@ export class LMStudioClient extends EventEmitter {
 
 // Factory function for creating configured LM Studio clients
 export function createLMStudioClient(
-  config: Partial<LMStudioConnectionConfig> = {}
+  config: Readonly<Partial<LMStudioConnectionConfig>> = {}
 ): LMStudioClient {
   const defaultConfig: LMStudioConnectionConfig = {
     timeout: 30000,

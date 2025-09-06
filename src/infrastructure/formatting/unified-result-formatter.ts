@@ -6,7 +6,6 @@
  * Provides rich, structured formatting with metadata extraction
  */
 
-import { logger } from '../logging/unified-logger.js';
 import { ToolExecutionResult } from '../types/tool-execution-types.js';
 
 export interface FormattingOptions {
@@ -37,7 +36,7 @@ export interface MultiToolFormattedResult extends FormattedResult {
     toolName: string;
     success: boolean;
     content: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   }>;
   summary: {
     totalTools: number;
@@ -56,7 +55,7 @@ export class UnifiedResultFormatter {
   /**
    * Format a single result with comprehensive extraction strategies
    */
-  formatResult(result: unknown, options: FormattingOptions = {}): FormattedResult {
+  public formatResult(result: Readonly<unknown>, options: Readonly<FormattingOptions> = {}): FormattedResult {
     const {
       includeMetadata = false,
       maxDepth = this.maxDepthDefault,
@@ -72,10 +71,10 @@ export class UnifiedResultFormatter {
     let content = '';
 
     try {
-      const extractionResult = this.extractContent(result, maxDepth, maxLength, highlightErrors);
-      content = extractionResult.content;
-      extractionStrategy = extractionResult.strategy;
-      warnings.push(...extractionResult.warnings);
+      const { content: extractedContent, strategy, warnings: extractionWarnings } = this.extractContent(result, maxDepth, maxLength, highlightErrors);
+      content = extractedContent;
+      extractionStrategy = strategy;
+      warnings.push(...extractionWarnings);
 
       // Apply format-specific processing
       if (preferMarkdown && format === 'text') {
@@ -88,7 +87,7 @@ export class UnifiedResultFormatter {
 
       // Truncate if too long
       if (content.length > maxLength) {
-        content = content.substring(0, maxLength - 3) + '...';
+        content = `${content.substring(0, maxLength - 3)}...`;
         warnings.push(`Content truncated to ${maxLength} characters`);
       }
     } catch (error) {
@@ -105,7 +104,7 @@ export class UnifiedResultFormatter {
             originalType: typeof result,
             extractionStrategy,
             hasWarnings: warnings.length > 0,
-            warnings,
+            warnings: warnings.map(w => String(w)),
             processedAt: new Date(),
           }
         : undefined,
@@ -117,10 +116,10 @@ export class UnifiedResultFormatter {
   /**
    * Format multiple tool results with summary and organization
    */
-  formatMultipleToolResults(
-    toolResults: any[],
-    toolCalls?: any[],
-    options: FormattingOptions = {}
+  public formatMultipleToolResults(
+    toolResults: readonly unknown[],
+    toolCalls?: readonly { name?: string; function?: { name?: string } }[],
+    options: Readonly<FormattingOptions> = {}
   ): MultiToolFormattedResult {
     const { includeMetadata = false } = options;
 
@@ -140,10 +139,23 @@ export class UnifiedResultFormatter {
 
     toolResults.forEach((result, index) => {
       const toolCall = toolCalls?.[index];
-      const toolName = toolCall?.name || toolCall?.function?.name || `Tool ${index + 1}`;
+      let toolName = `Tool ${index + 1}`;
+      if (toolCall && typeof toolCall === 'object') {
+        if ('name' in toolCall && typeof toolCall.name === 'string') {
+          toolName = toolCall.name;
+        } else if (
+          'function' in toolCall &&
+          toolCall.function &&
+          typeof toolCall.function === 'object' &&
+          'name' in toolCall.function &&
+          typeof toolCall.function.name === 'string'
+        ) {
+          toolName = toolCall.function.name;
+        }
+      }
 
       // Format individual result
-      const formattedResult = this.formatResult(result, options);
+      const formattedResult = this.formatResult(result as Readonly<unknown>, options);
       const hasError = this.isErrorResult(result);
 
       if (hasError) {
@@ -180,7 +192,7 @@ export class UnifiedResultFormatter {
 
     return {
       content,
-      format: options.format || 'text',
+      format: options.format ?? 'text',
       toolResults: formattedToolResults,
       summary: {
         totalTools: toolResults.length,
@@ -191,8 +203,8 @@ export class UnifiedResultFormatter {
         ? {
             originalType: 'array',
             extractionStrategy: 'multi-tool',
-            hasWarnings: formattedToolResults.some(tr => tr.metadata?.warnings?.length > 0),
-            warnings: formattedToolResults.flatMap(tr => tr.metadata?.warnings || []),
+            hasWarnings: (formattedToolResults as readonly typeof formattedToolResults[number][]).some(tr => Array.isArray(tr.metadata?.warnings) && tr.metadata.warnings.length > 0),
+            warnings: (formattedToolResults as readonly typeof formattedToolResults[number][]).flatMap(tr => tr.metadata?.warnings as string[]),
             processedAt: new Date(),
           }
         : undefined,
@@ -202,9 +214,9 @@ export class UnifiedResultFormatter {
   /**
    * Format ToolExecutionResult with structured output
    */
-  formatToolExecutionResult(
-    result: ToolExecutionResult,
-    options: FormattingOptions = {}
+  public formatToolExecutionResult(
+    result: Readonly<ToolExecutionResult>,
+    options: Readonly<FormattingOptions> = {}
   ): FormattedResult {
     const { includeMetadata = true, highlightErrors = true } = options;
 
@@ -221,7 +233,7 @@ export class UnifiedResultFormatter {
               originalType: 'ToolExecutionResult',
               extractionStrategy: 'error-result',
               hasWarnings: true,
-              warnings: result.warnings || [],
+              warnings: result.warnings ?? [],
               processedAt: new Date(),
             }
           : undefined,
@@ -229,12 +241,13 @@ export class UnifiedResultFormatter {
     }
 
     // Format successful result
-    const dataFormatted = this.formatResult(result.data, options);
-    let content = dataFormatted.content;
+    const { content: dataContent } = this.formatResult(result.data as Readonly<unknown>, options);
+    let content = dataContent;
 
     // Add output content if different from data
-    if (result.output?.content && result.output.content !== content) {
-      content = result.output.content;
+    const { content: outputContent } = result.output ?? {};
+    if (outputContent && outputContent !== content) {
+      content = outputContent;
     }
 
     // Add metadata if requested
@@ -251,19 +264,21 @@ export class UnifiedResultFormatter {
       }
 
       if (metadataLines.length > 0) {
-        content += '\n\n' + metadataLines.join('\n');
+                content += `
+        
+        ${metadataLines.join('\n')}`;
       }
     }
 
     return {
       content,
-      format: options.format || 'text',
+      format: options.format ?? 'text',
       metadata: includeMetadata
         ? {
             originalType: 'ToolExecutionResult',
             extractionStrategy: 'structured-result',
-            hasWarnings: (result.warnings?.length || 0) > 0,
-            warnings: result.warnings || [],
+            hasWarnings: (result.warnings?.length ?? 0) > 0,
+            warnings: result.warnings ?? [],
             processedAt: new Date(),
           }
         : undefined,
@@ -314,7 +329,7 @@ export class UnifiedResultFormatter {
           warnings: ['Maximum extraction depth reached'],
         };
       }
-      if (typeof result === 'object' && result !== null) {
+      if (typeof result === 'object') {
         const keys = Object.keys(result).slice(0, 5);
         return {
           content: `{Object with keys: ${keys.join(', ')}${Object.keys(result).length > 5 ? '...' : ''}}`,
@@ -386,7 +401,7 @@ export class UnifiedResultFormatter {
     }
 
     // Strategy 3: Deep object extraction with specialized patterns
-    if (typeof result === 'object' && result !== null) {
+    if (typeof result === 'object') {
       const record = result as Record<string, unknown>;
 
       // Enhanced MCP-style responses with deep traversal
@@ -433,7 +448,7 @@ export class UnifiedResultFormatter {
       if (errorResult) return errorResult;
 
       // Generic object with intelligent key prioritization
-      return this.extractFromGenericObject(record, maxDepth, maxLength, warnings);
+      return this.extractFromGenericObject(record, maxDepth, warnings);
     }
 
     // Strategy 4: Last resort with type information
@@ -448,14 +463,16 @@ export class UnifiedResultFormatter {
    * Extract content from homogeneous object arrays
    */
   private extractObjectArray(
-    array: any[],
+    array: readonly unknown[],
     maxDepth: number,
     maxLength: number,
     highlightErrors: boolean,
-    warnings: string[]
+    warnings: readonly string[]
   ): { content: string; strategy: string; warnings: string[] } {
+    const mutableWarnings: string[] = [...warnings];
+
     if (array.length === 0) {
-      return { content: '[]', strategy: 'empty-object-array', warnings };
+      return { content: '[]', strategy: 'empty-object-array', warnings: mutableWarnings };
     }
 
     // Sample first object to determine structure
@@ -476,7 +493,7 @@ export class UnifiedResultFormatter {
         })
         .join('\n');
 
-      return { content: formatted, strategy: 'object-array-table', warnings };
+      return { content: formatted, strategy: 'object-array-table', warnings: mutableWarnings };
     }
 
     // For large arrays, show summary
@@ -491,33 +508,33 @@ export class UnifiedResultFormatter {
 
     const content = `${summary}\n\nFirst ${Math.min(3, array.length)} items:\n${firstFew}`;
     if (array.length > 3) {
-      warnings.push(`Showing first 3 of ${array.length} array items`);
+      mutableWarnings.push(`Showing first 3 of ${array.length} array items`);
     }
 
-    return { content, strategy: 'object-array-summary', warnings };
+    return { content, strategy: 'object-array-summary', warnings: mutableWarnings };
   }
 
   /**
    * Extract from MCP-style patterns with deep traversal
    */
   private extractFromMCPPatterns(
-    record: Record<string, unknown>,
+    record: Readonly<Record<string, unknown>>,
     maxDepth: number,
     highlightErrors: boolean,
-    warnings: string[]
+    warnings: readonly string[]
   ): { content: string; strategy: string; warnings: string[] } | null {
     // Primary content properties
     const primaryProps = ['content', 'text', 'message', 'output', 'response', 'result'];
     for (const prop of primaryProps) {
       const value = record[prop];
       if (typeof value === 'string' && value.trim()) {
-        return { content: value, strategy: `mcp-${prop}`, warnings };
+        return { content: value, strategy: `mcp-${prop}`, warnings: [...warnings] };
       }
 
       // Deep traverse if property is object
       if (value && typeof value === 'object' && maxDepth > 1) {
         const deepResult = this.extractContent(value, maxDepth - 1, 10000, highlightErrors);
-        if (deepResult.content && deepResult.content.trim()) {
+        if (deepResult.content.trim()) {
           return {
             content: deepResult.content,
             strategy: `mcp-deep-${prop}`,
@@ -533,20 +550,30 @@ export class UnifiedResultFormatter {
 
       // Multi-level text extraction
       if (typeof content.text === 'string') {
-        return { content: content.text, strategy: 'nested-content-text', warnings };
+        return { content: content.text, strategy: 'nested-content-text', warnings: [...warnings] };
       }
 
       // Content arrays
       if (Array.isArray(content)) {
         const textContent = content
-          .map(c =>
-            typeof c === 'object' && c !== null ? (c as any).text || (c as any).content : String(c)
-          )
-          .filter(text => text && typeof text === 'string')
+          .map((c: unknown) => {
+            if (typeof c === 'object' && c !== null) {
+              const obj = c as Record<string, unknown>;
+              if (typeof obj.text === 'string') {
+                return obj.text;
+              }
+              if (typeof obj.content === 'string') {
+                return obj.content;
+              }
+              return '';
+            }
+            return String(c);
+          })
+          .filter((text: string) => text && typeof text === 'string')
           .join('\n');
 
         if (textContent) {
-          return { content: textContent, strategy: 'nested-content-array', warnings };
+          return { content: textContent, strategy: 'nested-content-array', warnings: [...warnings] };
         }
       }
     }
@@ -558,42 +585,63 @@ export class UnifiedResultFormatter {
    * Extract from common API response patterns
    */
   private extractFromAPIPatterns(
-    record: Record<string, unknown>,
+    record: Readonly<Record<string, unknown>>,
     maxDepth: number,
     maxLength: number,
     highlightErrors: boolean,
-    warnings: string[]
+    warnings: readonly string[]
   ): { content: string; strategy: string; warnings: string[] } | null {
     // OpenAI-compatible API patterns (LM Studio, OpenAI, etc.)
-    if (record.choices && Array.isArray(record.choices) && record.choices.length > 0) {
-      const choice = record.choices[0] as any;
+    interface OpenAIChoice {
+      message?: { content?: string };
+      text?: string;
+      delta?: { content?: string };
+      [key: string]: unknown;
+    }
+
+    if (
+      record.choices &&
+      Array.isArray(record.choices) &&
+      record.choices.length > 0
+    ) {
+      const [choiceRaw] = record.choices as unknown[];
+      const choice: OpenAIChoice =
+        typeof choiceRaw === 'object' && choiceRaw !== null ? (choiceRaw as OpenAIChoice) : {};
 
       // Handle message.content pattern
-      if (choice.message && typeof choice.message === 'object' && choice.message.content) {
+      if (
+        choice.message &&
+        typeof choice.message === 'object' &&
+        'content' in choice.message
+      ) {
         const content =
           typeof choice.message.content === 'string'
             ? choice.message.content
             : String(choice.message.content);
-        return { content, strategy: 'openai-message-content', warnings };
+        return { content, strategy: 'openai-message-content', warnings: [...warnings] };
       }
 
       // Handle direct text in choice
       if (typeof choice.text === 'string' && choice.text.trim()) {
-        return { content: choice.text, strategy: 'openai-choice-text', warnings };
+        return { content: choice.text, strategy: 'openai-choice-text', warnings: [...warnings] };
       }
 
       // Handle delta content (streaming responses)
-      if (choice.delta && typeof choice.delta === 'object' && choice.delta.content) {
+      if (
+        choice.delta &&
+        typeof choice.delta === 'object' &&
+        'content' in choice.delta
+      ) {
         const content =
           typeof choice.delta.content === 'string'
             ? choice.delta.content
             : String(choice.delta.content);
-        return { content, strategy: 'openai-delta-content', warnings };
+        return { content, strategy: 'openai-delta-content', warnings: [...warnings] };
       }
 
       // Fallback: extract from the choice object
       const choiceResult = this.extractContent(choice, maxDepth - 1, maxLength, highlightErrors);
-      if (choiceResult.content && choiceResult.content.trim()) {
+      if (choiceResult.content.trim()) {
         return {
           content: choiceResult.content,
           strategy: 'openai-choice-fallback',
@@ -643,9 +691,9 @@ export class UnifiedResultFormatter {
         highlightErrors
       );
       const metaInfo = [];
-      if (record.total) metaInfo.push(`total: ${record.total}`);
-      if (record.page) metaInfo.push(`page: ${record.page}`);
-      if (record.limit) metaInfo.push(`limit: ${record.limit}`);
+      if (typeof record.total === 'string' || typeof record.total === 'number' || typeof record.total === 'boolean') metaInfo.push(`total: ${record.total}`);
+      if (typeof record.page === 'string' || typeof record.page === 'number' || typeof record.page === 'boolean') metaInfo.push(`page: ${record.page}`);
+      if (typeof record.limit === 'string' || typeof record.limit === 'number' || typeof record.limit === 'boolean') metaInfo.push(`limit: ${record.limit}`);
 
       const content =
         metaInfo.length > 0
@@ -666,18 +714,18 @@ export class UnifiedResultFormatter {
    * Extract from database/ORM result patterns
    */
   private extractFromDatabasePatterns(
-    record: Record<string, unknown>,
+    record: Readonly<Record<string, unknown>>,
     maxDepth: number,
     maxLength: number,
     highlightErrors: boolean,
-    warnings: string[]
+    warnings: readonly string[]
   ): { content: string; strategy: string; warnings: string[] } | null {
     // Database query results
     if (record.rows && Array.isArray(record.rows)) {
       const rowsResult = this.extractContent(record.rows, maxDepth - 1, maxLength, highlightErrors);
       const metaInfo = [];
-      if (record.rowCount) metaInfo.push(`${record.rowCount} rows`);
-      if (record.command) metaInfo.push(`command: ${record.command}`);
+      if (typeof record.rowCount === 'string' || typeof record.rowCount === 'number' || typeof record.rowCount === 'boolean') metaInfo.push(`${record.rowCount} rows`);
+      if (typeof record.command === 'string' || typeof record.command === 'number' || typeof record.command === 'boolean') metaInfo.push(`command: ${record.command}`);
 
       const content =
         metaInfo.length > 0
@@ -731,21 +779,26 @@ export class UnifiedResultFormatter {
    * Extract from file system patterns
    */
   private extractFromFileSystemPatterns(
-    record: Record<string, unknown>,
+    record: Readonly<Record<string, unknown>>,
     maxDepth: number,
     maxLength: number,
     highlightErrors: boolean,
-    warnings: string[]
+    warnings: readonly string[]
   ): { content: string; strategy: string; warnings: string[] } | null {
     // File stats objects
-    if (record.size && record.mtime && record.isFile) {
-      const fileInfo = [];
-      if (record.name) fileInfo.push(`File: ${record.name}`);
-      if (record.size) fileInfo.push(`Size: ${record.size} bytes`);
-      if (record.mtime) fileInfo.push(`Modified: ${record.mtime}`);
-      if (record.mode) fileInfo.push(`Mode: ${record.mode}`);
+    if (
+      typeof record.size === 'number' &&
+      record.mtime !== undefined &&
+      typeof record.isFile === 'boolean' &&
+      record.isFile
+    ) {
+      const fileInfo: string[] = [];
+      if (typeof record.name === 'string') fileInfo.push(`File: ${record.name}`);
+      fileInfo.push(`Size: ${record.size} bytes`);
+      fileInfo.push(`Modified: ${String(record.mtime)}`);
+      if (record.mode !== undefined) fileInfo.push(`Mode: ${String(record.mode)}`);
 
-      return { content: fileInfo.join('\n'), strategy: 'file-stats', warnings };
+      return { content: fileInfo.join('\n'), strategy: 'file-stats', warnings: [...warnings] };
     }
 
     // Directory listings
@@ -770,9 +823,9 @@ export class UnifiedResultFormatter {
    * Extract from error patterns with enhanced detection
    */
   private extractFromErrorPatterns(
-    record: Record<string, unknown>,
+    record: Readonly<Record<string, unknown>>,
     highlightErrors: boolean,
-    warnings: string[]
+    warnings: readonly string[]
   ): { content: string; strategy: string; warnings: string[] } | null {
     // Standard error object
     if (record.error) {
@@ -780,12 +833,12 @@ export class UnifiedResultFormatter {
 
       if (typeof record.error === 'string') {
         errorContent = record.error;
-      } else if (typeof record.error === 'object' && record.error !== null) {
-        const errorObj = record.error as any;
-        const parts = [];
-        if (errorObj.message) parts.push(`Message: ${errorObj.message}`);
-        if (errorObj.code) parts.push(`Code: ${errorObj.code}`);
-        if (errorObj.details) parts.push(`Details: ${JSON.stringify(errorObj.details)}`);
+      } else if (typeof record.error === 'object') {
+        const errorObj = record.error as { message?: unknown; code?: unknown; details?: unknown };
+        const parts: string[] = [];
+        if ('message' in errorObj && errorObj.message !== undefined) parts.push(`Message: ${String(errorObj.message)}`);
+        if ('code' in errorObj && errorObj.code !== undefined) parts.push(`Code: ${String(errorObj.code)}`);
+        if ('details' in errorObj && errorObj.details !== undefined) parts.push(`Details: ${JSON.stringify(errorObj.details)}`);
         errorContent = parts.join('\n');
       }
 
@@ -799,7 +852,7 @@ export class UnifiedResultFormatter {
 
     // Exception-like patterns
     if (record.message && record.stack) {
-      const errorContent = `${record.message}\n\nStack trace:\n${record.stack}`;
+      const errorContent = `${String(record.message)}\n\nStack trace:\n${String(record.stack)}`;
       const finalContent = highlightErrors ? `❌ Exception\n${errorContent}` : errorContent;
       return {
         content: finalContent,
@@ -815,10 +868,9 @@ export class UnifiedResultFormatter {
    * Extract from generic object with intelligent key prioritization
    */
   private extractFromGenericObject(
-    record: Record<string, unknown>,
+    record: Readonly<Record<string, unknown>>,
     maxDepth: number,
-    maxLength: number,
-    warnings: string[]
+    warnings: readonly string[]
   ): { content: string; strategy: string; warnings: string[] } {
     // Prioritize human-readable keys
     const priorityKeys = [
@@ -855,28 +907,33 @@ export class UnifiedResultFormatter {
           otherKeys.length > 0
             ? `${key}: ${value}\n[Also contains: ${otherKeys.join(', ')}]`
             : `${key}: ${value}`;
-        return { content, strategy: 'object-priority-key', warnings };
+        // Make a mutable copy of warnings before returning
+        return { content, strategy: 'object-priority-key', warnings: [...warnings] };
       }
     }
 
     // Fall back to JSON with depth limiting
+    const mutableWarnings: string[] = [...warnings];
     try {
       const json = this.limitedJsonStringify(record, maxDepth);
       return {
         content: json,
         strategy: 'json-fallback',
-        warnings: [...warnings, 'Used JSON fallback'],
+        warnings: [...mutableWarnings, 'Used JSON fallback'],
       };
     } catch (error) {
-      warnings.push(`JSON stringify failed: ${(error as Error).message}`);
-      return { content: '[Object]', strategy: 'object-fallback', warnings };
+      const message = (error && typeof error === 'object' && 'message' in error)
+        ? String((error as { message?: unknown }).message)
+        : String(error);
+      mutableWarnings.push(`JSON stringify failed: ${message}`);
+      return { content: '[Object]', strategy: 'object-fallback', warnings: mutableWarnings };
     }
   }
 
   /**
    * Enhanced markdown formatting
    */
-  private enhanceWithMarkdown(content: string, originalResult: unknown): string {
+  private enhanceWithMarkdown(content: string, _originalResult: unknown): string {
     // Add code blocks for JSON-like content
     if (content.includes('{') && content.includes('}')) {
       return `\`\`\`json\n${content}\n\`\`\``;
@@ -893,23 +950,27 @@ export class UnifiedResultFormatter {
   /**
    * Check if result represents an error
    */
-  private isErrorResult(result: any): boolean {
+  private isErrorResult(result: unknown): boolean {
     if (!result || typeof result !== 'object') return false;
 
+    const obj = result as { error?: unknown; success?: unknown; message?: unknown };
+
     return !!(
-      result.error ||
-      result.success === false ||
-      (typeof result.message === 'string' && result.message.toLowerCase().includes('error'))
+      ('error' in obj && obj.error !== undefined) ||
+      ('success' in obj && obj.success === false) ||
+      ('message' in obj &&
+        typeof obj.message === 'string' &&
+        obj.message.toLowerCase().includes('error'))
     );
   }
 
   /**
    * JSON stringify with depth and circular reference protection
    */
-  private limitedJsonStringify(obj: any, maxDepth: number): string {
+  private limitedJsonStringify(obj: unknown, _maxDepth: number): string {
     const seen = new WeakSet();
 
-    const replacer = (key: string, value: any) => {
+    const replacer = (_key: string, value: unknown): unknown => {
       if (typeof value === 'object' && value !== null) {
         if (seen.has(value)) {
           return '[Circular Reference]';

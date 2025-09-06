@@ -10,19 +10,41 @@ import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
 import {
   loadRustExecutorSafely,
-  createFallbackRustExecutor,
 } from '../../utils/rust-module-loader.js';
 import type {
   StreamChunk,
+  StreamEvent,
+  StreamOptions,
   StreamProcessor,
   StreamSession,
-  StreamOptions,
-  StreamEvent,
 } from './stream-chunk-protocol.js';
+
+// Define the expected Rust module shape for type safety
+interface RustModule {
+  RustExecutor: new () => {
+    initialize: () => void;
+    streamFile: (
+      filePath: string,
+      chunkSize: number,
+      contextType: string,
+      chunkCallback: (chunk: unknown) => void
+    ) => string;
+    streamCommand: (
+      command: string,
+      args: readonly string[],
+      chunkSize: number,
+      chunkCallback: (chunk: unknown) => void
+    ) => string;
+    terminateStream?: (sessionId: string) => void;
+  };
+}
 
 // Load the Rust executor with cross-platform support
 const rustModuleResult = loadRustExecutorSafely();
-const RustExecutor = rustModuleResult.available ? rustModuleResult.module.RustExecutor : null;
+const RustExecutor =
+  rustModuleResult.available && rustModuleResult.module
+    ? (rustModuleResult.module as RustModule).RustExecutor
+    : null;
 
 if (rustModuleResult.available) {
   logger.info(`🦀 Rust executor loaded from: ${rustModuleResult.binaryPath}`);
@@ -34,14 +56,14 @@ if (rustModuleResult.available) {
  * High-performance streaming client backed by Rust
  */
 export class RustStreamingClient extends EventEmitter {
-  private rustExecutor: any | null = null;
-  private activeSessions: Map<string, StreamSession> = new Map();
-  private processors: Map<string, StreamProcessor> = new Map();
-  private sessionTimeouts: Map<string, NodeJS.Timeout> = new Map();
+  private readonly rustExecutor: InstanceType<RustModule['RustExecutor']> | null = null;
+  private readonly activeSessions: Map<string, StreamSession> = new Map();
+  private readonly processors: Map<string, StreamProcessor> = new Map();
+  private readonly sessionTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private isInitialized = false;
   private readonly SESSION_TIMEOUT_MS = 300000; // 5 minutes timeout
 
-  constructor() {
+  public constructor() {
     super();
     this.setMaxListeners(100); // Allow many concurrent streams
 
@@ -58,24 +80,24 @@ export class RustStreamingClient extends EventEmitter {
   /**
    * Check if Rust streaming is available
    */
-  isRustAvailable(): boolean {
+  public isRustAvailable(): boolean {
     return this.isInitialized && this.rustExecutor !== null;
   }
 
   /**
    * Stream file content with true chunked processing
    */
-  async streamFile(
+  public async streamFile(
     filePath: string,
-    processor: StreamProcessor,
-    options?: Partial<StreamOptions>
+    processor: Readonly<StreamProcessor>,
+    options?: Readonly<Partial<StreamOptions>>
   ): Promise<string> {
     if (!this.isRustAvailable()) {
       throw new Error('Rust executor not available for streaming');
     }
 
     const streamOptions = this.createStreamOptions('fileAnalysis', options);
-    const sessionId = `stream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const sessionId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     // Create session
     const session: StreamSession = {
@@ -100,17 +122,22 @@ export class RustStreamingClient extends EventEmitter {
 
     try {
       // Create callback for chunk processing
-      const chunkCallback = (chunk: any) => {
-        this.handleChunk(sessionId, chunk);
+      const chunkCallback = (chunk: unknown): void => {
+        void this.handleChunk(sessionId, chunk);
       };
 
       // Start streaming from Rust
-      const rustStreamId = this.rustExecutor.streamFile(
-        filePath,
-        streamOptions.chunkSize,
-        streamOptions.contextType,
-        chunkCallback
-      );
+      let rustStreamId = '';
+      if (this.rustExecutor) {
+        rustStreamId = this.rustExecutor.streamFile(
+          filePath,
+          streamOptions.chunkSize,
+          streamOptions.contextType,
+          chunkCallback
+        );
+      } else {
+        throw new Error('Rust executor not available for streaming');
+      }
 
       logger.info(`✅ Rust stream started: ${rustStreamId} for session ${sessionId}`);
       return sessionId;
@@ -126,18 +153,18 @@ export class RustStreamingClient extends EventEmitter {
   /**
    * Stream command output with real-time processing
    */
-  async streamCommand(
+  public async streamCommand(
     command: string,
-    args: string[],
-    processor: StreamProcessor,
-    options?: Partial<StreamOptions>
+    args: readonly string[],
+    processor: Readonly<StreamProcessor>,
+    options?: Readonly<Partial<StreamOptions>>
   ): Promise<string> {
     if (!this.isRustAvailable()) {
       throw new Error('Rust executor not available for streaming');
     }
 
     const streamOptions = this.createStreamOptions('commandOutput', options);
-    const sessionId = `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const sessionId = `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     // Create session
     const session: StreamSession = {
@@ -164,17 +191,23 @@ export class RustStreamingClient extends EventEmitter {
 
     try {
       // Create callback for chunk processing
-      const chunkCallback = (chunk: any) => {
-        this.handleChunk(sessionId, chunk);
+      const chunkCallback = (chunk: unknown): undefined => {
+        void this.handleChunk(sessionId, chunk);
+        return undefined;
       };
 
       // Start streaming from Rust
-      const rustStreamId = this.rustExecutor.streamCommand(
-        command,
-        args,
-        streamOptions.chunkSize,
-        chunkCallback
-      );
+      let rustStreamId = '';
+      if (this.rustExecutor) {
+        rustStreamId = this.rustExecutor.streamCommand(
+          command,
+          args,
+          streamOptions.chunkSize,
+          chunkCallback
+        );
+      } else {
+        throw new Error('Rust executor not available for streaming');
+      }
 
       logger.info(`✅ Rust command stream started: ${rustStreamId} for session ${sessionId}`);
       return sessionId;
@@ -190,14 +223,29 @@ export class RustStreamingClient extends EventEmitter {
   /**
    * Handle incoming chunks from Rust with EPIPE protection
    */
-  private async handleChunk(sessionId: string, rawChunk: any): Promise<void> {
+  private async handleChunk(sessionId: string, rawChunk: unknown): Promise<void> {
+    // Type guard for rawChunk
+    function isStreamChunkLike(obj: unknown): obj is StreamChunk {
+      if (typeof obj !== 'object' || obj === null) return false;
+      const o = obj as Record<string, unknown>;
+      return (
+        typeof o.streamId === 'string' &&
+        typeof o.sequence === 'number' &&
+        typeof o.contentType === 'string' &&
+        'data' in o &&
+        typeof o.size === 'number' &&
+        typeof o.metadata === 'object' &&
+        o.metadata !== null
+      );
+    }
+
     const session = this.activeSessions.get(sessionId);
     const processor = this.processors.get(sessionId);
 
     if (!session || !processor) {
       logger.warn(`Received chunk for unknown session: ${sessionId} - terminating orphaned stream`);
       // Terminate orphaned streams to prevent EPIPE
-      if (this.rustExecutor && this.rustExecutor.terminateStream) {
+      if (this.rustExecutor?.terminateStream) {
         try {
           this.rustExecutor.terminateStream(sessionId);
         } catch (error) {
@@ -224,7 +272,10 @@ export class RustStreamingClient extends EventEmitter {
     this.resetSessionTimeout(sessionId);
 
     try {
-      // Convert raw chunk to StreamChunk interface
+      if (!isStreamChunkLike(rawChunk)) {
+        throw new Error('Received chunk with invalid structure');
+      }
+
       const chunk: StreamChunk = {
         streamId: rawChunk.streamId,
         sequence: rawChunk.sequence,
@@ -233,20 +284,20 @@ export class RustStreamingClient extends EventEmitter {
         size: rawChunk.size,
         metadata: {
           source: rawChunk.metadata.source,
-          isLast: rawChunk.metadata.isLast,
-          progress: rawChunk.metadata.progress,
-          totalSize: rawChunk.metadata.totalSize,
-          error: rawChunk.metadata.error,
-          encoding: rawChunk.metadata.encoding,
-          mimeType: rawChunk.metadata.mimeType,
-          compression: rawChunk.metadata.compression,
+          isLast: !!rawChunk.metadata.isLast,
+          progress: typeof rawChunk.metadata.progress === 'number' ? rawChunk.metadata.progress : 0,
+          totalSize: typeof rawChunk.metadata.totalSize === 'number' ? rawChunk.metadata.totalSize : 0,
+          error: typeof rawChunk.metadata.error === 'string' ? rawChunk.metadata.error : undefined,
+          encoding: typeof rawChunk.metadata.encoding === 'string' ? rawChunk.metadata.encoding : undefined,
+          mimeType: typeof rawChunk.metadata.mimeType === 'string' ? rawChunk.metadata.mimeType : undefined,
+          compression: typeof rawChunk.metadata.compression === 'string' ? rawChunk.metadata.compression : undefined,
         },
         timing: {
-          generatedAt: rawChunk.timing?.generatedAt || Date.now(),
-          sentAt: rawChunk.timing?.sentAt || Date.now(),
-          rustProcessingTime: rawChunk.timing?.rustProcessingTime || 0,
+          generatedAt: rawChunk.timing.generatedAt,
+          sentAt: rawChunk.timing.sentAt,
+          rustProcessingTime: rawChunk.timing.rustProcessingTime,
         },
-        resourceUsage: rawChunk.resourceUsage,
+        resourceUsage: rawChunk.resourceUsage ?? undefined,
       };
 
       // Update session stats
@@ -309,7 +360,7 @@ export class RustStreamingClient extends EventEmitter {
    */
   private async completeSession(
     sessionId: string,
-    processor: StreamProcessor,
+    processor: Readonly<StreamProcessor>,
     session: StreamSession
   ): Promise<void> {
     session.state = 'completed';
@@ -418,19 +469,21 @@ export class RustStreamingClient extends EventEmitter {
   /**
    * Get active session statistics
    */
-  getActiveSessionStats(): Array<{ sessionId: string; stats: StreamSession['stats'] }> {
-    return Array.from(this.activeSessions.entries()).map(([sessionId, session]) => ({
-      sessionId,
-      stats: session.stats,
-    }));
+  public getActiveSessionStats(): Array<{ sessionId: string; stats: StreamSession['stats'] }> {
+    return Array.from(this.activeSessions.entries()).map(
+      ([sessionId, session]: readonly [string, Readonly<StreamSession>]) => ({
+        sessionId,
+        stats: session.stats,
+      })
+    );
   }
 
   /**
    * Cancel a streaming session
    */
-  async cancelStream(sessionId: string): Promise<boolean> {
+  public async cancelStream(sessionId: string): Promise<boolean> {
     const session = this.activeSessions.get(sessionId);
-    if (!session) return false;
+    if (!session) return Promise.resolve(false);
 
     session.state = 'cancelled';
     this.cleanupSession(sessionId);
@@ -442,7 +495,7 @@ export class RustStreamingClient extends EventEmitter {
     };
     this.emit('streamEvent', cancelledEvent);
 
-    return true;
+    return Promise.resolve(true);
   }
 
   /**
@@ -476,6 +529,15 @@ export class RustStreamingClient extends EventEmitter {
       case 'codeGeneration':
         baseOptions.compression = false; // Preserve code formatting
         break;
+      case 'searchResults':
+        // No special handling for searchResults, use defaults
+        break;
+      case 'default':
+        // No special handling for default, use defaults
+        break;
+      default:
+        // Ensure exhaustive switch; do nothing
+        break;
     }
 
     return baseOptions;
@@ -489,13 +551,13 @@ export class RustStreamingClient extends EventEmitter {
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 
   /**
    * Cleanup all resources
    */
-  async cleanup(): Promise<void> {
+  public async cleanup(): Promise<void> {
     // Cancel all active sessions
     for (const sessionId of this.activeSessions.keys()) {
       await this.cancelStream(sessionId);

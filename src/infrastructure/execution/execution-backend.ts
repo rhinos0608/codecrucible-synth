@@ -10,16 +10,16 @@
 
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { writeFile, readFile, unlink, mkdir } from 'fs/promises';
-import { join, resolve } from 'path';
+import { unlink, writeFile } from 'fs/promises';
+import { resolve } from 'path';
 import { randomBytes } from 'crypto';
 import { logger } from '../logging/logger.js';
 import {
-  ErrorFactory,
   ErrorCategory,
+  ErrorFactory,
+  ErrorHandler,
   ErrorSeverity,
   ServiceResponse,
-  ErrorHandler,
 } from '../../infrastructure/error-handling/structured-error-system.js';
 
 const execAsync = promisify(exec);
@@ -84,22 +84,22 @@ export abstract class ExecutionBackend {
   protected activeExecutions = 0;
   private executionLock = false;
 
-  constructor(config: BackendConfig) {
+  public constructor(config: Readonly<BackendConfig>) {
     this.config = config;
   }
 
-  abstract execute(
+  public abstract execute(
     command: string,
-    options?: ExecutionOptions
+    options?: Readonly<ExecutionOptions>
   ): Promise<ServiceResponse<ExecutionResult>>;
 
-  abstract cleanup(): Promise<void>;
+  public abstract cleanup(): Promise<void>;
 
-  abstract getStatus(): {
+  public abstract getStatus(): {
     type: string;
     active: number;
     available: boolean;
-    config: any;
+    config: unknown;
   };
 
   protected canExecute(): boolean {
@@ -164,19 +164,19 @@ export abstract class ExecutionBackend {
  * Docker execution backend
  */
 export class DockerBackend extends ExecutionBackend {
-  private containerPrefix = 'codecrucible';
-  private activeContainers = new Set<string>();
+  private readonly containerPrefix = 'codecrucible';
+  private readonly activeContainers = new Set<string>();
 
-  constructor(config: BackendConfig) {
+  public constructor(config: Readonly<BackendConfig>) {
     super({
       ...config,
-      dockerImage: config.dockerImage || 'python:3.11-slim',
+      dockerImage: config.dockerImage ?? 'python:3.11-slim',
     });
   }
 
-  async execute(
+  public async execute(
     command: string,
-    options: ExecutionOptions = {}
+    options: Readonly<ExecutionOptions> = {}
   ): Promise<ServiceResponse<ExecutionResult>> {
     const acquired = await this.acquireExecutionSlot();
     if (!acquired) {
@@ -247,14 +247,14 @@ export class DockerBackend extends ExecutionBackend {
         }
       }
 
-      dockerArgs.push(this.config.dockerImage!, 'bash', '-c', command);
+      dockerArgs.push(this.config.dockerImage as string, 'bash', '-c', command);
 
       logger.debug(`Executing in Docker: ${command}`, { containerId });
       this.activeContainers.add(containerId);
 
       const result = await execAsync(`docker ${dockerArgs.join(' ')}`, {
-        timeout: options.timeout || 30000,
-        maxBuffer: options.maxOutputSize || 1024 * 1024 * 10, // 10MB
+        timeout: options.timeout ?? 30000,
+        maxBuffer: options.maxOutputSize ?? 1024 * 1024 * 10, // 10MB
       });
 
       const duration = Date.now() - startTime;
@@ -270,10 +270,12 @@ export class DockerBackend extends ExecutionBackend {
           containerId,
         },
       });
-    } catch (error: any) {
+    } catch (error) {
       const duration = Date.now() - startTime;
 
-      if (error.killed && error.signal === 'SIGTERM') {
+      const err = error as { killed?: boolean; signal?: string; message?: string; stdout?: string; stderr?: string; code?: number };
+
+      if (err?.killed && err?.signal === 'SIGTERM') {
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
             'Execution timeout',
@@ -290,9 +292,11 @@ export class DockerBackend extends ExecutionBackend {
         );
       }
 
+      // Use a safer error type and access message property conditionally
+      const errObj = error as { message?: string; stdout?: string; stderr?: string; code?: number };
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
-          `Docker execution failed: ${error.message}`,
+          `Docker execution failed: ${errObj.message ?? 'Unknown error'}`,
           ErrorCategory.TOOL_EXECUTION,
           ErrorSeverity.HIGH,
           {
@@ -307,14 +311,14 @@ export class DockerBackend extends ExecutionBackend {
             context: {
               command,
               containerId,
-              stdout: error.stdout || '',
-              stderr: error.stderr || error.message,
-              exitCode: error.code || 1,
+              stdout: errObj.stdout ?? '',
+              stderr: errObj.stderr ?? errObj.message ?? '',
+              exitCode: errObj.code ?? 1,
               duration,
               backend: 'docker',
               component: 'docker-backend',
             },
-            originalError: error,
+            originalError: error as Error,
           }
         )
       );
@@ -331,7 +335,7 @@ export class DockerBackend extends ExecutionBackend {
     }
   }
 
-  async cleanup(): Promise<void> {
+  public async cleanup(): Promise<void> {
     logger.info('Cleaning up Docker backend');
 
     // Stop all active containers
@@ -347,7 +351,12 @@ export class DockerBackend extends ExecutionBackend {
     this.activeExecutions = 0;
   }
 
-  getStatus() {
+  public getStatus(): {
+    type: string;
+    active: number;
+    available: boolean;
+    config: unknown;
+  } {
     return {
       type: 'docker',
       active: this.activeExecutions,
@@ -364,12 +373,12 @@ export class DockerBackend extends ExecutionBackend {
  * E2B Cloud execution backend
  */
 export class E2BBackend extends ExecutionBackend {
-  private sandboxes = new Map<string, any>();
+  private readonly sandboxes = new Map<string, unknown>();
 
-  constructor(config: BackendConfig) {
+  public constructor(config: Readonly<BackendConfig>) {
     super({
       ...config,
-      e2bTemplate: config.e2bTemplate || 'python3',
+      e2bTemplate: config.e2bTemplate ?? 'python3',
     });
 
     if (!config.e2bApiKey) {
@@ -377,9 +386,9 @@ export class E2BBackend extends ExecutionBackend {
     }
   }
 
-  async execute(
+  public async execute(
     command: string,
-    options: ExecutionOptions = {}
+    options: Readonly<ExecutionOptions> = {}
   ): Promise<ServiceResponse<ExecutionResult>> {
     const acquired = await this.acquireExecutionSlot();
     if (!acquired) {
@@ -406,10 +415,10 @@ export class E2BBackend extends ExecutionBackend {
 
     try {
       // Dynamic import of E2B SDK (only if available)
-      let Sandbox: any;
+      let Sandbox: typeof import('e2b').Sandbox;
       try {
-        const e2b = await import('e2b');
-        Sandbox = e2b.Sandbox;
+        const { Sandbox: ImportedSandbox } = await import('e2b');
+        Sandbox = ImportedSandbox;
       } catch {
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
@@ -429,26 +438,34 @@ export class E2BBackend extends ExecutionBackend {
 
       logger.debug(`Creating E2B sandbox: ${sandboxId}`);
 
-      const sandbox = await Sandbox.create({
-        apiKey: this.config.e2bApiKey,
-        template: this.config.e2bTemplate,
-        cwd: options.workingDirectory,
-        env: options.environment,
-      });
+      const sandbox = await Sandbox.create(
+        this.config.e2bTemplate ?? 'python3',
+        {
+          apiKey: this.config.e2bApiKey,
+          envs: options.environment,
+        }
+      );
 
       this.sandboxes.set(sandboxId, sandbox);
 
+      // Type import for E2B Sandbox and Process
+      interface ProcessType {
+        wait: () => Promise<{ stdout: string; stderr: string; exitCode: number }>;
+      }
+
       // Execute command
-      const proc = await sandbox.process.start({
+      // Access process and close properties with explicit typing
+      const processObj = (sandbox as unknown as { process: { start: (opts: Readonly<{ cmd: string; timeout: number }>) => Promise<ProcessType> }; close: () => Promise<void> });
+      const proc = await processObj.process.start({
         cmd: command,
-        timeout: options.timeout || 30000,
+        timeout: options.timeout ?? 30000,
       });
 
       const result = await proc.wait();
       const duration = Date.now() - startTime;
 
       // Cleanup sandbox
-      await sandbox.close();
+      await processObj.close();
       this.sandboxes.delete(sandboxId);
 
       return ErrorHandler.createSuccessResponse({
@@ -462,12 +479,18 @@ export class E2BBackend extends ExecutionBackend {
           sandboxId,
         },
       });
-    } catch (error: any) {
-      const duration = Date.now() - startTime;
+    } catch (error) {
+      // duration is not used, so we omit it
+
+      let errorMessage = 'Unknown error';
+      const errorObj: unknown = error;
+      if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message: unknown }).message === 'string') {
+        errorMessage = (error as { message: string }).message;
+      }
 
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
-          `E2B execution failed: ${error.message}`,
+          `E2B execution failed: ${errorMessage}`,
           ErrorCategory.EXTERNAL_API,
           ErrorSeverity.HIGH,
           {
@@ -476,7 +499,7 @@ export class E2BBackend extends ExecutionBackend {
               timestamp: Date.now(),
               component: 'e2b-backend',
               metadata: { sandboxId, command },
-              error,
+              error: errorObj,
             },
           }
         )
@@ -488,7 +511,7 @@ export class E2BBackend extends ExecutionBackend {
       const sandbox = this.sandboxes.get(sandboxId);
       if (sandbox) {
         try {
-          await sandbox.close();
+          await (sandbox as { close: () => Promise<void> }).close();
         } catch {
           // Already closed
         }
@@ -497,13 +520,13 @@ export class E2BBackend extends ExecutionBackend {
     }
   }
 
-  async cleanup(): Promise<void> {
+  public async cleanup(): Promise<void> {
     logger.info('Cleaning up E2B backend');
 
     // Close all active sandboxes
     for (const [id, sandbox] of this.sandboxes) {
       try {
-        await sandbox.close();
+        await (sandbox as { close: () => Promise<void> }).close();
       } catch (error) {
         logger.warn(`Failed to close sandbox ${id}:`, error);
       }
@@ -513,14 +536,23 @@ export class E2BBackend extends ExecutionBackend {
     this.activeExecutions = 0;
   }
 
-  getStatus() {
+  public getStatus(): {
+    type: string;
+    active: number;
+    available: boolean;
+    config: {
+      template?: string;
+      endpoint?: string;
+      activeSandboxes: number;
+    };
+  } {
     return {
       type: 'e2b',
       active: this.activeExecutions,
       available: this.canExecute(),
       config: {
         template: this.config.e2bTemplate,
-        endpoint: this.config.e2bEndpoint || 'api.e2b.dev',
+        endpoint: this.config.e2bEndpoint ?? 'api.e2b.dev',
         activeSandboxes: this.sandboxes.size,
       },
     };
@@ -531,31 +563,40 @@ export class E2BBackend extends ExecutionBackend {
  * Local E2B execution backend (self-hosted)
  */
 export class LocalE2BBackend extends E2BBackend {
-  constructor(config: BackendConfig) {
+  public constructor(config: Readonly<BackendConfig>) {
     super({
       ...config,
-      e2bEndpoint: config.e2bEndpoint || 'http://localhost:4000',
+      e2bEndpoint: config.e2bEndpoint ?? 'http://localhost:4000',
     });
   }
 
-  override async execute(
+  public override async execute(
     command: string,
-    options: ExecutionOptions = {}
+    options: Readonly<ExecutionOptions> = {}
   ): Promise<ServiceResponse<ExecutionResult>> {
     // Override parent to use local endpoint
     process.env.E2B_API_URL = this.config.e2bEndpoint;
 
     const result = await super.execute(command, options);
 
-    // Update backend name in result
-    if (result.success && result.data) {
+    // Update backend name in result if it's a success response
+    if (result.success && 'data' in result) {
       result.data.backend = 'local_e2b';
     }
 
     return result;
   }
 
-  override getStatus() {
+  public override getStatus(): {
+    type: string;
+    active: number;
+    available: boolean;
+    config: {
+      template?: string;
+      endpoint?: string;
+      activeSandboxes: number;
+    };
+  } {
     const status = super.getStatus();
     status.type = 'local_e2b';
     return status;
@@ -566,22 +607,22 @@ export class LocalE2BBackend extends E2BBackend {
  * Firecracker execution backend for microVM isolation
  */
 export class FirecrackerBackend extends ExecutionBackend {
-  private activeVMs = new Set<string>();
-  private vmPrefix = 'codecrucible_vm';
+  private readonly activeVMs = new Set<string>();
+  private readonly vmPrefix = 'codecrucible_vm';
 
-  constructor(config: BackendConfig) {
+  public constructor(config: Readonly<BackendConfig>) {
     super({
       ...config,
-      firecrackerKernelPath: config.firecrackerKernelPath || '/opt/firecracker/vmlinux.bin',
-      firecrackerRootfsPath: config.firecrackerRootfsPath || '/opt/firecracker/rootfs.ext4',
-      firecrackerVcpuCount: config.firecrackerVcpuCount || 1,
-      firecrackerMemSizeMib: config.firecrackerMemSizeMib || 512,
+      firecrackerKernelPath: config.firecrackerKernelPath ?? '/opt/firecracker/vmlinux.bin',
+      firecrackerRootfsPath: config.firecrackerRootfsPath ?? '/opt/firecracker/rootfs.ext4',
+      firecrackerVcpuCount: config.firecrackerVcpuCount ?? 1,
+      firecrackerMemSizeMib: config.firecrackerMemSizeMib ?? 512,
     });
   }
 
-  async execute(
+  public async execute(
     command: string,
-    options: ExecutionOptions = {}
+    options: Readonly<ExecutionOptions> = {}
   ): Promise<ServiceResponse<ExecutionResult>> {
     const acquired = await this.acquireExecutionSlot();
     if (!acquired) {
@@ -627,7 +668,7 @@ export class FirecrackerBackend extends ExecutionBackend {
           mem_size_mib: this.config.firecrackerMemSizeMib,
           ht_enabled: false,
         },
-        'network-interfaces': [] as any[],
+        'network-interfaces': [] as unknown[],
       };
 
       // Write configuration to temporary file
@@ -638,7 +679,7 @@ export class FirecrackerBackend extends ExecutionBackend {
       this.activeVMs.add(vmId);
 
       // Start Firecracker VM
-      const fcProcess = spawn(
+      const _fcProcess = spawn(
         'firecracker',
         ['--api-sock', socketPath, '--config-file', configPath],
         {
@@ -667,17 +708,26 @@ export class FirecrackerBackend extends ExecutionBackend {
           memSizeMib: this.config.firecrackerMemSizeMib,
         },
       });
-    } catch (error: any) {
+    } catch (error) {
       const duration = Date.now() - startTime;
+
+      // Type guard for error object
+      interface ExecError {
+        message?: string;
+        stdout?: string;
+        stderr?: string;
+        code?: number;
+      }
+      const errObj: ExecError = typeof error === 'object' && error !== null ? error as ExecError : {};
 
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
-          `Firecracker execution failed: ${error.message}`,
+          `Firecracker execution failed: ${errObj.message ?? 'Unknown error'}`,
           ErrorCategory.TOOL_EXECUTION,
           ErrorSeverity.HIGH,
           {
             context: { command, vmId },
-            originalError: error,
+            originalError: error instanceof Error ? error : undefined,
             userMessage: 'Firecracker microVM execution failed',
             suggestedActions: [
               'Check Firecracker installation',
@@ -686,9 +736,9 @@ export class FirecrackerBackend extends ExecutionBackend {
             ],
             retryable: true,
             metadata: {
-              stdout: error.stdout || '',
-              stderr: error.stderr || error.message,
-              exitCode: error.code || 1,
+              stdout: errObj.stdout ?? '',
+              stderr: errObj.stderr ?? errObj.message ?? '',
+              exitCode: errObj.code ?? 1,
               duration,
               backend: 'firecracker',
             },
@@ -713,11 +763,10 @@ export class FirecrackerBackend extends ExecutionBackend {
     vmId: string,
     socketPath: string,
     command: string,
-    options: ExecutionOptions
+    options: Readonly<ExecutionOptions>
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     // Create a script file to execute in the VM
     const scriptPath = `/tmp/script_${vmId}.sh`;
-    const escapedCommand = command.replace(/"/g, '\\"').replace(/'/g, "\\'");
 
     try {
       // Write script to temporary file (would be injected into VM filesystem in real implementation)
@@ -738,11 +787,23 @@ export class FirecrackerBackend extends ExecutionBackend {
         stderr: result.stderr,
         exitCode: 0,
       };
-    } catch (error: any) {
+    } catch (error) {
+      let message = 'Execution failed';
+      let code = 1;
+      if (typeof error === 'object' && error !== null) {
+        if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
+          const { message: errMsg } = error as { message: string };
+          message = errMsg;
+        }
+        if ('code' in error && typeof (error as { code?: unknown }).code === 'number') {
+          const { code: errCode } = error as { code: number };
+          code = errCode;
+        }
+      }
       return {
         stdout: '',
-        stderr: error.message || 'Execution failed',
-        exitCode: error.code || 1,
+        stderr: message,
+        exitCode: code,
       };
     } finally {
       // Cleanup script file
@@ -754,7 +815,7 @@ export class FirecrackerBackend extends ExecutionBackend {
     }
   }
 
-  async cleanup(): Promise<void> {
+  public async cleanup(): Promise<void> {
     logger.info('Cleaning up Firecracker backend');
 
     // Stop all active VMs
@@ -777,7 +838,18 @@ export class FirecrackerBackend extends ExecutionBackend {
     this.activeExecutions = 0;
   }
 
-  getStatus() {
+  public getStatus(): {
+    type: string;
+    active: number;
+    available: boolean;
+    config: {
+      kernelPath?: string;
+      rootfsPath?: string;
+      vcpuCount?: number;
+      memSizeMib?: number;
+      activeVMs: number;
+    };
+  } {
     return {
       type: 'firecracker',
       active: this.activeExecutions,
@@ -797,21 +869,21 @@ export class FirecrackerBackend extends ExecutionBackend {
  * Podman execution backend for rootless containers
  */
 export class PodmanBackend extends ExecutionBackend {
-  private containerPrefix = 'codecrucible_pod';
-  private activeContainers = new Set<string>();
+  private readonly containerPrefix = 'codecrucible_pod';
+  private readonly activeContainers = new Set<string>();
 
-  constructor(config: BackendConfig) {
+  public constructor(config: Readonly<BackendConfig>) {
     super({
       ...config,
-      podmanImage: config.podmanImage || 'python:3.11-slim',
+      podmanImage: config.podmanImage ?? 'python:3.11-slim',
       podmanRootless: config.podmanRootless !== false,
-      podmanNetworkMode: config.podmanNetworkMode || 'none',
+      podmanNetworkMode: config.podmanNetworkMode ?? 'none',
     });
   }
 
-  async execute(
+  public async execute(
     command: string,
-    options: ExecutionOptions = {}
+    options: Readonly<ExecutionOptions> = {}
   ): Promise<ServiceResponse<ExecutionResult>> {
     const acquired = await this.acquireExecutionSlot();
     if (!acquired) {
@@ -890,7 +962,21 @@ export class PodmanBackend extends ExecutionBackend {
         podmanArgs.push('--read-only');
       }
 
-      podmanArgs.push(this.config.podmanImage!, 'bash', '-c', command);
+      if (!this.config.podmanImage) {
+        return ErrorHandler.createErrorResponse(
+          ErrorFactory.createError(
+            'Podman image is not defined',
+            ErrorCategory.CONFIGURATION,
+            ErrorSeverity.HIGH,
+            {
+              context: { command, containerId },
+              userMessage: 'Podman image must be specified in the backend configuration',
+              suggestedActions: ['Set podmanImage in the backend config'],
+            }
+          )
+        );
+      }
+      podmanArgs.push(this.config.podmanImage, 'bash', '-c', command);
 
       logger.debug(`Executing in Podman: ${command}`, { containerId });
       this.activeContainers.add(containerId);
@@ -915,10 +1001,21 @@ export class PodmanBackend extends ExecutionBackend {
           networkMode: this.config.podmanNetworkMode,
         },
       });
-    } catch (error: any) {
+    } catch (error) {
       const duration = Date.now() - startTime;
 
-      if (error.killed && error.signal === 'SIGTERM') {
+      // Type guard for error object
+      interface ExecError {
+        killed?: boolean;
+        signal?: string;
+        message?: string;
+        stdout?: string;
+        stderr?: string;
+        code?: number;
+      }
+      const errObj: ExecError = typeof error === 'object' && error !== null ? error as ExecError : {};
+
+      if (errObj.killed && errObj.signal === 'SIGTERM') {
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
             'Execution timeout',
@@ -936,12 +1033,12 @@ export class PodmanBackend extends ExecutionBackend {
 
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
-          `Podman execution failed: ${error.message}`,
+          `Podman execution failed: ${typeof error === 'object' && error !== null && 'message' in error ? (error as { message?: string }).message : 'Unknown error'}`,
           ErrorCategory.TOOL_EXECUTION,
           ErrorSeverity.HIGH,
           {
             context: { command, containerId },
-            originalError: error,
+            originalError: error instanceof Error ? error : undefined,
             userMessage: 'Podman container execution failed',
             suggestedActions: [
               'Check Podman installation',
@@ -950,9 +1047,9 @@ export class PodmanBackend extends ExecutionBackend {
             ],
             retryable: true,
             metadata: {
-              stdout: error.stdout || '',
-              stderr: error.stderr || error.message,
-              exitCode: error.code || 1,
+              stdout: typeof error === 'object' && error !== null && 'stdout' in error ? (error as { stdout?: string }).stdout ?? '' : '',
+              stderr: typeof error === 'object' && error !== null && 'stderr' in error ? (error as { stderr?: string }).stderr ?? ((error as { message?: string }).message ?? '') : (typeof error === 'object' && error !== null && 'message' in error ? (error as { message?: string }).message ?? '' : ''),
+              exitCode: typeof error === 'object' && error !== null && 'code' in error ? (error as { code?: number }).code ?? 1 : 1,
               duration,
               backend: 'podman',
             },
@@ -998,7 +1095,7 @@ export class PodmanBackend extends ExecutionBackend {
     return safeVars;
   }
 
-  async cleanup(): Promise<void> {
+  public async cleanup(): Promise<void> {
     logger.info('Cleaning up Podman backend');
 
     // Stop all active containers
@@ -1014,7 +1111,17 @@ export class PodmanBackend extends ExecutionBackend {
     this.activeExecutions = 0;
   }
 
-  getStatus() {
+  public getStatus(): {
+    type: string;
+    active: number;
+    available: boolean;
+    config: {
+      image?: string;
+      rootless?: boolean;
+      networkMode?: string;
+      activeContainers: number;
+    };
+  } {
     return {
       type: 'podman',
       active: this.activeExecutions,
@@ -1051,16 +1158,16 @@ export class LocalProcessBackend extends ExecutionBackend {
     'passwd',
   ];
 
-  constructor(config: BackendConfig) {
+  public constructor(config: Readonly<BackendConfig>) {
     super({
       ...config,
       localSafeguards: config.localSafeguards !== false,
     });
   }
 
-  async execute(
+  public async execute(
     command: string,
-    options: ExecutionOptions = {}
+    options: Readonly<ExecutionOptions> = {}
   ): Promise<ServiceResponse<ExecutionResult>> {
     // Safety checks first (before acquiring slot)
     if (this.config.localSafeguards) {
@@ -1131,17 +1238,17 @@ export class LocalProcessBackend extends ExecutionBackend {
 
       // Create a clean environment with only safe variables
       const safeEnvVars = {
-        PATH: process.env.PATH || '',
-        HOME: process.env.HOME || process.env.USERPROFILE || '',
-        TEMP: process.env.TEMP || process.env.TMP || '/tmp',
-        USER: process.env.USER || process.env.USERNAME || 'unknown',
+        PATH: process.env.PATH ?? '',
+        HOME: process.env.HOME ?? process.env.USERPROFILE ?? '',
+        TEMP: process.env.TEMP ?? process.env.TMP ?? '/tmp',
+        USER: process.env.USER ?? process.env.USERNAME ?? 'unknown',
       };
 
       const result = await execAsync(command, {
         cwd: options.workingDirectory,
         env: { ...safeEnvVars, ...options.environment },
-        timeout: options.timeout || 30000,
-        maxBuffer: options.maxOutputSize || 1024 * 1024 * 10,
+        timeout: options.timeout ?? 30000,
+        maxBuffer: options.maxOutputSize ?? 1024 * 1024 * 10,
       });
 
       const duration = Date.now() - startTime;
@@ -1154,10 +1261,21 @@ export class LocalProcessBackend extends ExecutionBackend {
         duration,
         backend: 'local_process',
       });
-    } catch (error: any) {
+    } catch (error) {
       const duration = Date.now() - startTime;
 
-      if (error.killed && error.signal === 'SIGTERM') {
+      // Type guard for error object
+      interface ExecError {
+        killed?: boolean;
+        signal?: string;
+        message?: string;
+        stdout?: string;
+        stderr?: string;
+        code?: number;
+      }
+      const errObj: ExecError = typeof error === 'object' && error !== null ? error as ExecError : {};
+
+      if (errObj.killed && errObj.signal === 'SIGTERM') {
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
             'Execution timeout',
@@ -1175,12 +1293,12 @@ export class LocalProcessBackend extends ExecutionBackend {
 
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
-          `Local execution failed: ${error.message}`,
+          `Local execution failed: ${errObj.message ?? 'Unknown error'}`,
           ErrorCategory.TOOL_EXECUTION,
           ErrorSeverity.MEDIUM,
           {
             context: { command },
-            originalError: error,
+            originalError: error instanceof Error ? error : undefined,
             userMessage: 'Local command execution failed',
             suggestedActions: [
               'Check command syntax',
@@ -1189,9 +1307,9 @@ export class LocalProcessBackend extends ExecutionBackend {
             ],
             retryable: true,
             metadata: {
-              stdout: error.stdout || '',
-              stderr: error.stderr || error.message,
-              exitCode: error.code || 1,
+              stdout: errObj.stdout ?? '',
+              stderr: errObj.stderr ?? errObj.message ?? '',
+              exitCode: errObj.code ?? 1,
               duration,
               backend: 'local_process',
             },
@@ -1260,12 +1378,20 @@ export class LocalProcessBackend extends ExecutionBackend {
     return { safe: true };
   }
 
-  async cleanup(): Promise<void> {
+  public async cleanup(): Promise<void> {
     logger.info('Local process backend cleanup (nothing to clean)');
     this.activeExecutions = 0;
   }
 
-  getStatus() {
+  public getStatus(): {
+    type: string;
+    active: number;
+    available: boolean;
+    config: {
+      safeguards?: boolean;
+      allowedCommands?: string[];
+    };
+  } {
     return {
       type: 'local_process',
       active: this.activeExecutions,
@@ -1282,7 +1408,7 @@ export class LocalProcessBackend extends ExecutionBackend {
  * Execution backend factory
  */
 export class ExecutionBackendFactory {
-  static create(config: BackendConfig): ExecutionBackend {
+  public static create(config: Readonly<BackendConfig>): ExecutionBackend {
     switch (config.type) {
       case 'docker':
         return new DockerBackend(config);
@@ -1297,11 +1423,11 @@ export class ExecutionBackendFactory {
       case 'podman':
         return new PodmanBackend(config);
       default:
-        throw new Error(`Unknown execution backend type: ${config.type}`);
+        throw new Error(`Unknown execution backend type: ${String(config.type)}`);
     }
   }
 
-  static async detectAvailable(): Promise<string[]> {
+  public static async detectAvailable(): Promise<string[]> {
     const available: string[] = [];
 
     // Check Docker
@@ -1344,10 +1470,10 @@ export class ExecutionBackendFactory {
  * Multi-backend execution manager
  */
 export class ExecutionManager {
-  private backends = new Map<string, ExecutionBackend>();
+  private readonly backends = new Map<string, ExecutionBackend>();
   private defaultBackend: string;
 
-  constructor(configs: BackendConfig[], defaultBackend?: string) {
+  public constructor(configs: ReadonlyArray<BackendConfig>, defaultBackend?: string) {
     if (configs.length === 0) {
       throw new Error('At least one execution backend must be configured');
     }
@@ -1357,19 +1483,19 @@ export class ExecutionManager {
       this.backends.set(config.type, backend);
     }
 
-    this.defaultBackend = defaultBackend || configs[0].type;
+    this.defaultBackend = defaultBackend ?? configs[0].type;
 
     logger.info(`Execution manager initialized with ${configs.length} backends`, {
-      backends: configs.map(c => c.type),
+      backends: configs.map((c: Readonly<BackendConfig>) => c.type),
       default: this.defaultBackend,
     });
   }
 
-  async execute(
+  public async execute(
     command: string,
-    options: ExecutionOptions & { backend?: string } = {}
+    options: Readonly<ExecutionOptions & { backend?: string }> = {}
   ): Promise<ServiceResponse<ExecutionResult>> {
-    const backendType = options.backend || this.defaultBackend;
+    const backendType = options.backend ?? this.defaultBackend;
     const backend = this.backends.get(backendType);
 
     if (!backend) {
@@ -1389,14 +1515,14 @@ export class ExecutionManager {
     return backend.execute(command, options);
   }
 
-  async cleanup(): Promise<void> {
+  public async cleanup(): Promise<void> {
     logger.info('Cleaning up all execution backends');
 
-    await Promise.all(Array.from(this.backends.values()).map(async backend => backend.cleanup()));
+    await Promise.all(Array.from(this.backends.values()).map(async (backend: Readonly<ExecutionBackend>) => backend.cleanup()));
   }
 
-  getStatus(): Record<string, any> {
-    const status: Record<string, any> = {
+  public getStatus(): { default: string; backends: Record<string, unknown> } {
+    const status: { default: string; backends: Record<string, unknown> } = {
       default: this.defaultBackend,
       backends: {},
     };
@@ -1408,7 +1534,7 @@ export class ExecutionManager {
     return status;
   }
 
-  setDefaultBackend(type: string): void {
+  public setDefaultBackend(type: string): void {
     if (!this.backends.has(type)) {
       throw new Error(`Backend ${type} is not configured`);
     }
@@ -1417,7 +1543,7 @@ export class ExecutionManager {
     logger.info(`Default execution backend set to: ${type}`);
   }
 
-  getAvailableBackends(): string[] {
+  public getAvailableBackends(): string[] {
     return Array.from(this.backends.keys());
   }
 }

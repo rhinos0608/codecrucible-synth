@@ -17,7 +17,7 @@ export interface ProviderHealthCheck {
   lastCheckTime: number;
   errorCount: number;
   averageResponseTime: number;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export interface IProvider {
@@ -27,22 +27,22 @@ export interface IProvider {
   readonly type: 'rust' | 'node' | 'python' | 'external';
   readonly capabilities: ProviderCapability[];
 
-  initialize(): Promise<void>;
-  shutdown(): Promise<void>;
-  isAvailable(): boolean;
-  getStatus(): ProviderStatus;
-  getHealthCheck(): Promise<ProviderHealthCheck>;
+  initialize: () => Promise<void>;
+  shutdown: () => Promise<void>;
+  isAvailable: () => boolean;
+  getStatus: () => ProviderStatus;
+  getHealthCheck: () => Promise<ProviderHealthCheck>;
 
   // Lifecycle events
-  onStatusChange?(status: ProviderStatus): void;
-  onError?(error: Error): void;
-  onHealthCheckFailed?(details: any): void;
+  onStatusChange?: (status: ProviderStatus) => void;
+  onError?: (error: Readonly<Error>) => void;
+  onHealthCheckFailed?: (details: unknown) => void;
 }
 
 export interface IRustProvider extends IProvider {
-  executeRustFunction(functionName: string, args: any[]): Promise<any>;
-  loadRustModule(modulePath: string): Promise<void>;
-  getModuleInfo(moduleName: string): Promise<any>;
+  executeRustFunction: (functionName: string, args: ReadonlyArray<unknown>) => Promise<unknown>;
+  loadRustModule: (modulePath: string) => Promise<void>;
+  getModuleInfo: (moduleName: string) => Promise<unknown>;
 }
 
 export interface ProviderMetrics {
@@ -56,36 +56,36 @@ export interface ProviderMetrics {
 }
 
 export interface IProviderManager {
-  registerProvider(provider: IProvider): Promise<void>;
-  unregisterProvider(id: string): Promise<boolean>;
-  getProvider(id: string): IProvider | undefined;
-  listProviders(): IProvider[];
-  listProvidersByType(type: string): IProvider[];
-  listProvidersByStatus(status: ProviderStatus): IProvider[];
+  registerProvider: (provider: Readonly<IProvider>) => Promise<void>;
+  unregisterProvider: (id: string) => Promise<boolean>;
+  getProvider: (id: string) => IProvider | undefined;
+  listProviders: () => IProvider[];
+  listProvidersByType: (type: string) => IProvider[];
+  listProvidersByStatus: (status: ProviderStatus) => IProvider[];
 
-  initializeAll(): Promise<void>;
-  initializeProvider(id: string): Promise<void>;
-  shutdownAll(): Promise<void>;
-  shutdownProvider(id: string): Promise<void>;
-  restartProvider(id: string): Promise<void>;
+  initializeAll: () => Promise<void>;
+  initializeProvider: (id: string) => Promise<void>;
+  shutdownAll: () => Promise<void>;
+  shutdownProvider: (id: string) => Promise<void>;
+  restartProvider: (id: string) => Promise<void>;
 
   // Health monitoring
-  healthCheckAll(): Promise<Map<string, ProviderHealthCheck>>;
-  healthCheck(id: string): Promise<ProviderHealthCheck | undefined>;
+  healthCheckAll: () => Promise<Map<string, ProviderHealthCheck>>;
+  healthCheck: (id: string) => Promise<ProviderHealthCheck | undefined>;
 
   // Metrics
-  getProviderMetrics(id: string): ProviderMetrics | undefined;
-  getAllMetrics(): Map<string, ProviderMetrics>;
+  getProviderMetrics: (id: string) => ProviderMetrics | undefined;
+  getAllMetrics: () => Map<string, ProviderMetrics>;
 
   // Events
-  on(
+  on: (
     event:
       | 'provider-registered'
       | 'provider-unregistered'
       | 'provider-status-changed'
       | 'provider-error',
-    callback: (data: any) => void
-  ): void;
+    callback: (data: Readonly<unknown>) => void
+  ) => void;
 }
 
 export interface ProviderConfig {
@@ -93,7 +93,7 @@ export interface ProviderConfig {
   name: string;
   type: 'rust' | 'node' | 'python' | 'external';
   version?: string;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
   enabled: boolean;
   priority?: number; // Higher numbers get priority
   retryCount?: number;
@@ -114,11 +114,11 @@ export interface ProviderCapability {
 }
 
 export class ProviderError extends Error {
-  constructor(
+  public constructor(
     message: string,
     public readonly providerId: string,
     public readonly operation: string,
-    public readonly originalError?: Error
+    public readonly originalError?: Readonly<Error>
   ) {
     super(message);
     this.name = 'ProviderError';
@@ -126,13 +126,13 @@ export class ProviderError extends Error {
 }
 
 export class ProviderClient implements IProviderManager {
-  private providers: Map<string, IProvider> = new Map();
-  private metrics: Map<string, ProviderMetrics> = new Map();
-  private healthChecks: Map<string, ProviderHealthCheck> = new Map();
-  private eventListeners: Map<string, Array<(data: any) => void>> = new Map();
-  private healthCheckIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private readonly providers: Map<string, IProvider> = new Map();
+  private readonly metrics: Map<string, ProviderMetrics> = new Map();
+  private readonly healthChecks: Map<string, ProviderHealthCheck> = new Map();
+  private readonly eventListeners: Map<string, Array<(data: Readonly<unknown>) => void>> = new Map();
+  private readonly healthCheckIntervals: Map<string, NodeJS.Timeout> = new Map();
 
-  constructor(private config: ProviderConfig[]) {
+  public constructor(private readonly config: ReadonlyArray<ProviderConfig>) {
     // Initialize event listener maps
     this.eventListeners.set('provider-registered', []);
     this.eventListeners.set('provider-unregistered', []);
@@ -140,12 +140,12 @@ export class ProviderClient implements IProviderManager {
     this.eventListeners.set('provider-error', []);
   }
 
-  async initialize(): Promise<void> {
+  public initialize(): void {
     // Initialize all configured providers
     for (const config of this.config) {
       if (config.enabled) {
         try {
-          await this.initializeProviderFromConfig(config);
+          this.initializeProviderFromConfig(config);
         } catch (error) {
           console.error(`Failed to initialize provider ${config.id}:`, error);
         }
@@ -153,7 +153,7 @@ export class ProviderClient implements IProviderManager {
     }
   }
 
-  async registerProvider(provider: IProvider): Promise<void> {
+  public registerProvider(provider: Readonly<IProvider>): void {
     if (this.providers.has(provider.id)) {
       throw new ProviderError(
         `Provider ${provider.id} is already registered`,
@@ -175,29 +175,35 @@ export class ProviderClient implements IProviderManager {
     // Set up lifecycle callbacks
     if (provider.onStatusChange) {
       const originalCallback = provider.onStatusChange;
-      provider.onStatusChange = (status: ProviderStatus) => {
-        originalCallback(status);
-        this.emit('provider-status-changed', { providerId: provider.id, status });
-      };
+      // Register a listener that wraps the original callback and emits the event
+      this.on('provider-status-changed', (data: Readonly<unknown>) => {
+        const eventData = data as Readonly<{ providerId: string; status: ProviderStatus }>;
+        if (eventData.providerId === provider.id) {
+          originalCallback(eventData.status);
+        }
+      });
     }
 
     if (provider.onError) {
       const originalCallback = provider.onError;
-      provider.onError = (error: Error) => {
-        originalCallback(error);
-        this.emit('provider-error', { providerId: provider.id, error });
-      };
+      // Register a listener that wraps the original callback and emits the event
+      this.on('provider-error', (data: Readonly<unknown>) => {
+        const eventData = data as Readonly<{ providerId: string; error: Readonly<Error> }>;
+        if (eventData.providerId === provider.id) {
+          originalCallback(eventData.error);
+        }
+      });
     }
 
     this.providers.set(provider.id, provider);
 
     // Start health check monitoring
-    await this.startHealthCheckMonitoring(provider.id);
+    this.startHealthCheckMonitoring(provider.id);
 
     this.emit('provider-registered', { providerId: provider.id, provider });
   }
 
-  async unregisterProvider(id: string): Promise<boolean> {
+  public async unregisterProvider(id: string): Promise<boolean> {
     const provider = this.providers.get(id);
     if (!provider) {
       return false;
@@ -228,24 +234,24 @@ export class ProviderClient implements IProviderManager {
     }
   }
 
-  getProvider(id: string): IProvider | undefined {
+  public getProvider(id: string): IProvider | undefined {
     return this.providers.get(id);
   }
 
-  listProviders(): IProvider[] {
+  public listProviders(): IProvider[] {
     return Array.from(this.providers.values());
   }
 
-  listProvidersByType(type: string): IProvider[] {
-    return this.listProviders().filter(p => p.type === type);
+  public listProvidersByType(type: Readonly<string>): IProvider[] {
+    return this.listProviders().filter((p: Readonly<IProvider>) => p.type === type);
   }
 
-  listProvidersByStatus(status: ProviderStatus): IProvider[] {
-    return this.listProviders().filter(p => p.getStatus() === status);
+  public listProvidersByStatus(status: Readonly<ProviderStatus>): IProvider[] {
+    return this.listProviders().filter((p: Readonly<IProvider>) => p.getStatus() === status);
   }
 
-  async initializeAll(): Promise<void> {
-    const initPromises = Array.from(this.providers.values()).map(async provider => {
+  public async initializeAll(): Promise<void> {
+    const initPromises = Array.from(this.providers.values()).map(async (provider: Readonly<IProvider>) => {
       try {
         await provider.initialize();
       } catch (error) {
@@ -261,7 +267,7 @@ export class ProviderClient implements IProviderManager {
     await Promise.allSettled(initPromises);
   }
 
-  async initializeProvider(id: string): Promise<void> {
+  public async initializeProvider(id: string): Promise<void> {
     const provider = this.providers.get(id);
     if (!provider) {
       throw new ProviderError(`Provider ${id} not found`, id, 'initialize');
@@ -282,8 +288,8 @@ export class ProviderClient implements IProviderManager {
     }
   }
 
-  async shutdownAll(): Promise<void> {
-    const shutdownPromises = Array.from(this.providers.values()).map(async provider => {
+  public async shutdownAll(): Promise<void> {
+    const shutdownPromises = Array.from(this.providers.values()).map(async (provider: Readonly<IProvider>) => {
       try {
         await provider.shutdown();
       } catch (error) {
@@ -300,7 +306,7 @@ export class ProviderClient implements IProviderManager {
     this.healthCheckIntervals.clear();
   }
 
-  async shutdownProvider(id: string): Promise<void> {
+  public async shutdownProvider(id: string): Promise<void> {
     const provider = this.providers.get(id);
     if (!provider) {
       throw new ProviderError(`Provider ${id} not found`, id, 'shutdown');
@@ -313,15 +319,15 @@ export class ProviderClient implements IProviderManager {
     }
   }
 
-  async restartProvider(id: string): Promise<void> {
+  public async restartProvider(id: string): Promise<void> {
     await this.shutdownProvider(id);
     await this.initializeProvider(id);
   }
 
-  async healthCheckAll(): Promise<Map<string, ProviderHealthCheck>> {
+  public async healthCheckAll(): Promise<Map<string, ProviderHealthCheck>> {
     const results = new Map<string, ProviderHealthCheck>();
 
-    const checkPromises = Array.from(this.providers.entries()).map(async ([id, provider]) => {
+    const checkPromises = Array.from(this.providers.entries()).map(async ([id, provider]: readonly [string, Readonly<IProvider>]) => {
       try {
         const healthCheck = await provider.getHealthCheck();
         results.set(id, healthCheck);
@@ -330,7 +336,7 @@ export class ProviderClient implements IProviderManager {
         const failedCheck: ProviderHealthCheck = {
           isHealthy: false,
           lastCheckTime: Date.now(),
-          errorCount: (this.healthChecks.get(id)?.errorCount || 0) + 1,
+          errorCount: (this.healthChecks.get(id)?.errorCount ?? 0) + 1,
           averageResponseTime: 0,
           details: { error: error instanceof Error ? error.message : 'Unknown error' },
         };
@@ -343,7 +349,7 @@ export class ProviderClient implements IProviderManager {
     return results;
   }
 
-  async healthCheck(id: string): Promise<ProviderHealthCheck | undefined> {
+  public async healthCheck(id: string): Promise<ProviderHealthCheck | undefined> {
     const provider = this.providers.get(id);
     if (!provider) {
       return undefined;
@@ -357,7 +363,7 @@ export class ProviderClient implements IProviderManager {
       const failedCheck: ProviderHealthCheck = {
         isHealthy: false,
         lastCheckTime: Date.now(),
-        errorCount: (this.healthChecks.get(id)?.errorCount || 0) + 1,
+        errorCount: (this.healthChecks.get(id)?.errorCount ?? 0) + 1,
         averageResponseTime: 0,
         details: { error: error instanceof Error ? error.message : 'Unknown error' },
       };
@@ -366,21 +372,21 @@ export class ProviderClient implements IProviderManager {
     }
   }
 
-  getProviderMetrics(id: string): ProviderMetrics | undefined {
+  public getProviderMetrics(id: string): ProviderMetrics | undefined {
     return this.metrics.get(id);
   }
 
-  getAllMetrics(): Map<string, ProviderMetrics> {
+  public getAllMetrics(): Map<string, ProviderMetrics> {
     return new Map(this.metrics);
   }
 
-  on(
+  public on(
     event:
       | 'provider-registered'
       | 'provider-unregistered'
       | 'provider-status-changed'
       | 'provider-error',
-    callback: (data: any) => void
+    callback: (data: Readonly<unknown>) => void
   ): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
@@ -388,7 +394,11 @@ export class ProviderClient implements IProviderManager {
     }
   }
 
-  async executeProviderMethod(providerId: string, method: string, args: any[]): Promise<any> {
+  public async executeProviderMethod(
+    providerId: string,
+    method: string,
+    args: ReadonlyArray<unknown>
+  ): Promise<unknown> {
     const provider = this.providers.get(providerId);
     if (!provider) {
       throw new ProviderError(`Provider ${providerId} not found`, providerId, method);
@@ -400,7 +410,16 @@ export class ProviderClient implements IProviderManager {
 
     const startTime = Date.now();
     try {
-      const result = await (provider as any)[method](...args);
+      // Use type assertion and runtime check for method existence and callability
+      const fn = (provider as unknown as Record<string, unknown>)[method];
+      if (typeof fn !== 'function') {
+        throw new ProviderError(
+          `Method ${method} does not exist on provider ${providerId}`,
+          providerId,
+          method
+        );
+      }
+      const result = await (fn as (...args: ReadonlyArray<unknown>) => unknown)(...args);
       this.updateMetrics(providerId, startTime, true);
       return result;
     } catch (error) {
@@ -414,18 +433,18 @@ export class ProviderClient implements IProviderManager {
     }
   }
 
-  private async initializeProviderFromConfig(config: ProviderConfig): Promise<void> {
+  private initializeProviderFromConfig(config: Readonly<ProviderConfig>): void {
     // This would be implemented based on the specific provider factory system
     // For now, this is a placeholder that would create providers based on config
     console.log(`Would initialize provider ${config.id} of type ${config.type}`);
   }
 
-  private async startHealthCheckMonitoring(providerId: string): Promise<void> {
-    const config = this.config.find(c => c.id === providerId);
-    const interval = config?.healthCheckInterval || 30000; // Default 30 seconds
+  private startHealthCheckMonitoring(providerId: Readonly<string>): void {
+    const config = this.config.find((c: Readonly<ProviderConfig>) => c.id === providerId);
+    const interval = config?.healthCheckInterval ?? 30000; // Default 30 seconds
 
-    const healthCheckInterval = setInterval(async () => {
-      await this.healthCheck(providerId);
+    const healthCheckInterval = setInterval(() => {
+      void this.healthCheck(providerId);
     }, interval);
 
     this.healthCheckIntervals.set(providerId, healthCheckInterval);
@@ -452,7 +471,7 @@ export class ProviderClient implements IProviderManager {
     metrics.errorRate = (metrics.failedRequests / totalRequests) * 100;
   }
 
-  private emit(event: string, data: any): void {
+  private emit(event: string, data: Readonly<unknown>): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
       listeners.forEach(callback => {

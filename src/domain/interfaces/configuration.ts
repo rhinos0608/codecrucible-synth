@@ -57,7 +57,7 @@ export type VoiceConfiguration = VoiceSystemConfiguration;
 export interface ModelProviderConfiguration {
   name: string;
   enabled: boolean;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
   priority: number;
   fallback?: boolean;
 }
@@ -65,7 +65,7 @@ export interface ModelProviderConfiguration {
 export interface ProviderConfiguration {
   type: string;
   enabled: boolean;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
   healthCheck?: {
     enabled: boolean;
     interval: number;

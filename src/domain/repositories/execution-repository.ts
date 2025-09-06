@@ -20,32 +20,32 @@ export interface ReasoningStepRepository {
   /**
    * Save a reasoning step to persistent storage
    */
-  save(step: ReasoningStep): Promise<void>;
+  save: (step: Readonly<ReasoningStep>) => Promise<void>;
 
   /**
    * Find reasoning steps by execution ID
    */
-  findByExecutionId(executionId: string): Promise<ReasoningStep[]>;
+  findByExecutionId: (executionId: string) => Promise<ReasoningStep[]>;
 
   /**
    * Find reasoning steps by type
    */
-  findByType(type: string): Promise<ReasoningStep[]>;
+  findByType: (type: string) => Promise<ReasoningStep[]>;
 
   /**
    * Find reasoning steps with low confidence that need attention
    */
-  findLowConfidenceSteps(): Promise<ReasoningStep[]>;
+  findLowConfidenceSteps: () => Promise<ReasoningStep[]>;
 
   /**
    * Get reasoning chain statistics for analysis
    */
-  getExecutionStatistics(executionId: string): Promise<ExecutionStatistics>;
+  getExecutionStatistics: (executionId: string) => Promise<ExecutionStatistics>;
 
   /**
    * Remove old reasoning steps (cleanup)
    */
-  removeOlderThan(date: Date): Promise<number>;
+  removeOlderThan: (date: Readonly<Date>) => Promise<number>;
 }
 
 /**
@@ -55,37 +55,37 @@ export interface ExecutionPlanRepository {
   /**
    * Save an execution plan
    */
-  save(plan: ExecutionPlan): Promise<void>;
+  save: (plan: Readonly<ExecutionPlan>) => Promise<void>;
 
   /**
    * Find execution plan by ID
    */
-  findById(planId: string): Promise<ExecutionPlan | null>;
+  findById: (planId: string) => Promise<ExecutionPlan | null>;
 
   /**
    * Find execution plans by domain
    */
-  findByDomain(domain: string): Promise<ExecutionPlan[]>;
+  findByDomain: (domain: string) => Promise<ExecutionPlan[]>;
 
   /**
    * Find high-risk execution plans that need review
    */
-  findHighRiskPlans(): Promise<ExecutionPlan[]>;
+  findHighRiskPlans: () => Promise<ExecutionPlan[]>;
 
   /**
    * Find successful execution plans for learning
    */
-  findSuccessfulPlans(domain?: string): Promise<ExecutionPlan[]>;
+  findSuccessfulPlans: (domain?: string) => Promise<ExecutionPlan[]>;
 
   /**
    * Get execution plan performance metrics
    */
-  getPlanMetrics(planId: string): Promise<PlanMetrics>;
+  getPlanMetrics: (planId: string) => Promise<PlanMetrics>;
 
   /**
    * Update execution plan with results
    */
-  updateWithResults(planId: string, results: ExecutionResults): Promise<void>;
+  updateWithResults: (planId: string, results: Readonly<ExecutionResults>) => Promise<void>;
 }
 
 /**
@@ -95,42 +95,42 @@ export interface ToolExecutionRepository {
   /**
    * Save a tool execution record
    */
-  save(execution: ToolExecution): Promise<void>;
+  save: (execution: Readonly<ToolExecution>) => Promise<void>;
 
   /**
    * Find tool execution by ID
    */
-  findById(executionId: string): Promise<ToolExecution | null>;
+  findById: (executionId: string) => Promise<ToolExecution | null>;
 
   /**
    * Find tool executions by tool name
    */
-  findByToolName(toolName: string): Promise<ToolExecution[]>;
+  findByToolName: (toolName: string) => Promise<ToolExecution[]>;
 
   /**
    * Find running tool executions
    */
-  findRunningExecutions(): Promise<ToolExecution[]>;
+  findRunningExecutions: () => Promise<ToolExecution[]>;
 
   /**
    * Find failed tool executions for analysis
    */
-  findFailedExecutions(since?: Date): Promise<ToolExecution[]>;
+  findFailedExecutions: (since?: Readonly<Date>) => Promise<ToolExecution[]>;
 
   /**
    * Get tool performance metrics
    */
-  getToolMetrics(toolName: string): Promise<ToolMetrics>;
+  getToolMetrics: (toolName: string) => Promise<ToolMetrics>;
 
   /**
    * Find tool executions that may be recoverable failures
    */
-  findRecoverableFailures(): Promise<ToolExecution[]>;
+  findRecoverableFailures: () => Promise<ToolExecution[]>;
 
   /**
    * Update execution status
    */
-  updateStatus(executionId: string, status: string): Promise<void>;
+  updateStatus: (executionId: string, status: string) => Promise<void>;
 }
 
 /**
@@ -140,42 +140,42 @@ export interface WorkflowTemplateRepository {
   /**
    * Save a workflow template
    */
-  save(template: WorkflowTemplate): Promise<void>;
+  save: (template: Readonly<WorkflowTemplate>) => Promise<void>;
 
   /**
    * Find workflow template by name
    */
-  findByName(name: string): Promise<WorkflowTemplate | null>;
+  findByName: (name: string) => Promise<WorkflowTemplate | null>;
 
   /**
    * Find workflow templates by domain
    */
-  findByDomain(domain: string): Promise<WorkflowTemplate[]>;
+  findByDomain: (domain: string) => Promise<WorkflowTemplate[]>;
 
   /**
    * Find workflow templates that match a prompt
    */
-  findMatching(prompt: string): Promise<WorkflowTemplateMatch[]>;
+  findMatching: (prompt: string) => Promise<WorkflowTemplateMatch[]>;
 
   /**
    * Get all workflow templates
    */
-  findAll(): Promise<WorkflowTemplate[]>;
+  findAll: () => Promise<WorkflowTemplate[]>;
 
   /**
    * Find workflow templates by complexity
    */
-  findByComplexity(complexity: 'simple' | 'moderate' | 'complex'): Promise<WorkflowTemplate[]>;
+  findByComplexity: (complexity: 'simple' | 'moderate' | 'complex') => Promise<WorkflowTemplate[]>;
 
   /**
    * Update workflow template
    */
-  update(name: string, template: WorkflowTemplate): Promise<void>;
+  update: (name: string, template: Readonly<WorkflowTemplate>) => Promise<void>;
 
   /**
    * Remove workflow template
    */
-  remove(name: string): Promise<void>;
+  remove: (name: string) => Promise<void>;
 }
 
 /**
@@ -272,27 +272,27 @@ export interface ExecutionQueryRepository {
   /**
    * Advanced query for reasoning steps
    */
-  queryReasoningSteps(query: ReasoningStepQuery): Promise<ReasoningStep[]>;
+  queryReasoningSteps: (query: Readonly<ReasoningStepQuery>) => Promise<ReasoningStep[]>;
 
   /**
    * Advanced query for execution plans
    */
-  queryExecutionPlans(query: ExecutionPlanQuery): Promise<ExecutionPlan[]>;
+  queryExecutionPlans: (query: Readonly<ExecutionPlanQuery>) => Promise<ExecutionPlan[]>;
 
   /**
    * Advanced query for tool executions
    */
-  queryToolExecutions(query: ToolExecutionQuery): Promise<ToolExecution[]>;
+  queryToolExecutions: (query: Readonly<ToolExecutionQuery>) => Promise<ToolExecution[]>;
 
   /**
    * Advanced query for workflow templates
    */
-  queryWorkflowTemplates(query: WorkflowTemplateQuery): Promise<WorkflowTemplate[]>;
+  queryWorkflowTemplates: (query: Readonly<WorkflowTemplateQuery>) => Promise<WorkflowTemplate[]>;
 
   /**
    * Get execution insights for optimization
    */
-  getExecutionInsights(timeRange: { from: Date; to: Date }): Promise<ExecutionInsights>;
+  getExecutionInsights: (timeRange: Readonly<{ from: Date; to: Date }>) => Promise<ExecutionInsights>;
 }
 
 export interface ExecutionInsights {

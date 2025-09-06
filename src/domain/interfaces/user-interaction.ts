@@ -9,44 +9,44 @@ export interface IUserOutput {
   /**
    * Display a message to the user
    */
-  display(message: string, options?: DisplayOptions): Promise<void>;
+  display: (message: Readonly<string>, options?: Readonly<DisplayOptions>) => Promise<void>;
 
   /**
    * Display a warning message
    */
-  warn(message: string): Promise<void>;
+  warn: (message: Readonly<string>) => Promise<void>;
 
   /**
    * Display an error message
    */
-  error(message: string): Promise<void>;
+  error: (message: Readonly<string>) => Promise<void>;
 
   /**
    * Display a success message
    */
-  success(message: string): Promise<void>;
+  success: (message: Readonly<string>) => Promise<void>;
 
   /**
    * Display progress information
    */
-  progress(message: string, progress?: number): Promise<void>;
+  progress: (message: Readonly<string>, progress?: Readonly<number>) => Promise<void>;
 }
 
 export interface IUserInput {
   /**
    * Prompt the user for input
    */
-  prompt(question: string, options?: PromptOptions): Promise<string>;
+  prompt: (question: Readonly<string>, options?: Readonly<PromptOptions>) => Promise<string>;
 
   /**
    * Prompt the user for confirmation (yes/no)
    */
-  confirm(question: string): Promise<boolean>;
+  confirm: (question: Readonly<string>) => Promise<boolean>;
 
   /**
    * Present the user with multiple choices
    */
-  select(question: string, choices: string[]): Promise<string>;
+  select: (question: Readonly<string>, choices: ReadonlyArray<string>) => Promise<string>;
 }
 
 export interface DisplayOptions {
@@ -71,10 +71,31 @@ export interface IUserInteraction extends IUserOutput, IUserInput {}
  * Event-based user interaction for decoupled communication
  */
 export interface IUserInteractionEvents {
-  emit(event: 'display', message: string, options?: DisplayOptions): void;
-  emit(event: 'prompt', question: string, options?: PromptOptions): void;
-  emit(event: 'progress', message: string, progress?: number): void;
-  on(event: 'display', handler: (message: string, options?: DisplayOptions) => void): void;
-  on(event: 'prompt', handler: (question: string, options?: PromptOptions) => void): void;
-  on(event: 'progress', handler: (message: string, progress?: number) => void): void;
+  emit: (
+    event: 'display',
+    message: Readonly<string>,
+    options?: Readonly<DisplayOptions>
+  ) => void;
+  emitPrompt: (
+    event: 'prompt',
+    question: Readonly<string>,
+    options?: Readonly<PromptOptions>
+  ) => void;
+  emitProgress: (
+    event: 'progress',
+    message: Readonly<string>,
+    progress?: Readonly<number>
+  ) => void;
+  onDisplay: (
+    event: 'display',
+    handler: (message: Readonly<string>, options?: Readonly<DisplayOptions>) => void
+  ) => void;
+  onPrompt: (
+    event: 'prompt',
+    handler: (question: Readonly<string>, options?: Readonly<PromptOptions>) => void
+  ) => void;
+  onProgress: (
+    event: 'progress',
+    handler: (message: Readonly<string>, progress?: Readonly<number>) => void
+  ) => void;
 }

@@ -5,10 +5,10 @@ import { PathUtilities } from '../../utils/path-utilities.js';
  * Normalize file paths using centralized PathUtilities.
  * Extracted from ToolIntegration for reuse and easier testing.
  */
-export function normalizePath(filePath: unknown, logger: ILogger): string | unknown {
+export function normalizePath(filePath: unknown, logger: ILogger): string {
   if (typeof filePath !== 'string') {
     logger.debug('[PATH DEBUG] Non-string path, using as-is:', filePath);
-    return filePath;
+    return String(filePath);
   }
 
   logger.debug(`[PATH DEBUG] Original path: "${filePath}"`);

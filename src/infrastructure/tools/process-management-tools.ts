@@ -1,11 +1,22 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
-import { spawn, exec, ChildProcess } from 'child_process';
+import { ChildProcess, exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { logger } from '../logging/logger.js';
 import { validateCommand } from '../../utils/command-security.js';
 
 const execAsync = promisify(exec);
+
+type ProcessManagerArgs = z.infer<
+  ReturnType<typeof AdvancedProcessTool.prototype['getParameterSchema']>
+>;
+type ProcessManagerResult =
+  | { error: string }
+  | { success: boolean; sessionId?: string | null; command?: string; pid?: number; initialOutput?: string; isRunning?: boolean; interactive?: boolean; message?: string }
+  | { sessionId: string; command: string; isRunning: boolean; output: string; totalLines: number; lastActivity: string; uptime: number }
+  | { totalSessions: number; runningSessions: number; sessions: any[] }
+  | { sessionId: string; command: string; pid: number; isRunning: boolean; startTime: string; lastActivity: string; uptime: number; outputLines: number; recentOutput: string; isInteractive: boolean }
+  | { success: boolean; sessionId: string; input: string; output: string; newLines: number; totalLines: number };
 
 interface ProcessSession {
   id: string;
@@ -21,11 +32,11 @@ interface ProcessSession {
  * Advanced Process Management Tool with session support
  */
 export class AdvancedProcessTool extends BaseTool {
-  private sessions: Map<string, ProcessSession> = new Map();
+  private readonly sessions: Map<string, ProcessSession> = new Map();
   private sessionCounter = 0;
 
-  constructor(private agentContext: { workingDirectory: string }) {
-    const parameters = z.object({
+  public getParameterSchema() {
+    return z.object({
       action: z.enum(['start', 'interact', 'read', 'list', 'kill', 'status']),
       sessionId: z.string().optional().describe('Session ID for existing processes'),
       command: z.string().optional().describe('Command to execute'),
@@ -33,18 +44,27 @@ export class AdvancedProcessTool extends BaseTool {
       timeout: z.number().optional().default(30000).describe('Timeout in milliseconds'),
       interactive: z.boolean().optional().default(false).describe('Start interactive session'),
       environment: z.record(z.string()).optional().describe('Environment variables'),
-      workingDirectory: z.string().optional().describe('Working directory'),
-    });
-
-    super({
-      name: 'processManager',
-      description: 'Advanced process management with sessions, interaction, and monitoring',
-      category: 'Process Management',
-      parameters,
     });
   }
 
-  async execute(args: z.infer<typeof this.definition.parameters>): Promise<any> {
+  public constructor(private readonly agentContext: Readonly<{ workingDirectory: string }>) {
+    super({
+      name: 'advancedProcessTool',
+      description: 'Advanced Process Management Tool with session support',
+      category: 'Process Management',
+      parameters: z.object({
+        action: z.enum(['start', 'interact', 'read', 'list', 'kill', 'status']),
+        sessionId: z.string().optional().describe('Session ID for existing processes'),
+        command: z.string().optional().describe('Command to execute'),
+        input: z.string().optional().describe('Input to send to process'),
+        timeout: z.number().optional().default(30000).describe('Timeout in milliseconds'),
+        interactive: z.boolean().optional().default(false).describe('Start interactive session'),
+        environment: z.record(z.string()).optional().describe('Environment variables'),
+      }),
+    });
+  }
+
+  public async execute(args: Readonly<ProcessManagerArgs>): Promise<ProcessManagerResult> {
     try {
       switch (args.action) {
         case 'start':
@@ -215,7 +235,7 @@ export class AdvancedProcessTool extends BaseTool {
     });
   }
 
-  private async interactWithProcess(args: any): Promise<any> {
+  public async interactWithProcess(args: any): Promise<any> {
     const session = this.sessions.get(args.sessionId!);
 
     if (!session) {
@@ -280,7 +300,6 @@ export class AdvancedProcessTool extends BaseTool {
         }
 
         if (session.process.killed) {
-          resolve(); // Process ended
           return;
         }
 
@@ -291,7 +310,7 @@ export class AdvancedProcessTool extends BaseTool {
     });
   }
 
-  private async readProcessOutput(args: any): Promise<any> {
+  public async readProcessOutput(args: any): Promise<any> {
     const session = this.sessions.get(args.sessionId!);
 
     if (!session) {
@@ -309,7 +328,7 @@ export class AdvancedProcessTool extends BaseTool {
     };
   }
 
-  private listSessions(): any {
+  public listSessions(): any {
     const sessions = Array.from(this.sessions.values()).map(session => ({
       id: session.id,
       command: session.command,
@@ -317,7 +336,6 @@ export class AdvancedProcessTool extends BaseTool {
       pid: session.process.pid,
       uptime: Date.now() - session.startTime,
       lastActivity: new Date(session.lastActivity).toISOString(),
-      outputLines: session.outputBuffer.length,
       isInteractive: session.isInteractive,
     }));
 
@@ -328,7 +346,7 @@ export class AdvancedProcessTool extends BaseTool {
     };
   }
 
-  private killProcess(args: any): any {
+  public killProcess(args: any): any {
     const session = this.sessions.get(args.sessionId!);
 
     if (!session) {
@@ -352,7 +370,6 @@ export class AdvancedProcessTool extends BaseTool {
 
       return {
         success: true,
-        sessionId: args.sessionId,
         message: 'Process terminated',
       };
     } catch (error) {
@@ -362,8 +379,7 @@ export class AdvancedProcessTool extends BaseTool {
       };
     }
   }
-
-  private getProcessStatus(args: any): any {
+  public getProcessStatus(args: any): any {
     const session = this.sessions.get(args.sessionId!);
 
     if (!session) {
@@ -383,8 +399,6 @@ export class AdvancedProcessTool extends BaseTool {
       isInteractive: session.isInteractive,
     };
   }
-}
-
 /**
  * Memory Code Execution Tool (like in Desktop Commander)
  */

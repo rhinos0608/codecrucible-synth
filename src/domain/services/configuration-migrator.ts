@@ -5,8 +5,8 @@
  * Provides analysis, transformation, and backup capabilities.
  */
 
-import { readFile, writeFile, mkdir, copyFile } from 'fs/promises';
-import { join, dirname } from 'path';
+import { copyFile, mkdir, readFile, writeFile } from 'fs/promises';
+import { dirname, join } from 'path';
 import { existsSync } from 'fs';
 import YAML from 'yaml';
 import { UnifiedConfiguration } from '../interfaces/configuration.js';
@@ -40,7 +40,7 @@ export interface ConfigurationConflict {
 }
 
 export interface ConflictingValue {
-  value: any;
+  value: unknown;
   source: string;
   precedence: number;
 }
@@ -75,11 +75,11 @@ export interface MigrationReport {
   manualInterventionsRequired: number;
   backupLocation: string;
   migrationTime: number; // milliseconds
-  validationResults: any;
+  validationResults: unknown;
 }
 
 export class ConfigurationMigrator {
-  private legacyFilePaths = [
+  private readonly legacyFilePaths = [
     'config/default.yaml',
     'codecrucible.config.json',
     'config/unified-model-config.yaml',
@@ -89,15 +89,15 @@ export class ConfigurationMigrator {
     'config/voices.yaml',
   ];
 
-  constructor(
-    private logger: ILogger,
-    private projectRoot: string = process.cwd()
+  public constructor(
+    private readonly logger: ILogger,
+    private readonly projectRoot: string = process.cwd()
   ) {}
 
   /**
    * Analyze existing configuration files and identify migration requirements
    */
-  async analyzeLegacyConfiguration(): Promise<MigrationAnalysis> {
+  public async analyzeLegacyConfiguration(): Promise<MigrationAnalysis> {
     this.logger.info('Analyzing legacy configuration files...');
 
     const legacyFiles: LegacyFileInfo[] = [];
@@ -141,7 +141,7 @@ export class ConfigurationMigrator {
   /**
    * Perform automatic migration of configuration files
    */
-  async performMigration(analysis?: MigrationAnalysis): Promise<MigrationResult> {
+  public async performMigration(analysis?: Readonly<MigrationAnalysis>): Promise<MigrationResult> {
     const startTime = Date.now();
     this.logger.info('Starting configuration migration...');
 
@@ -151,7 +151,7 @@ export class ConfigurationMigrator {
 
     try {
       // Get analysis if not provided
-      const migrationAnalysis = analysis || (await this.analyzeLegacyConfiguration());
+      const migrationAnalysis = analysis ?? (await this.analyzeLegacyConfiguration());
 
       // Create backup directory
       const backupDir = join(
@@ -179,19 +179,19 @@ export class ConfigurationMigrator {
       const validation = configManager.validateConfiguration(unifiedConfig);
 
       if (!validation.isValid) {
-        errors.push(...validation.errors.map(e => `${e.field}: ${e.message}`));
+        errors.push(...validation.errors.map((e: Readonly<{ field: string; message: string }>) => `${e.field}: ${e.message}`));
       }
 
       if (validation.warnings.length > 0) {
-        warnings.push(...validation.warnings.map(w => `${w.field}: ${w.message}`));
+        warnings.push(...validation.warnings.map((w: Readonly<{ field: string; message: string }>) => `${w.field}: ${w.message}`));
       }
 
       // Generate migration report
       const migrationReport: MigrationReport = {
         filesProcessed: migrationAnalysis.legacyFiles.length,
-        conflictsResolved: migrationAnalysis.conflicts.filter(c => c.resolution === 'auto').length,
+        conflictsResolved: migrationAnalysis.conflicts.filter((c: Readonly<ConfigurationConflict>) => c.resolution === 'auto').length,
         manualInterventionsRequired: migrationAnalysis.conflicts.filter(
-          c => c.resolution === 'manual'
+          (c: Readonly<ConfigurationConflict>) => c.resolution === 'manual'
         ).length,
         backupLocation: backupDir,
         migrationTime: Date.now() - startTime,
@@ -240,8 +240,8 @@ export class ConfigurationMigrator {
   /**
    * Generate a migration guide document
    */
-  async generateMigrationGuide(
-    analysis: MigrationAnalysis,
+  public async generateMigrationGuide(
+    analysis: Readonly<MigrationAnalysis>,
     unifiedConfigPath: string,
     backupPath: string
   ): Promise<void> {
@@ -359,11 +359,17 @@ If you encounter issues:
     const sections: string[] = [];
 
     try {
-      const parsed = format === 'json' ? JSON.parse(content) : YAML.parse(content);
-      sections.push(...Object.keys(parsed || {}));
+      const parsedRaw: unknown = format === 'json' ? JSON.parse(content) : YAML.parse(content);
+      const parsed = (parsedRaw && typeof parsedRaw === 'object') ? parsedRaw as Record<string, unknown> : {};
+
+      sections.push(...Object.keys(parsed));
 
       // Check for deprecated configurations
-      if (parsed.agent?.mode === 'fast') {
+      if (
+        typeof parsed.agent === 'object' &&
+        parsed.agent !== null &&
+        (parsed.agent as Record<string, unknown>).mode === 'fast'
+      ) {
         issues.push({
           type: 'deprecation',
           message: 'Fast mode is deprecated, use executionMode: "fast"',
@@ -372,7 +378,11 @@ If you encounter issues:
       }
 
       // Check for security issues
-      if (parsed.security?.allowUnsafeCommands) {
+      if (
+        typeof parsed.security === 'object' &&
+        parsed.security !== null &&
+        (parsed.security as Record<string, unknown>).allowUnsafeCommands
+      ) {
         issues.push({
           type: 'security',
           message: 'Unsafe commands are allowed',
@@ -381,7 +391,14 @@ If you encounter issues:
       }
 
       // Check for conflicts
-      if (parsed.model?.timeout && parsed.performance?.defaultTimeout) {
+      if (
+        typeof parsed.model === 'object' &&
+        parsed.model !== null &&
+        typeof parsed.performance === 'object' &&
+        parsed.performance !== null &&
+        (parsed.model as Record<string, unknown>).timeout &&
+        (parsed.performance as Record<string, unknown>).defaultTimeout
+      ) {
         issues.push({
           type: 'conflict',
           message: 'Multiple timeout configurations found',
@@ -410,10 +427,10 @@ If you encounter issues:
   }
 
   private async detectCrossFileConflicts(
-    files: LegacyFileInfo[]
+    files: ReadonlyArray<LegacyFileInfo>
   ): Promise<ConfigurationConflict[]> {
     const conflicts: ConfigurationConflict[] = [];
-    const configValues = new Map<string, ConflictingValue[]>();
+    const configValues: Map<string, ConflictingValue[]> = new Map();
 
     // Load and parse all files to extract values
     for (const file of files) {
@@ -422,7 +439,9 @@ If you encounter issues:
       try {
         const filePath = join(this.projectRoot, file.path);
         const content = await readFile(filePath, 'utf-8');
-        const parsed = file.format === 'json' ? JSON.parse(content) : YAML.parse(content);
+        const parsed: Record<string, unknown> = file.format === 'json'
+          ? (JSON.parse(content) as Record<string, unknown>)
+          : (YAML.parse(content) as Record<string, unknown>);
 
         this.extractConfigValues(parsed, file.path, configValues);
       } catch (error) {
@@ -450,7 +469,7 @@ If you encounter issues:
   }
 
   private extractConfigValues(
-    obj: any,
+    obj: Readonly<Record<string, unknown>>,
     source: string,
     configValues: Map<string, ConflictingValue[]>,
     prefix = ''
@@ -459,12 +478,14 @@ If you encounter issues:
       const fullKey = prefix ? `${prefix}.${key}` : key;
 
       if (value && typeof value === 'object' && !Array.isArray(value)) {
-        this.extractConfigValues(value, source, configValues, fullKey);
+        this.extractConfigValues(value as Readonly<Record<string, unknown>>, source, configValues, fullKey);
       } else {
-        if (!configValues.has(fullKey)) {
-          configValues.set(fullKey, []);
+        let arr = configValues.get(fullKey);
+        if (!arr) {
+          arr = [];
+          configValues.set(fullKey, arr);
         }
-        configValues.get(fullKey)!.push({
+        arr.push({
           value,
           source,
           precedence: this.getFilePrecedence(source),
@@ -488,7 +509,7 @@ If you encounter issues:
 
   private assessConflictSeverity(
     key: string,
-    values: ConflictingValue[]
+    _values: ReadonlyArray<ConflictingValue>
   ): 'low' | 'medium' | 'high' | 'critical' {
     // Critical conflicts that could break the system
     if (key.includes('endpoint') || key.includes('timeout') || key.includes('security')) {
@@ -510,7 +531,7 @@ If you encounter issues:
 
   private determineResolutionStrategy(
     key: string,
-    values: ConflictingValue[]
+    values: ReadonlyArray<ConflictingValue>
   ): 'auto' | 'manual' | 'prompt' {
     // Auto-resolve if there's a clear precedence winner
     const maxPrecedence = Math.max(...values.map(v => v.precedence));

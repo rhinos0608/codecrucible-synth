@@ -6,7 +6,7 @@
  */
 
 export interface UseCase<TRequest, TResponse> {
-  execute(request: TRequest): Promise<TResponse>;
+  execute: (request: TRequest) => Promise<TResponse>;
 }
 
 export interface AnalysisRequest {

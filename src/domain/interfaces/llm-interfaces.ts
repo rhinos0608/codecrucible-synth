@@ -19,7 +19,7 @@ export interface LLMResponse {
   finishReason?: string;
   // Provider-specific properties
   response?: string;
-  message?: any;
+  message?: unknown;
   output?: string;
   text?: string;
   prompt_eval_count?: number;
@@ -38,7 +38,7 @@ export interface LLMResponse {
     promptTokens?: number;
     completionTokens?: number;
     finishReason?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -67,35 +67,35 @@ export interface LLMProvider {
   /**
    * Check if the provider is available
    */
-  isAvailable(): Promise<boolean>;
+  isAvailable: () => Promise<boolean>;
 
   /**
    * Generate code using the provider
    */
-  generateCode(prompt: string, options?: any): Promise<LLMResponse>;
+  generateCode: (prompt: string, options?: Record<string, unknown>) => Promise<LLMResponse>;
 
   /**
    * Process a generic request with tool support (optional for function calling)
    */
-  request?(request: any): Promise<any>;
+  request?: (request: unknown) => Promise<unknown>;
 
   /**
    * Get provider capabilities
    */
-  getCapabilities(): LLMCapabilities;
+  getCapabilities: () => LLMCapabilities;
 
   /**
    * Get current provider status
    */
-  getStatus(): Promise<LLMStatus>;
+  getStatus: () => Promise<LLMStatus>;
 
   /**
    * Optional health check method
    */
-  healthCheck?(): Promise<void>;
+  healthCheck?: () => Promise<void>;
 
   /**
    * Reset statistics
    */
-  resetStats?(): void;
+  resetStats?: () => void;
 }

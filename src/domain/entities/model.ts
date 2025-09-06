@@ -8,7 +8,7 @@
  * - Business rules for model selection and health monitoring
  */
 
-import { ProviderType, ModelName } from '../value-objects/voice-values.js';
+import { ModelName, ProviderType } from '../value-objects/voice-values.js';
 
 /**
  * Model Entity - Core business object representing an AI model

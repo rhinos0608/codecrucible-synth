@@ -12,8 +12,8 @@
  * Uses Strategy and Decorator patterns for configurable behavior.
  */
 
-import { promises as fs, existsSync } from 'fs';
-import { relative, isAbsolute, dirname, extname, basename, resolve, sep } from 'path';
+import { existsSync, promises as fs } from 'fs';
+import { basename, dirname, extname, isAbsolute, relative, resolve } from 'path';
 import { glob } from 'glob';
 import { normalizePathSeparators } from '../../utils/path-utilities.js';
 import { BaseTool } from './unified-tool-system.js';
@@ -29,49 +29,70 @@ import {
 
 export interface FileOperationStrategy {
   name: string;
-  supports(operation: string, args: any): boolean;
-  execute(operation: string, args: any, context: ToolExecutionContext): Promise<any>;
+  supports: (operation: string, args: Readonly<Record<string, unknown>>) => boolean;
+  execute: (
+    operation: string,
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
+  ) => Promise<unknown>;
 }
 
 /**
  * Basic file operations strategy
  */
 export class BasicFileStrategy implements FileOperationStrategy {
-  name = 'basic';
+  public name = 'basic';
 
-  supports(operation: string, args?: any): boolean {
+  public supports(operation: string, _args?: Readonly<Record<string, unknown>>): boolean {
     return ['read', 'write', 'exists', 'stat'].includes(operation);
   }
 
-  async execute(operation: string, args: any, context: ToolExecutionContext): Promise<any> {
-    const path = this.resolvePath(args.path, context);
+  public async execute(
+    operation: string,
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
+  ): Promise<unknown> {
+    const path = this.resolvePath(String(args.path), context);
 
     switch (operation) {
-      case 'read':
-        return await this.readFile(path, args);
-      case 'write':
-        return await this.writeFile(path, args, context);
+      case 'read': {
+        const result = await this.readFile(path, args);
+        return result;
+      }
+      case 'write': {
+        const { content, encoding, mode } = args as { content: string; encoding?: BufferEncoding; mode?: number };
+        if (typeof content !== 'string') {
+          throw new Error('Content must be provided as a string for write operation');
+        }
+        await this.writeFile(path, { content, encoding, mode });
+        return { success: true };
+      }
       case 'exists':
         return existsSync(path);
-      case 'stat':
-        return await this.getFileInfo(path);
+      case 'stat': {
+        const result = await this.getFileInfo(path);
+        return result;
+      }
       default:
         throw new Error(`Unsupported operation: ${operation}`);
     }
   }
 
-  private async readFile(path: string, args: any): Promise<string> {
+  private async readFile(
+    path: string,
+    args: Readonly<{ maxSize?: number; encoding?: BufferEncoding }>
+  ): Promise<string> {
     try {
       await fs.access(path);
       const stats = await fs.stat(path);
 
-      // Size limit check
-      const maxSize = args.maxSize || 1000000; // 1MB default
+      const maxSize = typeof args.maxSize === 'number' ? args.maxSize : 1000000; // 1MB default
       if (stats.size > maxSize) {
         throw new Error(`File too large: ${stats.size} bytes exceeds limit of ${maxSize} bytes`);
       }
 
-      const content = await fs.readFile(path, args.encoding || 'utf-8');
+      const encoding: BufferEncoding = typeof args.encoding === 'string' ? args.encoding : 'utf-8';
+      const content = await fs.readFile(path, { encoding });
       return content.toString();
     } catch (error) {
       throw new Error(
@@ -80,15 +101,40 @@ export class BasicFileStrategy implements FileOperationStrategy {
     }
   }
 
-  private async writeFile(path: string, args: any, context: ToolExecutionContext): Promise<void> {
+  /**
+   * Get file information for stat operation.
+   */
+  private async getFileInfo(path: string): Promise<{
+    size: number;
+    isFile: boolean;
+    isDirectory: boolean;
+    modified: Date;
+    created: Date;
+    permissions: number;
+  }> {
+    const stats = await fs.stat(path);
+    return {
+      size: stats.size,
+      isFile: stats.isFile(),
+      isDirectory: stats.isDirectory(),
+      modified: stats.mtime,
+      created: stats.birthtime,
+      permissions: stats.mode,
+    };
+  }
+
+  private async writeFile(
+    path: string,
+    args: Readonly<{ content: string; encoding?: BufferEncoding; mode?: number }>,
+  ): Promise<void> {
     try {
       // Ensure directory exists
       const dir = dirname(path);
       await fs.mkdir(dir, { recursive: true });
 
-      const options: any = {};
+      const options: { encoding?: BufferEncoding; mode?: number } = {};
       if (args.encoding) options.encoding = args.encoding;
-      if (args.mode) options.mode = args.mode;
+      if (args.mode !== undefined) options.mode = args.mode;
 
       await fs.writeFile(path, args.content, options);
 
@@ -100,25 +146,7 @@ export class BasicFileStrategy implements FileOperationStrategy {
     }
   }
 
-  private async getFileInfo(path: string): Promise<any> {
-    try {
-      const stats = await fs.stat(path);
-      return {
-        size: stats.size,
-        isFile: stats.isFile(),
-        isDirectory: stats.isDirectory(),
-        modified: stats.mtime,
-        created: stats.birthtime,
-        permissions: stats.mode,
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to get file info for ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-
-  protected resolvePath(inputPath: string, context: ToolExecutionContext): string {
+  protected resolvePath(inputPath: string, context: Readonly<ToolExecutionContext>): string {
     if (!inputPath) {
       throw new Error('Path is required');
     }
@@ -149,39 +177,57 @@ export class BasicFileStrategy implements FileOperationStrategy {
  * Batch file operations strategy - handles multiple files and patterns
  */
 export class BatchFileStrategy extends BasicFileStrategy {
-  override name = 'batch';
+  public override name = 'batch';
 
-  override supports(operation: string, args: any): boolean {
+  public override supports(
+    operation: string,
+    args: Readonly<Record<string, unknown>>
+  ): boolean {
+    const hasPathsArray =
+      Object.prototype.hasOwnProperty.call(args, 'paths') &&
+      Array.isArray((args as { paths?: unknown }).paths);
+    const hasGlobPath =
+      Object.prototype.hasOwnProperty.call(args, 'path') &&
+      typeof (args as { path?: unknown }).path === 'string' &&
+      ((args as { path: string }).path).includes('*');
+
     return (
       super.supports(operation, args) &&
-      (Array.isArray(args.paths) || (typeof args.path === 'string' && args.path.includes('*')))
+      (hasPathsArray || hasGlobPath)
     );
   }
 
-  override async execute(
+  public override async execute(
     operation: string,
-    args: any,
-    context: ToolExecutionContext
-  ): Promise<any> {
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
+  ): Promise<Array<{ path: string; success: boolean; result?: unknown; error?: string }>> {
     const paths = await this.resolvePaths(args, context);
-    const maxFiles = args.maxFiles || 20;
+    const maxFiles =
+      typeof args.maxFiles === 'number'
+        ? args.maxFiles
+        : 20;
 
     if (paths.length > maxFiles) {
       throw new Error(`Too many files: ${paths.length} exceeds limit of ${maxFiles}`);
     }
 
-    const results: any[] = [];
+    const results: Array<{ path: string; success: boolean; result?: unknown; error?: string }> = [];
 
     for (const path of paths) {
       try {
-        const result = await super.execute(operation, { ...args, path }, context);
+        const result = await super.execute(
+          operation,
+          { ...args, path } as Readonly<Record<string, unknown>>,
+          context
+        );
         results.push({
           path,
           success: true,
           result,
         });
       } catch (error) {
-        if (args.continueOnError !== false) {
+        if ((args as { continueOnError?: boolean }).continueOnError !== false) {
           results.push({
             path,
             success: false,
@@ -196,11 +242,18 @@ export class BatchFileStrategy extends BasicFileStrategy {
     return results;
   }
 
-  private async resolvePaths(args: any, context: ToolExecutionContext): Promise<string[]> {
+  private async resolvePaths(
+    args: Readonly<{
+      paths?: unknown;
+      path?: unknown;
+      excludePatterns?: unknown;
+    }>,
+    context: ToolExecutionContext
+  ): Promise<string[]> {
     let inputPaths: string[] = [];
 
     if (Array.isArray(args.paths)) {
-      inputPaths = args.paths;
+      inputPaths = (args.paths as unknown[]).filter((p): p is string => typeof p === 'string');
     } else if (typeof args.path === 'string') {
       inputPaths = [args.path];
     } else {
@@ -215,7 +268,9 @@ export class BatchFileStrategy extends BasicFileStrategy {
         const globOptions = {
           cwd: context.workingDirectory,
           absolute: true,
-          ignore: args.excludePatterns || [],
+          ignore: Array.isArray(args.excludePatterns)
+            ? (args.excludePatterns as unknown[]).filter((p): p is string => typeof p === 'string')
+            : [],
         };
 
         const matches = await glob(inputPath, globOptions);
@@ -238,56 +293,60 @@ export class BatchFileStrategy extends BasicFileStrategy {
  * Smart file strategy - adds intelligent analysis and metadata
  */
 export class SmartFileStrategy extends BatchFileStrategy {
-  override name = 'smart';
+  public override name = 'smart';
 
-  override supports(operation: string, args: any): boolean {
-    return super.supports(operation, args) && args.includeMetadata !== false;
+  public override supports(
+    operation: string,
+    args: Readonly<Record<string, unknown>>
+  ): boolean {
+    return super.supports(operation, args) && (args as { includeMetadata?: boolean }).includeMetadata !== false;
   }
 
-  override async execute(
+  public override async execute(
     operation: string,
-    args: any,
-    context: ToolExecutionContext
-  ): Promise<any> {
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
+  ): Promise<{ path: string; success: boolean; result?: unknown; error?: string }[]> {
     const baseResult = await super.execute(operation, args, context);
 
     if (operation === 'read') {
       if (Array.isArray(baseResult)) {
         // Multiple files
-        return baseResult.map(item => this.enhanceFileResult(item, args));
+        return baseResult.map((item: Readonly<{ path: string; success: boolean; result?: unknown; error?: string }>) =>
+          this.enhanceFileResult(item)
+        );
       } else {
         // Single file
-        return this.enhanceFileResult(
-          {
-            path: args.path,
+        return [
+          this.enhanceFileResult({
+            path: (args as { path?: string }).path ?? '',
             success: true,
             result: baseResult,
-          },
-          args
-        );
+          })
+        ];
       }
     }
-
-    return baseResult;
+    return baseResult as { path: string; success: boolean; result?: unknown; error?: string }[];
   }
 
-  private enhanceFileResult(item: any, args: any): any {
+  private enhanceFileResult(
+    item: Readonly<{ path: string; success: boolean; result?: unknown; error?: string }>
+  ): Readonly<{ path: string; success: boolean; result?: unknown; error?: string; metadata?: FileMetadata; enhanced?: boolean }> {
     if (!item.success) {
       return item;
     }
 
-    const path = item.path;
-    const content = item.result;
+    const { path, result: content } = item;
 
-    const metadata: any = {
-      fileSize: Buffer.byteLength(content, 'utf8'),
+    const metadata: FileMetadata = {
+      fileSize: typeof content === 'string' ? Buffer.byteLength(content, 'utf8') : 0,
       fileExtension: extname(path),
       fileName: basename(path),
       directory: dirname(path),
+      language: typeof content === 'string' ? this.detectLanguage(path, content) : 'unknown',
+      analysis: undefined,
+      codeAnalysis: undefined,
     };
-
-    // Language detection
-    metadata.language = this.detectLanguage(path, content);
 
     // Content analysis
     if (typeof content === 'string') {
@@ -311,7 +370,7 @@ export class SmartFileStrategy extends BatchFileStrategy {
     };
   }
 
-  private detectLanguage(path: string, content: string): string {
+  private detectLanguage(path: string, _content: string): string {
     const ext = extname(path).toLowerCase();
 
     const languageMap: Record<string, string> = {
@@ -372,12 +431,12 @@ export class SmartFileStrategy extends BatchFileStrategy {
     return codeExtensions.includes(ext);
   }
 
-  private analyzeCode(content: string, language: string): any {
-    const analysis: any = {
+  private analyzeCode(content: string, language: string): CodeAnalysisResult {
+    const analysis: CodeAnalysisResult = {
       functions: [],
       classes: [],
       imports: [],
-      comments: [],
+      comments: { single: 0, multi: 0, total: 0 },
       complexity: 'unknown',
     };
 
@@ -506,17 +565,20 @@ export class SmartFileStrategy extends BatchFileStrategy {
         case 'java':
         case 'c':
         case 'cpp':
-          result.single = (content.match(/\/\/.*$/gm) || []).length;
-          result.multi = (content.match(/\/\*[\s\S]*?\*\//g) || []).length;
+          result.single = (content.match(/\/\/.*$/gm) ?? []).length;
+          result.multi = (content.match(/\/\*[\s\S]*?\*\//g) ?? []).length;
           break;
         case 'python':
         case 'bash':
-          result.single = (content.match(/#.*$/gm) || []).length;
-          result.multi = (content.match(/'''[\s\S]*?'''|"""[\s\S]*?"""/g) || []).length;
+          result.single = (content.match(/#.*$/gm) ?? []).length;
+          result.multi = (content.match(/'''[\s\S]*?'''|"""[\s\S]*?"""/g) ?? []).length;
           break;
         case 'html':
         case 'xml':
-          result.multi = (content.match(/<!--[\s\S]*?-->/g) || []).length;
+          result.multi = (content.match(/<!--[\s\S]*?-->/g) ?? []).length;
+          break;
+        default:
+          // No comment patterns for other languages
           break;
       }
 
@@ -532,12 +594,43 @@ export class SmartFileStrategy extends BatchFileStrategy {
 // ============================================================================
 // UNIFIED FILE TOOL - Main tool implementation
 // ============================================================================
+// Types for metadata
+// ============================================================================
+
+interface CodeAnalysisResult {
+  functions: string[];
+  classes: string[];
+  imports: string[];
+  comments: { single: number; multi: number; total: number };
+  complexity: string;
+  note?: string;
+  error?: string;
+}
+
+interface FileMetadata {
+  fileSize: number;
+  fileExtension: string;
+  fileName: string;
+  directory: string;
+  language: string;
+  analysis?: {
+    lineCount: number;
+    characterCount: number;
+    wordCount: number;
+    isEmpty: boolean;
+  };
+  codeAnalysis?: CodeAnalysisResult;
+}
+
+// ============================================================================
+// UNIFIED FILE TOOL - Main tool implementation
+// ============================================================================
 
 export class UnifiedFileTool extends BaseTool {
-  private strategies: Map<string, FileOperationStrategy> = new Map();
+  private readonly strategies: Map<string, FileOperationStrategy> = new Map();
 
-  constructor(context?: { workingDirectory?: string }) {
-    const workingDirectory = context?.workingDirectory || process.cwd();
+  public constructor(context?: Readonly<{ workingDirectory?: string }>) {
+    const workingDirectory = context?.workingDirectory ?? process.cwd();
 
     // Define comprehensive parameter schema
     const parameters: ToolParameterSchema = {
@@ -625,9 +718,9 @@ export class UnifiedFileTool extends BaseTool {
     this.strategies.set('smart', new SmartFileStrategy());
   }
 
-  async execute(
-    args: Record<string, any>,
-    context: ToolExecutionContext
+  public async execute(
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<ToolExecutionResult> {
     const startTime = Date.now();
     try {
@@ -635,14 +728,15 @@ export class UnifiedFileTool extends BaseTool {
       const strategy = this.selectStrategy(args);
 
       // Execute with selected strategy
-      const result = await strategy.execute(args.operation || 'read', args, context);
+      const operation = typeof args.operation === 'string' ? args.operation : 'read';
+      const result = await strategy.execute(operation, args, context);
 
       return {
         success: true,
         result,
         metadata: {
           strategy: strategy.name,
-          operation: args.operation || 'read',
+          operation,
           timestamp: new Date().toISOString(),
         },
         executionTimeMs: Date.now() - startTime,
@@ -660,40 +754,60 @@ export class UnifiedFileTool extends BaseTool {
     }
   }
 
-  private selectStrategy(args: any): FileOperationStrategy {
+  private selectStrategy(args: Readonly<Record<string, unknown>>): FileOperationStrategy {
     // Strategy selection logic based on arguments
 
     // Use smart strategy if metadata is requested
-    if (args.includeMetadata !== false) {
-      const smartStrategy = this.strategies.get('smart')!;
-      if (smartStrategy.supports(args.operation || 'read', args)) {
+    const includeMetadata = typeof args.includeMetadata === 'boolean' ? args.includeMetadata : true;
+    if (includeMetadata) {
+      const smartStrategy = this.strategies.get('smart');
+      if (
+        smartStrategy &&
+        smartStrategy.supports(
+          typeof args.operation === 'string' ? args.operation : 'read',
+          args
+        )
+      ) {
         return smartStrategy;
       }
     }
 
     // Use batch strategy for multiple files or patterns
-    if (Array.isArray(args.paths) || args.path?.includes('*')) {
-      const batchStrategy = this.strategies.get('batch')!;
-      if (batchStrategy.supports(args.operation || 'read', args)) {
+    const hasPathsArray = Array.isArray(args.paths);
+    const hasGlobPath =
+      typeof args.path === 'string' && args.path.includes('*');
+    if (hasPathsArray || hasGlobPath) {
+      const batchStrategy = this.strategies.get('batch');
+      if (
+        batchStrategy &&
+        batchStrategy.supports(
+          typeof args.operation === 'string' ? args.operation : 'read',
+          args
+        )
+      ) {
         return batchStrategy;
       }
     }
 
     // Default to basic strategy
-    return this.strategies.get('basic')!;
+    const basicStrategy = this.strategies.get('basic');
+    if (!basicStrategy) {
+      throw new Error('Basic file strategy is not available');
+    }
+    return basicStrategy;
   }
 
   /**
    * Add or replace a strategy
    */
-  addStrategy(strategy: FileOperationStrategy): void {
+  public addStrategy(strategy: Readonly<FileOperationStrategy>): void {
     this.strategies.set(strategy.name, strategy);
   }
 
   /**
    * Get available strategies
    */
-  getStrategies(): string[] {
+  public getStrategies(): string[] {
     return Array.from(this.strategies.keys());
   }
 }

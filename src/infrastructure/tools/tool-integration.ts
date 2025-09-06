@@ -5,7 +5,7 @@
 
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { FilesystemTools } from './filesystem-tools.js';
-import { createLogger } from '../logging/logger-adapter.js';
+import type { RustExecutionBackend as RealRustExecutionBackend } from '../execution/rust-executor/rust-execution-backend.js';
 
 export interface LLMFunction {
   type: 'function';
@@ -14,11 +14,13 @@ export interface LLMFunction {
     description: string;
     parameters: {
       type: 'object';
-      properties: Record<string, any>;
+      properties: Record<string, unknown>;
       required?: string[];
     };
   };
 }
+
+// (Removed from here; will be placed inside the ToolIntegration class below)
 
 export interface ToolCall {
   function: {
@@ -26,63 +28,103 @@ export interface ToolCall {
     arguments: string;
   };
 }
+// Use the real RustExecutionBackend type for type safety
+export type RustExecutionBackend = Readonly<RealRustExecutionBackend>;
+
+// Define types for tool arguments and execution results
+export interface ToolExecutionContext {
+  startTime: number;
+  userId: string;
+  requestId: string;
+  environment: string;
+}
+
+export interface ToolExecutionResult {
+  success: boolean;
+  metadata?: {
+    executionTime?: number;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export interface ToolDefinition<TArgs = Record<string, unknown>, TResult = ToolExecutionResult> {
+  id: string;
+  description: string;
+  inputSchema: {
+    properties: Record<string, unknown>;
+    required?: string[];
+  };
+  execute: (args: Readonly<TArgs>, context: Readonly<ToolExecutionContext>) => Promise<TResult>;
+}
 
 export class ToolIntegration {
-  private mcpManager: MCPServerManager;
-  private filesystemTools: FilesystemTools | null = null;
-  protected availableTools: Map<string, any> = new Map();
-  private initializationPromise: Promise<void> | null = null;
-  private isInitialized = false;
-  private rustBackend: any | null = null;
+  private readonly mcpManager: MCPServerManager;
+  private rustBackend: RustExecutionBackend | null;
+  private filesystemTools: FilesystemTools;
+  private isInitialized: boolean = false;
+  private availableTools: Map<string, ToolDefinition> = new Map();
+  private logger = console;
 
-  private readonly logger = createLogger('ToolIntegration');
-
-  constructor(mcpManager: MCPServerManager, rustBackend?: any) {
+  public constructor(mcpManager: MCPServerManager, rustBackend?: Readonly<RustExecutionBackend>) {
     this.mcpManager = mcpManager;
     this.rustBackend = rustBackend ?? null;
-    // Don't initialize synchronously - use lazy initialization
+    this.filesystemTools = new FilesystemTools();
   }
 
-  /**
-   * Lazy initialization with race condition protection
-   */
-  private async ensureInitialized(): Promise<void> {
-    if (this.isInitialized) {
-      return;
-    }
-
-    if (this.initializationPromise) {
-      return this.initializationPromise;
-    }
-
-    this.initializationPromise = this.initializeTools();
-    await this.initializationPromise;
+/**
+ * Ensures that tools are initialized before use.
+ */
+private async ensureInitialized(): Promise<void> {
+  if (!this.isInitialized) {
+    await this.initializeTools();
   }
+}
+
+/**
+ * Allows setting or updating the Rust backend after construction.
+ */
+public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
+  this.rustBackend = backend;
+  if (typeof this.filesystemTools.setRustBackend === 'function') {
+    // Cast to the correct type for FilesystemTools
+    this.filesystemTools.setRustBackend(backend as RealRustExecutionBackend);
+    this.logger.info('Rust backend updated via setRustBackend');
+  }
+}
+/* Duplicate constructor removed; logic merged into the main constructor above */
 
   private async initializeTools(): Promise<void> {
+    await Promise.resolve();
     try {
       // Initialize filesystem tools with proper backend delegation
-      this.filesystemTools = new FilesystemTools();
-
-      // Set MCP manager as fallback
-      if (this.mcpManager) {
-        this.filesystemTools.setMCPManager(this.mcpManager);
-      }
-
       // If an injected rustBackend exists, attach it to filesystem tools
-      if (this.rustBackend) {
+      if (this.rustBackend !== null) {
         try {
-          this.filesystemTools.setRustBackend(this.rustBackend);
-          this.logger.info('Injected Rust execution backend attached to filesystem tools');
+          if (this.rustBackend) {
+            this.filesystemTools.setRustBackend(this.rustBackend as RealRustExecutionBackend);
+            this.logger.info('Injected Rust execution backend attached to filesystem tools');
+          } else {
+            this.logger.warn('Provided rustBackend is null or undefined');
+          }
         } catch (error) {
           this.logger.warn('Failed to attach injected Rust backend to filesystem tools', error);
         }
       }
-
-      // Register filesystem tools
       const fsTools = this.filesystemTools.getTools();
       for (const tool of fsTools) {
-        this.availableTools.set(tool.id, tool);
+        if (tool?.id) {
+          // Ensure inputSchema has 'properties' (and optionally 'required')
+          const inputSchema = tool.inputSchema as { properties: Record<string, unknown>; required?: string[] } | undefined;
+          const safeTool = {
+            ...tool,
+            inputSchema: {
+              properties: inputSchema?.properties ?? {},
+              required: inputSchema?.required ?? [],
+            },
+          };
+          this.availableTools.set(tool.id, safeTool);
+        }
       }
 
       this.isInitialized = true;
@@ -95,11 +137,10 @@ export class ToolIntegration {
       this.isInitialized = true; // Mark as initialized to prevent retry loops
     }
   }
-
   /**
    * Get all tools in LLM function calling format with lazy initialization
    */
-  async getLLMFunctions(): Promise<LLMFunction[]> {
+  public async getLLMFunctions(): Promise<LLMFunction[]> {
     await this.ensureInitialized();
 
     const functions: LLMFunction[] = [];
@@ -112,8 +153,8 @@ export class ToolIntegration {
           description: tool.description,
           parameters: {
             type: 'object',
-            properties: tool.inputSchema.properties || {},
-            required: tool.inputSchema.required || [],
+            properties: tool.inputSchema.properties,
+            required: tool.inputSchema.required ?? [],
           },
         },
       });
@@ -125,7 +166,7 @@ export class ToolIntegration {
   /**
    * Synchronous version for backward compatibility (returns cached results)
    */
-  getLLMFunctionsCached(): LLMFunction[] {
+  public getLLMFunctionsCached(): LLMFunction[] {
     if (!this.isInitialized) {
       this.logger.warn('Tools not initialized yet, returning empty functions list');
       return [];
@@ -140,8 +181,8 @@ export class ToolIntegration {
           description: tool.description,
           parameters: {
             type: 'object',
-            properties: tool.inputSchema.properties || {},
-            required: tool.inputSchema.required || [],
+            properties: tool.inputSchema.properties,
+            required: tool.inputSchema.required ?? [],
           },
         },
       });
@@ -153,12 +194,12 @@ export class ToolIntegration {
   /**
    * Execute a tool call from the LLM with lazy initialization
    */
-  async executeToolCall(toolCall: ToolCall): Promise<any> {
+  public async executeToolCall(toolCall: Readonly<ToolCall>): Promise<ToolExecutionResult> {
     await this.ensureInitialized();
 
     try {
       const functionName = toolCall.function.name;
-      const args = JSON.parse(toolCall.function.arguments);
+      const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
 
       this.logger.info(`Executing tool: ${functionName} with args:`, args);
 
@@ -170,14 +211,14 @@ export class ToolIntegration {
         );
       }
 
-      const context = {
+      const context: ToolExecutionContext = {
         startTime: Date.now(),
         userId: 'system',
         requestId: `tool_${Date.now()}`,
         environment: 'development',
       };
 
-      const result = await tool.execute(args, context);
+      const result: ToolExecutionResult = await tool.execute(args, context);
 
       this.logger.info(`Tool ${functionName} executed successfully:`, {
         success: result.success,
@@ -194,7 +235,7 @@ export class ToolIntegration {
   /**
    * Get available tool names with lazy initialization
    */
-  async getAvailableToolNames(): Promise<string[]> {
+  public async getAvailableToolNames(): Promise<string[]> {
     await this.ensureInitialized();
     return Array.from(this.availableTools.keys());
   }
@@ -202,7 +243,7 @@ export class ToolIntegration {
   /**
    * Synchronous version for backward compatibility
    */
-  getAvailableToolNamesCached(): string[] {
+  public getAvailableToolNamesCached(): string[] {
     if (!this.isInitialized) {
       return [];
     }
@@ -212,7 +253,7 @@ export class ToolIntegration {
   /**
    * Check if a tool is available with lazy initialization
    */
-  async hasToolFunction(functionName: string): Promise<boolean> {
+  public async hasToolFunction(functionName: string): Promise<boolean> {
     await this.ensureInitialized();
     return this.availableTools.has(functionName);
   }
@@ -220,7 +261,7 @@ export class ToolIntegration {
   /**
    * Synchronous version for backward compatibility
    */
-  hasToolFunctionCached(functionName: string): boolean {
+  public hasToolFunctionCached(functionName: string): boolean {
     return this.availableTools.has(functionName);
   }
 }
@@ -232,17 +273,12 @@ export function initializeGlobalToolIntegration(mcpManager: MCPServerManager): v
   globalToolIntegration = new ToolIntegration(mcpManager);
 }
 
-export function getGlobalToolIntegration(): ToolIntegration | null {
-  return globalToolIntegration;
-}
-
-// Allow application code to inject a rust backend into the global instance later
-export function setGlobalToolIntegrationRustBackend(backend: any): void {
+export function setGlobalToolIntegrationRustBackend(backend: RustExecutionBackend): void {
   if (globalToolIntegration) {
     try {
-      // @ts-ignore - attach if method exists
-      if (typeof (globalToolIntegration as any).setRustBackend === 'function') {
-        (globalToolIntegration as any).setRustBackend(backend);
+      // Attach if method exists
+      if (typeof (globalToolIntegration as unknown as { setRustBackend?: (b: RustExecutionBackend) => void }).setRustBackend === 'function') {
+        (globalToolIntegration as unknown as { setRustBackend: (b: RustExecutionBackend) => void }).setRustBackend(backend);
       }
     } catch (e) {
       // ignore

@@ -107,7 +107,7 @@ export class ProcessingRequest {
   /**
    * Mark this request as failed
    */
-  fail(error: string): ProcessingRequest {
+  public fail(_error: string): ProcessingRequest {
     if (this._status === RequestStatus.COMPLETED) {
       throw new Error('Cannot fail a completed request');
     }
@@ -133,7 +133,7 @@ export class ProcessingRequest {
   /**
    * Check if this request requires specific capabilities
    */
-  requiresCapabilities(): string[] {
+  public requiresCapabilities(): string[] {
     const capabilities: string[] = [];
 
     switch (this._type) {
@@ -154,6 +154,9 @@ export class ProcessingRequest {
         break;
       case RequestType.REVIEW:
         capabilities.push('code-review', 'quality-assessment');
+        break;
+      default:
+        // Optionally handle unknown types
         break;
     }
 
@@ -378,7 +381,7 @@ export interface RequestContext {
   iteration?: number;
   phase?: string;
   routingStrategy?: string;
-  previousIterations?: any[];
+  previousIterations?: unknown[];
 }
 
 /**

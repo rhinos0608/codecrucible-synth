@@ -8,9 +8,9 @@ export interface ToolExecutionMetrics {
 }
 
 export class PerformanceMonitor {
-  private metrics: ToolExecutionMetrics[] = [];
+  private readonly metrics: ToolExecutionMetrics[] = [];
 
-  record(
+  public record(
     toolName: string,
     startTime: number,
     success: boolean,
@@ -31,7 +31,7 @@ export class PerformanceMonitor {
     }
   }
 
-  getMetrics(): ToolExecutionMetrics[] {
+  public getMetrics(): ToolExecutionMetrics[] {
     return [...this.metrics];
   }
 }

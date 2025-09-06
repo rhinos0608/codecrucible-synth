@@ -19,72 +19,72 @@ export interface IModelRepository {
   /**
    * Find a model by its name and provider
    */
-  findByNameAndProvider(name: string, providerType: ProviderType): Promise<Model | null>;
+  findByNameAndProvider: (name: string, providerType: Readonly<ProviderType>) => Promise<Model | null>;
 
   /**
    * Find all models
    */
-  findAll(): Promise<Model[]>;
+  findAll: () => Promise<Model[]>;
 
   /**
    * Find models by provider type
    */
-  findByProvider(providerType: ProviderType): Promise<Model[]>;
+  findByProvider: (providerType: Readonly<ProviderType>) => Promise<Model[]>;
 
   /**
    * Find models with specific capabilities
    */
-  findByCapabilities(capabilities: string[]): Promise<Model[]>;
+  findByCapabilities: (capabilities: ReadonlyArray<string>) => Promise<Model[]>;
 
   /**
    * Find available models (healthy and enabled)
    */
-  findAvailableModels(): Promise<Model[]>;
+  findAvailableModels: () => Promise<Model[]>;
 
   /**
    * Find models suitable for a request
    */
-  findSuitableModels(request: {
-    requiredCapabilities?: string[];
+  findSuitableModels: (request: Readonly<{
+    requiredCapabilities?: ReadonlyArray<string>;
     preferredSize?: 'small' | 'medium' | 'large';
     maxLatency?: number;
     qualityThreshold?: number;
-  }): Promise<Model[]>;
+  }>) => Promise<Model[]>;
 
   /**
    * Save a model (create or update)
    */
-  save(model: Model): Promise<void>;
+  save: (model: Readonly<Model>) => Promise<void>;
 
   /**
    * Save multiple models in a transaction
    */
-  saveAll(models: Model[]): Promise<void>;
+  saveAll: (models: ReadonlyArray<Readonly<Model>>) => Promise<void>;
 
   /**
    * Delete a model
    */
-  delete(name: string, providerType: ProviderType): Promise<void>;
+  delete: (name: Readonly<string>, providerType: Readonly<ProviderType>) => Promise<void>;
 
   /**
    * Check if a model exists
    */
-  exists(name: string, providerType: ProviderType): Promise<boolean>;
+  exists: (name: Readonly<string>, providerType: Readonly<ProviderType>) => Promise<boolean>;
 
   /**
    * Get count of total models
    */
-  count(): Promise<number>;
+  count: () => Promise<number>;
 
   /**
    * Get count of available models
    */
-  countAvailable(): Promise<number>;
+  countAvailable: () => Promise<number>;
 
   /**
    * Get models grouped by provider
    */
-  getModelsByProvider(): Promise<Map<string, Model[]>>;
+  getModelsByProvider: () => Promise<Map<string, Model[]>>;
 }
 
 /**
@@ -114,63 +114,72 @@ export interface IAdvancedModelRepository extends IModelRepository {
   /**
    * Find models using complex query criteria
    */
-  findByQuery(query: ModelQuery): Promise<Model[]>;
+  findByQuery: (query: Readonly<ModelQuery>) => Promise<Model[]>;
 
   /**
    * Find the best model for a given request
    */
-  findBestMatch(request: {
-    requiredCapabilities?: string[];
-    preferredSize?: 'small' | 'medium' | 'large';
-    maxLatency?: number;
-    qualityThreshold?: number;
-    excludedProviders?: ProviderType[];
-  }): Promise<Model | null>;
+  findBestMatch: (request: Readonly<{
+    readonly requiredCapabilities?: ReadonlyArray<string>;
+    readonly preferredSize?: 'small' | 'medium' | 'large';
+    readonly maxLatency?: number;
+    readonly qualityThreshold?: number;
+    readonly excludedProviders?: ReadonlyArray<ProviderType>;
+  }>) => Promise<Model | null>;
 
   /**
    * Get model performance statistics
    */
-  getPerformanceStats(
-    name: string,
-    providerType: ProviderType
-  ): Promise<ModelPerformanceStats | null>;
+  getPerformanceStats: (
+    name: Readonly<string>,
+    providerType: Readonly<ProviderType>
+  ) => Promise<ModelPerformanceStats | null>;
 
   /**
    * Get all model performance statistics
    */
-  getAllPerformanceStats(): Promise<ModelPerformanceStats[]>;
+  getAllPerformanceStats: () => Promise<ModelPerformanceStats[]>;
 
   /**
    * Update model health status
    */
-  updateHealthStatus(name: string, providerType: ProviderType, isHealthy: boolean): Promise<void>;
+  updateHealthStatus: (
+    name: Readonly<string>,
+    providerType: Readonly<ProviderType>,
+    isHealthy: Readonly<boolean>
+  ) => Promise<void>;
 
   /**
    * Bulk update model enabled status
    */
-  bulkUpdateEnabled(
-    modelIds: Array<{ name: string; provider: ProviderType }>,
+  /**
+   * Bulk update model enabled status
+   */
+  bulkUpdateEnabled: (
+    modelIds: ReadonlyArray<Readonly<{ name: string; provider: ProviderType }>>,
     enabled: boolean
-  ): Promise<void>;
+  ) => Promise<void>;
 
   /**
    * Record model usage
    */
-  recordUsage(
-    name: string,
-    providerType: ProviderType,
+  recordUsage: (
+    name: Readonly<string>,
+    providerType: Readonly<ProviderType>,
     success: boolean,
     latency: number
-  ): Promise<void>;
+  ) => Promise<void>;
 
   /**
    * Get model recommendations based on usage patterns
    */
-  getRecommendations(context: {
-    taskType?: string;
-    historicalPreference?: boolean;
-    performanceWeight?: number;
-  }): Promise<Model[]>;
+  getRecommendations: (
+    context: Readonly<{
+      taskType?: string;
+      historicalPreference?: boolean;
+      performanceWeight?: number;
+    }>
+  ) => Promise<Model[]>;
 }
 
 /**

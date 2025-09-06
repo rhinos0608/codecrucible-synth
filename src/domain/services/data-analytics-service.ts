@@ -134,8 +134,8 @@ export class DataAnalyticsService {
   /**
    * Analyze voice interaction patterns and performance
    */
-  analyzeVoiceInteractions(
-    interactions: Array<{
+  public analyzeVoiceInteractions(
+    interactions: ReadonlyArray<{
       sessionId: string;
       voiceName: string;
       confidence: number;
@@ -174,19 +174,19 @@ export class DataAnalyticsService {
   /**
    * Analyze code analysis results for insights
    */
-  analyzeCodeAnalysisResults(
-    analyses: Array<{
+  public analyzeCodeAnalysisResults(
+    analyses: ReadonlyArray<{
       projectId: number;
       filePath: string;
       analysisType: string;
       qualityScore: number;
       createdAt: Date;
-      results: any;
+      results: unknown;
     }>
   ): CodeAnalysisInsights {
     const totalAnalyses = analyses.length;
     const averageQualityScore = this.calculateMean(
-      analyses.filter(a => a.qualityScore != null).map(a => a.qualityScore)
+      analyses.map(a => a.qualityScore)
     );
 
     // Analysis type distribution
@@ -214,23 +214,29 @@ export class DataAnalyticsService {
   /**
    * Analyze database performance patterns
    */
-  analyzeDatabasePerformance(
-    queryMetrics: Array<{
-      queryType: string;
-      latency: number;
-      timestamp: Date;
-      cacheHit: boolean;
-      connectionPool: string;
+  public analyzeDatabasePerformance(
+    queryMetrics: ReadonlyArray<{
+      readonly queryType: string;
+      readonly latency: number;
+      readonly timestamp: Date;
+      readonly cacheHit: boolean;
+      readonly connectionPool: string;
     }>
   ): DatabaseOptimizationInsights {
     // Query performance patterns
-    const queryPerformancePatterns = this.analyzeQueryPerformance(queryMetrics);
+    const queryPerformancePatterns = this.analyzeQueryPerformance(
+      queryMetrics.map(q => ({ queryType: q.queryType, latency: q.latency }))
+    );
 
     // Cache efficiency
-    const cacheEfficiencyMetrics = this.analyzeCacheEfficiency(queryMetrics);
+    const cacheEfficiencyMetrics = this.analyzeCacheEfficiency(
+      queryMetrics.map(q => ({ cacheHit: q.cacheHit, latency: q.latency }))
+    );
 
     // Connection pool analytics
-    const connectionPoolAnalytics = this.analyzeConnectionPoolUsage(queryMetrics);
+    const connectionPoolAnalytics = this.analyzeConnectionPoolUsage(
+      queryMetrics.map(q => ({ connectionPool: q.connectionPool, timestamp: q.timestamp }))
+    );
 
     // Index recommendations (simplified heuristics)
     const indexRecommendations = this.generateIndexRecommendations(queryPerformancePatterns);
@@ -246,10 +252,10 @@ export class DataAnalyticsService {
   /**
    * Generate performance optimization recommendations
    */
-  generateOptimizationRecommendations(
-    voiceAnalytics: VoiceInteractionAnalytics,
-    codeAnalytics: CodeAnalysisInsights,
-    dbAnalytics: DatabaseOptimizationInsights
+  public generateOptimizationRecommendations(
+    voiceAnalytics: Readonly<VoiceInteractionAnalytics>,
+    codeAnalytics: Readonly<CodeAnalysisInsights>,
+    dbAnalytics: Readonly<DatabaseOptimizationInsights>
   ): OptimizationRecommendation[] {
     const recommendations: OptimizationRecommendation[] = [];
 
@@ -263,7 +269,7 @@ export class DataAnalyticsService {
     recommendations.push(...this.generateDatabaseOptimizationRecommendations(dbAnalytics));
 
     // Sort by impact and priority
-    return recommendations.sort((a, b) => {
+    return recommendations.sort((a: Readonly<OptimizationRecommendation>, b: Readonly<OptimizationRecommendation>) => {
       const impactOrder = { high: 3, medium: 2, low: 1 };
       return impactOrder[b.impact] - impactOrder[a.impact];
     });
@@ -272,12 +278,12 @@ export class DataAnalyticsService {
   // Private helper methods for voice analysis
 
   private analyzeVoicePerformance(
-    interactions: Array<{
+    interactions: ReadonlyArray<Readonly<{
       voiceName: string;
       confidence: number;
       tokensUsed: number;
       responseTime?: number;
-    }>
+    }>>
   ): Map<string, VoicePerformanceMetrics> {
     const voiceGroups = this.groupBy(interactions, i => i.voiceName);
     const performanceMap = new Map<string, VoicePerformanceMetrics>();
@@ -286,7 +292,9 @@ export class DataAnalyticsService {
       const totalUsage = voiceInteractions.length;
       const averageConfidence = this.calculateMean(voiceInteractions.map(i => i.confidence));
       const averageLatency = this.calculateMean(
-        voiceInteractions.filter(i => i.responseTime).map(i => i.responseTime!)
+        voiceInteractions
+          .filter((i): i is typeof i & { responseTime: number } => typeof i.responseTime === 'number')
+          .map(i => i.responseTime)
       );
       const successRate = voiceInteractions.filter(i => i.confidence > 0.7).length / totalUsage;
 
@@ -304,7 +312,7 @@ export class DataAnalyticsService {
   }
 
   private analyzeConfidenceTrends(
-    interactions: Array<{ confidence: number; createdAt: Date }>,
+    interactions: ReadonlyArray<Readonly<{ confidence: number; createdAt: Date }>>,
     hoursBack: number
   ): ConfidenceTrend[] {
     const now = new Date();
@@ -335,7 +343,7 @@ export class DataAnalyticsService {
   }
 
   private analyzeTokenUsagePatterns(
-    interactions: Array<{ tokensUsed: number; createdAt: Date }>
+    interactions: ReadonlyArray<{ tokensUsed: number; createdAt: Date }>
   ): TokenUsagePattern[] {
     // Group by hour for the last 24 hours
     const patterns: TokenUsagePattern[] = [];
@@ -371,7 +379,7 @@ export class DataAnalyticsService {
   // Private helper methods for code analysis
 
   private analyzeQualityTrends(
-    analyses: Array<{ qualityScore: number; createdAt: Date }>,
+    analyses: ReadonlyArray<{ qualityScore: number; createdAt: Date }>,
     daysBack: number
   ): QualityTrend[] {
     const trends: QualityTrend[] = [];
@@ -382,7 +390,7 @@ export class DataAnalyticsService {
       const windowEnd = new Date(windowStart.getTime() + 24 * 60 * 60 * 1000);
 
       const dayAnalyses = analyses.filter(
-        a => a.createdAt >= windowStart && a.createdAt < windowEnd && a.qualityScore != null
+        a => a.createdAt >= windowStart && a.createdAt < windowEnd
       );
 
       if (dayAnalyses.length > 0) {
@@ -402,32 +410,53 @@ export class DataAnalyticsService {
   }
 
   private generateProjectInsights(
-    analyses: Array<{
-      projectId: number;
-      filePath: string;
-      qualityScore: number;
-      createdAt: Date;
+    analyses: ReadonlyArray<{
+      readonly projectId: number;
+      readonly filePath: string;
+      readonly qualityScore: number;
+      readonly createdAt: Date;
     }>
   ): ProjectInsight[] {
-    const projectGroups = this.groupBy(analyses, a => a.projectId);
+    const projectGroups = this.groupBy(analyses, (a: Readonly<{
+      readonly projectId: number;
+      readonly filePath: string;
+      readonly qualityScore: number;
+      readonly createdAt: Date;
+    }>) => a.projectId);
     const insights: ProjectInsight[] = [];
 
     for (const [projectId, projectAnalyses] of projectGroups) {
       const totalAnalyses = projectAnalyses.length;
       const averageQuality = this.calculateMean(
-        projectAnalyses.filter(a => a.qualityScore != null).map(a => a.qualityScore)
+        (projectAnalyses as ReadonlyArray<{
+          readonly projectId: number;
+          readonly filePath: string;
+          readonly qualityScore: number;
+          readonly createdAt: Date;
+        }>).map(a => a.qualityScore)
       );
 
-      const fileFrequency = this.calculateDistribution(projectAnalyses, a => a.filePath);
+      const fileFrequency = this.calculateDistribution(
+        projectAnalyses as ReadonlyArray<{
+          readonly projectId: number;
+          readonly filePath: string;
+          readonly qualityScore: number;
+          readonly createdAt: Date;
+        }>,
+        a => a.filePath
+      );
       const mostAnalyzedFiles = Array.from(fileFrequency.entries())
-        .sort((a, b) => b[1] - a[1])
+        .sort((a: readonly [string, number], b: readonly [string, number]) => b[1] - a[1])
         .slice(0, 5)
-        .map(entry => entry[0]);
+        .map((entry: readonly [string, number]) => entry[0]);
 
       // Calculate quality improvement over time (simplified)
-      const sortedAnalyses = projectAnalyses
-        .filter(a => a.qualityScore != null)
-        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      const sortedAnalyses = Array.from(projectAnalyses).sort(
+        (
+          a: { readonly projectId: number; readonly filePath: string; readonly qualityScore: number; readonly createdAt: Date },
+          b: { readonly projectId: number; readonly filePath: string; readonly qualityScore: number; readonly createdAt: Date }
+        ) => a.createdAt.getTime() - b.createdAt.getTime()
+      );
 
       const qualityImprovement =
         sortedAnalyses.length > 1
@@ -450,7 +479,7 @@ export class DataAnalyticsService {
   }
 
   private analyzeFileTypePatterns(
-    analyses: Array<{ filePath: string; qualityScore: number }>
+    analyses: ReadonlyArray<Readonly<{ filePath: string; qualityScore: number }>>
   ): FileTypeAnalytic[] {
     const fileTypeGroups = this.groupBy(analyses, a => this.getFileExtension(a.filePath));
     const analytics: FileTypeAnalytic[] = [];
@@ -458,7 +487,7 @@ export class DataAnalyticsService {
     for (const [extension, fileAnalyses] of fileTypeGroups) {
       const analysisCount = fileAnalyses.length;
       const averageQuality = this.calculateMean(
-        fileAnalyses.filter(a => a.qualityScore != null).map(a => a.qualityScore)
+        (fileAnalyses as ReadonlyArray<Readonly<{ filePath: string; qualityScore: number }>>).map(a => a.qualityScore)
       );
 
       analytics.push({
@@ -611,16 +640,16 @@ export class DataAnalyticsService {
   }
 
   private generateDatabaseOptimizationRecommendations(
-    analytics: DatabaseOptimizationInsights
+    analytics: Readonly<DatabaseOptimizationInsights>
   ): OptimizationRecommendation[] {
     const recommendations: OptimizationRecommendation[] = [];
 
-    analytics.indexRecommendations.forEach(indexRec => {
+    (analytics.indexRecommendations as ReadonlyArray<IndexRecommendation>).forEach((indexRec: Readonly<IndexRecommendation>) => {
       recommendations.push({
         type: 'database-performance',
         title: `Add Index to ${indexRec.tableName}`,
         description: `Index on ${indexRec.columns.join(', ')} could improve performance by ${(indexRec.expectedImprovement * 100).toFixed(0)}%`,
-        impact: indexRec.priority as any,
+        impact: indexRec.priority,
         effort: 'low',
         estimatedImprovement: `${(indexRec.expectedImprovement * 100).toFixed(0)}% query performance improvement`,
       });
@@ -635,19 +664,22 @@ export class DataAnalyticsService {
     return values.length > 0 ? values.reduce((sum, val) => sum + val, 0) / values.length : 0;
   }
 
-  private groupBy<T, K>(array: T[], keyFn: (item: T) => K): Map<K, T[]> {
+  private groupBy<T, K>(array: ReadonlyArray<T>, keyFn: (item: T) => K): Map<K, T[]> {
     const map = new Map<K, T[]>();
     for (const item of array) {
       const key = keyFn(item);
       if (!map.has(key)) {
         map.set(key, []);
       }
-      map.get(key)!.push(item);
+      const group = map.get(key);
+      if (group) {
+        group.push(item);
+      }
     }
     return map;
   }
 
-  private calculateDistribution<T>(array: T[], keyFn: (item: T) => string): Map<string, number> {
+  private calculateDistribution<T>(array: ReadonlyArray<T>, keyFn: (item: T) => string): Map<string, number> {
     const distribution = new Map<string, number>();
     for (const item of array) {
       const key = keyFn(item);
@@ -716,7 +748,7 @@ export class DataAnalyticsService {
     return queryType.split('_')[0] || 'unknown_table';
   }
 
-  private extractPotentialIndexColumns(queryType: string): string[] {
+  private extractPotentialIndexColumns(_queryType: string): string[] {
     // Simplified column extraction (would need query parsing)
     return ['id', 'created_at']; // Common index candidates
   }

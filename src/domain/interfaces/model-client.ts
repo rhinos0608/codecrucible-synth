@@ -16,20 +16,20 @@ export interface ModelRequest {
   tools?: ModelTool[];
   context?: RequestContext;
   // Streaming callback for token-level observability
-  onStreamingToken?: (token: string, metadata?: any) => void;
+  onStreamingToken?: (token: string, metadata?: Record<string, unknown>) => void;
   // Structured message format for tool results
   messages?: Array<{
     role: 'user' | 'assistant' | 'tool';
     content: string;
-    tool_calls?: any[];
+    tool_calls?: Record<string, unknown>[];
     tool_call_id?: string;
   }>;
   // FIXED: Add missing properties for LM Studio adapter
-  tool_choice?: string | 'auto' | 'none';
+  tool_choice?: 'auto' | 'none';
   timeout?: number;
   // Ollama-specific parameters
   num_ctx?: number;
-  options?: Record<string, any>;
+  options?: Record<string, unknown>;
 }
 
 export interface ModelResponse {
@@ -42,7 +42,7 @@ export interface ModelResponse {
     completionTokens: number;
     totalTokens: number;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   toolCalls?: ToolCall[];
   // Additional properties for compatibility
   tokens_used?: number;
@@ -63,7 +63,7 @@ export interface ModelTool {
     description: string;
     parameters: {
       type: 'object';
-      properties: Record<string, any>;
+      properties: Record<string, unknown>;
       required?: string[];
     };
   };
@@ -83,7 +83,7 @@ export interface RequestContext {
   workingDirectory: string;
   files?: string[];
   securityLevel: 'low' | 'medium' | 'high';
-  userPreferences?: Record<string, any>;
+  userPreferences?: Record<string, unknown>;
 }
 
 export interface StreamToken {
@@ -91,7 +91,7 @@ export interface StreamToken {
   isComplete: boolean;
   index: number;
   timestamp: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -101,46 +101,46 @@ export interface IModelClient {
   /**
    * Send a request to the model
    */
-  request(request: ModelRequest): Promise<ModelResponse>;
+  request: (request: Readonly<ModelRequest>) => Promise<ModelResponse>;
 
   /**
    * Generate text from a prompt - legacy compatibility method
    */
-  generate(prompt: string, options?: any): Promise<string>;
+  generate: (prompt: string, options?: Record<string, unknown>) => Promise<string>;
 
   /**
    * Send a streaming request to the model
    */
-  stream(request: ModelRequest): AsyncIterableIterator<StreamToken>;
+  stream: (request: Readonly<ModelRequest>) => AsyncIterableIterator<StreamToken>;
 
   /**
    * Send a streaming request to the model with callback
    */
-  streamRequest(
-    request: ModelRequest,
-    onToken: (token: StreamToken) => void,
-    context?: any
-  ): Promise<ModelResponse>;
+  streamRequest: (
+    request: Readonly<ModelRequest>,
+    onToken: (token: Readonly<StreamToken>) => void,
+    context?: unknown
+  ) => Promise<ModelResponse>;
 
   /**
    * Get available models
    */
-  getAvailableModels(): Promise<ModelInfo[]>;
+  getAvailableModels: () => Promise<ModelInfo[]>;
 
   /**
    * Check if the client is healthy and ready
    */
-  isHealthy(): Promise<boolean>;
+  isHealthy: () => Promise<boolean>;
 
   /**
    * Initialize the client
    */
-  initialize(): Promise<void>;
+  initialize: () => Promise<void>;
 
   /**
    * Shutdown the client
    */
-  shutdown(): Promise<void>;
+  shutdown: () => Promise<void>;
 }
 
 export interface ModelInfo {
@@ -167,17 +167,17 @@ export interface IModelProvider {
   /**
    * Send a request to this provider
    */
-  request(request: ModelRequest): Promise<ModelResponse>;
+  request: (request: Readonly<ModelRequest>) => Promise<ModelResponse>;
 
   /**
    * Check if provider is available
    */
-  isAvailable(): Promise<boolean>;
+  isAvailable: () => Promise<boolean>;
 
   /**
    * Get supported models
    */
-  getSupportedModels(): Promise<ModelInfo[]>;
+  getSupportedModels: () => Promise<ModelInfo[]>;
 }
 
 /**
@@ -187,10 +187,10 @@ export interface IModelRouter {
   /**
    * Route a request to the best available provider
    */
-  route(request: ModelRequest): Promise<{ provider: IModelProvider; model: string }>;
+  route: (request: Readonly<ModelRequest>) => Promise<{ provider: IModelProvider; model: string }>;
 
   /**
    * Get fallback chain for a request
    */
-  getFallbackChain(request: ModelRequest): IModelProvider[];
+  getFallbackChain: (request: Readonly<ModelRequest>) => IModelProvider[];
 }

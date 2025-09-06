@@ -8,14 +8,22 @@
 
 import { logger } from '../logging/unified-logger.js';
 
-export type EvidenceCollectorCallback = (toolResult: any) => void;
+// Define a specific type for tool results
+export interface ToolResult {
+  success?: boolean;
+  error?: string;
+  output?: unknown;
+  [key: string]: unknown;
+}
+
+export type EvidenceCollectorCallback = (toolResult: Readonly<ToolResult>) => void;
 
 export interface ToolResultEvidence {
-  result: any;
+  result: ToolResult;
   timestamp: Date;
   success?: boolean;
   error?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -23,17 +31,17 @@ export interface ToolResultEvidence {
  * Singleton pattern ensures consistent evidence collection across the application
  */
 export class GlobalEvidenceCollector {
-  private static instance: GlobalEvidenceCollector;
+  private static instance: GlobalEvidenceCollector | null = null;
   private toolResults: ToolResultEvidence[] = [];
-  private evidenceCollectors: Set<EvidenceCollectorCallback> = new Set();
+  private readonly evidenceCollectors: Set<EvidenceCollectorCallback> = new Set();
   private maxResults: number = 1000; // Prevent memory leaks
 
   private constructor() {
     // Private constructor enforces singleton pattern
   }
 
-  static getInstance(): GlobalEvidenceCollector {
-    if (!GlobalEvidenceCollector.instance) {
+  public static getInstance(): GlobalEvidenceCollector {
+    if (GlobalEvidenceCollector.instance === null) {
       GlobalEvidenceCollector.instance = new GlobalEvidenceCollector();
       logger.info('🔥 GlobalEvidenceCollector: Singleton instance created');
     }
@@ -43,14 +51,14 @@ export class GlobalEvidenceCollector {
   /**
    * Add a tool result to the evidence collection
    */
-  addToolResult(toolResult: any): void {
+  public addToolResult(toolResult: ToolResult): void {
     const evidence: ToolResultEvidence = {
       result: toolResult,
       timestamp: new Date(),
-      success: toolResult?.success,
-      error: toolResult?.error,
+      success: typeof toolResult.success === 'boolean' ? toolResult.success : undefined,
+      error: typeof toolResult.error === 'string' ? toolResult.error : undefined,
       metadata: {
-        hasOutput: !!toolResult?.output,
+        hasOutput: typeof toolResult.output !== 'undefined',
         resultType: typeof toolResult,
         collectorCount: this.evidenceCollectors.size,
       },
@@ -58,13 +66,13 @@ export class GlobalEvidenceCollector {
 
     logger.debug('Evidence collector: Adding tool result', {
       collectorCount: this.evidenceCollectors.size,
-      hasResult: !!toolResult,
+      hasResult: toolResult !== undefined && toolResult !== null,
     });
 
     logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool result captured', {
-      hasResult: !!toolResult,
-      success: toolResult?.success,
-      hasOutput: !!toolResult?.output,
+      hasResult: toolResult !== undefined && toolResult !== null,
+      success: typeof toolResult.success === 'boolean' ? toolResult.success : undefined,
+      hasOutput: typeof toolResult.output !== 'undefined',
       collectorCount: this.evidenceCollectors.size,
       timestamp: evidence.timestamp,
     });
@@ -80,7 +88,7 @@ export class GlobalEvidenceCollector {
   /**
    * Register an evidence collector callback
    */
-  registerEvidenceCollector(callback: EvidenceCollectorCallback): void {
+  public registerEvidenceCollector(callback: EvidenceCollectorCallback): void {
     if (typeof callback !== 'function') {
       throw new Error('Evidence collector callback must be a function');
     }
@@ -96,7 +104,7 @@ export class GlobalEvidenceCollector {
   /**
    * Unregister an evidence collector callback
    */
-  unregisterEvidenceCollector(callback: EvidenceCollectorCallback): void {
+  public unregisterEvidenceCollector(callback: EvidenceCollectorCallback): void {
     const wasDeleted = this.evidenceCollectors.delete(callback);
 
     if (wasDeleted) {
@@ -107,36 +115,36 @@ export class GlobalEvidenceCollector {
   }
 
   /**
-   * Get all captured tool results
-   */
-  getToolResults(): ToolResultEvidence[] {
-    return [...this.toolResults];
-  }
-
-  /**
-   * Get only the raw tool results (for backward compatibility)
-   */
-  getRawToolResults(): any[] {
-    return this.toolResults.map(evidence => evidence.result);
-  }
-
-  /**
-   * Clear all tool results from memory
-   */
-  clearToolResults(): void {
-    const clearedCount = this.toolResults.length;
-    this.toolResults = [];
-
-    logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool results cleared', {
-      clearedCount,
-      remainingCollectors: this.evidenceCollectors.size,
-    });
-  }
+     * Get all captured tool results
+     */
+    public getToolResults(): ToolResultEvidence[] {
+      return [...this.toolResults];
+    }
+  
+    /**
+     * Get only the raw tool results (for backward compatibility)
+     */
+    public getRawToolResults(): Readonly<ToolResult>[] {
+      return this.toolResults.map((evidence: Readonly<ToolResultEvidence>) => evidence.result);
+    }
+  
+    /**
+     * Clear all tool results from memory
+     */
+    public clearToolResults(): void {
+      const clearedCount = this.toolResults.length;
+      this.toolResults = [];
+  
+      logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool results cleared', {
+        clearedCount,
+        remainingCollectors: this.evidenceCollectors.size,
+      });
+    }
 
   /**
    * Get collector statistics for monitoring
    */
-  getStatistics(): {
+  public getStatistics(): {
     totalResults: number;
     activeCollectors: number;
     successCount: number;
@@ -144,9 +152,9 @@ export class GlobalEvidenceCollector {
     oldestResult?: Date;
     newestResult?: Date;
   } {
-    const successCount = this.toolResults.filter(r => r.success).length;
-    const errorCount = this.toolResults.filter(r => r.error).length;
-    const timestamps = this.toolResults.map(r => r.timestamp);
+    const successCount = this.toolResults.filter((r: Readonly<ToolResultEvidence>) => r.success).length;
+    const errorCount = this.toolResults.filter((r: Readonly<ToolResultEvidence>) => r.error).length;
+    const timestamps = this.toolResults.map((r: Readonly<ToolResultEvidence>) => r.timestamp);
 
     return {
       totalResults: this.toolResults.length,
@@ -154,16 +162,16 @@ export class GlobalEvidenceCollector {
       successCount,
       errorCount,
       oldestResult:
-        timestamps.length > 0 ? new Date(Math.min(...timestamps.map(t => t.getTime()))) : undefined,
+        timestamps.length > 0 ? new Date(Math.min(...timestamps.map((t: Readonly<Date>) => t.getTime()))) : undefined,
       newestResult:
-        timestamps.length > 0 ? new Date(Math.max(...timestamps.map(t => t.getTime()))) : undefined,
+        timestamps.length > 0 ? new Date(Math.max(...timestamps.map((t: Readonly<Date>) => t.getTime()))) : undefined,
     };
   }
 
   /**
    * Configure maximum results to prevent memory leaks
    */
-  setMaxResults(maxResults: number): void {
+  public setMaxResults(maxResults: number): void {
     if (maxResults < 1) {
       throw new Error('Max results must be at least 1');
     }
@@ -180,7 +188,7 @@ export class GlobalEvidenceCollector {
   /**
    * Shutdown and cleanup all resources
    */
-  shutdown(): void {
+  public shutdown(): void {
     const clearedResults = this.toolResults.length;
     const clearedCollectors = this.evidenceCollectors.size;
 
@@ -198,7 +206,7 @@ export class GlobalEvidenceCollector {
   /**
    * Notify all registered collectors of new evidence
    */
-  private notifyCollectors(evidence: ToolResultEvidence): void {
+  private notifyCollectors(evidence: Readonly<ToolResultEvidence>): void {
     this.evidenceCollectors.forEach(collector => {
       try {
         logger.debug('Evidence collector: Calling collector callback');

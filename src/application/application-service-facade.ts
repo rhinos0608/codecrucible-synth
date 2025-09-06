@@ -8,19 +8,19 @@
  */
 
 import {
-  ProcessAIRequestUseCase,
   AIRequestInput,
   AIRequestOutput,
+  ProcessAIRequestUseCase,
 } from './use-cases/process-ai-request-use-case.js';
 import {
-  MultiVoiceSynthesisUseCase,
   MultiVoiceSynthesisInput,
   MultiVoiceSynthesisOutput,
+  MultiVoiceSynthesisUseCase,
 } from './use-cases/multi-voice-synthesis-use-case.js';
 import {
-  LivingSpiralProcessUseCase,
   LivingSpiralInput,
   LivingSpiralOutput,
+  LivingSpiralProcessUseCase,
 } from './use-cases/living-spiral-process-use-case.js';
 import {
   AnalyzeCodebaseUseCase,
@@ -42,16 +42,16 @@ import { UnifiedModelClient } from './services/model-client.js';
  * Ensures clean separation from infrastructure concerns
  */
 export class ApplicationServiceFacade {
-  private processAIRequestUseCase: ProcessAIRequestUseCase;
-  private multiVoiceSynthesisUseCase: MultiVoiceSynthesisUseCase;
-  private livingSpiralProcessUseCase: LivingSpiralProcessUseCase;
-  private analyzeCodebaseUseCase: AnalyzeCodebaseUseCase;
-  private simplifiedLivingSpiralCoordinator: SimplifiedLivingSpiralCoordinator;
+  private readonly processAIRequestUseCase: ProcessAIRequestUseCase;
+  private readonly multiVoiceSynthesisUseCase: MultiVoiceSynthesisUseCase;
+  private readonly livingSpiralProcessUseCase: LivingSpiralProcessUseCase;
+  private readonly analyzeCodebaseUseCase: AnalyzeCodebaseUseCase;
+  private readonly simplifiedLivingSpiralCoordinator: SimplifiedLivingSpiralCoordinator;
 
-  constructor(
-    voiceOrchestrationService: VoiceOrchestrationService,
-    modelSelectionService: ModelSelectionService,
-    modelClient?: UnifiedModelClient
+  public constructor(
+    readonly voiceOrchestrationService: VoiceOrchestrationService,
+    readonly modelSelectionService: ModelSelectionService,
+    readonly modelClient?: UnifiedModelClient
   ) {
     // Validate required dependencies - fail fast if critical services are missing
     if (!modelClient) {
@@ -89,51 +89,51 @@ export class ApplicationServiceFacade {
    * Process a single AI request
    * Use case: Basic AI interaction
    */
-  async processAIRequest(input: AIRequestInput): Promise<AIRequestOutput> {
-    return await this.processAIRequestUseCase.execute(input);
+  public async processAIRequest(input: Readonly<AIRequestInput>): Promise<AIRequestOutput> {
+    return this.processAIRequestUseCase.execute(input);
   }
 
   /**
    * Execute multi-voice synthesis
    * Use case: Complex problem solving with multiple perspectives
    */
-  async executeMultiVoiceSynthesis(
-    input: MultiVoiceSynthesisInput
+  public async executeMultiVoiceSynthesis(
+    input: Readonly<MultiVoiceSynthesisInput>
   ): Promise<MultiVoiceSynthesisOutput> {
-    return await this.multiVoiceSynthesisUseCase.execute(input);
+    return this.multiVoiceSynthesisUseCase.execute(input);
   }
 
   /**
    * Execute Living Spiral process (legacy interface)
    * Use case: Iterative development methodology
    */
-  async executeLivingSpiralProcess(input: LivingSpiralInput): Promise<LivingSpiralOutput> {
-    return await this.livingSpiralProcessUseCase.execute(input);
+  public async executeLivingSpiralProcess(input: Readonly<LivingSpiralInput>): Promise<LivingSpiralOutput> {
+    return this.livingSpiralProcessUseCase.execute(input);
   }
 
   /**
    * Execute Simplified Living Spiral process (new interface)
    * Use case: Clean iterative development with better separation of concerns
    */
-  async executeSimplifiedSpiralProcess(
-    input: SimplifiedSpiralInput
+  public async executeSimplifiedSpiralProcess(
+    input: Readonly<SimplifiedSpiralInput>
   ): Promise<SimplifiedSpiralOutput> {
-    return await this.simplifiedLivingSpiralCoordinator.executeSpiralProcess(input);
+    return this.simplifiedLivingSpiralCoordinator.executeSpiralProcess(input);
   }
 
   /**
    * Analyze codebase
    * Use case: Code analysis and recommendations
    */
-  async analyzeCodebase(input: CodebaseAnalysisInput): Promise<CodebaseAnalysisOutput> {
-    return await this.analyzeCodebaseUseCase.execute(input);
+  public async analyzeCodebase(input: Readonly<CodebaseAnalysisInput>): Promise<CodebaseAnalysisOutput> {
+    return this.analyzeCodebaseUseCase.execute(input);
   }
 
   /**
    * Get available use cases
    * Returns: List of available application operations
    */
-  getAvailableUseCases(): Array<{
+  public getAvailableUseCases(): Array<{
     name: string;
     description: string;
     inputType: string;
@@ -174,51 +174,49 @@ export class ApplicationServiceFacade {
   }
 
   /**
-   * Health check for application services
-   * Returns: Status of application layer components
-   */
-  async getHealthStatus(): Promise<{
-    status: 'healthy' | 'degraded' | 'unhealthy';
-    services: Record<string, 'available' | 'unavailable'>;
-    timestamp: Date;
-  }> {
-    const services: Record<string, 'available' | 'unavailable'> = {};
-
-    try {
-      // Test each use case availability (simplified check)
-      services.processAIRequest = this.processAIRequestUseCase ? 'available' : 'unavailable';
-      services.multiVoiceSynthesis = this.multiVoiceSynthesisUseCase ? 'available' : 'unavailable';
-      services.livingSpiralProcess = this.livingSpiralProcessUseCase ? 'available' : 'unavailable';
-      services.simplifiedSpiralProcess = this.simplifiedLivingSpiralCoordinator
-        ? 'available'
-        : 'unavailable';
-      services.codebaseAnalysis = this.analyzeCodebaseUseCase ? 'available' : 'unavailable';
-
-      const unavailableCount = Object.values(services).filter(
-        status => status === 'unavailable'
-      ).length;
-      const status =
-        unavailableCount === 0 ? 'healthy' : unavailableCount < 3 ? 'degraded' : 'unhealthy';
-
-      return {
-        status,
-        services,
-        timestamp: new Date(),
-      };
-    } catch (error) {
-      return {
-        status: 'unhealthy',
-        services: Object.fromEntries(Object.keys(services).map(key => [key, 'unavailable'])),
-        timestamp: new Date(),
-      };
+     * Health check for application services
+     * Returns: Status of application layer components
+     */
+    public getHealthStatus(): {
+      status: 'healthy' | 'degraded' | 'unhealthy';
+      services: Record<string, 'available' | 'unavailable'>;
+      timestamp: Date;
+    } {
+      const services: Record<string, 'available' | 'unavailable'> = {};
+  
+      try {
+        // All use cases are always initialized in the constructor, so they're always available
+        services.processAIRequest = 'available';
+        services.multiVoiceSynthesis = 'available';
+        services.livingSpiralProcess = 'available';
+        services.simplifiedSpiralProcess = 'available';
+        services.codebaseAnalysis = 'available';
+  
+        const unavailableCount = Object.values(services).filter(
+          status => status === 'unavailable'
+        ).length;
+        const status =
+          unavailableCount === 0 ? 'healthy' : unavailableCount < 3 ? 'degraded' : 'unhealthy';
+  
+        return {
+          status,
+          services,
+          timestamp: new Date(),
+        };
+      } catch (error) {
+        return {
+          status: 'unhealthy',
+          services: Object.fromEntries(Object.keys(services).map(key => [key, 'unavailable'])),
+          timestamp: new Date(),
+        };
+      }
     }
-  }
 
   /**
    * Graceful shutdown
    * Cleanup application resources
    */
-  async shutdown(): Promise<void> {
+  public async shutdown(): Promise<void> {
     // Clean shutdown of use cases if needed
     // In current implementation, no special cleanup required
     // This method provides extension point for future needs

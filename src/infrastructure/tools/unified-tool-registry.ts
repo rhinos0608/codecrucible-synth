@@ -253,7 +253,7 @@ export class UnifiedToolRegistry {
 
     try {
       // Pre-execution hooks
-      await this.preExecutionHook(tool, args, context);
+      this.preExecutionHook(tool, args, context);
       
       // Execute with timeout
       const timeoutMs = context.timeoutMs || this.getDefaultTimeout(tool);
@@ -302,20 +302,18 @@ export class UnifiedToolRegistry {
     }
   }
 
-  private async preExecutionHook(
-    tool: ToolDefinition, 
-    args: any, 
-    context: ToolExecutionContext
-  ): Promise<void> {
+  private preExecutionHook(
+    tool: Readonly<ToolDefinition>, 
+    args: Readonly<Record<string, unknown>>, 
+    context: Readonly<ToolExecutionContext>
+  ): void {
     // Validate arguments against schema
-    if (tool.inputSchema) {
-      this.validateArguments(args, tool.inputSchema);
-    }
+    this.validateArguments(args, tool.inputSchema);
 
     // Security checks
     if (tool.security.requiresApproval) {
       // Integration point for approval system
-      await this.requestApproval(tool, args, context);
+      this.requestApproval(tool, args, context);
     }
   }
 
@@ -353,7 +351,7 @@ export class UnifiedToolRegistry {
     }
   }
 
-  private createTimeoutPromise(timeoutMs: number, toolId: string): Promise<never> {
+  private async createTimeoutPromise(timeoutMs: number, toolId: string): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {
         reject(new Error(`Tool ${toolId} timed out after ${timeoutMs}ms`));
@@ -361,7 +359,11 @@ export class UnifiedToolRegistry {
     });
   }
 
-  private async postProcessResult(result: unknown, tool: ToolDefinition, context: ToolExecutionContext): Promise<unknown> {
+  private postProcessResult(
+    result: unknown,
+    tool: Readonly<ToolDefinition>,
+    _context: Readonly<ToolExecutionContext>
+  ): unknown {
     // Apply output truncation if needed
     if (typeof result === 'string' && result.length > 100000) {
       const truncated = outputConfig.truncateForContext(result, tool.category);
@@ -388,7 +390,7 @@ export class UnifiedToolRegistry {
   /**
    * Get all available tool names (including aliases)
    */
-  getAvailableToolNames(): string[] {
+  public getAvailableToolNames(): string[] {
     return Array.from(new Set([
       ...Array.from(this.tools.keys()),
       ...Array.from(this.aliases.keys())
@@ -398,39 +400,48 @@ export class UnifiedToolRegistry {
   /**
    * Get tools by category
    */
-  getToolsByCategory(category: string): ToolDefinition[] {
-    const toolIds = this.categories.get(category) || new Set();
-    return Array.from(toolIds).map(id => this.tools.get(id)!).filter(Boolean);
+  public getToolsByCategory(category: string): ToolDefinition[] {
+    const toolIds = this.categories.get(category) ?? new Set();
+    return Array.from(toolIds)
+      .map((id: string) => {
+        const tool = this.tools.get(id);
+        return tool ? tool : undefined;
+      })
+      .filter((tool): tool is ToolDefinition => Boolean(tool));
   }
 
   /**
    * Get tool metrics
    */
-  getToolMetrics(toolName: string): ToolMetrics | null {
+  public getToolMetrics(toolName: string): ToolMetrics | null {
     const toolId = this.resolveToolId(toolName);
-    return toolId ? this.metrics.get(toolId) || null : null;
+    return toolId ? this.metrics.get(toolId) ?? null : null;
   }
 
   /**
    * Health check - get registry status
    */
-  getRegistryStatus(): {
+  public getRegistryStatus(): {
     totalTools: number;
     totalAliases: number;
     categories: Record<string, number>;
     topTools: Array<{ id: string; successRate: number; avgDuration: number }>;
   } {
     const topTools = Array.from(this.metrics.entries())
-      .map(([id, metrics]) => ({
+      .map(([id, metrics]: readonly [string, ToolMetrics]) => ({
         id,
         successRate: metrics.getSuccessRate(),
         avgDuration: metrics.getAverageDuration()
       }))
-      .sort((a, b) => (b.successRate * 10000 - b.avgDuration) - (a.successRate * 10000 - a.avgDuration))
+      .sort((a: Readonly<{ id: string; successRate: number; avgDuration: number }>, b: Readonly<{ id: string; successRate: number; avgDuration: number }>) =>
+        (b.successRate * 10000 - b.avgDuration) - (a.successRate * 10000 - a.avgDuration)
+      )
       .slice(0, 10);
 
     const categories = Object.fromEntries(
-      Array.from(this.categories.entries()).map(([cat, tools]) => [cat, tools.size])
+      Array.from(this.categories.entries()).map(
+        ([cat, tools]: readonly [string, Set<string>]) => [cat, tools.size]
+      )
     );
 
     return {
@@ -450,34 +461,41 @@ class ToolMetrics {
   private successes: number = 0;
   private failures: number = 0;
   private totalDuration: number = 0;
-  private recentErrors: Array<{ error: any; timestamp: Date }> = [];
+  private readonly recentErrors: Array<{ error: unknown; timestamp: Date }> = [];
 
-  recordSuccess(duration: number): void {
+  public recordSuccess(duration: number): void {
     this.executions++;
     this.successes++;
     this.totalDuration += duration;
   }
 
-  recordFailure(duration: number, error: any): void {
+  public recordFailure(duration: number, error: unknown): void {
     this.executions++;
     this.failures++;
     this.totalDuration += duration;
-    
+
     this.recentErrors.push({ error, timestamp: new Date() });
     if (this.recentErrors.length > 10) {
       this.recentErrors.shift();
     }
   }
 
-  getSuccessRate(): number {
+  public getSuccessRate(): number {
     return this.executions > 0 ? this.successes / this.executions : 0;
   }
 
-  getAverageDuration(): number {
+  public getAverageDuration(): number {
     return this.executions > 0 ? this.totalDuration / this.executions : 0;
   }
 
-  getStats() {
+  public getStats(): {
+    executions: number;
+    successes: number;
+    failures: number;
+    successRate: number;
+    avgDuration: number;
+    recentErrors: Array<{ error: unknown; timestamp: Date }>;
+  } {
     return {
       executions: this.executions,
       successes: this.successes,

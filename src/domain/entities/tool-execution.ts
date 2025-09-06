@@ -87,60 +87,62 @@ export class ExecutionStatus {
 
   private constructor(private readonly _value: (typeof ExecutionStatus.VALID_STATUSES)[number]) {}
 
-  static create(value: string): ExecutionStatus {
-    if (!this.VALID_STATUSES.includes(value as any)) {
+  public static create(
+    value: string
+  ): ExecutionStatus {
+    if (!this.VALID_STATUSES.includes(value as typeof ExecutionStatus.VALID_STATUSES[number])) {
       throw new Error(
         `Invalid execution status: ${value}. Must be one of: ${this.VALID_STATUSES.join(', ')}`
       );
     }
-    return new ExecutionStatus(value as any);
+    return new ExecutionStatus(value as typeof ExecutionStatus.VALID_STATUSES[number]);
   }
 
-  static pending(): ExecutionStatus {
+  public static pending(): ExecutionStatus {
     return new ExecutionStatus('pending');
   }
 
-  static running(): ExecutionStatus {
+  public static running(): ExecutionStatus {
     return new ExecutionStatus('running');
   }
 
-  static success(): ExecutionStatus {
+  public static success(): ExecutionStatus {
     return new ExecutionStatus('success');
   }
 
-  static failure(): ExecutionStatus {
+  public static failure(): ExecutionStatus {
     return new ExecutionStatus('failure');
   }
 
-  static timeout(): ExecutionStatus {
+  public static timeout(): ExecutionStatus {
     return new ExecutionStatus('timeout');
   }
 
-  get value(): string {
+  public get value(): string {
     return this._value;
   }
 
-  equals(other: ExecutionStatus): boolean {
-    return this._value === other._value;
+  public equals(other: Readonly<ExecutionStatus>): boolean {
+    return this._value === other.value;
   }
 
-  isCompleted(): boolean {
+  public isCompleted(): boolean {
     return this._value === 'success' || this._value === 'failure' || this._value === 'timeout';
   }
 
-  isSuccessful(): boolean {
+  public isSuccessful(): boolean {
     return this._value === 'success';
   }
 
-  isFailed(): boolean {
+  public isFailed(): boolean {
     return this._value === 'failure' || this._value === 'timeout';
   }
 
-  isRunning(): boolean {
+  public isRunning(): boolean {
     return this._value === 'running';
   }
 
-  isPending(): boolean {
+  public isPending(): boolean {
     return this._value === 'pending';
   }
 }
@@ -210,26 +212,26 @@ export class ExecutionDuration {
  * Tool Arguments Value Object (reused from reasoning-step.ts)
  */
 export class ToolArguments {
-  private constructor(private readonly _args: Record<string, any>) {}
+  private constructor(private readonly _args: Readonly<Record<string, unknown>>) {}
 
-  static create(args: Record<string, any>): ToolArguments {
-    const clonedArgs = JSON.parse(JSON.stringify(args));
+  public static create(args: Readonly<Record<string, unknown>>): ToolArguments {
+    const clonedArgs = JSON.parse(JSON.stringify(args)) as Record<string, unknown>;
     return new ToolArguments(clonedArgs);
   }
 
-  static empty(): ToolArguments {
+  public static empty(): ToolArguments {
     return new ToolArguments({});
   }
 
-  get args(): Readonly<Record<string, any>> {
+  public get args(): Readonly<Record<string, unknown>> {
     return Object.freeze({ ...this._args });
   }
 
-  hasArgument(name: string): boolean {
+  public hasArgument(name: string): boolean {
     return name in this._args;
   }
 
-  getArgument(name: string): any {
+  public getArgument(name: string): unknown {
     return this._args[name];
   }
 
@@ -258,47 +260,47 @@ export class ToolArguments {
  */
 export class ToolResult {
   private constructor(
-    private readonly _output: any,
+    private readonly _output: unknown,
     private readonly _success: boolean,
     private readonly _errorMessage?: string
   ) {}
 
-  static success(output: any): ToolResult {
+  public static success(output: unknown): ToolResult {
     return new ToolResult(output, true);
   }
 
-  static failure(errorMessage: string, output?: any): ToolResult {
+  public static failure(errorMessage: string, output?: unknown): ToolResult {
     return new ToolResult(output, false, errorMessage);
   }
 
-  get output(): any {
+  public get output(): unknown {
     return this._output;
   }
 
-  get success(): boolean {
+  public get success(): boolean {
     return this._success;
   }
 
-  get errorMessage(): string | undefined {
+  public get errorMessage(): string | undefined {
     return this._errorMessage;
   }
 
-  isSuccess(): boolean {
+  public isSuccess(): boolean {
     return this._success;
   }
 
-  isFailure(): boolean {
+  public isFailure(): boolean {
     return !this._success;
   }
 
-  hasOutput(): boolean {
+  public hasOutput(): boolean {
     return this._output !== null && this._output !== undefined;
   }
 
   /**
    * Business rule: Check if result contains meaningful data
    */
-  hasMeaningfulOutput(): boolean {
+  public hasMeaningfulOutput(): boolean {
     if (!this.hasOutput()) return false;
 
     if (typeof this._output === 'string') {
@@ -309,7 +311,7 @@ export class ToolResult {
       return this._output.length > 0;
     }
 
-    if (typeof this._output === 'object') {
+    if (typeof this._output === 'object' && this._output !== null) {
       return Object.keys(this._output).length > 0;
     }
 
@@ -319,7 +321,7 @@ export class ToolResult {
   /**
    * Business rule: Check if failure is recoverable
    */
-  isRecoverableFailure(): boolean {
+  public isRecoverableFailure(): boolean {
     if (this._success) return false;
 
     // Check for common recoverable errors
@@ -418,7 +420,7 @@ export class ToolExecution {
   /**
    * Complete the tool execution with success
    */
-  completeSuccess(result: any): ToolExecution {
+  public completeSuccess(result: unknown): ToolExecution {
     if (!this._status.isRunning()) {
       throw new Error(`Cannot complete execution in ${this._status.value} state`);
     }
@@ -437,7 +439,7 @@ export class ToolExecution {
   /**
    * Complete the tool execution with failure
    */
-  completeFailure(errorMessage: string, output?: any): ToolExecution {
+  public completeFailure(errorMessage: string, output?: unknown): ToolExecution {
     if (!this._status.isRunning()) {
       throw new Error(`Cannot complete execution in ${this._status.value} state`);
     }
@@ -586,7 +588,7 @@ export class ToolExecution {
 
   // Factory methods
 
-  static createPending(toolName: string, arguments_: Record<string, any>): ToolExecution {
+  public static createPending(toolName: string, arguments_: Readonly<Record<string, unknown>>): ToolExecution {
     const executionId = `exec_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     return new ToolExecution(
       executionId,
@@ -602,12 +604,12 @@ export class ToolExecution {
 export interface ToolExecutionConfiguration {
   executionId: string;
   toolName: string;
-  arguments: Record<string, any>;
+  arguments: Readonly<Record<string, unknown>>;
   startTime: string;
   status: string;
   endTime?: string;
   result?: {
-    output: any;
+    output: unknown;
     success: boolean;
     errorMessage?: string;
   };

@@ -96,31 +96,34 @@ export interface IWorkflowOrchestrator {
   /**
    * Process a workflow request
    */
-  processRequest(request: WorkflowRequest): Promise<WorkflowResponse>;
+  processRequest: (request: Readonly<WorkflowRequest>) => Promise<WorkflowResponse>;
 
   /**
    * Execute a tool with proper context and security
    */
-  executeTool(
+  executeTool: (
     toolName: string,
-    args: ToolExecutionArgs,
-    context: WorkflowContext
-  ): Promise<ToolExecutionResult>;
+    args: Readonly<ToolExecutionArgs>,
+    context: Readonly<WorkflowContext>
+  ) => Promise<ToolExecutionResult>;
 
   /**
    * Process a model request with routing and fallbacks
    */
-  processModelRequest(request: ModelRequest, context?: WorkflowContext): Promise<ModelResponse>;
+  processModelRequest: (
+    request: Readonly<ModelRequest>,
+    context?: Readonly<WorkflowContext>
+  ) => Promise<ModelResponse>;
 
   /**
    * Initialize the orchestrator with dependencies
    */
-  initialize(dependencies: OrchestratorDependencies): Promise<void>;
+  initialize: (dependencies: Readonly<OrchestratorDependencies>) => Promise<void>;
 
   /**
    * Shutdown and cleanup resources
    */
-  shutdown(): Promise<void>;
+  shutdown: () => Promise<void>;
 }
 
 /**
@@ -130,32 +133,32 @@ export interface LivingSpiralCoordinatorInterface {
   /**
    * Execute the complete Living Spiral process
    */
-  executeSpiralProcess(initialPrompt: string): Promise<unknown>;
+  executeSpiralProcess: (initialPrompt: string) => Promise<unknown>;
 
   /**
    * Execute a single spiral iteration
    */
-  executeSpiralIteration(input: string, iteration: number): Promise<unknown>;
+  executeSpiralIteration: (input: string, iteration: number) => Promise<unknown>;
 
   /**
    * Check if convergence has been achieved
    */
-  checkConvergence(results: unknown[]): Promise<boolean>;
+  checkConvergence: (results: ReadonlyArray<unknown>) => Promise<boolean>;
 
   /**
    * Analyze code or files
    */
-  analyzeCode(filePath: string, context: WorkflowContext): Promise<unknown>;
+  analyzeCode: (filePath: string, context: Readonly<WorkflowContext>) => Promise<unknown>;
 
   /**
    * Initialize the orchestrator with dependencies
    */
-  initialize(dependencies: OrchestratorDependencies): Promise<void>;
+  initialize: (dependencies: Readonly<OrchestratorDependencies>) => Promise<void>;
 
   /**
    * Shutdown and cleanup
    */
-  shutdown(): Promise<void>;
+  shutdown: () => Promise<void>;
 }
 
 export interface OrchestratorDependencies {

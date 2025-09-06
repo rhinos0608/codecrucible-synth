@@ -151,10 +151,10 @@ export type {
 
 // Domain Exceptions (pure domain errors)
 export class DomainError extends Error {
-  constructor(
+  public constructor(
     message: string,
     public readonly code?: string,
-    public readonly context?: Record<string, any>
+    public readonly context?: Readonly<Record<string, unknown>>
   ) {
     super(message);
     this.name = 'DomainError';
@@ -162,21 +162,21 @@ export class DomainError extends Error {
 }
 
 export class ValidationError extends DomainError {
-  constructor(message: string, context?: Record<string, any>) {
+  public constructor(message: string, context?: Readonly<Record<string, unknown>>) {
     super(message, 'VALIDATION_ERROR', context);
     this.name = 'ValidationError';
   }
 }
 
 export class BusinessRuleError extends DomainError {
-  constructor(message: string, context?: Record<string, any>) {
+  public constructor(message: string, context?: Readonly<Record<string, unknown>>) {
     super(message, 'BUSINESS_RULE_ERROR', context);
     this.name = 'BusinessRuleError';
   }
 }
 
 export class DomainNotFoundError extends DomainError {
-  constructor(resource: string, identifier: string) {
+  public constructor(resource: string, identifier: string) {
     super(`${resource} not found: ${identifier}`, 'NOT_FOUND', { resource, identifier });
     this.name = 'DomainNotFoundError';
   }

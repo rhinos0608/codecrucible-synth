@@ -81,7 +81,7 @@ export type ToolCategory =
 /**
  * Type-safe mapping from registry keys to function names
  */
-export type RegistryToFunctionMap = {
+export interface RegistryToFunctionMap {
   filesystem_list: 'filesystem_list_directory';
   filesystem_read: 'filesystem_read_file';
   filesystem_write: 'filesystem_write_file';
@@ -94,7 +94,7 @@ export type RegistryToFunctionMap = {
   npm_run: 'npm_run';
   smithery_status: 'smithery_status';
   smithery_refresh: 'smithery_refresh';
-};
+}
 
 // ================================
 // TOOL DEFINITIONS WITH TYPES
@@ -254,21 +254,21 @@ export class TypedToolIdentifiers {
   /**
    * Get all available tool registry keys
    */
-  static getAllRegistryKeys(): ToolRegistryKey[] {
+  public static getAllRegistryKeys(): ToolRegistryKey[] {
     return Object.keys(TYPED_TOOL_CATALOG) as ToolRegistryKey[];
   }
 
   /**
    * Get all available function names
    */
-  static getAllFunctionNames(): ToolFunctionName[] {
-    return Object.values(TYPED_TOOL_CATALOG).map(tool => tool.functionName);
+  public static getAllFunctionNames(): ToolFunctionName[] {
+    return Object.values(TYPED_TOOL_CATALOG).map((tool: Readonly<TypedToolDefinition>) => tool.functionName);
   }
 
   /**
    * Get function name from registry key (type-safe)
    */
-  static getFunctionName<K extends ToolRegistryKey>(registryKey: K): RegistryToFunctionMap[K] {
+  public static getFunctionName<K extends ToolRegistryKey>(registryKey: K): RegistryToFunctionMap[K] {
     const tool = TYPED_TOOL_CATALOG[registryKey];
     return tool.functionName as RegistryToFunctionMap[K];
   }
@@ -276,80 +276,87 @@ export class TypedToolIdentifiers {
   /**
    * Get tool definition by registry key (type-safe)
    */
-  static getToolDefinition(registryKey: ToolRegistryKey): TypedToolDefinition {
+  public static getToolDefinition(registryKey: ToolRegistryKey): TypedToolDefinition {
     return TYPED_TOOL_CATALOG[registryKey];
   }
 
   /**
    * Get tools by category (type-safe)
    */
-  static getToolsByCategory(category: ToolCategory): TypedToolDefinition[] {
-    return Object.values(TYPED_TOOL_CATALOG).filter(tool => tool.category === category);
+  public static getToolsByCategory(category: ToolCategory): TypedToolDefinition[] {
+    return Object.values(TYPED_TOOL_CATALOG).filter((tool: Readonly<TypedToolDefinition>) => tool.category === category);
   }
 
   /**
    * Get core tools (type-safe)
    */
-  static getCoreTools(): TypedToolDefinition[] {
-    return Object.values(TYPED_TOOL_CATALOG).filter(tool => tool.isCore);
+  public static getCoreTools(): TypedToolDefinition[] {
+    return Object.values(TYPED_TOOL_CATALOG).filter((tool: Readonly<TypedToolDefinition>) => tool.isCore);
   }
 
   /**
    * Get tools by risk level (type-safe)
    */
-  static getToolsByRiskLevel(riskLevel: 'low' | 'medium' | 'high'): TypedToolDefinition[] {
-    return Object.values(TYPED_TOOL_CATALOG).filter(tool => tool.riskLevel === riskLevel);
+  public static getToolsByRiskLevel(riskLevel: 'low' | 'medium' | 'high'): TypedToolDefinition[] {
+    return Object.values(TYPED_TOOL_CATALOG).filter((tool: Readonly<TypedToolDefinition>) => tool.riskLevel === riskLevel);
   }
 
   /**
    * Validate registry key at runtime (with type guard)
    */
-  static isValidRegistryKey(key: string): key is ToolRegistryKey {
+  public static isValidRegistryKey(key: string): key is ToolRegistryKey {
     return key in TYPED_TOOL_CATALOG;
   }
 
   /**
    * Validate function name at runtime (with type guard)
    */
-  static isValidFunctionName(name: string): name is ToolFunctionName {
-    return Object.values(TYPED_TOOL_CATALOG).some(tool => tool.functionName === name);
+  public static isValidFunctionName(name: string): name is ToolFunctionName {
+    return Object.values(TYPED_TOOL_CATALOG).some((tool: Readonly<TypedToolDefinition>) => tool.functionName === name);
   }
 
   /**
    * Find registry key by alias (type-safe)
    */
-  static findRegistryKeyByAlias(alias: string): ToolRegistryKey | null {
-    const tool = Object.values(TYPED_TOOL_CATALOG).find(tool => tool.aliases.includes(alias));
+  public static findRegistryKeyByAlias(alias: string): ToolRegistryKey | null {
+    const tool = Object.values(TYPED_TOOL_CATALOG).find((tool: Readonly<TypedToolDefinition>) => tool.aliases.includes(alias));
     return tool ? tool.registryKey : null;
   }
 
   /**
    * Get all aliases for a registry key (type-safe)
    */
-  static getAliases(registryKey: ToolRegistryKey): string[] {
+  public static getAliases(registryKey: ToolRegistryKey): string[] {
     return TYPED_TOOL_CATALOG[registryKey].aliases;
   }
 
   /**
    * Get tool statistics for debugging
    */
-  static getToolStatistics() {
-    const tools = Object.values(TYPED_TOOL_CATALOG);
-    const categories = [...new Set(tools.map(t => t.category))];
-    const riskLevels = [...new Set(tools.map(t => t.riskLevel))];
+  public static getToolStatistics(): {
+    totalTools: number;
+    coreTools: number;
+    categories: number;
+    riskLevels: number;
+    byCategory: { category: ToolCategory; count: number }[];
+    byRiskLevel: { riskLevel: 'low' | 'medium' | 'high'; count: number }[];
+  } {
+    const tools = Object.values(TYPED_TOOL_CATALOG) as ReadonlyArray<TypedToolDefinition>;
+    const categories = [...new Set(tools.map((t: Readonly<TypedToolDefinition>) => t.category))];
+    const riskLevels = [...new Set(tools.map((t: Readonly<TypedToolDefinition>) => t.riskLevel))];
 
     return {
       totalTools: tools.length,
-      coreTools: tools.filter(t => t.isCore).length,
+      coreTools: tools.filter((t: Readonly<TypedToolDefinition>) => t.isCore).length,
       categories: categories.length,
       riskLevels: riskLevels.length,
-      byCategory: categories.map(cat => ({
+      byCategory: categories.map((cat: ToolCategory) => ({
         category: cat,
-        count: tools.filter(t => t.category === cat).length,
+        count: tools.filter((t: Readonly<TypedToolDefinition>) => t.category === cat).length,
       })),
-      byRiskLevel: riskLevels.map(risk => ({
+      byRiskLevel: riskLevels.map((risk: 'low' | 'medium' | 'high') => ({
         riskLevel: risk,
-        count: tools.filter(t => t.riskLevel === risk).length,
+        count: tools.filter((t: Readonly<TypedToolDefinition>) => t.riskLevel === risk).length,
       })),
     };
   }

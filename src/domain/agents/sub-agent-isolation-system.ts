@@ -31,8 +31,8 @@ export interface IsolationContext {
 }
 
 class SubAgentIsolationSystem {
-  private activeContexts: Map<string, IsolationContext> = new Map();
-  private defaultConfigs: Record<IsolationLevel, IsolationConfig> = {
+  private readonly activeContexts: Map<string, IsolationContext> = new Map();
+  private readonly defaultConfigs: Record<IsolationLevel, IsolationConfig> = {
     [IsolationLevel.MINIMAL]: {
       level: IsolationLevel.MINIMAL,
       maxMemory: 256 * 1024 * 1024, // 256MB
@@ -67,7 +67,7 @@ class SubAgentIsolationSystem {
     },
   };
 
-  createIsolationContext(agentId: string, level: IsolationLevel = IsolationLevel.STANDARD): string {
+  public createIsolationContext(agentId: string, _level: IsolationLevel = IsolationLevel.STANDARD): string {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const context: IsolationContext = {
@@ -85,7 +85,7 @@ class SubAgentIsolationSystem {
     return sessionId;
   }
 
-  validateOperation(sessionId: string, operation: string): boolean {
+  public validateOperation(sessionId: string, operation: string): boolean {
     const context = this.activeContexts.get(sessionId);
     if (!context) {
       return false;
@@ -109,7 +109,7 @@ class SubAgentIsolationSystem {
     return true;
   }
 
-  terminateContext(sessionId: string): boolean {
+  public terminateContext(sessionId: string): boolean {
     const context = this.activeContexts.get(sessionId);
     if (context) {
       console.log(
@@ -121,15 +121,15 @@ class SubAgentIsolationSystem {
     return false;
   }
 
-  getContextStatus(sessionId: string): IsolationContext | null {
-    return this.activeContexts.get(sessionId) || null;
+  public getContextStatus(sessionId: string): IsolationContext | null {
+    return this.activeContexts.get(sessionId) ?? null;
   }
 
-  getAllActiveContexts(): IsolationContext[] {
+  public getAllActiveContexts(): IsolationContext[] {
     return Array.from(this.activeContexts.values());
   }
 
-  enforceResourceLimits(sessionId: string): boolean {
+  public enforceResourceLimits(sessionId: string): boolean {
     const context = this.activeContexts.get(sessionId);
     if (!context) {
       return false;

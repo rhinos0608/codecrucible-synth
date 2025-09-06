@@ -12,14 +12,14 @@ export interface PluginMetadata {
 
 export interface PluginContext {
   // Narrow context to interfaces to avoid infra coupling
-  registerCommand?: (name: string, handler: Function) => void;
-  registerQuery?: (name: string, handler: Function) => void;
+  registerCommand?: (name: string, handler: (...args: readonly unknown[]) => unknown) => void;
+  registerQuery?: (name: string, handler: (...args: readonly unknown[]) => unknown) => void;
 }
 
 export interface IPlugin {
   readonly meta: PluginMetadata;
 
-  initialize?(context: PluginContext): Promise<void> | void;
-  start?(): Promise<void> | void;
-  stop?(): Promise<void> | void;
+  initialize?: (context: Readonly<PluginContext>) => Promise<void> | void;
+  start?: () => Promise<void> | void;
+  stop?: () => Promise<void> | void;
 }

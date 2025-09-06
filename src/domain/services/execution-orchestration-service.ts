@@ -9,13 +9,13 @@
  */
 
 import {
+  Domain,
   ExecutionPlan,
   Goal,
-  Domain,
-  StepEstimate,
   SelectedTools,
+  StepEstimate,
 } from '../entities/execution-plan.js';
-import { ReasoningStep, ConfidenceScore, ToolArguments } from '../entities/reasoning-step.js';
+import { ConfidenceScore, ReasoningStep, ToolArguments } from '../entities/reasoning-step.js';
 import { WorkflowTemplate } from '../entities/workflow-template.js';
 
 /**
@@ -31,10 +31,10 @@ export class ExecutionContext {
     private readonly _userPreferences: ExecutionPreferences
   ) {}
 
-  static create(
+  public static create(
     executionId: string,
     originalPrompt: string,
-    availableTools: string[],
+    availableTools: readonly string[],
     maxSteps: number = 10,
     timeoutMs: number = 300000,
     preferences: ExecutionPreferences = ExecutionPreferences.balanced()
@@ -49,26 +49,26 @@ export class ExecutionContext {
     );
   }
 
-  get executionId(): string {
+  public get executionId(): string {
     return this._executionId;
   }
-  get originalPrompt(): string {
+  public get originalPrompt(): string {
     return this._originalPrompt;
   }
-  get availableTools(): readonly string[] {
+  public get availableTools(): readonly string[] {
     return this._availableTools;
   }
-  get maxSteps(): number {
+  public get maxSteps(): number {
     return this._maxSteps;
   }
-  get timeoutMs(): number {
+  public get timeoutMs(): number {
     return this._timeoutMs;
   }
-  get userPreferences(): ExecutionPreferences {
+  public get userPreferences(): ExecutionPreferences {
     return this._userPreferences;
   }
 
-  hasAvailableTool(toolName: string): boolean {
+  public hasAvailableTool(toolName: string): boolean {
     return this._availableTools.includes(toolName);
   }
 }
@@ -85,7 +85,7 @@ export class ExecutionPreferences {
     private readonly _confidenceThreshold: number
   ) {}
 
-  static create(
+  public static create(
     preferSpeed: boolean,
     preferQuality: boolean,
     allowOptionalSteps: boolean = true,
@@ -101,31 +101,31 @@ export class ExecutionPreferences {
     );
   }
 
-  static balanced(): ExecutionPreferences {
+  public static balanced(): ExecutionPreferences {
     return new ExecutionPreferences(false, false, true, 300000, 0.7);
   }
 
-  static speedFocused(): ExecutionPreferences {
+  public static speedFocused(): ExecutionPreferences {
     return new ExecutionPreferences(true, false, false, 120000, 0.6);
   }
 
-  static qualityFocused(): ExecutionPreferences {
+  public static qualityFocused(): ExecutionPreferences {
     return new ExecutionPreferences(false, true, true, 600000, 0.8);
   }
 
-  get preferSpeed(): boolean {
+  public get preferSpeed(): boolean {
     return this._preferSpeed;
   }
-  get preferQuality(): boolean {
+  public get preferQuality(): boolean {
     return this._preferQuality;
   }
-  get allowOptionalSteps(): boolean {
+  public get allowOptionalSteps(): boolean {
     return this._allowOptionalSteps;
   }
-  get maxExecutionTime(): number {
+  public get maxExecutionTime(): number {
     return this._maxExecutionTime;
   }
-  get confidenceThreshold(): number {
+  public get confidenceThreshold(): number {
     return this._confidenceThreshold;
   }
 }
@@ -137,24 +137,24 @@ export class ExecutionResult {
   private constructor(
     private readonly _success: boolean,
     private readonly _finalResult: string,
-    private readonly _reasoningChain: readonly ReasoningStep[],
+    private readonly _reasoningChain: ReadonlyArray<ReasoningStep>,
     private readonly _executionPlan: ExecutionPlan,
     private readonly _totalSteps: number,
     private readonly _executionTime: number,
     private readonly _tokensUsed: number,
     private readonly _streamed: boolean,
-    private readonly _insights: readonly string[]
+    private readonly _insights: ReadonlyArray<string>
   ) {}
 
-  static create(
+  public static create(
     success: boolean,
     finalResult: string,
-    reasoningChain: ReasoningStep[],
+    reasoningChain: ReadonlyArray<ReasoningStep>,
     executionPlan: ExecutionPlan,
     executionTime: number,
     tokensUsed: number = 0,
     streamed: boolean = false,
-    insights: string[] = []
+    insights: readonly string[] = []
   ): ExecutionResult {
     return new ExecutionResult(
       success,
@@ -169,38 +169,38 @@ export class ExecutionResult {
     );
   }
 
-  get success(): boolean {
+  public get success(): boolean {
     return this._success;
   }
-  get finalResult(): string {
+  public get finalResult(): string {
     return this._finalResult;
   }
-  get reasoningChain(): readonly ReasoningStep[] {
+  public get reasoningChain(): readonly ReasoningStep[] {
     return this._reasoningChain;
   }
-  get executionPlan(): ExecutionPlan {
+  public get executionPlan(): ExecutionPlan {
     return this._executionPlan;
   }
-  get totalSteps(): number {
+  public get totalSteps(): number {
     return this._totalSteps;
   }
-  get executionTime(): number {
+  public get executionTime(): number {
     return this._executionTime;
   }
-  get tokensUsed(): number {
+  public get tokensUsed(): number {
     return this._tokensUsed;
   }
-  get streamed(): boolean {
+  public get streamed(): boolean {
     return this._streamed;
   }
-  get insights(): readonly string[] {
+  public get insights(): readonly string[] {
     return this._insights;
   }
 
   /**
    * Business rule: Check if execution was efficient
    */
-  isEfficient(): boolean {
+  public isEfficient(): boolean {
     const avgTimePerStep = this._executionTime / Math.max(1, this._totalSteps);
     return this._success && avgTimePerStep < 30000; // < 30s per step
   }
@@ -208,22 +208,22 @@ export class ExecutionResult {
   /**
    * Business rule: Get quality score based on success and reasoning
    */
-  calculateQualityScore(): number {
+  public calculateQualityScore(): number {
     if (!this._success) return 0;
 
     let score = 0.4; // Base success score
 
     // High-confidence steps contribute to quality
-    const highConfidenceSteps = this._reasoningChain.filter(step =>
+    const highConfidenceSteps = this._reasoningChain.filter((step: Readonly<ReasoningStep>) =>
       step.confidence.isHigh()
     ).length;
     score += (highConfidenceSteps / this._totalSteps) * 0.3;
 
     // Successful tool executions contribute to quality
     const successfulToolSteps = this._reasoningChain.filter(
-      step => step.isToolStep() && step.isSuccessful()
+      (step: Readonly<ReasoningStep>) => step.isToolStep() && step.isSuccessful()
     ).length;
-    const totalToolSteps = this._reasoningChain.filter(step => step.isToolStep()).length;
+    const totalToolSteps = this._reasoningChain.filter((step: Readonly<ReasoningStep>) => step.isToolStep()).length;
 
     if (totalToolSteps > 0) {
       score += (successfulToolSteps / totalToolSteps) * 0.3;
@@ -242,26 +242,29 @@ export class ExecutionOrchestrationService {
   /**
    * Business rule: Create execution plan from user prompt
    */
-  createExecutionPlan(
+  public createExecutionPlan(
     prompt: string,
-    availableTools: string[],
-    workflowTemplate?: WorkflowTemplate
+    availableTools: readonly string[],
+    workflowTemplate?: Readonly<WorkflowTemplate>
   ): ExecutionPlan {
     const goal = Goal.create(prompt);
     const domain = this.inferDomainFromPrompt(prompt);
     const complexity = goal.estimateComplexity();
 
     if (workflowTemplate && workflowTemplate.matches(prompt)) {
-      return this.createWorkflowBasedPlan(goal, domain, workflowTemplate, availableTools);
+      return this.createWorkflowBasedPlan(goal, domain, workflowTemplate as WorkflowTemplate, [...availableTools]);
     }
 
-    return this.createHeuristicPlan(goal, domain, complexity, availableTools);
+    return this.createHeuristicPlan(goal, domain, complexity, [...availableTools]);
   }
 
   /**
    * Business rule: Validate execution plan feasibility
    */
-  validateExecutionPlan(plan: ExecutionPlan, context: ExecutionContext): ValidationResult {
+  public validateExecutionPlan(
+    plan: Readonly<ExecutionPlan>,
+    context: Readonly<ExecutionContext>
+  ): ValidationResult {
     const issues: string[] = [];
     const warnings: string[] = [];
 
@@ -298,7 +301,7 @@ export class ExecutionOrchestrationService {
   /**
    * Business rule: Optimize execution plan based on preferences
    */
-  optimizeExecutionPlan(plan: ExecutionPlan, context: ExecutionContext): ExecutionPlan {
+  public optimizeExecutionPlan(plan: ExecutionPlan, context: Readonly<ExecutionContext>): ExecutionPlan {
     let optimizedPlan = plan;
 
     // Speed optimization: reduce optional tools
@@ -327,12 +330,12 @@ export class ExecutionOrchestrationService {
   /**
    * Business rule: Create next reasoning step in execution chain
    */
-  createNextReasoningStep(
-    currentChain: ReasoningStep[],
-    context: ExecutionContext,
-    plan: ExecutionPlan,
+  public createNextReasoningStep(
+    currentChain: ReadonlyArray<ReasoningStep>,
+    context: Readonly<ExecutionContext>,
+    plan: Readonly<ExecutionPlan>,
     aiGeneratedContent?: string,
-    toolResult?: any
+    toolResult?: Readonly<{ error?: string; success?: boolean; [key: string]: unknown }>
   ): ReasoningStep | null {
     const stepNumber = currentChain.length + 1;
 
@@ -347,7 +350,7 @@ export class ExecutionOrchestrationService {
 
     // If we have AI-generated content, process it
     if (aiGeneratedContent) {
-      return this.processAIReasoningContent(stepNumber, aiGeneratedContent, context);
+      return this.processAIReasoningContent(stepNumber, aiGeneratedContent, context as ExecutionContext);
     }
 
     // If we have a tool result, create observation step
@@ -362,10 +365,10 @@ export class ExecutionOrchestrationService {
   /**
    * Business rule: Check if execution should continue
    */
-  shouldContinueExecution(
-    currentChain: ReasoningStep[],
-    context: ExecutionContext,
-    plan: ExecutionPlan
+  public shouldContinueExecution(
+    currentChain: ReadonlyArray<ReasoningStep>,
+    context: Readonly<ExecutionContext>,
+    plan: Readonly<ExecutionPlan>
   ): ContinuationDecision {
     // Check step limit
     if (currentChain.length >= context.maxSteps) {
@@ -374,18 +377,18 @@ export class ExecutionOrchestrationService {
 
     // Check for successful conclusion
     const lastStep = currentChain[currentChain.length - 1];
-    if (lastStep?.type.value === 'conclusion' && lastStep.confidence.isHigh()) {
+    if (lastStep.type.value === 'conclusion' && lastStep.confidence.isHigh()) {
       return ContinuationDecision.stop('High-confidence conclusion reached');
     }
 
     // Check for consecutive errors
-    const recentErrors = currentChain.slice(-3).filter(step => step.hasError()).length;
+    const recentErrors = currentChain.slice(-3).filter((step: Readonly<ReasoningStep>) => step.hasError()).length;
     if (recentErrors >= 2) {
       return ContinuationDecision.stop('Too many consecutive errors');
     }
 
     // Check if goal appears to be achieved
-    if (this.isGoalAchieved(currentChain, plan.goal)) {
+    if (this.isGoalAchieved(currentChain as ReasoningStep[], plan.goal)) {
       return ContinuationDecision.stop('Goal appears to be achieved');
     }
 
@@ -401,21 +404,21 @@ export class ExecutionOrchestrationService {
   /**
    * Business rule: Calculate final execution result
    */
-  synthesizeFinalResult(
-    reasoningChain: ReasoningStep[],
-    plan: ExecutionPlan,
-    context: ExecutionContext,
+  public synthesizeFinalResult(
+    reasoningChain: ReadonlyArray<ReasoningStep>,
+    plan: Readonly<ExecutionPlan>,
+    context: Readonly<ExecutionContext>,
     executionTime: number
   ): ExecutionResult {
-    const success = this.determineExecutionSuccess(reasoningChain, plan);
-    const finalResult = this.extractFinalResult(reasoningChain, plan);
-    const insights = this.generateExecutionInsights(reasoningChain, plan, context);
+    const success = this.determineExecutionSuccess(reasoningChain as ReasoningStep[], plan as ExecutionPlan);
+    const finalResult = this.extractFinalResult(reasoningChain as ReasoningStep[], plan as ExecutionPlan);
+    const insights = this.generateExecutionInsights(reasoningChain as ReasoningStep[], plan as ExecutionPlan, context as ExecutionContext);
 
     return ExecutionResult.create(
       success,
       finalResult,
-      reasoningChain,
-      plan,
+      reasoningChain as ReasoningStep[],
+      plan as ExecutionPlan,
       executionTime,
       0, // tokens - would be calculated by infrastructure
       false, // streamed - would be set by infrastructure
@@ -461,10 +464,10 @@ export class ExecutionOrchestrationService {
   private createWorkflowBasedPlan(
     goal: Goal,
     domain: Domain,
-    template: WorkflowTemplate,
-    availableTools: string[]
+    template: Readonly<WorkflowTemplate>,
+    availableTools: readonly string[]
   ): ExecutionPlan {
-    const executableSteps = template.getExecutableSteps(availableTools);
+    const executableSteps = template.getExecutableSteps(Array.from(availableTools));
     const allRequiredTools = template.getAllRequiredTools();
 
     return new ExecutionPlan(
@@ -531,7 +534,7 @@ export class ExecutionOrchestrationService {
   private processAIReasoningContent(
     stepNumber: number,
     content: string,
-    context: ExecutionContext
+    _context: Readonly<ExecutionContext>
   ): ReasoningStep {
     // Simplified AI content processing - would be more sophisticated in real implementation
     if (content.toLowerCase().includes('conclusion') || content.toLowerCase().includes('result')) {
@@ -553,13 +556,13 @@ export class ExecutionOrchestrationService {
 
   private processToolResult(
     stepNumber: number,
-    toolResult: any,
-    context: ExecutionContext
+    toolResult: Readonly<{ error?: string; success?: boolean; [key: string]: unknown }>,
+    _context: Readonly<ExecutionContext>
   ): ReasoningStep {
-    const hasError = toolResult?.error || toolResult?.success === false;
+    const hasError = typeof toolResult.error === 'string' || toolResult.success === false;
 
     if (hasError) {
-      return ReasoningStep.createErrorStep(stepNumber, toolResult.error || 'Tool execution failed');
+      return ReasoningStep.createErrorStep(stepNumber, typeof toolResult.error === 'string' ? toolResult.error : 'Tool execution failed');
     }
 
     const observation = `Tool executed successfully. Result: ${JSON.stringify(toolResult).substring(0, 200)}`;
@@ -568,9 +571,9 @@ export class ExecutionOrchestrationService {
 
   private determineNextStep(
     stepNumber: number,
-    currentChain: ReasoningStep[],
-    plan: ExecutionPlan,
-    context: ExecutionContext
+    currentChain: ReadonlyArray<ReasoningStep>,
+    plan: Readonly<ExecutionPlan>,
+    _context: Readonly<ExecutionContext>
   ): ReasoningStep {
     // Simplified next step determination - would be more sophisticated in real implementation
     if (currentChain.length === 0) {
@@ -601,7 +604,7 @@ export class ExecutionOrchestrationService {
     );
   }
 
-  private isGoalAchieved(currentChain: ReasoningStep[], goal: Goal): boolean {
+  private isGoalAchieved(currentChain: ReadonlyArray<ReasoningStep>, _goal: Readonly<Goal>): boolean {
     // Simplified goal achievement check
     const successfulSteps = currentChain.filter(step => step.isSuccessful()).length;
     const totalSteps = currentChain.length;
@@ -609,7 +612,7 @@ export class ExecutionOrchestrationService {
     return successfulSteps >= totalSteps * 0.8 && totalSteps >= 3;
   }
 
-  private calculateRecentConfidence(recentSteps: ReasoningStep[]): ConfidenceScore {
+  private calculateRecentConfidence(recentSteps: ReadonlyArray<ReasoningStep>): ConfidenceScore {
     if (recentSteps.length === 0) return ConfidenceScore.medium();
 
     const avgConfidence =
@@ -618,7 +621,7 @@ export class ExecutionOrchestrationService {
     return ConfidenceScore.create(avgConfidence);
   }
 
-  private determineExecutionSuccess(reasoningChain: ReasoningStep[], plan: ExecutionPlan): boolean {
+  private determineExecutionSuccess(reasoningChain: ReadonlyArray<ReasoningStep>, _plan: Readonly<ExecutionPlan>): boolean {
     if (reasoningChain.length === 0) return false;
 
     const successfulSteps = reasoningChain.filter(step => step.isSuccessful()).length;
@@ -627,7 +630,7 @@ export class ExecutionOrchestrationService {
     return successfulSteps > errorSteps && successfulSteps >= reasoningChain.length * 0.6;
   }
 
-  private extractFinalResult(reasoningChain: ReasoningStep[], plan: ExecutionPlan): string {
+  private extractFinalResult(reasoningChain: ReadonlyArray<ReasoningStep>, _plan: Readonly<ExecutionPlan>): string {
     // Find the last conclusion step
     const conclusionSteps = reasoningChain.filter(step => step.type.value === 'conclusion');
     if (conclusionSteps.length > 0) {
@@ -644,9 +647,9 @@ export class ExecutionOrchestrationService {
   }
 
   private generateExecutionInsights(
-    reasoningChain: ReasoningStep[],
-    plan: ExecutionPlan,
-    context: ExecutionContext
+    reasoningChain: ReadonlyArray<ReasoningStep>,
+    plan: Readonly<ExecutionPlan>,
+    _context: Readonly<ExecutionContext>
   ): string[] {
     const insights: string[] = [];
 
@@ -684,17 +687,17 @@ export class ValidationResult {
     private readonly _warnings: readonly string[]
   ) {}
 
-  static create(isValid: boolean, issues: string[], warnings: string[]): ValidationResult {
+  public static create(isValid: boolean, issues: readonly string[], warnings: readonly string[]): ValidationResult {
     return new ValidationResult(isValid, Object.freeze([...issues]), Object.freeze([...warnings]));
   }
 
-  get isValid(): boolean {
+  public get isValid(): boolean {
     return this._isValid;
   }
-  get issues(): readonly string[] {
+  public get issues(): readonly string[] {
     return this._issues;
   }
-  get warnings(): readonly string[] {
+  public get warnings(): readonly string[] {
     return this._warnings;
   }
 }
@@ -706,25 +709,25 @@ export class ContinuationDecision {
     private readonly _needsReview: boolean = false
   ) {}
 
-  static continue(): ContinuationDecision {
+  public static continue(): ContinuationDecision {
     return new ContinuationDecision(true, 'Continue execution');
   }
 
-  static stop(reason: string): ContinuationDecision {
+  public static stop(reason: string): ContinuationDecision {
     return new ContinuationDecision(false, reason);
   }
 
-  static review(reason: string): ContinuationDecision {
+  public static review(reason: string): ContinuationDecision {
     return new ContinuationDecision(false, reason, true);
   }
 
-  get shouldContinue(): boolean {
+  public get shouldContinue(): boolean {
     return this._shouldContinue;
   }
-  get reason(): string {
+  public get reason(): string {
     return this._reason;
   }
-  get needsReview(): boolean {
+  public get needsReview(): boolean {
     return this._needsReview;
   }
 }

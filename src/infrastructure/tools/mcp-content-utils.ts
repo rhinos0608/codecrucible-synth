@@ -65,7 +65,7 @@ export function extractFirstContentText(content: MCPContentItem[] | undefined): 
     return '';
   }
 
-  const firstItem = content[0];
+  const [firstItem] = content;
   return firstItem && typeof firstItem.text === 'string' ? firstItem.text : '';
 }
 

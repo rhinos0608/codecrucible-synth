@@ -22,13 +22,13 @@ export class ReasoningStepType {
 
   private constructor(private readonly _value: (typeof ReasoningStepType.VALID_TYPES)[number]) {}
 
-  static create(value: string): ReasoningStepType {
-    if (!this.VALID_TYPES.includes(value as any)) {
+  public static create(value: string): ReasoningStepType {
+    if (!this.VALID_TYPES.includes(value as "thought" | "action" | "observation" | "conclusion" | "error")) {
       throw new Error(
         `Invalid reasoning step type: ${value}. Must be one of: ${this.VALID_TYPES.join(', ')}`
       );
     }
-    return new ReasoningStepType(value as any);
+    return new ReasoningStepType(value as "thought" | "action" | "observation" | "conclusion" | "error");
   }
 
   static thought(): ReasoningStepType {
@@ -125,32 +125,32 @@ export class ConfidenceScore {
  * Tool Arguments Value Object
  */
 export class ToolArguments {
-  private constructor(private readonly _args: Record<string, any>) {}
+  private constructor(private readonly _args: Readonly<Record<string, unknown>>) {}
 
-  static create(args: Record<string, any>): ToolArguments {
+  public static create(args: Readonly<Record<string, unknown>>): ToolArguments {
     // Deep clone to ensure immutability
-    const clonedArgs = JSON.parse(JSON.stringify(args));
+    const clonedArgs = JSON.parse(JSON.stringify(args)) as Record<string, unknown>;
     return new ToolArguments(clonedArgs);
   }
 
-  static empty(): ToolArguments {
+  public static empty(): ToolArguments {
     return new ToolArguments({});
   }
 
-  get args(): Readonly<Record<string, any>> {
+  public get args(): Readonly<Record<string, unknown>> {
     return Object.freeze({ ...this._args });
   }
 
-  hasArgument(name: string): boolean {
+  public hasArgument(name: string): boolean {
     return name in this._args;
   }
 
-  getArgument(name: string): any {
+  public getArgument(name: string): unknown {
     return this._args[name];
   }
 
-  withArgument(name: string, value: any): ToolArguments {
-    const newArgs = { ...this._args, [name]: value };
+  public withArgument(name: string, value: unknown): ToolArguments {
+    const newArgs: Record<string, unknown> = { ...this._args, [name]: value };
     return new ToolArguments(newArgs);
   }
 }
@@ -166,11 +166,11 @@ export class ReasoningStep {
   private readonly _timestamp: Date;
   private readonly _toolName?: string;
   private readonly _toolArgs?: ToolArguments;
-  private readonly _toolResult?: any;
+  private readonly _toolResult?: unknown;
   private readonly _executionTime?: number;
-  private readonly _metadata: Record<string, any>;
+  private readonly _metadata: Readonly<Record<string, unknown>>;
 
-  constructor(
+  public constructor(
     stepNumber: number,
     type: ReasoningStepType,
     content: string,
@@ -178,9 +178,9 @@ export class ReasoningStep {
     timestamp: Date = new Date(),
     toolName?: string,
     toolArgs?: ToolArguments,
-    toolResult?: any,
+    toolResult?: unknown,
     executionTime?: number,
-    metadata: Record<string, any> = {}
+    metadata: Readonly<Record<string, unknown>> = {}
   ) {
     this.validateInputs(stepNumber, content);
 
@@ -197,43 +197,43 @@ export class ReasoningStep {
   }
 
   // Getters
-  get stepNumber(): number {
+  public get stepNumber(): number {
     return this._stepNumber;
   }
 
-  get type(): ReasoningStepType {
+  public get type(): ReasoningStepType {
     return this._type;
   }
 
-  get content(): string {
+  public get content(): string {
     return this._content;
   }
 
-  get confidence(): ConfidenceScore {
+  public get confidence(): ConfidenceScore {
     return this._confidence;
   }
 
-  get timestamp(): Date {
+  public get timestamp(): Date {
     return new Date(this._timestamp);
   }
 
-  get toolName(): string | undefined {
+  public get toolName(): string | undefined {
     return this._toolName;
   }
 
-  get toolArgs(): ToolArguments | undefined {
+  public get toolArgs(): ToolArguments | undefined {
     return this._toolArgs;
   }
 
-  get toolResult(): any {
+  public get toolResult(): unknown {
     return this._toolResult;
   }
 
-  get executionTime(): number | undefined {
+  public get executionTime(): number | undefined {
     return this._executionTime;
   }
 
-  get metadata(): Record<string, any> {
+  public get metadata(): Record<string, unknown> {
     return { ...this._metadata };
   }
 
@@ -319,7 +319,7 @@ export class ReasoningStep {
   /**
    * Create a new reasoning step with tool execution result
    */
-  withToolResult(result: any, executionTime?: number): ReasoningStep {
+  public withToolResult(result: unknown, executionTime?: number): ReasoningStep {
     return new ReasoningStep(
       this._stepNumber,
       this._type,
@@ -437,10 +437,10 @@ export interface ReasoningStepConfiguration {
   type: string;
   content: string;
   toolName?: string;
-  toolArgs?: Record<string, any>;
-  toolResult?: any;
+  toolArgs?: Record<string, unknown>;
+  toolResult?: unknown;
   confidence: number;
   timestamp: string;
   executionTime?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }

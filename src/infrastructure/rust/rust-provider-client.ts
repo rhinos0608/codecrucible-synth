@@ -7,7 +7,6 @@
 
 import { logger } from '../../infrastructure/logging/logger.js';
 import { RustBridgeManager } from '../execution/rust-executor/rust-bridge-manager.js';
-import type { ProviderClient } from '../../domain/interfaces/provider-interfaces.js';
 
 export interface RustProviderConfig {
   name: string;
@@ -27,15 +26,41 @@ export interface RustProviderStats {
 }
 
 /**
- * Client for interacting with Rust-based provider services
+ * Types for Rust provider requests and modules
  */
-export class RustProviderClient {
-  private config: RustProviderConfig;
-  private bridgeManager: RustBridgeManager;
-  private stats: RustProviderStats;
-  private startTime: number;
+export interface RustProviderRequest {
+  type: string;
+  operation?: string;
+  path?: string;
+  content?: string;
+  options?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
-  constructor(config: Partial<RustProviderConfig> = {}) {
+export interface RustModule {
+  executeFilesystem?: (
+    operation: string,
+    path: string,
+    content?: string,
+    options?: Record<string, unknown>
+  ) => Promise<unknown>;
+  execute?: (
+    type: string,
+    args: string,
+    options?: Record<string, unknown>
+  ) => Promise<unknown>;
+}
+
+ /**
+  * Client for interacting with Rust-based provider services
+  */
+export class RustProviderClient {
+  private readonly config: RustProviderConfig;
+  private readonly bridgeManager: RustBridgeManager;
+  private readonly stats: RustProviderStats;
+  private readonly startTime: number;
+
+  public constructor(config: Readonly<Partial<RustProviderConfig>> = {}) {
     this.config = {
       name: 'rust-provider',
       version: '1.0.0',
@@ -59,7 +84,7 @@ export class RustProviderClient {
   /**
    * Initialize the provider client
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     try {
       logger.info('Initializing Rust provider client...', {
         name: this.config.name,
@@ -70,32 +95,13 @@ export class RustProviderClient {
       if (!success) {
         throw new Error('Failed to initialize Rust bridge');
       }
-
-      logger.info('Rust provider client initialized successfully');
     } catch (error) {
-      logger.error('Failed to initialize Rust provider client:', error);
+      logger.error('Error initializing Rust provider client:', error);
       throw error;
     }
   }
 
-  /**
-   * Check if the provider is available and healthy
-   */
-  async isAvailable(): Promise<boolean> {
-    return this.bridgeManager.isHealthy();
-  }
-
-  /**
-   * Get provider configuration
-   */
-  getConfig(): RustProviderConfig {
-    return { ...this.config };
-  }
-
-  /**
-   * Get provider statistics
-   */
-  getStats(): RustProviderStats {
+  public getStats(): RustProviderStats {
     return {
       ...this.stats,
       uptime: Date.now() - this.startTime,
@@ -105,7 +111,7 @@ export class RustProviderClient {
   /**
    * Execute a request through the Rust provider
    */
-  async execute(request: any): Promise<any> {
+  public async execute(request: Readonly<RustProviderRequest>): Promise<unknown> {
     const startTime = Date.now();
     this.stats.totalRequests++;
 
@@ -114,10 +120,10 @@ export class RustProviderClient {
         throw new Error('Rust provider is not healthy');
       }
 
-      const rustModule = this.bridgeManager.getRustModule();
+      const rustModule = this.bridgeManager.getRustModule() as RustModule;
 
       // Execute the request through the Rust module
-      const result = await this.executeRequest(rustModule, request);
+      const result: unknown = await this.executeRequest(rustModule, request);
 
       // Update statistics
       const responseTime = Date.now() - startTime;
@@ -137,21 +143,21 @@ export class RustProviderClient {
   /**
    * Get supported capabilities
    */
-  getCapabilities(): string[] {
+  public getCapabilities(): string[] {
     return [...this.config.capabilities];
   }
 
   /**
    * Check if a specific capability is supported
    */
-  hasCapability(capability: string): boolean {
+  public hasCapability(capability: string): boolean {
     return this.config.capabilities.includes(capability);
   }
 
   /**
    * Shutdown the provider client
    */
-  async shutdown(): Promise<void> {
+  public async shutdown(): Promise<void> {
     try {
       await this.bridgeManager.shutdown();
       logger.info('Rust provider client shut down successfully');
@@ -162,7 +168,7 @@ export class RustProviderClient {
 
   // Private methods
 
-  private async executeRequest(rustModule: any, request: any): Promise<any> {
+  private async executeRequest(rustModule: Readonly<RustModule>, request: Readonly<RustProviderRequest>): Promise<unknown> {
     // Route request based on type
     switch (request.type) {
       case 'file-operation':
@@ -176,38 +182,71 @@ export class RustProviderClient {
     }
   }
 
-  private async executeFileOperation(rustModule: any, request: any): Promise<any> {
+  private async executeFileOperation(
+    rustModule: RustModule,
+    request: RustProviderRequest
+  ): Promise<unknown> {
     if (typeof rustModule.executeFilesystem !== 'function') {
       throw new Error('File operation not supported by Rust module');
     }
 
     const { operation, path, content, options } = request;
-    return await rustModule.executeFilesystem(operation, path, content, options);
+    // Ensure operation and path are strings
+    if (typeof operation !== 'string' || typeof path !== 'string') {
+      throw new Error('Invalid operation or path for file operation');
+    }
+    return rustModule.executeFilesystem(
+      operation,
+      path,
+      typeof content === 'string' ? content : undefined,
+      options
+    );
   }
 
-  private async executeCodeAnalysis(rustModule: any, request: any): Promise<any> {
+  private async executeCodeAnalysis(
+    rustModule: Readonly<RustModule>,
+    request: Readonly<RustProviderRequest>
+  ): Promise<unknown> {
     if (typeof rustModule.execute !== 'function') {
       throw new Error('Code analysis not supported by Rust module');
     }
 
     const args = JSON.stringify(request);
-    return await rustModule.execute('code-analysis', args, request.options);
+    return rustModule.execute('code-analysis', args, typeof request.options === 'object' && request.options !== null ? request.options : undefined);
   }
 
-  private async executeComputeTask(rustModule: any, request: any): Promise<any> {
+  private async executeComputeTask(
+    rustModule: RustModule,
+    request: RustProviderRequest
+  ): Promise<unknown> {
     if (typeof rustModule.execute !== 'function') {
       throw new Error('Compute task not supported by Rust module');
     }
 
     const args = JSON.stringify(request);
-    return await rustModule.execute('compute-task', args, request.options ?? undefined);
+    const options = typeof request.options === 'object' && request.options !== null ? request.options : undefined;
+    return rustModule.execute('compute-task', args, options);
   }
 
-  private async executeGenericRequest(rustModule: any, request: any): Promise<any> {
-    // Generic request execution through Rust executor
-    if (rustModule.execute) {
-      const result = await rustModule.execute(JSON.stringify(request));
-      return JSON.parse(result);
+  private async executeGenericRequest(
+    rustModule: Readonly<RustModule>,
+    request: Readonly<RustProviderRequest>
+  ): Promise<unknown> {
+    if (typeof rustModule.execute === 'function') {
+      const result = await rustModule.execute(
+        'generic',
+        JSON.stringify(request),
+        request.options
+      );
+      // If result is a string, try to parse as JSON, otherwise return as is
+      if (typeof result === 'string') {
+        try {
+          return JSON.parse(result) as unknown;
+        } catch {
+          return result;
+        }
+      }
+      return result;
     }
 
     throw new Error('Generic request execution not supported');

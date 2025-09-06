@@ -20,15 +20,15 @@ export class FilesystemTools {
   private rustBackend: RustExecutionBackend | null = null;
   private mcpManager: MCPServerManager | null = null;
 
-  setRustBackend(backend: RustExecutionBackend): void {
+  public setRustBackend(backend: RustExecutionBackend): void {
     this.rustBackend = backend;
   }
 
-  setMCPManager(manager: MCPServerManager): void {
+  public setMCPManager(manager: MCPServerManager): void {
     this.mcpManager = manager;
   }
 
-  async readFile(path: string): Promise<string> {
+  public async readFile(path: Readonly<string>): Promise<string> {
     // Try Rust streaming first for true performance
     if (rustStreamingClient.isRustAvailable()) {
       try {
@@ -40,13 +40,21 @@ export class FilesystemTools {
 
         // Create stream processor to accumulate chunks
         const processor: StreamProcessor = {
-          async processChunk(chunk: StreamChunk): Promise<void> {
+          processChunk(chunk: Readonly<StreamChunk>): Promise<void> {
             totalChunks++;
             totalBytes += chunk.size;
 
             // Accumulate data (for small files this is fine)
             if (chunk.contentType === 'file_content' && chunk.data) {
-              fileContent += chunk.data;
+              if (typeof chunk.data === 'string') {
+                fileContent += chunk.data;
+              } else if (chunk.data instanceof Buffer) {
+                fileContent += chunk.data.toString('utf8');
+              } else if (chunk.data instanceof Uint8Array) {
+                fileContent += Buffer.from(chunk.data).toString('utf8');
+              } else {
+                fileContent += String(chunk.data);
+              }
             }
 
             // Log progress for large files
@@ -55,22 +63,31 @@ export class FilesystemTools {
                 `File read progress: ${chunk.metadata.progress.toFixed(1)}% (${chunk.sequence + 1} chunks)`
               );
             }
+
+            return Promise.resolve();
           },
 
-          async onCompleted(session: StreamSession): Promise<void> {
+          onCompleted(session: StreamSession): Promise<void> {
+            const duration =
+              typeof session.stats.endTime === 'number' && typeof session.stats.startTime === 'number'
+                ? `${session.stats.endTime - session.stats.startTime}ms`
+                : 'unknown';
             logger.info(`✅ File read completed via Rust streaming: ${path}`, {
               chunks: totalChunks,
               bytes: totalBytes,
-              duration: `${session.stats.endTime! - session.stats.startTime}ms`,
+              duration,
             });
+            return Promise.resolve();
           },
 
-          async onError(error: string, session: StreamSession): Promise<void> {
+          onError(error: string, _session: Readonly<StreamSession>): Promise<void> {
             logger.error(`❌ Rust streaming error for ${path}: ${error}`);
+            return Promise.resolve();
           },
 
-          async onBackpressure(streamId: string): Promise<void> {
+          onBackpressure(streamId: string): Promise<void> {
             logger.debug(`🚦 Backpressure applied for stream ${streamId}`);
+            return Promise.resolve();
           },
         };
 
@@ -106,7 +123,7 @@ export class FilesystemTools {
               resolved = true;
               clearInterval(pollInterval);
               logger.warn(`⏰ File read timeout for ${path} after 30 seconds`);
-              rustStreamingClient.cancelStream(sessionId);
+              void rustStreamingClient.cancelStream(sessionId);
               reject(
                 new Error(`File read timeout: ${path} - operation took longer than 30 seconds`)
               );
@@ -122,13 +139,13 @@ export class FilesystemTools {
           // Override resolve/reject to include cleanup
           const originalResolve = resolve;
           const originalReject = reject;
-          resolve = (...args) => {
+          resolve = (): void => {
             cleanup();
-            originalResolve(...args);
+            originalResolve();
           };
-          reject = (...args) => {
+          reject = (): void => {
             cleanup();
-            originalReject(...args);
+            originalReject();
           };
         });
 
@@ -187,7 +204,7 @@ export class FilesystemTools {
     }
   }
 
-  async writeFile(path: string, content: string): Promise<void> {
+  public async writeFile(path: string, content: string): Promise<void> {
     // Try Rust executor first
     if (this.rustBackend?.isAvailable()) {
       try {
@@ -231,7 +248,7 @@ export class FilesystemTools {
     }
   }
 
-  async listFiles(directory: string): Promise<string[]> {
+  public async listFiles(directory: string): Promise<string[]> {
     // Try Rust executor first
     if (this.rustBackend?.isAvailable()) {
       try {
@@ -251,7 +268,8 @@ export class FilesystemTools {
 
         const result = await this.rustBackend.execute(request);
         if (result.success && Array.isArray(result.result)) {
-          return result.result;
+          // Ensure only strings are returned
+          return result.result.filter((item): item is string => typeof item === 'string');
         }
 
         logger.warn('Rust filesystem list failed, falling back to MCP', {
@@ -277,7 +295,7 @@ export class FilesystemTools {
     }
   }
 
-  async exists(path: string): Promise<boolean> {
+  public async exists(path: string): Promise<boolean> {
     // Try Rust executor first
     if (this.rustBackend?.isAvailable()) {
       try {
@@ -321,7 +339,13 @@ export class FilesystemTools {
     }
   }
 
-  getTools(): Array<any> {
+  public getTools(): Array<{
+    id: string;
+    name: string;
+    description: string;
+    inputSchema: object;
+    execute: (args: Record<string, unknown>, context: { startTime?: number }) => Promise<{ success: boolean; data: unknown; metadata: { executionTime: number } }>;
+  }> {
     return [
       {
         id: 'filesystem_read',
@@ -337,9 +361,13 @@ export class FilesystemTools {
           },
           required: ['file_path'],
         },
-        execute: async (args: any, context: any) => {
-          const startTime = context?.startTime || Date.now();
-          const content = await this.readFile(args.file_path);
+        execute: async (
+          args: Record<string, unknown>,
+          context: { startTime?: number }
+        ): Promise<{ success: boolean; data: string; metadata: { executionTime: number } }> => {
+          const startTime = context?.startTime ?? Date.now();
+          const filePath = typeof args.file_path === 'string' ? args.file_path : '';
+          const content = await this.readFile(filePath);
           return {
             success: true,
             data: content,
@@ -365,12 +393,17 @@ export class FilesystemTools {
           },
           required: ['file_path', 'content'],
         },
-        execute: async (args: any, context: any) => {
-          const startTime = context?.startTime || Date.now();
-          await this.writeFile(args.file_path, args.content);
+        execute: async (
+          args: Record<string, unknown>,
+          context: { startTime?: number }
+        ): Promise<{ success: boolean; data: string; metadata: { executionTime: number } }> => {
+          const startTime = context?.startTime ?? Date.now();
+          const filePath = typeof args.file_path === 'string' ? args.file_path : '';
+          const content = typeof args.content === 'string' ? args.content : '';
+          await this.writeFile(filePath, content);
           return {
             success: true,
-            data: `File written successfully: ${args.file_path}`,
+            data: `File written successfully: ${filePath}`,
             metadata: { executionTime: Date.now() - startTime },
           };
         },
@@ -389,9 +422,13 @@ export class FilesystemTools {
           },
           required: ['path'],
         },
-        execute: async (args: any, context: any) => {
-          const startTime = context?.startTime || Date.now();
-          const files = await this.listFiles(args.path);
+        execute: async (
+          args: Record<string, unknown>,
+          context: { startTime?: number }
+        ): Promise<{ success: boolean; data: string[]; metadata: { executionTime: number } }> => {
+          const startTime = context?.startTime ?? Date.now();
+          const dirPath = typeof args.path === 'string' ? args.path : '';
+          const files = await this.listFiles(dirPath);
           return {
             success: true,
             data: files,
@@ -413,12 +450,16 @@ export class FilesystemTools {
           },
           required: ['file_path'],
         },
-        execute: async (args: any, context: any) => {
-          const startTime = context?.startTime || Date.now();
-          const exists = await this.exists(args.file_path);
+        execute: async (
+          args: Record<string, unknown>,
+          context: { startTime?: number }
+        ): Promise<{ success: boolean; data: { exists: boolean; path: string }; metadata: { executionTime: number } }> => {
+          const startTime = context?.startTime ?? Date.now();
+          const filePath = typeof args.file_path === 'string' ? args.file_path : '';
+          const exists = await this.exists(filePath);
           return {
             success: true,
-            data: { exists, path: args.file_path },
+            data: { exists, path: filePath },
             metadata: { executionTime: Date.now() - startTime },
           };
         },

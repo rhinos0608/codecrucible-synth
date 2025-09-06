@@ -20,12 +20,16 @@ export class WorkflowStepPriority {
     private readonly _value: (typeof WorkflowStepPriority.VALID_PRIORITIES)[number]
   ) {}
 
-  static create(value: string): WorkflowStepPriority {
+  public static create(value: string): WorkflowStepPriority {
     const normalizedValue = value.toLowerCase();
-    if (!this.VALID_PRIORITIES.includes(normalizedValue as any)) {
-      return new WorkflowStepPriority('medium'); // Default
+    if (WorkflowStepPriority.isValidPriority(normalizedValue)) {
+      return new WorkflowStepPriority(normalizedValue as typeof WorkflowStepPriority.VALID_PRIORITIES[number]);
     }
-    return new WorkflowStepPriority(normalizedValue as any);
+    return new WorkflowStepPriority('medium');
+  }
+
+  private static isValidPriority(value: string): value is typeof WorkflowStepPriority.VALID_PRIORITIES[number] {
+    return (this.VALID_PRIORITIES as readonly string[]).includes(value);
   }
 
   static low(): WorkflowStepPriority {
@@ -113,23 +117,23 @@ export class RequiredTools {
   /**
    * Business rule: Check if all required tools are available in the provided set
    */
-  areAvailable(availableTools: string[]): boolean {
-    return this._tools.every(requiredTool =>
-      availableTools.some(available => available.toLowerCase().includes(requiredTool.toLowerCase()))
-    );
-  }
+  areAvailable(availableTools: readonly string[]): boolean {
+      return this._tools.every(requiredTool =>
+        availableTools.some(available => available.toLowerCase().includes(requiredTool.toLowerCase()))
+      );
+    }
 
   /**
    * Business rule: Get missing tools from available set
    */
-  getMissingTools(availableTools: string[]): string[] {
-    return this._tools.filter(
-      requiredTool =>
-        !availableTools.some(available =>
-          available.toLowerCase().includes(requiredTool.toLowerCase())
-        )
-    );
-  }
+  getMissingTools(availableTools: readonly string[]): string[] {
+      return this._tools.filter(
+        requiredTool =>
+          !availableTools.some(available =>
+            available.toLowerCase().includes(requiredTool.toLowerCase())
+          )
+      );
+    }
 
   withAdditionalTool(toolName: string): RequiredTools {
     if (!toolName || toolName.trim().length === 0 || this._tools.includes(toolName)) {
@@ -316,31 +320,31 @@ export class WorkflowStep {
   /**
    * Business rule: Check if this step can be executed with available tools
    */
-  canExecute(availableTools: string[]): boolean {
-    return this._requiredTools.areAvailable(availableTools);
-  }
+  canExecute(availableTools: readonly string[]): boolean {
+      return this._requiredTools.areAvailable(availableTools);
+    }
 
   /**
    * Business rule: Check if this step should be skipped based on constraints
    */
-  shouldSkip(availableTools: string[], skipOptional: boolean = false): boolean {
-    // Can't skip mandatory steps
-    if (this._isMandatory) {
+  shouldSkip(availableTools: readonly string[], skipOptional: boolean = false): boolean {
+      // Can't skip mandatory steps
+      if (this._isMandatory) {
+        return false;
+      }
+  
+      // Skip if tools not available
+      if (!this.canExecute(availableTools)) {
+        return true;
+      }
+  
+      // Skip optional steps if requested
+      if (skipOptional && !this._isMandatory) {
+        return true;
+      }
+  
       return false;
     }
-
-    // Skip if tools not available
-    if (!this.canExecute(availableTools)) {
-      return true;
-    }
-
-    // Skip optional steps if requested
-    if (skipOptional && !this._isMandatory) {
-      return true;
-    }
-
-    return false;
-  }
 
   /**
    * Business rule: Calculate execution priority score for scheduling
@@ -415,6 +419,7 @@ export class WorkflowTemplate {
   private readonly _trigger: WorkflowTrigger;
   private readonly _steps: readonly WorkflowStep[];
 
+
   constructor(
     name: string,
     domain: Domain,
@@ -471,36 +476,38 @@ export class WorkflowTemplate {
   /**
    * Business rule: Check if this template can be executed with available tools
    */
-  canExecute(availableTools: string[]): boolean {
-    const mandatorySteps = this._steps.filter(step => step.isMandatory);
-    return mandatorySteps.every(step => step.canExecute(availableTools));
-  }
+  canExecute(availableTools: readonly string[]): boolean {
+      const mandatorySteps = this._steps.filter(step => step.isMandatory);
+      return mandatorySteps.every(step => step.canExecute(availableTools));
+    }
 
   /**
    * Business rule: Get executable steps based on available tools
    */
-  getExecutableSteps(availableTools: string[], skipOptional: boolean = false): WorkflowStep[] {
+  public getExecutableSteps(availableTools: readonly string[], skipOptional: boolean = false): WorkflowStep[] {
     return this._steps.filter(step => !step.shouldSkip(availableTools, skipOptional));
   }
 
   /**
    * Business rule: Get all required tools for this workflow
    */
-  getAllRequiredTools(): string[] {
+  public getAllRequiredTools(): string[] {
     const allTools = new Set<string>();
-    this._steps.forEach(step => step.requiredTools.tools.forEach(tool => allTools.add(tool)));
+    this._steps.forEach(step => {
+      step.requiredTools.tools.forEach(tool => {
+        allTools.add(tool);
+      });
+    });
     return Array.from(allTools);
   }
-
-  /**
-   * Business rule: Get missing tools that prevent execution
-   */
-  getMissingTools(availableTools: string[]): string[] {
+  public getMissingTools(availableTools: readonly string[]): string[] {
     const missingTools = new Set<string>();
 
     this._steps.forEach(step => {
       if (step.isMandatory) {
-        step.requiredTools.getMissingTools(availableTools).forEach(tool => missingTools.add(tool));
+        step.requiredTools.getMissingTools(availableTools).forEach(tool => {
+          missingTools.add(tool);
+        });
       }
     });
 
@@ -512,7 +519,7 @@ export class WorkflowTemplate {
    */
   estimateExecutionTime(): number {
     // Base time per step: 2-8 minutes depending on complexity
-    const baseTimePerStep = this._steps.reduce((total, step) => {
+    const baseTimePerStep = this._steps.reduce((total: number, step: WorkflowStep) => {
       const stepComplexity = step.requiredTools.count;
       const stepTime = Math.min(8, Math.max(2, stepComplexity * 2));
       return total + stepTime;
@@ -520,7 +527,7 @@ export class WorkflowTemplate {
 
     // Domain-specific adjustments
     let domainMultiplier = 1.0;
-    if (this._domain.requiresHighPrecision()) {
+    if (this._domain && typeof this._domain.requiresHighPrecision === 'function' && this._domain.requiresHighPrecision()) {
       domainMultiplier = 1.3;
     }
 
@@ -602,7 +609,7 @@ export class WorkflowTemplate {
 
   // Factory methods
 
-  static createProjectAnalysisTemplate(): WorkflowTemplate {
+  public static createProjectAnalysisTemplate(): WorkflowTemplate {
     const trigger = WorkflowTrigger.create([
       'analyze project',
       'project structure',
@@ -660,7 +667,7 @@ export class WorkflowTemplate {
     );
   }
 
-  static createFileSystemExplorationTemplate(): WorkflowTemplate {
+  public static createFileSystemExplorationTemplate(): WorkflowTemplate {
     const trigger = WorkflowTrigger.create([
       'explore files',
       'browse directory',

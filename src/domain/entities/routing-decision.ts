@@ -25,12 +25,18 @@ export class TaskComplexity {
     private readonly _value: (typeof TaskComplexity.VALID_COMPLEXITIES)[number]
   ) {}
 
-  static create(value: string): TaskComplexity {
+  public static create(value: string): TaskComplexity {
     const normalizedValue = value.toLowerCase();
-    if (!this.VALID_COMPLEXITIES.includes(normalizedValue as any)) {
-      return new TaskComplexity('moderate'); // Default fallback
+    if (
+      !TaskComplexity.VALID_COMPLEXITIES.includes(
+        normalizedValue as (typeof TaskComplexity.VALID_COMPLEXITIES)[number]
+      )
+    ) {
+      return new TaskComplexity('moderate');
     }
-    return new TaskComplexity(normalizedValue as any);
+    return new TaskComplexity(
+      normalizedValue as (typeof TaskComplexity.VALID_COMPLEXITIES)[number]
+    );
   }
 
   static simple(): TaskComplexity {
@@ -166,22 +172,24 @@ export class ModelCapability {
 
   private constructor(private readonly _capabilities: readonly string[]) {}
 
-  static create(capabilities: string[]): ModelCapability {
-    const validCapabilities = capabilities.filter(cap =>
-      this.VALID_CAPABILITIES.includes(cap as any)
+  public static create(
+    capabilities: readonly (typeof ModelCapability.VALID_CAPABILITIES)[number][]
+  ): ModelCapability {
+    const validCapabilities = capabilities.filter((cap): cap is (typeof ModelCapability.VALID_CAPABILITIES)[number] =>
+      this.VALID_CAPABILITIES.includes(cap)
     );
     return new ModelCapability(Object.freeze(validCapabilities));
   }
 
-  static coding(): ModelCapability {
+  public static coding(): ModelCapability {
     return new ModelCapability(['code-generation', 'debugging', 'refactoring', 'analysis']);
   }
 
-  static general(): ModelCapability {
+  public static general(): ModelCapability {
     return new ModelCapability(['text-generation', 'reasoning', 'conversation']);
   }
 
-  static advanced(): ModelCapability {
+  public static advanced(): ModelCapability {
     return new ModelCapability([
       'code-generation',
       'analysis',
@@ -327,42 +335,48 @@ export class RoutingPriority {
 
   private constructor(private readonly _value: (typeof RoutingPriority.VALID_PRIORITIES)[number]) {}
 
-  static create(value: string): RoutingPriority {
+  public static create(value: string): RoutingPriority {
     const normalizedValue = value.toLowerCase();
-    if (!this.VALID_PRIORITIES.includes(normalizedValue as any)) {
-      return new RoutingPriority('medium'); // Default fallback
+    if (
+      !this.VALID_PRIORITIES.includes(
+        normalizedValue as (typeof RoutingPriority.VALID_PRIORITIES)[number]
+      )
+    ) {
+      return new RoutingPriority('medium');
     }
-    return new RoutingPriority(normalizedValue as any);
+    return new RoutingPriority(
+      normalizedValue as (typeof RoutingPriority.VALID_PRIORITIES)[number]
+    );
   }
 
-  static low(): RoutingPriority {
+  public static low(): RoutingPriority {
     return new RoutingPriority('low');
   }
 
-  static medium(): RoutingPriority {
+  public static medium(): RoutingPriority {
     return new RoutingPriority('medium');
   }
 
-  static high(): RoutingPriority {
+  public static high(): RoutingPriority {
     return new RoutingPriority('high');
   }
 
-  static critical(): RoutingPriority {
+  public static critical(): RoutingPriority {
     return new RoutingPriority('critical');
   }
 
-  get value(): string {
+  public get value(): string {
     return this._value;
   }
 
-  equals(other: RoutingPriority): boolean {
-    return this._value === other._value;
+  public equals(other: Readonly<RoutingPriority>): boolean {
+    return this._value === other.value;
   }
 
   /**
    * Business rule: Get priority weight for routing decisions
    */
-  getWeight(): number {
+  public getWeight(): number {
     switch (this._value) {
       case 'critical':
         return 1.0;
@@ -377,11 +391,11 @@ export class RoutingPriority {
     }
   }
 
-  isHighPriority(): boolean {
+  public isHighPriority(): boolean {
     return this._value === 'high' || this._value === 'critical';
   }
 
-  isCritical(): boolean {
+  public isCritical(): boolean {
     return this._value === 'critical';
   }
 }

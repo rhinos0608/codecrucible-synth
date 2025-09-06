@@ -52,10 +52,10 @@ async function showQuickStatus(): Promise<void> {
 
   try {
     const controller = new AbortController();
-    const healthCheckTimeout = Number.parseInt(process.env.HEALTH_CHECK_TIMEOUT || '3000', 10);
-    const timeoutId = setTimeout(() => controller.abort(), healthCheckTimeout);
+    const healthCheckTimeout = Number.parseInt(process.env.HEALTH_CHECK_TIMEOUT ?? '3000', 10);
+    const timeoutId = setTimeout(() => { controller.abort(); }, healthCheckTimeout);
 
-    const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || 'http://localhost:11434';
+    const ollamaEndpoint = process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434';
     const response = await fetch(`${ollamaEndpoint}/api/tags`, { signal: controller.signal });
     clearTimeout(timeoutId);
     console.log(response.ok ? 'Ollama: Available' : 'Ollama: Service error');
@@ -65,10 +65,10 @@ async function showQuickStatus(): Promise<void> {
 
   try {
     const controller = new AbortController();
-    const healthCheckTimeout = Number.parseInt(process.env.HEALTH_CHECK_TIMEOUT || '3000', 10);
-    const timeoutId = setTimeout(() => controller.abort(), healthCheckTimeout);
+    const healthCheckTimeout = Number.parseInt(process.env.HEALTH_CHECK_TIMEOUT ?? '3000', 10);
+    const timeoutId = setTimeout(() => { controller.abort(); }, healthCheckTimeout);
 
-    const lmStudioEndpoint = process.env.LM_STUDIO_ENDPOINT || 'http://localhost:1234';
+    const lmStudioEndpoint = process.env.LM_STUDIO_ENDPOINT ?? 'http://localhost:1234';
     const response = await fetch(`${lmStudioEndpoint}/v1/models`, { signal: controller.signal });
     clearTimeout(timeoutId);
     console.log(response.ok ? 'LM Studio: Available' : 'LM Studio: Service error');
@@ -87,16 +87,16 @@ async function showAvailableModels(): Promise<void> {
   // Ollama models
   try {
     const controller = new AbortController();
-    const modelListTimeout = Number.parseInt(process.env.MODEL_LIST_TIMEOUT || '5000', 10);
-    const timeoutId = setTimeout(() => controller.abort(), modelListTimeout);
+    const modelListTimeout = Number.parseInt(process.env.MODEL_LIST_TIMEOUT ?? '5000', 10);
+    const timeoutId = setTimeout(() => { controller.abort(); }, modelListTimeout);
 
-    const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || 'http://localhost:11434';
+    const ollamaEndpoint = process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434';
     const response = await fetch(`${ollamaEndpoint}/api/tags`, { signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (response.ok) {
-      type OllamaTags = { models?: Array<{ name: string }> };
-      const data: OllamaTags = await response.json();
+      interface OllamaTags { models?: Array<{ name: string }> }
+      const data = await response.json() as OllamaTags;
       console.log('Ollama Models:');
       if (Array.isArray(data.models) && data.models.length > 0) {
         for (const m of data.models) {
@@ -113,16 +113,16 @@ async function showAvailableModels(): Promise<void> {
   // LM Studio models
   try {
     const controller = new AbortController();
-    const modelListTimeout = Number.parseInt(process.env.MODEL_LIST_TIMEOUT || '5000', 10);
-    const timeoutId = setTimeout(() => controller.abort(), modelListTimeout);
+    const modelListTimeout = Number.parseInt(process.env.MODEL_LIST_TIMEOUT ?? '5000', 10);
+    const timeoutId = setTimeout(() => { controller.abort(); }, modelListTimeout);
 
-    const lmStudioEndpoint = process.env.LM_STUDIO_ENDPOINT || 'http://localhost:1234';
+    const lmStudioEndpoint = process.env.LM_STUDIO_ENDPOINT ?? 'http://localhost:1234';
     const response = await fetch(`${lmStudioEndpoint}/v1/models`, { signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (response.ok) {
-      type LMStudioModels = { data?: Array<{ id: string }> };
-      const data: LMStudioModels = await response.json();
+      interface LMStudioModels { data?: Array<{ id: string }> }
+      const data = await response.json() as LMStudioModels;
       console.log();
       console.log('LM Studio Models:');
       if (Array.isArray(data.data) && data.data.length > 0) {
@@ -169,7 +169,7 @@ export async function fastMain(): Promise<void> {
 
     console.log('Loading full system for complex operations...');
     const { main } = await import('./index.js');
-    return main();
+    await main();
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Fast CLI error occurred', { error: errorMessage });

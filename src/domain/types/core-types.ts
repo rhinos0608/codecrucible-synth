@@ -12,7 +12,7 @@ export interface StreamToken {
   timestamp?: number;
   index?: number;
   isComplete?: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   finishReason?: string;
   usage?: {
     promptTokens: number;
@@ -46,7 +46,7 @@ export type ExecutionMode = 'sync' | 'async' | 'streaming' | 'batch';
 
 export interface SynthesisResponse {
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: string;
   metadata: {
     timestamp: string;

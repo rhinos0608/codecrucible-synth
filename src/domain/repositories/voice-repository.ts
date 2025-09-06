@@ -18,57 +18,57 @@ export interface IVoiceRepository {
   /**
    * Find a voice by its unique identifier
    */
-  findById(id: string): Promise<Voice | null>;
+  findById: (id: string) => Promise<Voice | null>;
 
   /**
    * Find all voices
    */
-  findAll(): Promise<Voice[]>;
+  findAll: () => Promise<Voice[]>;
 
   /**
    * Find voices by their expertise areas
    */
-  findByExpertise(expertise: string[]): Promise<Voice[]>;
+  findByExpertise: (expertise: readonly string[]) => Promise<Voice[]>;
 
   /**
    * Find enabled voices only
    */
-  findEnabledVoices(): Promise<Voice[]>;
+  findEnabledVoices: () => Promise<Voice[]>;
 
   /**
    * Find voices suitable for a specific task type
    */
-  findSuitableVoices(taskType: 'creative' | 'analytical' | 'balanced'): Promise<Voice[]>;
+  findSuitableVoices: (taskType: 'creative' | 'analytical' | 'balanced') => Promise<Voice[]>;
 
   /**
    * Save a voice (create or update)
    */
-  save(voice: Voice): Promise<void>;
+  save: (voice: Readonly<Voice>) => Promise<void>;
 
   /**
    * Save multiple voices in a transaction
    */
-  saveAll(voices: Voice[]): Promise<void>;
+  saveAll: (voices: readonly Readonly<Voice>[]) => Promise<void>;
 
   /**
    * Delete a voice by ID
    */
-  deleteById(id: string): Promise<void>;
+  deleteById: (id: string) => Promise<void>;
 
   /**
    * Check if a voice exists
    */
-  exists(id: string): Promise<boolean>;
+  exists: (id: string) => Promise<boolean>;
 
   /**
    * Get count of total voices
    */
-  count(): Promise<number>;
+  count: () => Promise<number>;
 
   /**
    * Get count of enabled voices
    */
-  countEnabled(): Promise<number>;
+  countEnabled: () => Promise<number>;
 }
 
 /**
@@ -97,27 +97,27 @@ export interface IAdvancedVoiceRepository extends IVoiceRepository {
   /**
    * Find voices using complex query criteria
    */
-  findByQuery(query: VoiceQuery): Promise<Voice[]>;
+  findByQuery: (query: Readonly<VoiceQuery>) => Promise<Voice[]>;
 
   /**
    * Find the most suitable voice for a given context
    */
-  findBestMatch(context: {
+  findBestMatch: (context: Readonly<{
     taskType: 'creative' | 'analytical' | 'balanced';
-    requiredExpertise?: string[];
-    excludedVoices?: string[];
+    requiredExpertise?: readonly string[];
+    excludedVoices?: readonly string[];
     preferredStyle?: string;
-  }): Promise<Voice | null>;
+  }>) => Promise<Voice | null>;
 
   /**
    * Get voice usage statistics
    */
-  getUsageStatistics(): Promise<VoiceUsageStats[]>;
+  getUsageStatistics: () => Promise<VoiceUsageStats[]>;
 
   /**
    * Bulk enable/disable voices
    */
-  bulkUpdateEnabled(voiceIds: string[], enabled: boolean): Promise<void>;
+  bulkUpdateEnabled: (voiceIds: readonly string[], enabled: boolean) => Promise<void>;
 }
 
 /**

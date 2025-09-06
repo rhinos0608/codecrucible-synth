@@ -47,7 +47,7 @@ export interface OllamaGenerationRequest {
     top_p?: number;
     repeat_penalty?: number;
     seed?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -58,7 +58,7 @@ export interface OllamaChatRequest {
     content: string;
   }>;
   stream?: boolean;
-  options?: Record<string, any>;
+  options?: Record<string, unknown>;
 }
 
 export interface OllamaResponse {
@@ -102,9 +102,9 @@ export class OllamaClient extends EventEmitter {
   private client: Ollama;
   private config: OllamaConnectionConfig;
   private healthCheckTimer?: NodeJS.Timeout;
-  private connectionStatus: OllamaConnectionStatus;
+  private readonly connectionStatus: OllamaConnectionStatus;
 
-  constructor(config: OllamaConnectionConfig) {
+  public constructor(config: Readonly<OllamaConnectionConfig>) {
     super();
     this.config = config;
 
@@ -130,7 +130,7 @@ export class OllamaClient extends EventEmitter {
   /**
    * Test connection to Ollama server
    */
-  async testConnection(): Promise<boolean> {
+  public async testConnection(): Promise<boolean> {
     try {
       const models = await this.withTimeout(this.client.list(), this.config.connectionTimeout);
 
@@ -154,16 +154,53 @@ export class OllamaClient extends EventEmitter {
   /**
    * List available models from Ollama server
    */
-  async listModels(): Promise<OllamaModelInfo[]> {
-    const operation = async () => {
+  public async listModels(): Promise<OllamaModelInfo[]> {
+    const operation = async (): Promise<OllamaModelInfo[]> => {
       const response = await this.client.list();
 
       // Transform ModelResponse to OllamaModelInfo format
-      return response.models.map(model => ({
-        ...model,
-        modified_at:
-          model.modified_at instanceof Date ? model.modified_at.toISOString() : model.modified_at,
-      }));
+      return response.models.map((model: unknown) => {
+        // Type guard to check if model is OllamaModelInfo-like
+        if (
+          typeof model === 'object' &&
+          model !== null &&
+          'name' in model &&
+          'size' in model &&
+          'digest' in model &&
+          'details' in model &&
+          'modified_at' in model
+        ) {
+          const m = model as {
+            name: string;
+            size: number;
+            digest: string;
+            details: {
+              format: string;
+              family: string;
+              families: string[];
+              parameter_size: string;
+              quantization_level: string;
+            };
+            modified_at: unknown;
+          };
+          let modifiedAt: string;
+          if (m.modified_at instanceof Date) {
+            modifiedAt = m.modified_at.toISOString();
+          } else if (typeof m.modified_at === 'string') {
+            modifiedAt = m.modified_at;
+          } else {
+            modifiedAt = new Date(String(m.modified_at)).toISOString();
+          }
+          return {
+            name: m.name,
+            size: m.size,
+            digest: m.digest,
+            details: m.details,
+            modified_at: modifiedAt,
+          } as OllamaModelInfo;
+        }
+        throw new Error('Invalid model format received from Ollama server');
+      });
     };
 
     return this.executeWithRetry(operation);
@@ -172,13 +209,13 @@ export class OllamaClient extends EventEmitter {
   /**
    * Generate text using specified model
    */
-  async generateText(request: OllamaGenerationRequest): Promise<OllamaResponse> {
-    const operation = async () => {
-      return await this.client.generate({
+  public async generateText(request: Readonly<OllamaGenerationRequest>): Promise<OllamaResponse> {
+    const operation = async (): Promise<OllamaResponse> => {
+      return this.client.generate({
         model: request.model,
         prompt: request.prompt,
         stream: false,
-        options: request.options || {},
+        options: request.options ?? {},
       });
     };
 
@@ -188,15 +225,15 @@ export class OllamaClient extends EventEmitter {
   /**
    * Generate streaming text using specified model
    */
-  async generateTextStream(
-    request: OllamaGenerationRequest
+  public async generateTextStream(
+    request: Readonly<OllamaGenerationRequest>
   ): Promise<AsyncIterable<OllamaResponse>> {
-    const operation = async () => {
+    const operation = async (): Promise<AsyncIterable<OllamaResponse>> => {
       return this.client.generate({
         model: request.model,
         prompt: request.prompt,
         stream: true,
-        options: request.options || {},
+        options: request.options ?? {},
       });
     };
 
@@ -207,13 +244,13 @@ export class OllamaClient extends EventEmitter {
   /**
    * Chat with specified model
    */
-  async chat(request: OllamaChatRequest): Promise<OllamaChatResponse> {
-    const operation = async () => {
-      return await this.client.chat({
+  public async chat(request: Readonly<OllamaChatRequest>): Promise<OllamaChatResponse> {
+    const operation = async (): Promise<OllamaChatResponse> => {
+      return this.client.chat({
         model: request.model,
         messages: request.messages,
         stream: false,
-        options: request.options || {},
+        options: request.options ?? {},
       });
     };
 
@@ -223,13 +260,13 @@ export class OllamaClient extends EventEmitter {
   /**
    * Chat streaming with specified model
    */
-  async chatStream(request: OllamaChatRequest): Promise<AsyncIterable<OllamaChatResponse>> {
-    const operation = async () => {
+  public async chatStream(request: Readonly<OllamaChatRequest>): Promise<AsyncIterable<OllamaChatResponse>> {
+    const operation = async (): Promise<AsyncIterable<OllamaChatResponse>> => {
       return this.client.chat({
         model: request.model,
         messages: request.messages,
         stream: true,
-        options: request.options || {},
+        options: request.options ?? {},
       });
     };
 
@@ -240,8 +277,8 @@ export class OllamaClient extends EventEmitter {
   /**
    * Pull a model from Ollama registry
    */
-  async pullModel(modelName: string): Promise<void> {
-    const operation = async () => {
+  public async pullModel(modelName: string): Promise<void> {
+    const operation = async (): Promise<void> => {
       await this.client.pull({ model: modelName });
     };
 
@@ -251,8 +288,8 @@ export class OllamaClient extends EventEmitter {
   /**
    * Delete a model from Ollama server
    */
-  async deleteModel(modelName: string): Promise<void> {
-    const operation = async () => {
+  public async deleteModel(modelName: string): Promise<void> {
+    const operation: () => Promise<void> = async () => {
       await this.client.delete({ model: modelName });
     };
 
@@ -262,21 +299,21 @@ export class OllamaClient extends EventEmitter {
   /**
    * Get current connection status
    */
-  getConnectionStatus(): OllamaConnectionStatus {
+  public getConnectionStatus(): OllamaConnectionStatus {
     return { ...this.connectionStatus };
   }
 
   /**
    * Get server configuration
    */
-  getConfig(): OllamaConnectionConfig {
+  public getConfig(): OllamaConnectionConfig {
     return { ...this.config };
   }
 
   /**
    * Close connection and cleanup resources
    */
-  async close(): Promise<void> {
+  public close(): void {
     if (this.healthCheckTimer) {
       clearInterval(this.healthCheckTimer);
       this.healthCheckTimer = undefined;
@@ -289,7 +326,7 @@ export class OllamaClient extends EventEmitter {
   /**
    * Update connection configuration
    */
-  updateConfig(newConfig: Partial<OllamaConnectionConfig>): void {
+  public updateConfig(newConfig: Readonly<Partial<OllamaConnectionConfig>>): void {
     this.config = { ...this.config, ...newConfig };
 
     // Reinitialize client if endpoint changed
@@ -353,9 +390,9 @@ export class OllamaClient extends EventEmitter {
     throw lastError;
   }
 
-  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  private async withTimeout<T>(promise: Readonly<Promise<T>>, timeoutMs: number): Promise<T> {
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+      setTimeout(() => { reject(new Error(`Operation timed out after ${timeoutMs}ms`)); }, timeoutMs);
     });
 
     return Promise.race([promise, timeoutPromise]);
@@ -366,14 +403,15 @@ export class OllamaClient extends EventEmitter {
   }
 
   private startHealthMonitoring(): void {
-    this.healthCheckTimer = setInterval(async () => {
-      await this.testConnection();
+    this.healthCheckTimer = setInterval(() => {
+      // Fire and forget, do not return a Promise
+      void this.testConnection();
     }, this.config.healthCheckInterval);
   }
 }
 
 // Factory function for creating configured Ollama clients
-export function createOllamaClient(config: Partial<OllamaConnectionConfig> = {}): OllamaClient {
+export function createOllamaClient(config: Readonly<Partial<OllamaConnectionConfig>> = {}): OllamaClient {
   const defaultConfig: OllamaConnectionConfig = {
     endpoint: 'http://localhost:11434',
     timeout: 30000,

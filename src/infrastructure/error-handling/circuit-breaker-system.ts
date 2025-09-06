@@ -61,7 +61,7 @@ export class CircuitBreaker {
     private name: string = 'unnamed'
   ) {}
 
-  async execute<T>(fn: () => Promise<T>): Promise<T> {
+  public async execute<T>(fn: () => Promise<T>): Promise<T> {
     this.totalCalls++;
     const startTime = Date.now();
 
@@ -86,9 +86,9 @@ export class CircuitBreaker {
       if (this.config.timeout) {
         result = await Promise.race([
           fn(),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Operation timeout')), this.config.timeout!)
-          ),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => { reject(new Error('Operation timeout')); }, this.config.timeout);
+          }),
         ]);
       } else {
         result = await fn();
@@ -251,25 +251,33 @@ export class CircuitBreakerManager extends CircuitBreakerSystem {
     super();
   }
 
-  static getInstance(): CircuitBreakerManager {
-    if (!CircuitBreakerManager.instance) {
+  public static getInstance(): CircuitBreakerManager {
+    if (typeof CircuitBreakerManager.instance === 'undefined') {
       CircuitBreakerManager.instance = new CircuitBreakerManager();
     }
     return CircuitBreakerManager.instance;
   }
 
-  getCircuitBreaker(
+  public getCircuitBreaker(
     name: string,
-    operation?: () => Promise<any>,
-    config?: any
+    config?: Partial<{
+      failureThreshold: number;
+      recoveryTimeout: number;
+      timeout: number;
+      successThreshold?: number;
+      operationTimeout?: number;
+      onStateChange?: (state: CircuitBreakerState, breaker: string) => void;
+      onSuccess?: (breaker: string) => void;
+      onFailure?: (error: Error, breaker: string) => void;
+    }>
   ): CircuitBreaker | undefined {
     // If config is provided, create a new breaker with that config
     if (config && !this.breakers.has(name)) {
       const breakerConfig: CircuitBreakerConfig = {
-        failureThreshold: config.failureThreshold || 5,
-        resetTimeout: config.recoveryTimeout || 30000,
-        monitoringPeriod: config.timeout || 30000,
-        successThreshold: config.successThreshold || 1,
+        failureThreshold: config.failureThreshold ?? 5,
+        resetTimeout: config.recoveryTimeout ?? 30000,
+        monitoringPeriod: config.timeout ?? 30000,
+        successThreshold: config.successThreshold ?? 1,
         timeout: config.operationTimeout,
         onStateChange: config.onStateChange,
         onSuccess: config.onSuccess,

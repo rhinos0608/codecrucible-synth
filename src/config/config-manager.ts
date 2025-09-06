@@ -21,7 +21,7 @@ export interface AppConfig {
   };
   llmProviders: {
     default: string;
-    providers: Record<string, any>;
+    providers: Record<string, unknown>;
   };
   agent: {
     enabled: boolean;
@@ -47,15 +47,15 @@ export interface AppConfig {
  * @deprecated Use UnifiedConfigurationManager instead
  */
 export class ConfigManager {
-  private unifiedManager: UnifiedConfigurationManager;
+  private readonly unifiedManager: UnifiedConfigurationManager;
 
-  constructor() {
+  public constructor() {
     console.warn('⚠️ ConfigManager is deprecated. Use UnifiedConfigurationManager instead.');
     const configLogger = createLogger('UnifiedConfigurationManager');
     this.unifiedManager = new UnifiedConfigurationManager(configLogger);
   }
 
-  async loadConfiguration(): Promise<AppConfig> {
+  public async loadConfiguration(): Promise<AppConfig> {
     try {
       await this.unifiedManager.initialize();
       const unified = this.unifiedManager.getConfiguration();
@@ -68,22 +68,36 @@ export class ConfigManager {
     }
   }
 
-  private convertToLegacyFormat(unified: UnifiedConfiguration): AppConfig {
+  private convertToLegacyFormat(unified: Readonly<UnifiedConfiguration>): AppConfig {
     return {
       model: {
         endpoint:
-          unified.model.providers[0]?.endpoint ||
-          process.env.OLLAMA_ENDPOINT ||
+          unified.model.providers[0]?.endpoint ??
+          process.env.OLLAMA_ENDPOINT ??
           'http://localhost:11434',
-        name: unified.model.defaultModel || process.env.MODEL_DEFAULT_NAME || 'default',
-        timeout: unified.model.timeout || parseInt(process.env.REQUEST_TIMEOUT || '30000'),
-        maxTokens: unified.model.maxTokens || parseInt(process.env.MODEL_MAX_TOKENS || '131072'),
+        name: unified.model.defaultModel,
+        timeout: unified.model.timeout ?? parseInt(process.env.REQUEST_TIMEOUT ?? '30000', 10),
+        maxTokens: unified.model.maxTokens ?? parseInt(process.env.MODEL_MAX_TOKENS ?? '131072', 10),
         temperature:
-          unified.model.temperature || parseFloat(process.env.MODEL_TEMPERATURE || '0.7'),
+          unified.model.temperature ?? parseFloat(process.env.MODEL_TEMPERATURE ?? '0.7'),
       },
       llmProviders: {
         default: unified.model.defaultProvider || 'ollama',
-        providers: this.convertProviders(unified.model.providers),
+        providers: this.convertProviders(
+          unified.model.providers.map(p => ({
+            name: p.name ?? '',
+            type: p.type ?? '',
+            endpoint: p.endpoint ?? '',
+            enabled: p.enabled ?? false,
+            models: p.models ?? [],
+          })) as readonly {
+            name: string;
+            type: string;
+            endpoint: string;
+            enabled: boolean;
+            models: string[];
+          }[]
+        ),
       },
       agent: {
         enabled: true,
@@ -94,22 +108,34 @@ export class ConfigManager {
         enableSecurity: unified.security.enableSandbox || true, // Use enableSandbox as security indicator
       },
       voices: {
-        default: unified.voice.defaultVoices || ['explorer', 'developer'],
-        available: unified.voice.availableVoices || ['explorer', 'maintainer', 'architect'],
-        parallel: unified.voice.parallelVoices || true,
-        maxConcurrent: unified.voice.maxConcurrentVoices || 3,
+        default: unified.voice.defaultVoices,
+        available: unified.voice.availableVoices ?? ['explorer', 'maintainer', 'architect'],
+        parallel: unified.voice.parallelVoices ?? true,
+        maxConcurrent: unified.voice.maxConcurrentVoices ?? 3,
       },
       database: {
-        path: unified.infrastructure.database.path || './data.db',
-        inMemory: unified.infrastructure.database.inMemory || false,
+        path: unified.infrastructure.database.path ?? './data.db',
+        inMemory: unified.infrastructure.database.inMemory ?? false,
       },
     };
   }
 
-  private convertProviders(providers: any[]): Record<string, any> {
-    const result: Record<string, any> = {};
+  private convertProviders(
+    providers: readonly {
+      name: string;
+      type: string;
+      endpoint: string;
+      enabled: boolean;
+      models: string[];
+    }[]
+  ): Record<string, { provider: string; endpoint: string; enabled: boolean; models: string[] }> {
+    const result: Record<string, { provider: string; endpoint: string; enabled: boolean; models: string[] }> = {};
 
     for (const provider of providers) {
+      if (!provider.name) {
+        // Skip providers without a valid name
+        continue;
+      }
       result[provider.name] = {
         provider: provider.type,
         endpoint: provider.endpoint,
@@ -121,18 +147,18 @@ export class ConfigManager {
     return result;
   }
 
-  async getAgentConfig(): Promise<AppConfig> {
-    return await this.loadConfiguration();
+  public async getAgentConfig(): Promise<AppConfig> {
+    return this.loadConfiguration();
   }
 
   private getDefaultConfig(): AppConfig {
     return {
       model: {
-        endpoint: process.env.OLLAMA_ENDPOINT || 'http://localhost:11434',
-        name: process.env.MODEL_DEFAULT_NAME || 'default',
-        timeout: parseInt(process.env.REQUEST_TIMEOUT || '30000'),
-        maxTokens: parseInt(process.env.MODEL_MAX_TOKENS || '131072'),
-        temperature: parseFloat(process.env.MODEL_TEMPERATURE || '0.7'),
+        endpoint: process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434',
+        name: process.env.MODEL_DEFAULT_NAME ?? 'default',
+        timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '30000', 10),
+        maxTokens: parseInt(process.env.MODEL_MAX_TOKENS ?? '131072', 10),
+        temperature: parseFloat(process.env.MODEL_TEMPERATURE ?? '0.7'),
       },
       llmProviders: {
         default: 'ollama',

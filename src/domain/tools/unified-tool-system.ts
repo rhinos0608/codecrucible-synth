@@ -33,7 +33,7 @@ export abstract class BaseTool implements ITool {
   protected context?: ToolExecutionContext;
   protected decorators: ToolDecorator[] = [];
 
-  public constructor(definition: Omit<ToolDefinition, 'id'> & { name: string }) {
+  public constructor(definition: Readonly<Omit<ToolDefinition, 'id'> & { name: string }>) {
     this.definition = {
       ...definition,
       id: this.generateToolId(definition.name),
@@ -41,11 +41,11 @@ export abstract class BaseTool implements ITool {
   }
 
   public abstract execute(
-    args: Record<string, unknown>,
-    context: ToolExecutionContext
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<ToolExecutionResult>;
 
-  public validateArguments(args: Record<string, unknown>): { valid: boolean; errors?: string[] } {
+  public validateArguments(args: Readonly<Record<string, unknown>>): { valid: boolean; errors?: string[] } {
     const errors: string[] = [];
 
     // Check required parameters
@@ -75,7 +75,7 @@ export abstract class BaseTool implements ITool {
     };
   }
 
-  public canExecute(context: ToolExecutionContext): boolean {
+  public canExecute(context: Readonly<ToolExecutionContext>): boolean {
     // Check security level compatibility
     const toolSecurity = this.definition.securityLevel;
     const contextSecurity = context.securityLevel;
@@ -89,10 +89,9 @@ export abstract class BaseTool implements ITool {
     }
 
     // Check permissions
-    return this.definition.permissions.every(permission =>
-      context.permissions.some(
-        contextPerm =>
-          contextPerm.type === permission.type && contextPerm.resource === permission.resource
+    return this.definition.permissions.every((permission: { type: string; resource: string }) =>
+      context.permissions.some((contextPerm: { type: string; resource: string }) =>
+        contextPerm.type === permission.type && contextPerm.resource === permission.resource
       )
     );
   }
@@ -109,8 +108,8 @@ export abstract class BaseTool implements ITool {
    * Execute with decorators applied
    */
   protected async executeWithDecorators(
-    args: Record<string, unknown>,
-    context: ToolExecutionContext
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<ToolExecutionResult> {
     let result = await this.execute(args, context);
 
@@ -126,7 +125,7 @@ export abstract class BaseTool implements ITool {
     return `tool_${name.toLowerCase().replace(/\s+/g, '_')}`;
   }
 
-  private validateParameter(paramName: string, value: unknown, paramDef: ParameterDefinition): string | null {
+  private validateParameter(paramName: string, value: unknown, paramDef: Readonly<ParameterDefinition>): string | null {
     // Type validation
     if (paramDef.type === 'string' && typeof value !== 'string') {
       return `Parameter ${paramName} must be a string`;
@@ -200,26 +199,26 @@ export class SecurityDecorator implements ToolDecorator {
   public constructor(private readonly securityValidator: IUnifiedSecurityValidator) {}
 
   public async preProcess(
-    args: Record<string, unknown>,
-    context: ToolExecutionContext
-  ): Promise<Record<string, unknown>> {
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
+  ): Promise<Readonly<Record<string, unknown>>> {
     // Validate arguments for security threats
     for (const [key, value] of Object.entries(args)) {
       if (typeof value === 'string') {
         const validation = await this.securityValidator.validateInput(value, {
           sessionId: context.sessionId,
-          requestId: context.sessionId + '_' + Date.now(),
-          userAgent: context.userAgent || 'CodeCrucible/1.0',
-          ipAddress: context.ipAddress || '127.0.0.1',
+          requestId: `${context.sessionId}_${Date.now()}`,
+          userAgent: context.userAgent ?? 'CodeCrucible/1.0',
+          ipAddress: context.ipAddress ?? '127.0.0.1',
           timestamp: new Date(),
           operationType: 'input',
           environment: 'sandbox',
-          permissions: context.permissions.map(p => p.type),
+          permissions: (context.permissions as readonly { type: string }[]).map((p: { type: string }) => p.type),
         });
 
         if (!validation.isValid) {
           throw new Error(
-            `Security violation in parameter ${key}: ${validation.violations.map(v => v.message).join(', ')}`
+            `Security violation in parameter ${key}: ${(validation.violations as readonly { message: string }[]).map((v: { message: string }) => v.message).join(', ')}`
           );
         }
       }
@@ -229,9 +228,9 @@ export class SecurityDecorator implements ToolDecorator {
   }
 
   public async postProcess(
-    result: ToolExecutionResult,
-    args: Record<string, unknown>,
-    context: ToolExecutionContext
+    result: Readonly<ToolExecutionResult>,
+    _args: Readonly<Record<string, unknown>>,
+    _context: Readonly<ToolExecutionContext>
   ): Promise<ToolExecutionResult> {
     // Sanitize output if needed
     if (typeof result.result === 'string') {
@@ -413,16 +412,16 @@ export class LoggingDecorator implements ToolDecorator {
 export class RetryDecorator implements ToolDecorator {
   public readonly name = 'retry';
 
-  constructor(
+  public constructor(
     private readonly maxRetries: number = 3,
     private readonly backoffMs: number = 1000,
     private readonly backoffMultiplier: number = 2
   ) {}
 
   public async postProcess(
-    result: ToolExecutionResult,
-    args: Record<string, unknown>,
-    context: ToolExecutionContext
+    result: Readonly<ToolExecutionResult>,
+    _args: Readonly<Record<string, unknown>>,
+    _context: Readonly<ToolExecutionContext>
   ): Promise<ToolExecutionResult> {
     if (result.success) {
       return result;
@@ -804,9 +803,9 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
     }
 
     // Add decorators to tool if the implementation supports it
-    decorators.forEach((decorator): void => {
-      if (typeof (decoratedTool as any).addDecorator === 'function') {
-        (decoratedTool as any).addDecorator(decorator);
+    decorators.forEach((decorator: Readonly<ToolDecorator>): void => {
+      if (typeof decoratedTool.addDecorator === 'function') {
+        decoratedTool.addDecorator(decorator);
       }
     });
 

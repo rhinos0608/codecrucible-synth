@@ -18,47 +18,47 @@ export interface RoutingDecisionRepository {
   /**
    * Save a routing decision
    */
-  save(decision: RoutingDecision): Promise<void>;
+  save: (decision: Readonly<RoutingDecision>) => Promise<void>;
 
   /**
    * Find routing decision by request ID
    */
-  findByRequestId(requestId: string): Promise<RoutingDecision | null>;
+  findByRequestId: (requestId: Readonly<string>) => Promise<RoutingDecision | null>;
 
   /**
    * Find routing decisions by selected model
    */
-  findBySelectedModel(modelId: string): Promise<RoutingDecision[]>;
+  findBySelectedModel: (modelId: Readonly<string>) => Promise<RoutingDecision[]>;
 
   /**
    * Find low confidence routing decisions for review
    */
-  findLowConfidenceDecisions(): Promise<RoutingDecision[]>;
+  findLowConfidenceDecisions: () => Promise<RoutingDecision[]>;
 
   /**
    * Find routing decisions by task complexity
    */
-  findByTaskComplexity(complexity: string): Promise<RoutingDecision[]>;
+  findByTaskComplexity: (complexity: Readonly<string>) => Promise<RoutingDecision[]>;
 
   /**
    * Find routing decisions by priority level
    */
-  findByPriority(priority: string): Promise<RoutingDecision[]>;
+  findByPriority: (priority: Readonly<string>) => Promise<RoutingDecision[]>;
 
   /**
    * Get routing performance metrics
    */
-  getRoutingMetrics(modelId?: string): Promise<RoutingMetrics>;
+  getRoutingMetrics: (modelId?: Readonly<string>) => Promise<RoutingMetrics>;
 
   /**
    * Find decisions that should be reviewed
    */
-  findDecisionsForReview(): Promise<RoutingDecision[]>;
+  findDecisionsForReview: () => Promise<RoutingDecision[]>;
 
   /**
    * Remove old routing decisions (cleanup)
    */
-  removeOlderThan(date: Date): Promise<number>;
+  removeOlderThan: (date: Readonly<Date>) => Promise<number>;
 }
 
 /**
@@ -68,49 +68,49 @@ export interface ModelAvailabilityRepository {
   /**
    * Save or update model information
    */
-  save(model: Model): Promise<void>;
+  save: (model: Readonly<Model>) => Promise<void>;
 
   /**
    * Find model by name and provider
    */
-  findByNameAndProvider(name: string, provider: string): Promise<Model | null>;
+  findByNameAndProvider: (name: Readonly<string>, provider: Readonly<string>) => Promise<Model | null>;
 
   /**
    * Find all available models
    */
-  findAvailable(): Promise<Model[]>;
+  findAvailable: () => Promise<Model[]>;
 
   /**
    * Find models by capability
    */
-  findByCapability(capability: string): Promise<Model[]>;
+  findByCapability: (capability: Readonly<string>) => Promise<Model[]>;
 
   /**
    * Find models suitable for task complexity
    */
-  findSuitableForComplexity(
+  findSuitableForComplexity: (
     complexity: 'simple' | 'moderate' | 'complex' | 'advanced'
-  ): Promise<Model[]>;
+  ) => Promise<Model[]>;
 
   /**
    * Update model health status
    */
-  updateHealthStatus(modelId: string, isHealthy: boolean): Promise<void>;
+  updateHealthStatus: (modelId: string, isHealthy: boolean) => Promise<void>;
 
   /**
    * Get model performance history
    */
-  getPerformanceHistory(modelId: string): Promise<ModelPerformanceHistory>;
+  getPerformanceHistory: (modelId: string) => Promise<ModelPerformanceHistory>;
 
   /**
    * Find models with performance issues
    */
-  findUnhealthyModels(): Promise<Model[]>;
+  findUnhealthyModels: () => Promise<Model[]>;
 
   /**
    * Get model usage statistics
    */
-  getUsageStatistics(modelId: string): Promise<ModelUsageStatistics>;
+  getUsageStatistics: (modelId: string) => Promise<ModelUsageStatistics>;
 }
 
 /**
@@ -120,32 +120,32 @@ export interface RoutingAnalyticsRepository {
   /**
    * Record routing outcome for learning
    */
-  recordRoutingOutcome(decision: RoutingDecision, outcome: RoutingOutcome): Promise<void>;
+  recordRoutingOutcome: (decision: Readonly<RoutingDecision>, outcome: Readonly<RoutingOutcome>) => Promise<void>;
 
   /**
    * Get routing success rates by model
    */
-  getSuccessRatesByModel(): Promise<Map<string, number>>;
+  getSuccessRatesByModel: () => Promise<Map<string, number>>;
 
   /**
    * Get routing performance trends
    */
-  getPerformanceTrends(timeRange: TimeRange): Promise<RoutingTrends>;
+  getPerformanceTrends: (timeRange: Readonly<TimeRange>) => Promise<RoutingTrends>;
 
   /**
    * Find routing patterns for optimization
    */
-  findRoutingPatterns(): Promise<RoutingPattern[]>;
+  findRoutingPatterns: () => Promise<RoutingPattern[]>;
 
   /**
    * Get routing recommendations
    */
-  getRoutingRecommendations(): Promise<RoutingRecommendation[]>;
+  getRoutingRecommendations: () => Promise<RoutingRecommendation[]>;
 
   /**
    * Get model comparison data
    */
-  getModelComparison(modelIds: string[]): Promise<ModelComparison>;
+  getModelComparison: (modelIds: ReadonlyArray<string>) => Promise<ModelComparison>;
 }
 
 /**
@@ -292,27 +292,27 @@ export interface RoutingQueryRepository {
   /**
    * Advanced query for routing decisions
    */
-  queryRoutingDecisions(query: RoutingDecisionQuery): Promise<RoutingDecision[]>;
+  queryRoutingDecisions: (query: Readonly<RoutingDecisionQuery>) => Promise<RoutingDecision[]>;
 
   /**
    * Advanced query for model availability
    */
-  queryModels(query: ModelAvailabilityQuery): Promise<Model[]>;
+  queryModels: (query: Readonly<ModelAvailabilityQuery>) => Promise<Model[]>;
 
   /**
    * Advanced analytics queries
    */
-  queryAnalytics(query: RoutingAnalyticsQuery): Promise<RoutingAnalyticsResult>;
+  queryAnalytics: (query: Readonly<RoutingAnalyticsQuery>) => Promise<RoutingAnalyticsResult>;
 
   /**
    * Get routing insights for optimization
    */
-  getRoutingInsights(timeRange: TimeRange): Promise<RoutingInsights>;
+  getRoutingInsights: (timeRange: Readonly<TimeRange>) => Promise<RoutingInsights>;
 
   /**
    * Find optimal model for specific criteria
    */
-  findOptimalModel(criteria: OptimalModelCriteria): Promise<OptimalModelRecommendation>;
+  findOptimalModel: (criteria: Readonly<OptimalModelCriteria>) => Promise<OptimalModelRecommendation>;
 }
 
 export interface RoutingAnalyticsResult {

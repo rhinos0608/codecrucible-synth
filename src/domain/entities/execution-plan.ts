@@ -28,48 +28,48 @@ export class Domain {
 
   private constructor(private readonly _value: (typeof Domain.VALID_DOMAINS)[number]) {}
 
-  static create(value: string): Domain {
+  public static create(value: string): Domain {
     const normalizedValue = value.toLowerCase();
-    if (!this.VALID_DOMAINS.includes(normalizedValue as any)) {
+    if (!this.VALID_DOMAINS.includes(normalizedValue as (typeof Domain.VALID_DOMAINS)[number])) {
       // Default to general for unknown domains
       return new Domain('general');
     }
-    return new Domain(normalizedValue as any);
+    return new Domain(normalizedValue as (typeof Domain.VALID_DOMAINS)[number]);
   }
 
-  static coding(): Domain {
+  public static coding(): Domain {
     return new Domain('coding');
   }
 
-  static analysis(): Domain {
+  public static analysis(): Domain {
     return new Domain('analysis');
   }
 
-  static debugging(): Domain {
+  public static debugging(): Domain {
     return new Domain('debugging');
   }
 
-  static general(): Domain {
+  public static general(): Domain {
     return new Domain('general');
   }
 
-  get value(): string {
+  public get value(): string {
     return this._value;
   }
 
-  equals(other: Domain): boolean {
-    return this._value === other._value;
+  public equals(other: Readonly<Domain>): boolean {
+    return this._value === other.value;
   }
 
-  isCodingDomain(): boolean {
+  public isCodingDomain(): boolean {
     return this._value === 'coding' || this._value === 'debugging' || this._value === 'testing';
   }
 
-  isAnalyticalDomain(): boolean {
+  public isAnalyticalDomain(): boolean {
     return this._value === 'analysis' || this._value === 'research';
   }
 
-  requiresHighPrecision(): boolean {
+  public requiresHighPrecision(): boolean {
     return this._value === 'debugging' || this._value === 'testing' || this._value === 'deployment';
   }
 }
@@ -82,15 +82,15 @@ export class Goal {
     this.validateDescription(_description);
   }
 
-  static create(description: string): Goal {
+  public static create(description: string): Goal {
     return new Goal(description);
   }
 
-  get description(): string {
+  public get description(): string {
     return this._description;
   }
 
-  get truncatedDescription(): string {
+  public get truncatedDescription(): string {
     return this._description.length > 100
       ? `${this._description.substring(0, 100)}...`
       : this._description;
@@ -99,7 +99,7 @@ export class Goal {
   /**
    * Business rule: Determine complexity based on goal description
    */
-  estimateComplexity(): 'simple' | 'moderate' | 'complex' {
+  public estimateComplexity(): 'simple' | 'moderate' | 'complex' {
     const description = this._description.toLowerCase();
 
     // Simple tasks - single operations
@@ -128,7 +128,7 @@ export class Goal {
   /**
    * Business rule: Determine if goal requires multiple steps
    */
-  requiresMultipleSteps(): boolean {
+  public requiresMultipleSteps(): boolean {
     const complexityIndicators = ['and', 'then', 'also', 'analyze', 'implement', 'create', 'build'];
     const description = this._description.toLowerCase();
     return complexityIndicators.some(indicator => description.includes(indicator));
@@ -151,48 +151,48 @@ export class Goal {
 export class SelectedTools {
   private constructor(private readonly _tools: readonly string[]) {}
 
-  static create(tools: string[]): SelectedTools {
+  public static create(tools: readonly string[]): SelectedTools {
     // Remove duplicates and ensure non-empty tool names
     const uniqueTools = Array.from(new Set(tools.filter(tool => tool && tool.trim().length > 0)));
     return new SelectedTools(Object.freeze(uniqueTools));
   }
 
-  static empty(): SelectedTools {
+  public static empty(): SelectedTools {
     return new SelectedTools(Object.freeze([]));
   }
 
-  get tools(): readonly string[] {
+  public get tools(): readonly string[] {
     return this._tools;
   }
 
-  get count(): number {
+  public get count(): number {
     return this._tools.length;
   }
 
-  isEmpty(): boolean {
+  public isEmpty(): boolean {
     return this._tools.length === 0;
   }
 
-  hasTool(toolName: string): boolean {
+  public hasTool(toolName: string): boolean {
     return this._tools.includes(toolName);
   }
 
-  hasFileSystemTools(): boolean {
+  public hasFileSystemTools(): boolean {
     return this._tools.some(tool => tool.includes('filesystem'));
   }
 
-  hasCodeTools(): boolean {
+  public hasCodeTools(): boolean {
     return this._tools.some(tool => tool.includes('code') || tool.includes('git'));
   }
 
-  hasAnalysisTools(): boolean {
+  public hasAnalysisTools(): boolean {
     return this._tools.some(tool => tool.includes('analysis') || tool.includes('search'));
   }
 
   /**
    * Business rule: Estimate execution complexity based on tool selection
    */
-  estimateComplexity(): number {
+  public estimateComplexity(): number {
     if (this.isEmpty()) return 0;
 
     let complexity = this._tools.length * 0.2; // Base complexity per tool
@@ -215,7 +215,7 @@ export class SelectedTools {
     return Math.min(1.0, complexity);
   }
 
-  withAdditionalTool(toolName: string): SelectedTools {
+  public withAdditionalTool(toolName: string): SelectedTools {
     if (!toolName || toolName.trim().length === 0) {
       return this;
     }
@@ -236,11 +236,11 @@ export class StepEstimate {
     this.validateStepCount(_estimatedSteps);
   }
 
-  static create(steps: number): StepEstimate {
+  public static create(steps: number): StepEstimate {
     return new StepEstimate(steps);
   }
 
-  static fromComplexity(complexity: 'simple' | 'moderate' | 'complex'): StepEstimate {
+  public static fromComplexity(complexity: 'simple' | 'moderate' | 'complex'): StepEstimate {
     switch (complexity) {
       case 'simple':
         return new StepEstimate(2);
@@ -253,32 +253,32 @@ export class StepEstimate {
     }
   }
 
-  get value(): number {
+  public get value(): number {
     return this._estimatedSteps;
   }
 
-  isSimple(): boolean {
+  public isSimple(): boolean {
     return this._estimatedSteps <= 3;
   }
 
-  isModerate(): boolean {
+  public isModerate(): boolean {
     return this._estimatedSteps > 3 && this._estimatedSteps <= 6;
   }
 
-  isComplex(): boolean {
+  public isComplex(): boolean {
     return this._estimatedSteps > 6;
   }
 
   /**
    * Business rule: Calculate estimated execution time in minutes
    */
-  estimateExecutionTime(): number {
+  public estimateExecutionTime(): number {
     // Assume 2-5 minutes per step on average, with complexity scaling
     const baseTimePerStep = this.isComplex() ? 5 : this.isModerate() ? 3 : 2;
     return this._estimatedSteps * baseTimePerStep;
   }
 
-  adjustForTools(toolComplexity: number): StepEstimate {
+  public adjustForTools(toolComplexity: number): StepEstimate {
     const adjustment = Math.ceil(this._estimatedSteps * toolComplexity);
     return new StepEstimate(Math.min(20, this._estimatedSteps + adjustment)); // Cap at 20 steps
   }

@@ -8,15 +8,15 @@ export interface ToolRunResult {
 }
 
 export class ResultAggregator {
-  private results: ToolRunResult[] = [];
+  private readonly results: ToolRunResult[] = [];
 
-  add(result: ToolRunResult): void {
+  public add(result: Readonly<ToolRunResult>): void {
     this.results.push(result);
   }
 
-  combine() {
-    const successes = this.results.filter(r => r.success);
-    const errors = this.results.filter(r => !r.success);
+  public combine(): { successes: ToolRunResult[]; errors: ToolRunResult[] } {
+    const successes = this.results.filter((r: Readonly<ToolRunResult>) => r.success);
+    const errors = this.results.filter((r: Readonly<ToolRunResult>) => !r.success);
     logger.debug('Aggregated tool results', {
       successes: successes.length,
       errors: errors.length,

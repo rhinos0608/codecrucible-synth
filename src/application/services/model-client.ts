@@ -6,17 +6,20 @@ import {
   StreamToken,
   ModelInfo,
 } from '../../domain/interfaces/model-client.js';
-import { ProviderAdapter } from './provider-adapters.js';
+import { ProviderAdapter } from './provider-adapters/index.js';
 import { RequestProcessor, BasicRequestProcessor } from './request-processor.js';
 import { ResponseHandler, BasicResponseHandler } from './response-handler.js';
 import { IStreamingManager, StreamingManager } from './streaming-manager.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { logger as defaultLogger } from '../../infrastructure/logging/unified-logger.js';
-import { 
+import {
   enterpriseErrorHandler,
-  EnterpriseErrorHandler 
+  EnterpriseErrorHandler,
 } from '../../infrastructure/error-handling/enterprise-error-handler.js';
-import { ErrorCategory, ErrorSeverity } from '../../infrastructure/error-handling/structured-error-system.js';
+import {
+  ErrorCategory,
+  ErrorSeverity,
+} from '../../infrastructure/error-handling/structured-error-system.js';
 
 export interface ModelClientOptions {
   adapters: ProviderAdapter[];
@@ -79,7 +82,7 @@ export class ModelClient extends EventEmitter implements IModelClient {
           return adapter;
         }
       }
-      
+
       // Fallback to first available if no ollama adapter found
       const first = this.adapters.values().next().value;
       if (!first) {
@@ -90,7 +93,7 @@ export class ModelClient extends EventEmitter implements IModelClient {
           {
             operation: 'model_adapter_selection',
             resource: 'ai_providers',
-            context: { configuredProviders: 0, systemPhase: 'initialization' }
+            context: { configuredProviders: 0, systemPhase: 'initialization' },
           }
         );
         throw error;
@@ -113,11 +116,11 @@ export class ModelClient extends EventEmitter implements IModelClient {
       {
         operation: 'model_adapter_selection',
         resource: 'ai_provider',
-        context: { 
+        context: {
           requestedProvider: name,
           availableProviders,
-          configuredProviders: this.adapters.size
-        }
+          configuredProviders: this.adapters.size,
+        },
       }
     );
     throw error;
@@ -131,19 +134,16 @@ export class ModelClient extends EventEmitter implements IModelClient {
       return this.responseHandler.parse(raw, adapter.name);
     } catch (err) {
       // Use enterprise error handler for AI provider failures
-      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
-        err as Error,
-        {
-          operation: 'ai_model_generation',
-          resource: 'ai_provider',
-          context: { 
-            modelName: request.model,
-            promptLength: request.prompt?.length || 0,
-            provider: 'unknown'
-          }
-        }
-      );
-      
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(err as Error, {
+        operation: 'ai_model_generation',
+        resource: 'ai_provider',
+        context: {
+          modelName: request.model,
+          promptLength: request.prompt?.length || 0,
+          provider: 'unknown',
+        },
+      });
+
       // Always throw the structured error to prevent undefined returns
       throw structuredError;
     }
@@ -155,26 +155,23 @@ export class ModelClient extends EventEmitter implements IModelClient {
       return response?.content || '';
     } catch (err) {
       // Use enterprise error handler for generation failures
-      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
-        err as Error,
-        {
-          operation: 'ai_text_generation',
-          resource: 'ai_provider',
-          context: { 
-            prompt: prompt.substring(0, 100),
-            options: JSON.stringify(options).substring(0, 100)
-          }
-        }
-      );
-      
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(err as Error, {
+        operation: 'ai_text_generation',
+        resource: 'ai_provider',
+        context: {
+          prompt: prompt.substring(0, 100),
+          options: JSON.stringify(options).substring(0, 100),
+        },
+      });
+
       this.logger.error('ModelClient.generate() failed:', {
         errorId: structuredError.id,
         message: structuredError.message,
         category: structuredError.category,
         severity: structuredError.severity,
-        retryable: structuredError.retryable
+        retryable: structuredError.retryable,
       });
-      
+
       throw structuredError;
     }
   }
@@ -187,7 +184,7 @@ export class ModelClient extends EventEmitter implements IModelClient {
         ...token,
         isComplete: token.isComplete ?? false,
         index: token.index ?? 0,
-        timestamp: token.timestamp ?? Date.now()
+        timestamp: token.timestamp ?? Date.now(),
       };
     }
   }

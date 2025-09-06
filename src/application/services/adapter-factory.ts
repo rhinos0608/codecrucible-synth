@@ -1,4 +1,10 @@
-import { ProviderAdapter, OllamaAdapter, LMStudioAdapter, ClaudeAdapter, HuggingFaceAdapter } from './provider-adapters.js';
+import {
+  ProviderAdapter,
+  OllamaAdapter,
+  LMStudioAdapter,
+  ClaudeAdapter,
+  HuggingFaceAdapter,
+} from './provider-adapters/index.js';
 
 export type ProviderConfig = {
   type: 'ollama' | 'lm-studio' | 'claude' | 'huggingface';
@@ -18,7 +24,7 @@ export function createAdaptersFromProviders(
   const adapters: ProviderAdapter[] = [];
   for (const p of providers) {
     const defaultModel = p.defaultModel || (p.models && p.models[0]) || '';
-    
+
     if (p.type === 'ollama') {
       // Ollama can work without a default model - it uses the model from each request
       const modelToUse = defaultModel || 'llama3.1:8b'; // Fallback for adapter constructor

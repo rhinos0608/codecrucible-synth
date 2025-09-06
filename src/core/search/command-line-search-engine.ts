@@ -23,10 +23,17 @@ export class CommandLineSearchEngine {
         .map(line => {
           try {
             const parsed = JSON.parse(line);
-            if (parsed.type === 'match') {
+            if (
+              parsed.type === 'match' &&
+              parsed.data &&
+              parsed.data.path &&
+              typeof parsed.data.path.text === 'string' &&
+              parsed.data.lines &&
+              typeof parsed.data.lines.text === 'string'
+            ) {
               return {
-                filePath: parsed.data.path.text as string,
-                content: parsed.data.lines.text as string,
+                filePath: parsed.data.path.text,
+                content: parsed.data.lines.text,
               } as Document;
             }
           } catch {

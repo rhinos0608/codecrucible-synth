@@ -792,7 +792,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
    * Enhanced: Generate unique stream ID for AI SDK v5.0 compatibility
    */
   private generateStreamId(): string {
-    return `stream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   }
 
   /**

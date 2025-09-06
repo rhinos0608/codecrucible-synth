@@ -425,11 +425,24 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     adapter: ProviderAdapter,
     request: ModelRequest
   ): AsyncIterable<StreamToken> {
-    if (adapter.stream) {
+    // CRITICAL FIX: Skip native streaming for tool-enabled requests
+    // Many providers (like Ollama) have separate endpoints for simple prompts vs tool-enabled chat
+    const hasTools = request.tools && Array.isArray(request.tools) && request.tools.length > 0;
+    
+    if (adapter.stream && !hasTools) {
+      logger.debug(`Using native ${adapter.name} streaming (no tools provided)`);
       for await (const token of adapter.stream(request)) {
         yield token;
       }
       return;
+    }
+
+    // For tool-enabled requests or adapters without native streaming,
+    // use non-streaming request and simulate streaming
+    if (hasTools) {
+      logger.info(`🔧 Tool-enabled request detected for ${adapter.name} - using non-streaming with simulated streaming`);
+    } else {
+      logger.debug(`${adapter.name} adapter has no native streaming - using non-streaming with simulated streaming`);
     }
 
     const result = await adapter.request(request);

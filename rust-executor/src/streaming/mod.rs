@@ -2,7 +2,7 @@
 mod error_handling;
 mod worker_pool;
 mod chunk_batcher;
-mod atomic_metrics;
+pub mod atomic_metrics;
 
 // Re-exports
 pub use error_handling::*;

@@ -9,7 +9,6 @@ import { logger } from '../../infrastructure/logging/logger.js';
 import { EventEmitter } from 'events';
 import { ExecutionCache, shouldCacheResult } from './execution-cache.js';
 import { PerformanceMonitor, ToolExecutionMetrics } from './performance-monitor.js';
-import { createMcpServerManager } from '../../mcp-servers/mcp-bootstrap.js';
 
 export interface EnhancedToolConfig {
   enableCaching: boolean;
@@ -39,7 +38,7 @@ export class EnhancedToolIntegration extends EventEmitter {
   private activeExecutions: Set<string> = new Set();
   private cacheCleanupInterval?: NodeJS.Timeout;
 
-  constructor(config?: Partial<EnhancedToolConfig>, baseToolIntegration?: ToolIntegration, rustBackend?: any) {
+  constructor(baseToolIntegration: ToolIntegration, config?: Partial<EnhancedToolConfig>) {
     super();
 
     this.config = {
@@ -54,14 +53,12 @@ export class EnhancedToolIntegration extends EventEmitter {
       ...config,
     };
 
-    // CRITICAL FIX: Always require baseToolIntegration to prevent MCP server duplication
-    if (baseToolIntegration) {
-      this.baseToolIntegration = baseToolIntegration;
-    } else {
-      const mcpManager = createMcpServerManager();
-      this.baseToolIntegration = new ToolIntegration(mcpManager, rustBackend);
-      logger.warn('⚠️ Created fallback MCP manager in EnhancedToolIntegration - prefer passing baseToolIntegration');
+    // SECURITY FIX: Always require baseToolIntegration to prevent MCP server duplication
+    if (!baseToolIntegration) {
+      throw new Error('EnhancedToolIntegration requires a baseToolIntegration parameter to prevent MCP server duplication and ensure consistent security configuration');
     }
+    
+    this.baseToolIntegration = baseToolIntegration;
     this.orchestrator = new DomainAwareToolOrchestrator();
 
     this.cacheCleanupInterval = this.executionCache.startCleanup();

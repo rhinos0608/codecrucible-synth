@@ -122,7 +122,7 @@ export async function initialize(
       );
       const baseToolIntegration = getGlobalToolIntegration();
       if (baseToolIntegration) {
-        const enhancedIntegration = new EnhancedToolIntegration(undefined, baseToolIntegration);
+        const enhancedIntegration = new EnhancedToolIntegration(baseToolIntegration);
         setGlobalEnhancedToolIntegration(enhancedIntegration);
         logger.info('✅ Enhanced tool integration initialized (reusing base integration)');
       }

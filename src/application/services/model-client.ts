@@ -71,6 +71,16 @@ export class ModelClient extends EventEmitter implements IModelClient {
   private getAdapter(name?: string): ProviderAdapter {
     // If no specific provider requested, return first available
     if (!name) {
+      // CRITICAL FIX: Instead of blindly returning first adapter, try to be smart about it
+      // Check if we have an ollama adapter and prefer it for common models
+      for (const adapter of this.adapters.values()) {
+        if (adapter.name === 'ollama') {
+          this.logger.debug('🔧 Auto-selected Ollama adapter as no provider specified');
+          return adapter;
+        }
+      }
+      
+      // Fallback to first available if no ollama adapter found
       const first = this.adapters.values().next().value;
       if (!first) {
         const error = EnterpriseErrorHandler.createEnterpriseError(
@@ -85,6 +95,7 @@ export class ModelClient extends EventEmitter implements IModelClient {
         );
         throw error;
       }
+      this.logger.debug(`🔧 Using fallback adapter: ${first.name}`);
       return first;
     }
 

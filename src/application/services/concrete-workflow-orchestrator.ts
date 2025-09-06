@@ -320,98 +320,133 @@ User Request: ${userPrompt}`;
   }
 
   private async handlePromptRequest(request: WorkflowRequest): Promise<any> {
-    const { payload } = request;
-
-    if (this.modelClient) {
-      // Get MCP tools for AI model with smart selection (unless disabled)
-      const mcpTools =
-        payload.options?.useTools !== false
-          ? await this.getMCPToolsForModel(payload.input || payload.prompt)
-          : [];
-
-      // CRITICAL FIX: Create enhanced prompt with explicit tool usage instructions
-      const originalPrompt = payload.input || payload.prompt;
-      const enhancedPrompt = this.createEnhancedPrompt(originalPrompt, mcpTools.length > 0);
-
-      const modelRequest: ModelRequest = {
-        id: request.id,
-        prompt: enhancedPrompt,
-        model: payload.options?.model,
-        temperature: payload.options?.temperature,
-        maxTokens: payload.options?.maxTokens,
-        stream: false, // Temporarily disable streaming to test tool usage
-        tools: mcpTools, // Include MCP tools for AI model (empty array if useTools is false)
-        context: request.context,
-        // CRITICAL FIX: Always include num_ctx to override Ollama's 4096 default
-        num_ctx: parseInt(process.env.OLLAMA_NUM_CTX || '131072'),
-        options: payload.options,
-      };
-
-      // Log when enhanced prompt is used
-      if (mcpTools.length > 0) {
-        logger.info(
-          `🎯 Enhanced prompt with explicit tool usage instructions (${mcpTools.length} tools available)`
-        );
-      }
-
-      // Log when tools are disabled for simple questions
-      if (payload.options?.useTools === false) {
-        logger.info('🚫 Tools disabled for simple question to enable pure streaming');
-      }
-
-      let response: ModelResponse;
-
-      if (payload.options?.stream) {
-        if (
-          modelRequest.provider &&
-          !providerCapabilityRegistry.supports(modelRequest.provider, 'streaming')
-        ) {
-          logger.warn(
-            `Provider ${modelRequest.provider} does not support streaming; falling back to non-streaming`
-          );
-          response = await this.processModelRequest(modelRequest);
-        } else {
-          modelRequest.stream = true;
-          response = await this.streamingManager.stream(this.modelClient!, modelRequest);
-        }
-      } else {
-        response = await this.processModelRequest(modelRequest);
-      }
-
-      // Handle any tool calls from the AI model
-      logger.debug('ConcreteWorkflowOrchestrator: Checking for tool calls');
-      logger.debug('ConcreteWorkflowOrchestrator: response keys:', Object.keys(response));
-      logger.debug(
-        'ConcreteWorkflowOrchestrator: response.toolCalls exists:',
-        !!response.toolCalls
-      );
-      logger.debug(
-        'ConcreteWorkflowOrchestrator: response.toolCalls length:',
-        response.toolCalls?.length
-      );
-
-      if (
-        response.toolCalls &&
-        response.toolCalls.length > 0 &&
-        this.toolExecutionRouter &&
-        (!modelRequest.provider ||
-          providerCapabilityRegistry.supports(modelRequest.provider, 'toolCalling'))
-      ) {
-        response = await this.toolExecutionRouter.handleToolCalls(
-          response,
-          request,
-          modelRequest,
-          req => this.processModelRequest(req)
-        );
-      }
-
-      return response;
-    } else {
+    if (!this.modelClient) {
       return {
         response: 'Model client not available. Please ensure the system is properly configured.',
         fallback: true,
       };
     }
+
+    // Prepare tools and prompt
+    const { mcpTools, enhancedPrompt } = await this.prepareMCPToolsAndPrompt(request);
+    
+    // Build model request
+    const modelRequest = this.buildModelRequest(request, enhancedPrompt, mcpTools);
+    
+    // Execute request (streaming or non-streaming)
+    const response = await this.executeModelRequest(modelRequest);
+    
+    // Handle tool calls if present
+    return await this.processToolCalls(response, request, modelRequest);
+  }
+
+  /**
+   * Prepare MCP tools and enhanced prompt for the request
+   */
+  private async prepareMCPToolsAndPrompt(request: WorkflowRequest): Promise<{
+    mcpTools: ModelTool[];
+    enhancedPrompt: string;
+  }> {
+    const { payload } = request;
+    const originalPrompt = payload.input || payload.prompt;
+
+    // Get MCP tools for AI model with smart selection (unless disabled)
+    const mcpTools = payload.options?.useTools !== false
+      ? await this.getMCPToolsForModel(originalPrompt)
+      : [];
+
+    // Create enhanced prompt with explicit tool usage instructions
+    const enhancedPrompt = this.createEnhancedPrompt(originalPrompt, mcpTools.length > 0);
+
+    // Log tool usage status
+    if (mcpTools.length > 0) {
+      logger.info(
+        `🎯 Enhanced prompt with explicit tool usage instructions (${mcpTools.length} tools available)`
+      );
+    }
+
+    if (payload.options?.useTools === false) {
+      logger.info('🚫 Tools disabled for simple question to enable pure streaming');
+    }
+
+    return { mcpTools, enhancedPrompt };
+  }
+
+  /**
+   * Build the model request with all necessary parameters
+   */
+  private buildModelRequest(
+    request: WorkflowRequest, 
+    enhancedPrompt: string, 
+    mcpTools: ModelTool[]
+  ): ModelRequest {
+    const { payload } = request;
+
+    return {
+      id: request.id,
+      prompt: enhancedPrompt,
+      model: payload.options?.model,
+      // Let ModelClient use its properly configured defaultProvider from model selection
+      temperature: payload.options?.temperature,
+      maxTokens: payload.options?.maxTokens,
+      stream: payload.options?.stream ?? true,
+      tools: mcpTools,
+      context: request.context,
+      // Always include num_ctx to override Ollama's 4096 default
+      num_ctx: parseInt(process.env.OLLAMA_NUM_CTX || '131072'),
+      options: payload.options,
+    };
+  }
+
+  /**
+   * Execute the model request with appropriate streaming strategy
+   */
+  private async executeModelRequest(modelRequest: ModelRequest): Promise<ModelResponse> {
+    if (!modelRequest.stream) {
+      return await this.processModelRequest(modelRequest);
+    }
+
+    // Check provider streaming capability
+    if (modelRequest.provider && 
+        !providerCapabilityRegistry.supports(modelRequest.provider, 'streaming')) {
+      logger.warn(
+        `Provider ${modelRequest.provider} does not support streaming; falling back to non-streaming`
+      );
+      modelRequest.stream = false;
+      return await this.processModelRequest(modelRequest);
+    }
+
+    return await this.streamingManager.stream(this.modelClient!, modelRequest);
+  }
+
+  /**
+   * Process tool calls from the AI response if present
+   */
+  private async processToolCalls(
+    response: ModelResponse, 
+    request: WorkflowRequest, 
+    modelRequest: ModelRequest
+  ): Promise<ModelResponse> {
+    logger.debug('ConcreteWorkflowOrchestrator: Checking for tool calls');
+    logger.debug('ConcreteWorkflowOrchestrator: response keys:', Object.keys(response));
+    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls exists:', !!response.toolCalls);
+    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls length:', response.toolCalls?.length);
+
+    if (response.toolCalls && 
+        response.toolCalls.length > 0 && 
+        this.toolExecutionRouter &&
+        (!modelRequest.provider || 
+         providerCapabilityRegistry.supports(modelRequest.provider, 'toolCalling'))) {
+      
+      return await this.toolExecutionRouter.handleToolCalls(
+        response,
+        request,
+        modelRequest,
+        req => this.processModelRequest(req)
+      );
+    }
+
+    return response;
   }
 
   // Tool execution handler

@@ -3,6 +3,7 @@ import { ModelRequest, ModelResponse } from '../../../domain/interfaces/model-cl
 import { MCPServerManager } from '../../../mcp-servers/mcp-server-manager.js';
 import { logger } from '../../../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../../../utils/error-utils.js';
+import { getGlobalEnhancedToolIntegration } from '../../../infrastructure/tools/enhanced-tool-integration.js';
 
 /**
  * Routes tool execution requests and handles follow-up model synthesis.
@@ -39,12 +40,42 @@ export class ToolExecutionRouter {
         continue;
       }
       try {
-        const toolResult = await this.mcpManager.executeTool(
-          toolCall.function.name,
-          parsedArgs,
-          request.context
-        );
-        logger.info(`✅ Tool call ${toolCall.function.name} executed successfully`);
+        let toolResult;
+        
+        // Try to use EnhancedToolIntegration for caching and performance benefits
+        const enhancedIntegration = getGlobalEnhancedToolIntegration();
+        
+        if (enhancedIntegration) {
+          // Route through EnhancedToolIntegration for caching, monitoring, and intelligent routing
+          const toolCallObj = {
+            id: toolCall.id || `${toolCall.function.name}_${Date.now()}`,
+            function: {
+              name: toolCall.function.name,
+              arguments: JSON.stringify(parsedArgs)
+            }
+          };
+          
+          const context = {
+            sessionId: request.context?.sessionId || request.id,
+            priority: 'medium' as const,
+            metadata: {
+              workflowRequestId: request.id,
+              originalContext: request.context
+            }
+          };
+          
+          toolResult = await enhancedIntegration.executeToolCall(toolCallObj, context);
+          logger.info(`✅ Tool call ${toolCall.function.name} executed via EnhancedToolIntegration`);
+        } else {
+          // Fallback to direct MCP manager execution
+          toolResult = await this.mcpManager.executeTool(
+            toolCall.function.name,
+            parsedArgs,
+            request.context
+          );
+          logger.info(`✅ Tool call ${toolCall.function.name} executed via MCP fallback`);
+        }
+        
         toolResults.push({ id: toolCall.id || toolCall.function.name, result: toolResult });
       } catch (error) {
         logger.error(`❌ Tool call ${toolCall.function.name} failed:`, error);

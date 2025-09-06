@@ -137,7 +137,20 @@ impl RustExecutor {
 
         // Initialize communication handler with executors using shared runtime
         let runtime = self.runtime.lock().expect("Failed to acquire runtime lock");
-        match runtime.block_on(self.communication_handler.initialize()) {
+        match runtime.block_on(async {
+            // Initialize communication handler
+            match self.communication_handler.initialize().await {
+                Ok(_) => {
+                    // Initialize metrics aggregation with the runtime context
+                    self.initialize_metrics_aggregation().await;
+                    Ok(())
+                }
+                Err(e) => {
+                    error!("Communication handler initialization failed: {:?}", e);
+                    Err(e)
+                }
+            }
+        }) {
             Ok(_) => {
                 self.initialized = true;
                 info!("RustExecutor initialized successfully: {}", self.id);
@@ -449,6 +462,28 @@ impl RustExecutor {
         }
         metrics.average_execution_time_ms =
             metrics.total_execution_time_ms as f64 / metrics.total_requests as f64;
+    }
+
+    /// Initialize metrics aggregation with proper Tokio runtime context
+    async fn initialize_metrics_aggregation(&self) {
+        use crate::streaming::atomic_metrics::{AtomicStreamingMetrics, MetricsAggregator};
+        use std::sync::Arc;
+        
+        // Create atomic metrics for the streaming engine
+        let atomic_metrics = Arc::new(AtomicStreamingMetrics::new());
+        
+        // Create metrics aggregator with 5-second intervals
+        let aggregator = Arc::new(MetricsAggregator::new(atomic_metrics, 5000));
+        
+        // Start background aggregation task within the runtime context
+        // This ensures the Tokio runtime is available for the background tasks
+        tokio::spawn(async move {
+            // The aggregator will now start successfully since we're in a runtime context
+            aggregator.start_aggregation_task();
+            info!("Metrics aggregation task started successfully");
+        });
+        
+        info!("Metrics system initialized with Tokio runtime context");
     }
 
     /// Stream file content with true streaming (no memory accumulation)

@@ -12,7 +12,14 @@ describe('EnhancedToolIntegration cleanup', () => {
 
   it('clears cache cleanup interval on dispose', () => {
     const before = jest.getTimerCount();
-    const integration = new EnhancedToolIntegration();
+    
+    // Create a mock base tool integration for testing
+    const mockBaseIntegration = {
+      executeToolCall: jest.fn().mockResolvedValue({ result: 'test' }),
+      getLLMFunctions: jest.fn().mockResolvedValue([])
+    } as any;
+    
+    const integration = new EnhancedToolIntegration(mockBaseIntegration);
     expect(jest.getTimerCount()).toBeGreaterThan(before);
     integration.dispose();
     expect(jest.getTimerCount()).toBe(before);

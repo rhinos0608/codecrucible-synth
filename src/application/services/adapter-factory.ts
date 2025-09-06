@@ -20,8 +20,9 @@ export function createAdaptersFromProviders(
     const defaultModel = p.defaultModel || (p.models && p.models[0]) || '';
     
     if (p.type === 'ollama') {
-      if (!defaultModel) continue;
-      adapters.push(new OllamaAdapter(p.endpoint, defaultModel));
+      // Ollama can work without a default model - it uses the model from each request
+      const modelToUse = defaultModel || 'llama3.1:8b'; // Fallback for adapter constructor
+      adapters.push(new OllamaAdapter(p.endpoint, modelToUse));
     } else if (p.type === 'lm-studio') {
       if (!defaultModel) continue;
       adapters.push(new LMStudioAdapter(p.endpoint, defaultModel));

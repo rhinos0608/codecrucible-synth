@@ -711,6 +711,12 @@ export class OllamaProvider implements LLMProvider {
           toolCount: ollamaRequest.tools.length,
         });
 
+        // CRITICAL DEBUG: Log the exact request being sent to Ollama
+        logger.info('🔍 DEBUGGING: Complete Ollama request payload:', {
+          endpoint: `${this.endpoint}/api/chat`,
+          payload: JSON.stringify(ollamaRequest, null, 2)
+        });
+
         const response = await fetch(`${this.endpoint}/api/chat`, {
           method: 'POST',
           headers: {
@@ -719,8 +725,24 @@ export class OllamaProvider implements LLMProvider {
           body: JSON.stringify(ollamaRequest),
         });
 
+        // CRITICAL DEBUG: Log response status and headers
+        logger.info('🔍 DEBUGGING: Ollama response received:', {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok,
+          contentType: response.headers.get('content-type'),
+          contentLength: response.headers.get('content-length')
+        });
+
         if (!response.ok) {
           const errorText = await response.text();
+          logger.error('🔍 DEBUGGING: Ollama error response:', {
+            status: response.status,
+            statusText: response.statusText,
+            errorText: errorText,
+            errorTextLength: errorText.length
+          });
+          
           logger.warn('Ollama function calling failed, attempting fallback', {
             status: response.status,
             error: errorText,
@@ -861,6 +883,18 @@ export class OllamaProvider implements LLMProvider {
           result = await this.parseRobustJSON(mockResponse as Response);
         }
 
+        // CRITICAL DEBUG: Log the parsed result structure
+        logger.info('🔍 DEBUGGING: Ollama parsed result:', {
+          resultKeys: Object.keys(result || {}),
+          hasMessage: !!result?.message,
+          messageKeys: result?.message ? Object.keys(result.message) : [],
+          messageContent: result?.message?.content || 'NO MESSAGE CONTENT',
+          messageContentLength: (result?.message?.content || '').length,
+          hasToolCalls: !!result?.message?.tool_calls,
+          toolCallsLength: result?.message?.tool_calls?.length || 0,
+          rawResultPreview: JSON.stringify(result || {}).substring(0, 500)
+        });
+
         logger.debug('Ollama function calling response received', {
           hasToolCalls: !!result.message?.tool_calls,
           toolCallCount: result.message?.tool_calls?.length || 0,
@@ -883,21 +917,44 @@ export class OllamaProvider implements LLMProvider {
           throw new Error(`Ollama request ${request.id} returned no content and no valid tool calls. This indicates a provider failure.`);
         }
         
-        return {
-          id: request.id,
-          content: finalContent || '',
-          toolCalls:
-            result.message?.tool_calls?.map((toolCall: any) => ({
+        // CRITICAL FIX: Try multiple sources for tool calls
+        let extractedToolCalls = [];
+        
+        // First, try structured tool_calls from result.message.tool_calls
+        if (result.message?.tool_calls && Array.isArray(result.message.tool_calls) && result.message.tool_calls.length > 0) {
+          logger.debug('Using structured tool_calls from Ollama response');
+          extractedToolCalls = result.message.tool_calls.map((toolCall: any) => ({
+            id: toolCall.function?.name || `tool_${Date.now()}`,
+            function: {
+              name: toolCall.function?.name,
+              // CRITICAL FIX: Check if arguments are already a string to prevent double-encoding
+              arguments:
+                typeof toolCall.function?.arguments === 'string'
+                  ? toolCall.function.arguments
+                  : JSON.stringify(toolCall.function?.arguments || {}),
+            },
+          }));
+        } else {
+          // Fallback: Try to parse tool calls from content field
+          logger.debug('No structured tool_calls found, trying to parse from content field');
+          const contentToolCalls = this.parseToolCallsFromContent(finalContent);
+          if (contentToolCalls.length > 0) {
+            extractedToolCalls = contentToolCalls.map((toolCall: any) => ({
               id: toolCall.function?.name || `tool_${Date.now()}`,
               function: {
                 name: toolCall.function?.name,
-                // CRITICAL FIX: Check if arguments are already a string to prevent double-encoding
-                arguments:
-                  typeof toolCall.function?.arguments === 'string'
-                    ? toolCall.function.arguments
-                    : JSON.stringify(toolCall.function?.arguments || {}),
+                arguments: typeof toolCall.function?.arguments === 'string'
+                  ? toolCall.function.arguments 
+                  : JSON.stringify(toolCall.function?.arguments || {}),
               },
-            })) || [],
+            }));
+          }
+        }
+
+        return {
+          id: request.id,
+          content: finalContent || '',
+          toolCalls: extractedToolCalls,
           usage: {
             promptTokens: result.prompt_eval_count || 0,
             completionTokens: result.eval_count || 0,
@@ -914,6 +971,65 @@ export class OllamaProvider implements LLMProvider {
 
     // Fallback to regular generateCode for non-tool requests
     return await this.generateCode(request.prompt, request.options || {});
+  }
+
+  /**
+   * CRITICAL FIX: Parse tool calls from content field
+   * Ollama often returns tool calls as JSON text in content instead of structured tool_calls
+   */
+  private parseToolCallsFromContent(content: string): any[] {
+    if (!content || typeof content !== 'string') {
+      return [];
+    }
+
+    try {
+      // Try to parse the entire content as JSON first
+      const parsed = JSON.parse(content.trim());
+      
+      // Check if it looks like a tool call structure
+      if (parsed.name && (parsed.arguments || parsed.parameters)) {
+        logger.info('🔧 Detected tool call in content field - converting to structured format');
+        return [{
+          function: {
+            name: parsed.name,
+            arguments: parsed.arguments || parsed.parameters || {}
+          }
+        }];
+      }
+    } catch (error) {
+      // Content is not JSON, check if it contains JSON-like patterns
+      const jsonPattern = /\{\s*"name"\s*:\s*"[^"]+"/;
+      if (jsonPattern.test(content)) {
+        logger.debug('Content contains JSON pattern but failed to parse - might be embedded JSON');
+        
+        // Try to extract JSON objects from text
+        const jsonMatches = content.match(/\{[^}]*"name"[^}]*\}/g);
+        if (jsonMatches) {
+          const toolCalls = [];
+          for (const match of jsonMatches) {
+            try {
+              const parsed = JSON.parse(match);
+              if (parsed.name) {
+                toolCalls.push({
+                  function: {
+                    name: parsed.name,
+                    arguments: parsed.arguments || parsed.parameters || {}
+                  }
+                });
+              }
+            } catch (e) {
+              continue; // Skip invalid JSON matches
+            }
+          }
+          if (toolCalls.length > 0) {
+            logger.info(`🔧 Extracted ${toolCalls.length} tool calls from content text`);
+            return toolCalls;
+          }
+        }
+      }
+    }
+    
+    return [];
   }
 
   /**

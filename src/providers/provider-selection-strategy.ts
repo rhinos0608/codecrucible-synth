@@ -23,6 +23,11 @@ export interface ProviderSelectionConfig {
   selectionStrategy: 'fastest' | 'most-capable' | 'balanced' | 'adaptive';
   timeoutMs: number;
   maxRetries: number;
+  /**
+   * @deprecated This property is deprecated and will be removed in a future release.
+   * Use the fallback logic in the selection strategy instead.
+   */
+  fallbackChain?: ProviderType[];
 }
 
 export interface SelectionContext {

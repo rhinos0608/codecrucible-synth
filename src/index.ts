@@ -107,118 +107,16 @@ export async function initialize(
       verbose: cliOptions.verbose,
     });
 
-    // Initialize MCP Server Manager for extended functionality
-    const { MCPServerManager } = await import('./mcp-servers/mcp-server-manager.js');
-    const mcpConfig = {
-      filesystem: {
-        enabled: true,
-        restrictedPaths: ['/etc', '/sys', '/proc'],
-        allowedPaths: [process.cwd()],
-      },
-      git: {
-        enabled: true,
-        autoCommitMessages: true,
-        safeModeEnabled: true,
-      },
-      terminal: {
-        enabled: true,
-        allowedCommands: [
-          // Basic commands
-          'ls',
-          'cat',
-          'echo',
-          'pwd',
-          'which',
-          'node',
-          'npm',
-          // Safe search commands for development workflows
-          'grep',
-          'rg',
-          'ripgrep',
-          'find',
-          'locate',
-          'ack',
-          'ag',
-          'fzf',
-          // File inspection commands
-          'head',
-          'tail',
-          'less',
-          'more',
-          'wc',
-          'sort',
-          'uniq',
-          // Development tools
-          'git',
-          'diff',
-          'curl',
-          'wget',
-          'jq',
-          'yq',
-        ],
-        blockedCommands: [
-          // Destructive file operations
-          'rm',
-          'rmdir',
-          'unlink',
-          'mv',
-          'cp',
-          // System administration
-          'sudo',
-          'su',
-          'chmod',
-          'chown',
-          'chgrp',
-          // Process management
-          'kill',
-          'pkill',
-          'killall',
-          'nohup',
-          'bg',
-          'fg',
-          // Network security risks
-          'nc',
-          'netcat',
-          'telnet',
-          'ssh',
-          'scp',
-          'rsync',
-          // System modification
-          'mount',
-          'umount',
-          'fdisk',
-          'mkfs',
-          'dd',
-        ],
-      },
-      packageManager: {
-        enabled: true,
-        autoInstall: false,
-        securityScan: true,
-      },
-      smithery: {
-        enabled: !!process.env.SMITHERY_API_KEY,
-        apiKey: process.env.SMITHERY_API_KEY,
-        autoDiscovery: true,
-      },
-    };
-
-    const mcpServerManager = new MCPServerManager(mcpConfig);
-
-    // Prepare (initialize) MCP servers
-    await mcpServerManager.initialize();
-    try {
-      await mcpServerManager.startServers();
-      logger.info('✅ MCP servers are ready for tool execution');
-
-      // Initialize global tool integration now that MCP servers are ready
+        // Initialize MCP servers via bootstrap module
+    const { bootstrapMcpServers } = await import("./mcp-servers/mcp-bootstrap.js");
+    const mcpServerManager = await bootstrapMcpServers();
+    if (mcpServerManager) {
       const { initializeGlobalToolIntegration, getGlobalToolIntegration } = await import(
         './infrastructure/tools/tool-integration.js'
       );
       initializeGlobalToolIntegration(mcpServerManager);
       logger.info('✅ Global tool integration initialized with MCP servers');
-      
-      // Initialize enhanced tool integration using the existing base integration
+
       const { EnhancedToolIntegration, setGlobalEnhancedToolIntegration } = await import(
         './infrastructure/tools/enhanced-tool-integration.js'
       );
@@ -228,12 +126,6 @@ export async function initialize(
         setGlobalEnhancedToolIntegration(enhancedIntegration);
         logger.info('✅ Enhanced tool integration initialized (reusing base integration)');
       }
-    } catch (error) {
-      logger.warn(
-        '⚠️ MCP servers initialization had issues, continuing with degraded capabilities:',
-        error
-      );
-      // Continue without MCP servers - graceful degradation
     }
 
     // Create ConcreteWorkflowOrchestrator (implements IWorkflowOrchestrator interface)

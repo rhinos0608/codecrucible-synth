@@ -162,6 +162,16 @@ impl CommandExecutor {
                     Vec::new()
                 }
             }
+        } else if let Ok(default_path) = std::env::current_dir()
+            .map(|p| p.join("shared/command-allowlist.json"))
+        {
+            match Self::load_whitelist_from_file(default_path.as_path()) {
+                Ok(list) => list,
+                Err(_) => DEFAULT_ALLOWED_COMMANDS
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+            }
         } else {
             DEFAULT_ALLOWED_COMMANDS
                 .iter()

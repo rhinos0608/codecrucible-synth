@@ -25,9 +25,12 @@
 ## Module Index
 
 - `src/application/services/concrete-workflow-orchestrator.ts` – coordinates
-  workflow execution. Streaming logic resides in
-  `src/application/services/orchestrator/streaming-handler.ts` and tool registry
-  management in `src/application/services/orchestrator/tool-registry.ts`.
+  workflow execution. Streaming handled by
+  `src/application/services/orchestrator/streaming-manager.ts` and tool routing
+  by `src/application/services/orchestrator/tool-execution-router.ts`. Provider
+  capabilities are tracked via `src/application/services/provider-capability-registry.ts`.
 - `src/application/services/unified-cli-coordinator.ts` – orchestrates CLI
   operations with resilience events handled in
   `src/application/services/cli/resilience-manager.ts`.
+- MCP server initialization centralized in
+  `src/mcp-servers/mcp-bootstrap.ts` to avoid duplication.

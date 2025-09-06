@@ -275,7 +275,7 @@ export async function initialize(
         endpoint: process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434',
         enabled: true,
         priority: 1,
-        defaultModel: 'qwen2.5-coder:7b',
+        defaultModel: undefined, // No hardcoded default - use dynamic selection
         timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
       },
       {

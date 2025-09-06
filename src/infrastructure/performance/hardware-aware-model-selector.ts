@@ -132,16 +132,8 @@ export class HardwareAwareModelSelector extends EventEmitter {
       throw new Error('No models compatible with current hardware configuration');
     }
 
-    // Prioritize qwen2.5-coder if available
-    const qwenCoder = suitableModels.find((m: ModelInfo) =>
-      m.name.toLowerCase().includes('qwen2.5-coder')
-    );
+    // Sort models by hardware compatibility and capability score
     let sortedModels = this.sortModelsByHardwareCompatibility(suitableModels);
-
-    if (qwenCoder) {
-      // Move qwen2.5-coder to the front if it's available
-      sortedModels = [qwenCoder, ...sortedModels.filter(m => m !== qwenCoder)];
-    }
 
     // Create fallback chain - only include models smaller or equal in size to primary
     const primaryModelSize = this.estimateModelMemoryUsage(sortedModels[0]);
@@ -204,13 +196,6 @@ export class HardwareAwareModelSelector extends EventEmitter {
    */
   private sortModelsByHardwareCompatibility(models: ModelInfo[]): ModelInfo[] {
     return models.sort((a, b) => {
-      // Give priority to qwen2.5-coder
-      const aIsQwenCoder = a.name.toLowerCase().includes('qwen2.5-coder');
-      const bIsQwenCoder = b.name.toLowerCase().includes('qwen2.5-coder');
-
-      if (aIsQwenCoder && !bIsQwenCoder) return -1;
-      if (!aIsQwenCoder && bIsQwenCoder) return 1;
-
       const scoreA = this.calculateHardwareCompatibilityScore(a);
       const scoreB = this.calculateHardwareCompatibilityScore(b);
       return scoreB - scoreA;
@@ -293,7 +278,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
     if (nameLower.includes('7b') || nameLower.includes('8b')) return 4;
     if (nameLower.includes('3b') || nameLower.includes('2b')) return 2;
     if (nameLower.includes('gemma') && nameLower.includes('2b')) return 2;
-    if (nameLower.includes('qwen2.5-coder')) return 4; // Qwen 2.5 Coder 7B
+    if (nameLower.includes('coder')) return 3; // Coding models
     if (nameLower.includes('llama3.2')) return 2; // Llama 3.2 is small
 
     return 4; // Default estimate

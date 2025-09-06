@@ -257,9 +257,9 @@ export class LMStudioProvider {
       // If no models are loaded, try to use a default available model
       // Based on the models we saw in the CLI listing, use a known good model
       const defaultModels = [
-        'qwen2.5-coder-7b-instruct',
-        'qwen/qwen2.5-coder-14b:qwen2.5-coder-14b-instruct',
-        'qwen/qwen2.5-coder-14b',
+        'llama3.1-8b-instruct',
+        'deepseek-coder-6.7b-instruct',
+        'codellama-7b-instruct',
         'openai/gpt-oss-20b:gpt-oss-20b',
       ];
 

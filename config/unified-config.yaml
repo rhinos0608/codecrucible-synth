@@ -184,12 +184,6 @@ model:
             function_calling: true
             json_mode: true
             optimal_for: ["function_calling", "tools", "analysis", "coding", "debugging"]
-          - name: "qwen2.5-coder:7b"              # Excellent coding model
-            temperature: 0.1
-            max_context: 131072
-            memory_requirement: 5.8
-            function_calling: true
-            optimal_for: ["coding", "analysis", "debugging", "refactoring"]
           - name: "deepseek-coder:8b"             # Good for code generation
             temperature: 0.15
             max_context: 131072
@@ -197,12 +191,6 @@ model:
             function_calling: true
             optimal_for: ["code_generation", "refactoring", "optimization"]
         fallback:
-          - name: "qwen2.5-coder:3b"              # Smaller, lower memory
-            temperature: 0.1
-            max_context: 64000                     # Reduced context for memory
-            memory_requirement: 3.5
-            function_calling: true
-            optimal_for: ["simple_coding", "templates"]
           - name: "llama3.2:3b"                   # Minimal memory model
             temperature: 0.3
             max_context: 32000
@@ -259,10 +247,6 @@ model:
             temperature: 0.6
             max_tokens: 128000
             optimal_for: ["large-file-processing"]
-          - name: "qwen/qwen2.5-coder-14b"  # From unified-model-config.yaml
-            temperature: 0.2
-            max_tokens: 128000
-            optimal_for: ["complex_coding"]
         fallback:
           - name: "gpt-3.5-turbo"  # OpenAI compatible
             temperature: 0.7
@@ -316,14 +300,14 @@ model_preloader:
     - model: "llama3.1:8b"              # Best function calling, load first
       context: 32000                     # Start with safe context for warmup
       memory_requirement: 6.5            # GB
-    - model: "qwen2.5-coder:7b"         # Backup coding model
+    - model: "deepseek-coder:8b"        # Backup coding model
       context: 32000
-      memory_requirement: 5.8
+      memory_requirement: 6.2
   
   fallback_models:
-    - model: "qwen2.5-coder:3b"         # Low memory fallback
+    - model: "llama3.2:3b"              # Low memory fallback
       context: 16000
-      memory_requirement: 3.5
+      memory_requirement: 2.8
   
   # Preloading behavior
   max_concurrent_loads: 1              # Prevent memory contention

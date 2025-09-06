@@ -325,18 +325,18 @@ export class ModelDiscoveryService {
     const fallbacks: Record<ProviderType, ModelInfo[]> = {
       'ollama': [
         {
-          name: 'qwen2.5-coder:7b',
+          name: 'llama3.1:8b',
           provider: 'ollama',
-          size: '7B',
-          family: 'Qwen',
-          capabilities: ['code-generation', 'chat'],
+          size: '8B',
+          family: 'Llama',
+          capabilities: ['function-calling', 'code-generation', 'chat'],
           isAvailable: false,
           lastChecked: new Date()
         },
         {
-          name: 'deepseek-coder:6.7b',
+          name: 'deepseek-coder:8b',
           provider: 'ollama',
-          size: '6.7B',
+          size: '8B',
           family: 'DeepSeek',
           capabilities: ['code-generation', 'chat'],
           isAvailable: false,

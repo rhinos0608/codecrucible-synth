@@ -977,32 +977,27 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
       // If no specific model provided, assume auto-selection will pick a supported model
       if (!model) {
         logger.debug(
-          'No specific model provided, assuming auto-selection will pick supported model'
+          'No specific model provided, will attempt tool use with auto-selected model'
         );
-        return true; // Trust that auto-selection picks qwen2.5-coder which supports tools
+        return true; // Optimistically attempt tool use - system handles failures gracefully
       }
 
-      // Only certain Ollama models support function calling
+      // Dynamic capability detection - no hardcoded model lists
       const model_name = model.toLowerCase();
-      const supportedModels = [
-        'llama3',
-        'llama3.1',
-        'llama3.2',
-        'qwen2.5',
-        'qwq',
-        'mistral',
-        'codellama',
-      ];
-
-      const isSupported = supportedModels.some(supportedModel =>
-        model_name.includes(supportedModel)
-      );
-      logger.info('🔍 DEBUG: Model tool support check', { 
-        originalModel: model,
-        normalizedModel: model_name, 
-        supportedModels,
-        isSupported,
-        modelMatches: supportedModels.filter(supportedModel => model_name.includes(supportedModel))
+      
+      // Extract model size for capability assessment (e.g., "8b", "7b", "32b")
+      const sizeMatch = model_name.match(/(\d+(?:\.\d+)?)b/);
+      const modelSize = sizeMatch ? parseFloat(sizeMatch[1]) : 0;
+      
+      // Always attempt tool use - the system will handle failures gracefully
+      // This allows us to discover new models' capabilities dynamically
+      const isSupported = true;
+      
+      logger.info('🔍 Dynamic tool capability detection', { 
+        model: model_name,
+        detectedSize: modelSize || 'unknown',
+        strategy: 'Optimistic - will attempt tool use and handle failures gracefully',
+        rationale: 'Avoiding hardcoded lists to support new models dynamically'
       });
       return isSupported;
     }

@@ -94,9 +94,8 @@ export class CLIDisplay {
     console.log(chalk.bold('\n🤖 Model Recommendations\n'));
 
     const models = [
-      { name: 'qwen2.5-coder:7b', type: 'Coding', performance: 'High', size: '4.4GB' },
+      { name: 'llama3.1:8b', type: 'Function Calling', performance: 'Excellent', size: '4.7GB' },
       { name: 'deepseek-coder:8b', type: 'Coding', performance: 'High', size: '4.9GB' },
-      { name: 'llama3.1:8b', type: 'General', performance: 'Medium', size: '4.7GB' },
       { name: 'codestral:22b', type: 'Coding', performance: 'Very High', size: '13GB' },
     ];
 
@@ -120,8 +119,8 @@ export class CLIDisplay {
    * Get performance indicator for a model
    */
   public static getModelPerformance(model: string): string {
-    const highPerf = ['qwen2.5-coder', 'deepseek-coder', 'codestral'];
-    const mediumPerf = ['llama3.1', 'mistral'];
+    const highPerf = ['llama3.1', 'deepseek-coder', 'codestral'];
+    const mediumPerf = ['mistral'];
 
     if (highPerf.some(h => model.includes(h))) return chalk.green('●');
     if (mediumPerf.some(m => model.includes(m))) return chalk.yellow('●');

@@ -140,7 +140,7 @@ export class OutputFormatter {
     } catch (error) {
       console.error('❌ Error discovering models:', (error as Error).message);
       console.log('\n📋 Fallback models (may not be available):');
-      console.log('  ⚠️ qwen2.5-coder:7b (Ollama)');
+      console.log('  ⚠️ llama3.1:8b (Ollama)');
       console.log('  ⚠️ deepseek-coder:6.7b (Ollama)');
       console.log('  ⚠️ local-model (LM Studio)');
       

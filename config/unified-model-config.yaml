@@ -29,7 +29,7 @@ llm:
         preferred:
           - "llama3.1:8b"  # Will use settings from unified-config.yaml
         fallback:
-          - "qwen2.5-coder:3b"
+          - "llama3.2:3b"
       
   # All other settings come from unified-config.yaml
   routing:

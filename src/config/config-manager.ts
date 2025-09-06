@@ -142,7 +142,7 @@ export class ConfigManager {
             endpoint: 'http://localhost:11434',
             enabled: true,
             models: [
-              process.env.MODEL_DEFAULT_NAME || 'qwen2.5-coder:7b',
+              process.env.MODEL_DEFAULT_NAME, // No hardcoded default - use dynamic selection
               'deepseek-coder:8b',
             ].filter(Boolean),
           },

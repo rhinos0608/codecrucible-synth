@@ -69,7 +69,7 @@ export class OllamaProvider implements LLMProvider {
         const data = await response.json();
         if (!data.models || data.models.length === 0) {
           logger.warn('Ollama service is running but no models are available');
-          logger.info('To fix: Run "ollama pull qwen2.5-coder:7b" or another model');
+          logger.info('To fix: Run "ollama pull llama3.1:8b" or "ollama pull deepseek-coder:8b"');
           return false;
         }
         logger.debug(`Ollama service available with ${data.models.length} models`);
@@ -289,7 +289,7 @@ export class OllamaProvider implements LLMProvider {
         // Check if Ollama is actually running and the model exists
         const isOllamaAvailable = await this.isAvailable();
         if (!isOllamaAvailable) {
-          throw new Error('Ollama service is not available or no models are loaded. Run "ollama serve" and "ollama pull qwen2.5-coder:7b"');
+          throw new Error('Ollama service is not available or no models are loaded. Run "ollama serve" and "ollama pull llama3.1:8b"');
         }
         
         // Log the full response for debugging

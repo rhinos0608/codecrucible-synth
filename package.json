@@ -112,6 +112,7 @@
     "@azure/arm-resources": "^5.2.0",
     "@azure/identity": "^4.0.1",
     "@e2b/code-interpreter": "^1.5.1",
+    "@huggingface/inference": "^4.7.1",
     "@lmstudio/sdk": "^1.5.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@opentelemetry/api": "^1.9.0",
@@ -238,7 +239,11 @@
     "directories": {
       "output": "build/desktop"
     },
-    "files": ["dist/**/*", "config/**/*", "node_modules/**/*"],
+    "files": [
+      "dist/**/*",
+      "config/**/*",
+      "node_modules/**/*"
+    ],
     "mac": {
       "category": "public.app-category.developer-tools"
     },
@@ -269,11 +274,11 @@
     }
   },
   "optionalDependencies": {
-    "@codecrucible/rust-executor-win32-x64-msvc": "*",
-    "@codecrucible/rust-executor-darwin-x64": "*",
     "@codecrucible/rust-executor-darwin-arm64": "*",
-    "@codecrucible/rust-executor-linux-x64-gnu": "*",
+    "@codecrucible/rust-executor-darwin-x64": "*",
     "@codecrucible/rust-executor-linux-arm64-gnu": "*",
-    "@codecrucible/rust-executor-linux-x64-musl": "*"
+    "@codecrucible/rust-executor-linux-x64-gnu": "*",
+    "@codecrucible/rust-executor-linux-x64-musl": "*",
+    "@codecrucible/rust-executor-win32-x64-msvc": "*"
   }
 }

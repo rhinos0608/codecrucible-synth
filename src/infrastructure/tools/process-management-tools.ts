@@ -3,46 +3,9 @@ import { BaseTool } from './base-tool.js';
 import { spawn, exec, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import { logger } from '../logging/logger.js';
+import { validateCommand } from '../../utils/command-security.js';
 
 const execAsync = promisify(exec);
-
-// SECURITY: Command whitelist and validation
-const ALLOWED_COMMANDS = ['node', 'npm', 'git', 'ls', 'pwd', 'cat', 'grep', 'find', 'echo'];
-const BLOCKED_PATTERNS = [
-  /rm\s+-rf/i, // Dangerous deletions
-  /chmod\s+777/i, // Permission changes
-  /sudo/i, // Privilege escalation
-  /su\s+/i, // User switching
-  /curl.*\|.*sh/i, // Remote code execution
-  /wget.*\|.*sh/i, // Remote code execution
-  /eval/i, // Code evaluation
-  /exec/i, // Code execution
-  />\s*\/dev\//i, // Device access
-  /[;&|`$()]/, // Shell injection characters
-];
-
-function validateCommand(command: string): { isValid: boolean; reason?: string } {
-  if (!command || command.trim() === '') {
-    return { isValid: false, reason: 'Empty command' };
-  }
-
-  // Check against blocked patterns
-  for (const pattern of BLOCKED_PATTERNS) {
-    if (pattern.test(command)) {
-      return { isValid: false, reason: `Command contains blocked pattern: ${pattern}` };
-    }
-  }
-
-  // Extract base command
-  const baseCommand = command.split(' ')[0];
-
-  // Check if base command is allowed
-  if (!ALLOWED_COMMANDS.includes(baseCommand)) {
-    return { isValid: false, reason: `Command '${baseCommand}' is not in allowed list` };
-  }
-
-  return { isValid: true };
-}
 
 interface ProcessSession {
   id: string;

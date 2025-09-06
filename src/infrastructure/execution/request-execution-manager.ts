@@ -35,7 +35,7 @@ import { GlobalEvidenceCollector } from '../evidence/global-evidence-collector.j
 import { unifiedResultFormatter } from '../formatting/unified-result-formatter.js';
 
 export type ExecutionMode = 'fast' | 'quality' | 'balanced';
-export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
+export type ProviderType = 'ollama' | 'lm-studio' | 'claude' | 'huggingface' | 'auto';
 
 export interface ExecutionStrategy {
   mode: ExecutionMode;
@@ -295,8 +295,8 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   ): Promise<ModelResponse> {
     const fallbackChain =
       strategy.provider === 'auto'
-        ? ['ollama', 'lm-studio', 'huggingface'] // Default fallback chain - huggingface now implemented
-        : [strategy.provider, 'ollama', 'lm-studio', 'huggingface'].filter(
+        ? ['ollama', 'lm-studio', 'claude', 'huggingface'] // Default fallback chain - all providers now implemented
+        : [strategy.provider, 'ollama', 'lm-studio', 'claude', 'huggingface'].filter(
             (p, i, arr) => arr.indexOf(p) === i
           );
 
@@ -434,18 +434,19 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         // Route to streaming or regular processing based on request.stream flag
         let response;
         if (request.stream && request.onStreamingToken) {
-          // For streaming requests, check if provider has stream method (per ProviderAdapter interface)
-          const modelClient = provider as any;
-          if (modelClient.stream && typeof modelClient.stream === 'function') {
+          // Check if provider supports streaming via ProviderAdapter interface
+          const supportsStreaming = this.providerSupportsStreaming(provider, providerType);
+          
+          if (supportsStreaming) {
             logger.debug(`Provider ${providerType} supports streaming, using stream method`);
             // Use the streaming interface properly
             response = await Promise.race([
-              this.handleStreamingRequest(modelClient, requestWithAbort, request.onStreamingToken),
+              this.handleStreamingRequest(provider, requestWithAbort, request.onStreamingToken),
               this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
             ]);
           } else {
             // Fallback to regular processing if provider doesn't support streaming
-            logger.warn(`Provider ${providerType} does not support streaming (no stream method), falling back to regular processing`);
+            logger.warn(`Provider ${providerType} does not support streaming, falling back to regular processing`);
             response = await Promise.race([
               provider.processRequest(requestWithAbort, context),
               this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
@@ -749,6 +750,11 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     let lastToken: any = null;
 
     try {
+      // Check if provider has stream method before calling it
+      if (!provider.stream || typeof provider.stream !== 'function') {
+        throw new Error(`Provider ${provider.name || 'unknown'} does not support streaming`);
+      }
+      
       // Use the provider adapter's stream method
       const streamIterator = provider.stream(request);
       
@@ -1158,6 +1164,27 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     }
 
     return String(result || '');
+  }
+
+  /**
+   * Properly detect if provider supports streaming via ProviderAdapter interface
+   */
+  private providerSupportsStreaming(provider: any, providerType: string): boolean {
+    // Check if provider has the stream method (ProviderAdapter interface)
+    if (provider && typeof provider.stream === 'function') {
+      logger.debug(`${providerType} supports streaming via ProviderAdapter.stream method`);
+      return true;
+    }
+
+    // Check if provider has streaming capability metadata
+    if (provider && provider.capabilities && provider.capabilities.supportsStreaming === true) {
+      logger.debug(`${providerType} supports streaming via capabilities metadata`);
+      return true;
+    }
+
+    // Don't rely on "known providers" - only check actual capabilities
+    logger.debug(`${providerType} does not support streaming (no stream method or capabilities metadata)`);
+    return false;
   }
 
 }

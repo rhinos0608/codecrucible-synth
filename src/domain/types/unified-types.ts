@@ -1040,7 +1040,7 @@ export interface REPLInterface {
 export interface UnifiedClientConfig {
   endpoint?: string;
   providers: Array<{
-    type: 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
+    type: 'ollama' | 'lm-studio' | 'claude' | 'huggingface' | 'auto';
     endpoint?: string;
     apiKey?: string;
     model?: string;

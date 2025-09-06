@@ -734,6 +734,23 @@ User Request: ${userPrompt}`;
             return await modelClient.request(requestWithProvider);
           },
           
+          // Streaming method that RequestExecutionManager expects for streaming support detection
+          stream: async function*(request: ModelRequest): AsyncIterable<any> {
+            // Get the actual ProviderAdapter from ModelClient's internal adapters
+            const adapters = (modelClient as any).adapters;
+            if (adapters && adapters.has(providerType)) {
+              const actualAdapter = adapters.get(providerType);
+              if (actualAdapter && typeof actualAdapter.stream === 'function') {
+                logger.debug(`Provider repository adapter: delegating stream to actual ${providerType} adapter`);
+                yield* actualAdapter.stream(request);
+                return;
+              }
+            }
+            
+            // Fallback: if no streaming support, throw error to trigger fallback to processRequest
+            throw new Error(`Provider ${providerType} does not support streaming`);
+          },
+          
           // Methods that RequestExecutionManager expects
           getModelName: () => providerType,
           isAvailable: () => true, // Assume modelClient handles availability
@@ -745,8 +762,8 @@ User Request: ${userPrompt}`;
       
       // Provide other methods that RequestExecutionManager might expect
       listProviders: () => {
-        // Return common provider types
-        return ['ollama', 'lm-studio', 'openai', 'anthropic'];
+        // Return the same providers as availableProviders for consistency
+        return Array.from(availableProviders);
       },
       
       isProviderAvailable: (providerType: string) => true,

@@ -90,7 +90,7 @@ export class OutputFormatter {
         includeUnavailable: true,
         timeout: 8000,
         cache: true,
-        providers: ['ollama', 'lm-studio', 'huggingface']
+        providers: ['ollama', 'lm-studio', 'claude', 'huggingface']
       });
 
       if (models.length === 0) {

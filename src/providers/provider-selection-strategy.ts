@@ -16,7 +16,7 @@ import { PerformanceMonitor } from '../utils/performance.js';
 import { ProviderRegistry } from './provider-registry.js';
 import type { IProviderCapabilityDiscovery } from './provider-capability-discovery.js';
 
-export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
+export type ProviderType = 'ollama' | 'lm-studio' | 'claude' | 'huggingface' | 'auto';
 export type ExecutionMode = 'fast' | 'quality' | 'balanced';
 
 export interface ProviderSelectionConfig {

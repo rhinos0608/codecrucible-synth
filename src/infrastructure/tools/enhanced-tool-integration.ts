@@ -46,7 +46,7 @@ export class EnhancedToolIntegration extends EventEmitter {
   private activeExecutions: Set<string> = new Set();
   private cacheCleanupInterval?: NodeJS.Timeout;
 
-  constructor(config?: Partial<EnhancedToolConfig>, rustBackend?: any) {
+  constructor(config?: Partial<EnhancedToolConfig>, baseToolIntegration?: ToolIntegration, rustBackend?: any) {
     super();
 
     this.config = {
@@ -61,37 +61,42 @@ export class EnhancedToolIntegration extends EventEmitter {
       ...config,
     };
 
-    // Create a basic MCP manager for tool integration
-    const mcpConfig = {
-      filesystem: {
-        enabled: true,
-        restrictedPaths: [] as string[],
-        allowedPaths: [process.cwd()],
-      },
-      git: {
-        enabled: false,
-        autoCommitMessages: false,
-        safeModeEnabled: true,
-      },
-      terminal: {
-        enabled: false,
-        allowedCommands: [] as string[],
-        blockedCommands: ['rm', 'del', 'rmdir'],
-      },
-      packageManager: {
-        enabled: false,
-        autoInstall: false,
-        securityScan: true,
-      },
-      smithery: {
-        enabled: !!process.env.SMITHERY_API_KEY,
-        apiKey: process.env.SMITHERY_API_KEY,
-        enabledServers: [] as string[],
-        autoDiscovery: true,
-      },
-    };
-    const mcpManager = new MCPServerManager(mcpConfig);
-    this.baseToolIntegration = new ToolIntegration(mcpManager, rustBackend);
+    // Use existing ToolIntegration if provided to prevent MCP server duplication
+    if (baseToolIntegration) {
+      this.baseToolIntegration = baseToolIntegration;
+    } else {
+      // Fallback: create our own MCP manager (should be avoided to prevent duplication)
+      const mcpConfig = {
+        filesystem: {
+          enabled: true,
+          restrictedPaths: [] as string[],
+          allowedPaths: [process.cwd()],
+        },
+        git: {
+          enabled: false,
+          autoCommitMessages: false,
+          safeModeEnabled: true,
+        },
+        terminal: {
+          enabled: false,
+          allowedCommands: [] as string[],
+          blockedCommands: ['rm', 'del', 'rmdir'],
+        },
+        packageManager: {
+          enabled: false,
+          autoInstall: false,
+          securityScan: true,
+        },
+        smithery: {
+          enabled: !!process.env.SMITHERY_API_KEY,
+          apiKey: process.env.SMITHERY_API_KEY,
+          enabledServers: [] as string[],
+          autoDiscovery: true,
+        },
+      };
+      const mcpManager = new MCPServerManager(mcpConfig);
+      this.baseToolIntegration = new ToolIntegration(mcpManager, rustBackend);
+    }
     this.orchestrator = new DomainAwareToolOrchestrator();
 
     this.setupCacheCleanup();

@@ -69,22 +69,47 @@ export class ModelClient extends EventEmitter implements IModelClient {
   }
 
   private getAdapter(name?: string): ProviderAdapter {
-    if (name && this.adapters.has(name)) return this.adapters.get(name)!;
-    const first = this.adapters.values().next().value;
-    if (!first) {
-      const error = EnterpriseErrorHandler.createEnterpriseError(
-        'No provider adapters configured for AI models',
-        ErrorCategory.SYSTEM,
-        ErrorSeverity.CRITICAL,
-        {
-          operation: 'model_adapter_selection',
-          resource: 'ai_providers',
-          context: { configuredProviders: 0, systemPhase: 'initialization' }
-        }
-      );
-      throw error;
+    // If no specific provider requested, return first available
+    if (!name) {
+      const first = this.adapters.values().next().value;
+      if (!first) {
+        const error = EnterpriseErrorHandler.createEnterpriseError(
+          'No provider adapters configured for AI models',
+          ErrorCategory.SYSTEM,
+          ErrorSeverity.CRITICAL,
+          {
+            operation: 'model_adapter_selection',
+            resource: 'ai_providers',
+            context: { configuredProviders: 0, systemPhase: 'initialization' }
+          }
+        );
+        throw error;
+      }
+      return first;
     }
-    return first;
+
+    // If specific provider requested, fail fast if not found
+    if (this.adapters.has(name)) {
+      return this.adapters.get(name)!;
+    }
+
+    // Fail fast instead of silent fallback
+    const availableProviders = Array.from(this.adapters.keys());
+    const error = EnterpriseErrorHandler.createEnterpriseError(
+      `Requested provider '${name}' not found. Available providers: ${availableProviders.join(', ')}`,
+      ErrorCategory.CONFIGURATION,
+      ErrorSeverity.HIGH,
+      {
+        operation: 'model_adapter_selection',
+        resource: 'ai_provider',
+        context: { 
+          requestedProvider: name,
+          availableProviders,
+          configuredProviders: this.adapters.size
+        }
+      }
+    );
+    throw error;
   }
 
   async request(request: ModelRequest): Promise<ModelResponse> {

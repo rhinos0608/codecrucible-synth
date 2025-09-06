@@ -67,6 +67,8 @@ interface NativeRustExecutor {
 export class RustExecutionBackend {
   private rustExecutor: NativeRustExecutor | null = null;
   private initialized = false;
+  private initializationPromise: Promise<boolean> | null = null; // Prevent concurrent initialization
+  private initializationLock = false; // Simple lock mechanism
   private options: RustExecutorOptions;
   private tsOrchestrator?: IToolExecutor;
   private performanceStats = {
@@ -95,9 +97,46 @@ export class RustExecutionBackend {
   }
 
   /**
-   * Initialize the Rust executor NAPI module
+   * Initialize the Rust executor NAPI module with race condition protection
    */
   async initialize(): Promise<boolean> {
+    // Return existing initialization if already completed
+    if (this.initialized) {
+      return true;
+    }
+
+    // Return existing initialization promise if already in progress
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    // Check lock to prevent concurrent initialization
+    if (this.initializationLock) {
+      // Wait for the lock to be released and return result
+      while (this.initializationLock) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      return this.initialized;
+    }
+
+    // Acquire lock and create initialization promise
+    this.initializationLock = true;
+    this.initializationPromise = this.doInitialize();
+    
+    try {
+      const result = await this.initializationPromise;
+      return result;
+    } finally {
+      // Release lock regardless of outcome
+      this.initializationLock = false;
+      this.initializationPromise = null;
+    }
+  }
+
+  /**
+   * Internal initialization method
+   */
+  private async doInitialize(): Promise<boolean> {
     try {
       // Initialize logging for Rust module
       if (typeof global !== 'undefined') {
@@ -143,9 +182,10 @@ export class RustExecutionBackend {
       if (RustExecutor || createRustExecutor) {
         this.rustExecutor = RustExecutor ? new RustExecutor() : createRustExecutor();
 
-        // Initialize the Rust executor
+        // Initialize the Rust executor atomically
         const initResult = this.rustExecutor?.initialize();
         if (initResult) {
+          // Only set initialized flag after successful initialization
           this.initialized = true;
           logger.info('🚀 RustExecutionBackend initialized successfully', {
             executorId: this.rustExecutor?.id || 'unknown',
@@ -155,6 +195,8 @@ export class RustExecutionBackend {
         } else {
           logger.error('❌ Rust executor initialization failed');
           this.initialized = false;
+          // Clean up partially initialized state
+          this.rustExecutor = null;
           throw new Error('Rust executor initialization failed');
         }
         return true;

@@ -41,6 +41,11 @@ export const defaultProviderRegistry = new ProviderRegistry(
       endpoint: 'http://localhost:11434',
       capabilities: { streaming: true, toolCalling: true },
     },
+    claude: {
+      name: 'claude',
+      endpoint: 'https://api.anthropic.com/v1/messages',
+      capabilities: { streaming: false, toolCalling: true },
+    },
     huggingface: {
       name: 'huggingface',
       endpoint: 'https://api-inference.huggingface.co',
@@ -51,5 +56,5 @@ export const defaultProviderRegistry = new ProviderRegistry(
       capabilities: { streaming: true, toolCalling: true },
     },
   },
-  ['ollama', 'lm-studio', 'huggingface']
+  ['ollama', 'lm-studio', 'claude', 'huggingface']
 );

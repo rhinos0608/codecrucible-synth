@@ -26,7 +26,8 @@ export function normalizePath(filePath: unknown, logger: ILogger): string | unkn
     filePath = relativePath;
   }
 
-  const normalizedPath = PathUtilities.normalizeAIPath(filePath, {
+  // TypeScript assertion: we know filePath is string at this point
+  const normalizedPath = PathUtilities.normalizeAIPath(filePath as string, {
     allowAbsolute: true,
     allowRelative: true,
     allowTraversal: false,

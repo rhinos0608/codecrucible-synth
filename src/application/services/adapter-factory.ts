@@ -1,7 +1,7 @@
-import { ProviderAdapter, OllamaAdapter, LMStudioAdapter } from './provider-adapters.js';
+import { ProviderAdapter, OllamaAdapter, LMStudioAdapter, ClaudeAdapter, HuggingFaceAdapter } from './provider-adapters.js';
 
 export type ProviderConfig = {
-  type: 'ollama' | 'lm-studio';
+  type: 'ollama' | 'lm-studio' | 'claude' | 'huggingface';
   endpoint: string;
   models?: string[];
   defaultModel?: string;
@@ -9,6 +9,7 @@ export type ProviderConfig = {
   enabled?: boolean;
   priority?: number;
   timeout?: number;
+  apiKey?: string; // Required for claude and huggingface
 };
 
 export function createAdaptersFromProviders(
@@ -17,11 +18,25 @@ export function createAdaptersFromProviders(
   const adapters: ProviderAdapter[] = [];
   for (const p of providers) {
     const defaultModel = p.defaultModel || (p.models && p.models[0]) || '';
-    if (!defaultModel) continue;
+    
     if (p.type === 'ollama') {
+      if (!defaultModel) continue;
       adapters.push(new OllamaAdapter(p.endpoint, defaultModel));
     } else if (p.type === 'lm-studio') {
+      if (!defaultModel) continue;
       adapters.push(new LMStudioAdapter(p.endpoint, defaultModel));
+    } else if (p.type === 'claude') {
+      if (!p.apiKey) {
+        console.warn('Claude provider requires apiKey, skipping');
+        continue;
+      }
+      adapters.push(new ClaudeAdapter(p.apiKey, p.endpoint));
+    } else if (p.type === 'huggingface') {
+      if (!p.apiKey || !defaultModel) {
+        console.warn('HuggingFace provider requires apiKey and defaultModel, skipping');
+        continue;
+      }
+      adapters.push(new HuggingFaceAdapter(p.apiKey, defaultModel, p.endpoint));
     }
   }
   return adapters;

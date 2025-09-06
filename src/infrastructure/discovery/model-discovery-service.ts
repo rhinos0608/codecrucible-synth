@@ -48,7 +48,7 @@ export class ModelDiscoveryService {
       includeUnavailable = false,
       timeout = 10000,
       cache = true,
-      providers = ['ollama', 'lm-studio', 'huggingface']
+      providers = ['ollama', 'lm-studio', 'claude', 'huggingface']
     } = options;
 
     const allModels: ModelInfo[] = [];
@@ -348,6 +348,15 @@ export class ModelDiscoveryService {
           name: 'local-model',
           provider: 'lm-studio',
           capabilities: ['chat', 'completion'],
+          isAvailable: false,
+          lastChecked: new Date()
+        }
+      ],
+      'claude': [
+        {
+          name: 'claude-3-sonnet-20240229',
+          provider: 'claude',
+          capabilities: ['chat', 'tool-calling'],
           isAvailable: false,
           lastChecked: new Date()
         }

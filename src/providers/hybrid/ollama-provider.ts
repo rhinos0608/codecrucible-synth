@@ -306,17 +306,26 @@ export class OllamaProvider implements LLMProvider {
       
       if (finalContent.length === 0) {
         const errorMessage = `Ollama returned zero-length content from model ${payload.model}. Model may be initializing or prompt may be inappropriate.`;
+        
+        // Check if there are ACTUAL tool calls with meaningful data
+        const hasValidToolCalls = (
+          (data.tool_calls && Array.isArray(data.tool_calls) && data.tool_calls.length > 0 && data.tool_calls[0]?.function?.name) ||
+          (data.message?.tool_calls && Array.isArray(data.message.tool_calls) && data.message.tool_calls.length > 0 && data.message.tool_calls[0]?.function?.name)
+        );
+        
         logger.error(errorMessage, {
           model: payload.model,
           promptLength: builtPrompt.length,
-          hasToolCalls: !!data.tool_calls || (data.message && data.message.tool_calls)
+          hasValidToolCalls,
+          toolCallsCount: data.tool_calls?.length || data.message?.tool_calls?.length || 0,
+          responseKeys: Object.keys(data)
         });
         
-        // Only allow zero-length content if there are tool calls
-        if (!data.tool_calls && !(data.message && data.message.tool_calls)) {
-          throw new Error(errorMessage);
+        // Only allow zero-length content if there are VALID tool calls with function names
+        if (!hasValidToolCalls) {
+          throw new Error(errorMessage + ' No valid tool calls found to compensate for empty content.');
         } else {
-          logger.debug('Empty content allowed due to tool calls being present');
+          logger.debug('Empty content allowed due to valid tool calls being present');
         }
       }
 
@@ -866,9 +875,17 @@ export class OllamaProvider implements LLMProvider {
         }
 
         // Return response in expected format
+        // Validate content before returning - fail fast if no content and no valid tool calls
+        const finalContent = result.message?.content || result.content || result.response;
+        const hasValidToolCalls = result.message?.tool_calls && Array.isArray(result.message.tool_calls) && result.message.tool_calls.length > 0 && result.message.tool_calls[0]?.function?.name;
+        
+        if (!finalContent && !hasValidToolCalls) {
+          throw new Error(`Ollama request ${request.id} returned no content and no valid tool calls. This indicates a provider failure.`);
+        }
+        
         return {
           id: request.id,
-          content: result.message?.content || result.content || result.response || '',
+          content: finalContent || '',
           toolCalls:
             result.message?.tool_calls?.map((toolCall: any) => ({
               id: toolCall.function?.name || `tool_${Date.now()}`,

@@ -211,11 +211,22 @@ export async function initialize(
       logger.info('✅ MCP servers are ready for tool execution');
 
       // Initialize global tool integration now that MCP servers are ready
-      const { initializeGlobalToolIntegration } = await import(
+      const { initializeGlobalToolIntegration, getGlobalToolIntegration } = await import(
         './infrastructure/tools/tool-integration.js'
       );
       initializeGlobalToolIntegration(mcpServerManager);
       logger.info('✅ Global tool integration initialized with MCP servers');
+      
+      // Initialize enhanced tool integration using the existing base integration
+      const { EnhancedToolIntegration, setGlobalEnhancedToolIntegration } = await import(
+        './infrastructure/tools/enhanced-tool-integration.js'
+      );
+      const baseToolIntegration = getGlobalToolIntegration();
+      if (baseToolIntegration) {
+        const enhancedIntegration = new EnhancedToolIntegration(undefined, baseToolIntegration);
+        setGlobalEnhancedToolIntegration(enhancedIntegration);
+        logger.info('✅ Enhanced tool integration initialized (reusing base integration)');
+      }
     } catch (error) {
       logger.warn(
         '⚠️ MCP servers initialization had issues, continuing with degraded capabilities:',
@@ -255,18 +266,46 @@ export async function initialize(
         ? (process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434')
         : (process.env.LM_STUDIO_ENDPOINT ?? 'ws://localhost:8080');
 
-    // Build provider config and adapters using factory
+    // Build provider config and adapters using factory - CREATE ALL PROVIDERS
     const providersConfig = [
       {
-        type: selectedModelInfo.provider as 'ollama' | 'lm-studio',
-        name: `${selectedModelInfo.provider}-selected`,
-        endpoint,
+        type: 'ollama' as const,
+        name: 'ollama',
+        endpoint: process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434',
         enabled: true,
         priority: 1,
-        models: [selectedModelInfo.selectedModel.id],
+        defaultModel: 'qwen2.5-coder:7b',
         timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
       },
-    ];
+      {
+        type: 'lm-studio' as const,
+        name: 'lm-studio',
+        endpoint: process.env.LM_STUDIO_ENDPOINT ?? 'ws://localhost:8080',
+        enabled: true,
+        priority: 2,
+        defaultModel: 'local-model',
+        timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
+      },
+      {
+        type: 'claude' as const,
+        name: 'claude',
+        endpoint: process.env.CLAUDE_ENDPOINT ?? 'https://api.anthropic.com/v1/messages',
+        enabled: !!process.env.ANTHROPIC_API_KEY,
+        priority: 3,
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
+      },
+      {
+        type: 'huggingface' as const,
+        name: 'huggingface',
+        endpoint: process.env.HUGGINGFACE_ENDPOINT ?? 'https://api-inference.huggingface.co',
+        enabled: !!process.env.HUGGINGFACE_API_KEY,
+        priority: 4,
+        apiKey: process.env.HUGGINGFACE_API_KEY,
+        defaultModel: 'microsoft/DialoGPT-medium',
+        timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
+      },
+    ].filter(p => p.enabled); // Only include enabled providers
     const adapters = createAdaptersFromProviders(providersConfig);
 
     const modelClientConfig = {

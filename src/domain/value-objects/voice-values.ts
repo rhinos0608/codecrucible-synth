@@ -198,7 +198,7 @@ export class ProviderType {
   }
 
   private static getValidTypes(): string[] {
-    return ['ollama', 'lm-studio', 'huggingface', 'auto'];
+    return ['ollama', 'lm-studio', 'claude', 'huggingface', 'auto'];
   }
 
   equals(other: ProviderType): boolean {

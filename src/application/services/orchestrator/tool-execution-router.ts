@@ -24,10 +24,24 @@ export class ToolExecutionRouter {
     const toolResults: Array<{ id: string; result: any; error?: string }> = [];
 
     for (const toolCall of response.toolCalls) {
+      let parsedArgs;
+      try {
+        parsedArgs = JSON.parse(toolCall.function.arguments);
+      } catch (parseError) {
+        logger.error(
+          `❌ Failed to parse arguments for tool call ${toolCall.function.name}: ${getErrorMessage(parseError)}. Arguments: ${toolCall.function.arguments}`
+        );
+        toolResults.push({
+          id: toolCall.id || toolCall.function.name,
+          result: null,
+          error: `Malformed tool arguments: ${getErrorMessage(parseError)}`,
+        });
+        continue;
+      }
       try {
         const toolResult = await this.mcpManager.executeTool(
           toolCall.function.name,
-          JSON.parse(toolCall.function.arguments),
+          parsedArgs,
           request.context
         );
         logger.info(`✅ Tool call ${toolCall.function.name} executed successfully`);

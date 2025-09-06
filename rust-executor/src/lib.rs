@@ -71,6 +71,7 @@ pub struct ExecutionOptions {
     pub security_level: Option<SecurityLevel>,
     pub capabilities: Option<Vec<String>>,
     pub environment: Option<HashMap<String, String>>,
+    pub stream_response: Option<bool>,
 }
 
 /// Execution result for JavaScript interop
@@ -196,7 +197,10 @@ impl RustExecutor {
             timeout_ms: options
                 .as_ref()
                 .and_then(|o| o.timeout_ms.map(|t| t as u64)),
-            stream_response: false,
+            stream_response: options
+                .as_ref()
+                .and_then(|o| o.stream_response)
+                .unwrap_or(false),
         };
 
         // Execute request through communication handler and update performance metrics using shared runtime

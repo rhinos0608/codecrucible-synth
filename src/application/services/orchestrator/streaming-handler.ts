@@ -19,7 +19,8 @@ export async function executeWithStreaming(
   const response = await modelClient.streamRequest(modelRequest, (token: StreamToken) => {
     tokenCount++;
     logger.debug(`📝 Token ${tokenCount}: "${token.content}" (complete: ${token.isComplete})`);
-    if (token.content && !token.isComplete) {
+    // Display all tokens with content, including the final one
+    if (token.content) {
       process.stdout.write(token.content);
       displayedContent += token.content;
     }

@@ -742,17 +742,115 @@ export class OllamaProvider implements LLMProvider {
           throw new Error(`Ollama request failed: ${response.status} - ${this.sanitizeErrorMessage(errorText)}`);
         }
 
-        // Robust JSON parsing for function calling responses
-        logger.debug('About to parse JSON for function calling');
-        const responseText = await response.text();
-        logger.debug('Raw response text length:', responseText.length);
-        logger.debug('Raw response preview:', responseText.substring(0, 300));
-        
-        // Reset response for parseRobustJSON (since we already consumed the text)
-        const mockResponse = {
-          text: async () => responseText
-        };
-        const result = await this.parseRobustJSON(mockResponse as Response);
+        // Handle streaming vs non-streaming responses
+        let result;
+        if (request.stream && request.onStreamingToken) {
+          // For streaming requests, process the stream and collect chunks
+          logger.debug('Processing streaming response for function calling');
+          const reader = response.body?.getReader();
+          if (!reader) {
+            throw new Error('No response body reader available for streaming');
+          }
+          
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let accumulatedContent = '';
+          let toolCalls: any[] = [];
+          let lastMetadata: any = {};
+          
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              
+              try {
+                const chunk = JSON.parse(line);
+                
+                // Emit streaming token if content is present
+                if (chunk.message?.content) {
+                  accumulatedContent += chunk.message.content;
+                  request.onStreamingToken({
+                    content: chunk.message.content,
+                    isComplete: false,
+                  });
+                } else if (chunk.response) {
+                  accumulatedContent += chunk.response;
+                  request.onStreamingToken({
+                    content: chunk.response,
+                    isComplete: false,
+                  });
+                }
+                
+                // Collect tool calls
+                if (chunk.message?.tool_calls) {
+                  toolCalls = toolCalls.concat(chunk.message.tool_calls);
+                }
+                
+                // Keep metadata from chunks with done flag
+                if (chunk.done) {
+                  lastMetadata = chunk;
+                  // Emit final token
+                  request.onStreamingToken({
+                    content: '',
+                    isComplete: true,
+                  });
+                }
+              } catch (e) {
+                // Skip malformed JSON lines
+                continue;
+              }
+            }
+          }
+          
+          // Process any remaining buffer
+          if (buffer.trim()) {
+            try {
+              const chunk = JSON.parse(buffer);
+              if (chunk.message?.content) {
+                accumulatedContent += chunk.message.content;
+              } else if (chunk.response) {
+                accumulatedContent += chunk.response;
+              }
+              if (chunk.message?.tool_calls) {
+                toolCalls = toolCalls.concat(chunk.message.tool_calls);
+              }
+              if (chunk.done) {
+                lastMetadata = chunk;
+              }
+            } catch (e) {
+              // Skip malformed final buffer
+            }
+          }
+          
+          // Construct result from accumulated data
+          result = {
+            message: {
+              content: accumulatedContent,
+              tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+            },
+            content: accumulatedContent,
+            response: accumulatedContent,
+            ...lastMetadata,
+          };
+        } else {
+          // For non-streaming requests, use the existing text parsing
+          logger.debug('About to parse JSON for function calling');
+          const responseText = await response.text();
+          logger.debug('Raw response text length:', responseText.length);
+          logger.debug('Raw response preview:', responseText.substring(0, 300));
+          
+          // Reset response for parseRobustJSON (since we already consumed the text)
+          const mockResponse = {
+            text: async () => responseText
+          };
+          result = await this.parseRobustJSON(mockResponse as Response);
+        }
 
         logger.debug('Ollama function calling response received', {
           hasToolCalls: !!result.message?.tool_calls,
@@ -1112,25 +1210,83 @@ export class OllamaProvider implements LLMProvider {
         responsePreview: responseText.substring(0, 200),
       });
       
-      // Strategy 2: Handle streaming JSON with tool calls (improved)
+      // Strategy 2: Handle streaming JSON - accumulate all chunks
       try {
-        // Split by lines and parse the first complete JSON object with tool calls
         const lines = responseText.split('\n').filter(line => line.trim());
         
+        // Check if this looks like streaming response (multiple JSON objects)
+        if (lines.length > 1) {
+          let accumulatedContent = '';
+          let toolCalls: any[] = [];
+          let lastMetadata: any = {};
+          
+          for (const line of lines) {
+            try {
+              const parsed = JSON.parse(line);
+              
+              // Accumulate content from streaming chunks
+              if (parsed.message?.content) {
+                accumulatedContent += parsed.message.content;
+              } else if (parsed.response) {
+                accumulatedContent += parsed.response;
+              } else if (parsed.content) {
+                accumulatedContent += parsed.content;
+              }
+              
+              // Collect tool calls
+              if (parsed.message?.tool_calls) {
+                toolCalls = toolCalls.concat(parsed.message.tool_calls);
+              }
+              
+              // Keep metadata from last chunk (usually has timing info)
+              if (parsed.done) {
+                lastMetadata = parsed;
+              }
+            } catch (lineError) {
+              // Continue to next line
+              continue;
+            }
+          }
+          
+          // If we accumulated content, return it
+          if (accumulatedContent || toolCalls.length > 0) {
+            logger.info('Accumulated streaming response', {
+              contentLength: accumulatedContent.length,
+              toolCallCount: toolCalls.length,
+              lineCount: lines.length,
+            });
+            
+            return {
+              message: {
+                content: accumulatedContent,
+                tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+              },
+              response: accumulatedContent,
+              content: accumulatedContent,
+              model: lastMetadata.model || this.config.defaultModel,
+              total_duration: lastMetadata.total_duration,
+              load_duration: lastMetadata.load_duration,
+              prompt_eval_count: lastMetadata.prompt_eval_count,
+              eval_count: lastMetadata.eval_count,
+              eval_duration: lastMetadata.eval_duration,
+              done: true,
+            };
+          }
+        }
+        
+        // Fallback to single-line extraction if not streaming format
         for (const line of lines) {
           try {
             const parsed = JSON.parse(line);
-            // Look for the response with tool calls or content
+            // Look for complete response with tool calls or content
             if (parsed.message && (parsed.message.tool_calls || parsed.message.content)) {
-              logger.info('Extracted JSON with tool calls from streaming content', {
-                originalLength: responseText.length,
+              logger.info('Extracted single JSON response', {
                 hasToolCalls: !!parsed.message.tool_calls,
-                toolCallCount: parsed.message.tool_calls?.length || 0,
+                hasContent: !!parsed.message.content,
               });
               return parsed;
             }
           } catch (lineError) {
-            // Continue to next line
             continue;
           }
         }
@@ -1150,7 +1306,7 @@ export class OllamaProvider implements LLMProvider {
         logger.debug('JSON extraction failed', { error: errorMessage });
       }
       
-      // Strategy 3: Handle streaming/partial JSON responses
+      // Strategy 3: Handle streaming/partial JSON responses (single response format)
       try {
         const lines = responseText.split('\n').filter(line => line.trim());
         for (const line of lines) {

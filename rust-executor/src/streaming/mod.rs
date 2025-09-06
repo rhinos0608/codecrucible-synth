@@ -18,6 +18,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::fs::File;
 use tokio::process::Command;
 use uuid::Uuid;
+use tracing::{info, warn, error};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Structured error type for NAPI callback failures (preserves debugging context)
@@ -54,22 +55,51 @@ fn create_string_batch_callback(
     Box::new(move |chunks: Vec<StreamChunk>| -> std::result::Result<(), String> {
         use napi::threadsafe_function::ThreadsafeFunctionCallMode;
         let chunk_count = chunks.len();
-        let result = callback.call(Ok(chunks), ThreadsafeFunctionCallMode::NonBlocking);
+        
+        // First try non-blocking call for performance
+        let result = callback.call(Ok(chunks.clone()), ThreadsafeFunctionCallMode::NonBlocking);
         
         if result == napi::Status::Ok {
-            Ok(())
-        } else {
+            return Ok(());
+        }
+        
+        // If non-blocking failed due to queue full, try blocking with retry for backpressure
+        if result == napi::Status::QueueFull {
+            warn!("NAPI queue full for stream {}, applying backpressure with blocking call", stream_id);
+            
+            // Retry with blocking mode to apply backpressure
+            let blocking_result = callback.call(Ok(chunks), ThreadsafeFunctionCallMode::Blocking);
+            
+            if blocking_result == napi::Status::Ok {
+                info!("Backpressure resolved: sent {} chunks for stream {} using blocking mode", chunk_count, stream_id);
+                return Ok(());
+            }
+            
+            // If blocking also failed, report the error
             let timestamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_millis();
             
             let error_msg = format!(
-                "NAPI_BATCH_ERROR{{status:{:?},operation:batch_transfer,chunks:{},stream:{},timestamp:{}}}",
-                result, chunk_count, stream_id, timestamp
+                "NAPI_BATCH_ERROR{{status:{:?},operation:batch_transfer_blocking_failed,chunks:{},stream:{},timestamp:{}}}",
+                blocking_result, chunk_count, stream_id, timestamp
             );
-            Err(error_msg)
+            error!("Critical: Both non-blocking and blocking NAPI calls failed: {}", error_msg);
+            return Err(error_msg);
         }
+        
+        // For other errors, report them directly
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        
+        let error_msg = format!(
+            "NAPI_BATCH_ERROR{{status:{:?},operation:batch_transfer,chunks:{},stream:{},timestamp:{}}}",
+            result, chunk_count, stream_id, timestamp
+        );
+        Err(error_msg)
     })
 }
 

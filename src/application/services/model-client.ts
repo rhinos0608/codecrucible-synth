@@ -147,7 +147,12 @@ export class ModelClient extends EventEmitter implements IModelClient {
     const processed = this.requestProcessor.process(request);
     const adapter = this.getAdapter(processed.provider);
     for await (const token of this.streamingManager.stream(adapter, processed)) {
-      yield token;
+      yield {
+        ...token,
+        isComplete: token.isComplete ?? false,
+        index: token.index ?? 0,
+        timestamp: token.timestamp ?? Date.now()
+      };
     }
   }
 

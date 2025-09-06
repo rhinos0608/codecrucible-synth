@@ -7,6 +7,27 @@ import { unifiedResultFormatter } from '../../infrastructure/formatting/unified-
  * Replaces scattered formatting logic with consistent, comprehensive formatting
  */
 export function formatOutput(result: unknown): string {
+  // Handle objects that might have response or content properties
+  if (result && typeof result === 'object' && !Array.isArray(result)) {
+    const obj = result as any;
+    
+    // Check for nested message.content pattern
+    if (obj.message && typeof obj.message === 'object' && obj.message.content) {
+      return formatOutput(obj.message.content);
+    }
+    
+    // Check for direct content/response/text properties
+    if (obj.content && typeof obj.content === 'string') {
+      return obj.content;
+    }
+    if (obj.response && typeof obj.response === 'string') {
+      return obj.response;
+    }
+    if (obj.text && typeof obj.text === 'string') {
+      return obj.text;
+    }
+  }
+  
   // Use centralized result formatter for consistent output
   const formatted = unifiedResultFormatter.formatResult(result, {
     includeMetadata: false,
@@ -30,6 +51,14 @@ export function formatOutput(result: unknown): string {
     
     if (typeof result === 'number') {
       return `✅ Result: ${result}`;
+    }
+    
+    // If result is an object but content is empty, try to show something meaningful
+    if (result && typeof result === 'object') {
+      const str = JSON.stringify(result, null, 2);
+      if (str !== '{}') {
+        return str;
+      }
     }
     
     return '✅ Operation completed successfully';

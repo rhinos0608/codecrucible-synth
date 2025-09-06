@@ -18,6 +18,7 @@ import {
   StreamChunk,
   StreamConfig,
   IStreamingManager,
+  StreamingManager,
 } from '../services/streaming-manager.js';
 import { AgenticWorkflowDisplay } from './agentic-workflow-display.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';

@@ -41,7 +41,18 @@ export class BasicResponseHandler implements ResponseHandler {
     if (typeof raw === 'string') {
       content = raw;
     } else if (raw && typeof raw === 'object') {
-      content = raw.content || raw.text || raw.response || raw.message || '';
+      // Handle nested message objects
+      if (raw.message && typeof raw.message === 'object') {
+        content = raw.message.content || raw.message.text || raw.message.response || '';
+      } else {
+        content = raw.content || raw.text || raw.response || raw.message || '';
+      }
+      
+      // If content is still an object, try to extract from it
+      if (content && typeof content === 'object') {
+        const contentObj = content as any;
+        content = contentObj.content || contentObj.text || contentObj.response || JSON.stringify(content);
+      }
     } else {
       content = String(raw || '');
     }

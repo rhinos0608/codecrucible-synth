@@ -429,10 +429,30 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           abortSignal: abortController.signal,
         };
 
-        const response = await Promise.race([
-          provider.processRequest(requestWithAbort, context),
-          this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
-        ]);
+        // Route to streaming or regular processing based on request.stream flag
+        let response;
+        if (request.stream && request.onStreamingToken) {
+          // For streaming requests, check if provider has streamRequest method
+          const modelClient = provider as any;
+          if (modelClient.streamRequest && typeof modelClient.streamRequest === 'function') {
+            response = await Promise.race([
+              modelClient.streamRequest(requestWithAbort, request.onStreamingToken, context),
+              this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
+            ]);
+          } else {
+            // Fallback to regular processing if provider doesn't support streaming
+            logger.warn('Provider does not support streaming, falling back to regular processing');
+            response = await Promise.race([
+              provider.processRequest(requestWithAbort, context),
+              this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
+            ]);
+          }
+        } else {
+          response = await Promise.race([
+            provider.processRequest(requestWithAbort, context),
+            this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
+          ]);
+        }
 
         // Mark request as completed successfully
         requestTimeoutOptimizer.completeRequest(requestId);

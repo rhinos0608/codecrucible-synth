@@ -32,6 +32,8 @@ export interface ChatMessage {
   };
 }
 
+type LMChatMessageInput = { role: 'system' | 'user' | 'assistant'; content: string };
+
 export interface LLMTool {
   type: string;
   function: {
@@ -179,7 +181,10 @@ export class LMStudioProvider {
     }
   }
 
-  async generateTextStreaming(prompt: string, options: LLMOptions = {}): Promise<AsyncIterable<string>> {
+  async generateTextStreaming(
+    prompt: string,
+    options: LLMOptions = {}
+  ): Promise<AsyncIterable<string>> {
     try {
       logger.debug('LMStudioProvider generateTextStreaming called', {
         promptLength: prompt.length,
@@ -235,8 +240,13 @@ export class LMStudioProvider {
       // Get model instance
       const model = await this.client.llm.model(modelToUse);
 
-      // Convert messages to LM Studio format and use respond method
-      const response = await model.respond(messages, {
+      // Filter/convert to roles supported by LM Studio ('system' | 'user' | 'assistant')
+      const lmMessages: LMChatMessageInput[] = messages
+        .filter(m => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
+        .map(m => ({ role: m.role as LMChatMessageInput['role'], content: m.content }));
+
+      // Use respond with sanitized messages
+      const response = await model.respond(lmMessages, {
         temperature: options.temperature || 0.7,
         maxTokens: options.maxTokens || 1000,
         ...options,
@@ -258,7 +268,11 @@ export class LMStudioProvider {
   }
 
   // Advanced LM Studio feature - agentic workflows
-  async act(task: string, tools: LLMTool[] = [], options: LLMOptions = {}): Promise<AgenticResponse> {
+  async act(
+    task: string,
+    tools: LLMTool[] = [],
+    options: LLMOptions = {}
+  ): Promise<AgenticResponse> {
     try {
       logger.debug('LMStudioProvider act called', {
         taskLength: task.length,
@@ -276,7 +290,16 @@ export class LMStudioProvider {
       const model = await this.client.llm.model(modelToUse);
 
       // Use LM Studio's .act() method for autonomous agents
-      const response = await model.act(task, tools, {
+      // Cast tools to SDK-compatible type (runtime validated by SDK)
+      const response = await (
+        model as unknown as {
+          act: (
+            task: string,
+            tools: unknown[],
+            options: Record<string, unknown>
+          ) => Promise<unknown>;
+        }
+      ).act(task, tools as unknown[], {
         temperature: options.temperature || 0.7,
         maxSteps: options.maxSteps || 10,
         ...options,
@@ -290,7 +313,7 @@ export class LMStudioProvider {
       return {
         result: response,
         steps: [], // LM Studio doesn't provide step details in current version
-        metadata: { model: modelToUse, task }
+        metadata: { model: modelToUse, task },
       };
     } catch (error) {
       logger.error('LMStudioProvider act failed', {
@@ -392,14 +415,14 @@ export class LMStudioProvider {
       return {
         content,
         model: this.model,
-        metadata: { requestType: 'chat' }
+        metadata: { requestType: 'chat' },
       };
     } else if (request.prompt) {
       const content = await this.generateText(request.prompt, request.options || {});
       return {
         content,
         model: this.model,
-        metadata: { requestType: 'completion' }
+        metadata: { requestType: 'completion' },
       };
     } else {
       throw new Error('Invalid request format: must include either messages or prompt');

@@ -35,12 +35,12 @@ export class CLIUserInteraction implements IUserInteraction {
     if (options.stream) {
       // CRITICAL FIX: For streaming output, ensure proper finalization
       process.stdout.write(formattedMessage);
-      
+
       // Ensure the output is flushed and finalized properly
       if (options.final || message.trim().length === 0 || message.endsWith('\n')) {
         process.stdout.write('\n');
       }
-      
+
       // Force flush to prevent output buffering issues
       if (process.stdout.isTTY) {
         process.stdout.cursorTo(0);

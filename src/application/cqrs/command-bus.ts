@@ -32,7 +32,8 @@ export class CommandBus {
     }
 
     // Compose middleware pipeline
-    const invoke: () => Promise<unknown> = (): Promise<unknown> => Promise.resolve(handler.handle(command));
+    const invoke: () => Promise<unknown> = (): Promise<unknown> =>
+      Promise.resolve(handler.handle(command));
     let pipeline: () => Promise<unknown> = invoke;
     for (let i = this.middleware.length - 1; i >= 0; i--) {
       const mw = this.middleware[i];

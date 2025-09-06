@@ -89,16 +89,19 @@ export class CouncilDecisionEngine extends EventEmitter {
     try {
       // Collect perspectives from all voices in parallel with timeout
       this.logger.debug(`Collecting perspectives from ${voices.length} voices in parallel`);
-      
+
       const perspectivePromises = voices.map(voiceId =>
         Promise.race([
-          this.voiceSystem.getVoicePerspective(voiceId, prompt)
+          this.voiceSystem
+            .getVoicePerspective(voiceId, prompt)
             .then(perspective => perspective as VoicePerspective),
-          new Promise<null>((_, reject) => 
-            setTimeout(() => reject(new Error(`Voice ${voiceId} timed out`)), config.timeoutMs / voices.length)
-          )
-        ])
-        .catch(error => {
+          new Promise<null>((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`Voice ${voiceId} timed out`)),
+              config.timeoutMs / voices.length
+            )
+          ),
+        ]).catch(error => {
           this.logger.warn(`Failed to get perspective from voice ${voiceId}:`, error);
           return null; // Return null for failed perspectives, filter out later
         })
@@ -109,7 +112,7 @@ export class CouncilDecisionEngine extends EventEmitter {
 
       // Apply consensus threshold from configuration
       const consensusLevel = this.calculateConsensus(perspectives);
-      
+
       if (consensusLevel < config.consensusThreshold) {
         this.logger.warn(`Council session ${sessionId} failed to meet consensus threshold`, {
           achieved: consensusLevel,
@@ -119,9 +122,9 @@ export class CouncilDecisionEngine extends EventEmitter {
 
       // Apply configuration-based decision synthesis
       const finalDecision = this.synthesizeDecisionWithConfig(perspectives, config);
-      
+
       // Handle dissent based on configuration
-      const dissent = config.allowDissent 
+      const dissent = config.allowDissent
         ? this.extractDissent(perspectives, consensusLevel, config.consensusThreshold)
         : [];
 
@@ -139,14 +142,13 @@ export class CouncilDecisionEngine extends EventEmitter {
         decisionRationale,
         dissent,
       };
-
     } finally {
       clearTimeout(sessionTimeout);
     }
   }
 
   private synthesizeDecisionWithConfig(
-    perspectives: VoicePerspective[], 
+    perspectives: VoicePerspective[],
     config: CouncilConfig
   ): string {
     switch (config.mode) {
@@ -165,7 +167,7 @@ export class CouncilDecisionEngine extends EventEmitter {
     // Combine perspectives in a collaborative manner - enhance with better synthesis logic
     const positions = perspectives.map(p => p.position);
     const reasoning = perspectives.map(p => p.reasoning).filter(r => r.trim().length > 0);
-    
+
     if (reasoning.length > 0) {
       return `Collaborative approach incorporating ${positions.length} perspectives: ${positions.join('; ')}. Combined reasoning: ${reasoning.slice(0, 2).join('; ')}.`;
     }
@@ -176,38 +178,42 @@ export class CouncilDecisionEngine extends EventEmitter {
     // Highlight different viewpoints and conflicts with structured debate format
     const highConfidence = perspectives.filter(p => p.confidence > 0.7);
     const positions = highConfidence.length > 0 ? highConfidence : perspectives;
-    
+
     const debates = positions.map(p => {
-      const concerns = p.concerns.length > 0 ? ` (concerns: ${p.concerns.slice(0, 2).join(', ')})` : '';
+      const concerns =
+        p.concerns.length > 0 ? ` (concerns: ${p.concerns.slice(0, 2).join(', ')})` : '';
       return `${p.voiceId}: ${p.position}${concerns}`;
     });
-    
+
     return `Structured debate synthesis: ${debates.join('; ')}.`;
   }
 
   private synthesizeWithConsensus(perspectives: VoicePerspective[], threshold: number): string {
     // Only include perspectives that meet consensus threshold with detailed analysis
     const consensusViews = perspectives.filter(p => p.confidence >= threshold);
-    
+
     if (consensusViews.length === 0) {
       const fallback = perspectives.sort((a, b) => b.confidence - a.confidence)[0];
       return `No consensus reached (threshold: ${threshold}). Highest confidence perspective from ${fallback?.voiceId || 'unknown'}: ${fallback?.position || 'No perspectives available'}`;
     }
-    
-    const avgConfidence = consensusViews.reduce((sum, v) => sum + v.confidence, 0) / consensusViews.length;
+
+    const avgConfidence =
+      consensusViews.reduce((sum, v) => sum + v.confidence, 0) / consensusViews.length;
     return `Strong consensus (${consensusViews.length}/${perspectives.length} voices, avg confidence: ${avgConfidence.toFixed(2)}): ${consensusViews.map(p => p.position).join('; ')}.`;
   }
 
   private extractDissent(
-    perspectives: VoicePerspective[], 
-    consensusLevel: number, 
+    perspectives: VoicePerspective[],
+    consensusLevel: number,
     threshold: number
   ): string[] {
     if (consensusLevel >= threshold) return [];
-    
+
     // Find perspectives that significantly differ from the majority
     const lowConfidence = perspectives.filter(p => p.confidence < 0.5);
-    return lowConfidence.map(p => `${p.voiceId} dissents: ${p.concerns?.join(', ') || 'General disagreement'}`);
+    return lowConfidence.map(
+      p => `${p.voiceId} dissents: ${p.concerns?.join(', ') || 'General disagreement'}`
+    );
   }
 
   private generateExplanation(perspectives: VoicePerspective[], config: CouncilConfig): string {
@@ -217,10 +223,8 @@ export class CouncilDecisionEngine extends EventEmitter {
       `Consensus threshold: ${config.consensusThreshold}`,
     ];
 
-    const reasoning = perspectives
-      .map(p => p.reasoning)
-      .filter(r => r && r.trim().length > 0);
-    
+    const reasoning = perspectives.map(p => p.reasoning).filter(r => r && r.trim().length > 0);
+
     if (reasoning.length > 0) {
       explanationParts.push(`Key reasoning: ${reasoning.slice(0, 3).join('; ')}`);
     }

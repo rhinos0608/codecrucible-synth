@@ -30,12 +30,11 @@ export interface MCPServerConfig {
 }
 
 export class EnhancedMCPClientManager extends EventEmitter {
-  private baseManager: MCPServerManager;
-  private config: ClientConfig;
-  private _connectionPool: Map<string, any> = new Map();
+  private readonly baseManager: MCPServerManager;
+  // Removed unused _connectionPool property
   private healthCheckInterval: NodeJS.Timeout | null = null;
 
-  constructor(config?: Partial<ClientConfig>) {
+  public constructor(public readonly config?: Readonly<Partial<ClientConfig>>) {
     super();
 
     this.config = {
@@ -62,7 +61,7 @@ export class EnhancedMCPClientManager extends EventEmitter {
     this.startHealthMonitoring();
   }
 
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     logger.info('Initializing Enhanced MCP Client Manager');
     await this.baseManager.initialize();
   }
@@ -73,18 +72,20 @@ export class EnhancedMCPClientManager extends EventEmitter {
     }
 
     this.healthCheckInterval = setInterval(() => {
+      // Move the void expression to its own statement and ensure proper typing
       this.performHealthChecks().catch(error => {
         logger.error('Health check error:', error);
       });
-    }, this.config.healthCheckInterval);
+    }, this.config?.healthCheckInterval ?? 60000);
   }
 
   private async performHealthChecks(): Promise<void> {
     // Health check implementation would go here
     logger.debug('Performing MCP client health checks');
+    return Promise.resolve();
   }
 
-  async shutdown(): Promise<void> {
+  public async shutdown(): Promise<void> {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
       this.healthCheckInterval = null;

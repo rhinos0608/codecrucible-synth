@@ -52,16 +52,20 @@ export interface ServiceFactoryConfig {
  * Replaces singleton pattern with RuntimeContext-based dependency management
  */
 export class ServiceFactory {
-  private readonly runtimeContext: RuntimeContext;
+  private runtimeContext: RuntimeContext;
   private configManager?: UnifiedConfigurationManager;
   private resourceCoordinator?: ConfigurableResourceCoordinator;
 
   public constructor(
-    private readonly config: ServiceFactoryConfig = {},
-    private readonly logger: ILogger = createLogger('ServiceFactory')
+    private config: ServiceFactoryConfig = {},
+    private logger: ILogger = createLogger('ServiceFactory')
   ) {
     this.runtimeContext = createRuntimeContext({
       eventBus: new EventBus(),
+    });
+    // Initialize Rust execution backend asynchronously and attach to runtime context
+    this.ensureRustBackend().catch(err => {
+      this.logger.warn('Error initializing RustExecutionBackend in constructor', err);
     });
   }
 
@@ -160,12 +164,9 @@ export class ServiceFactory {
     }
   }
 
-  public async ensureRustBackend(): Promise<RustExecutionBackend | null> {
-    if (this.runtimeContext.rustBackend) {
-      return this.runtimeContext.rustBackend;
-    }
-
+  private async ensureRustBackend(): Promise<void> {
     try {
+      // Attempt to create and initialize the RustExecutionBackend
       const rustBackend = new RustExecutionBackend();
       if (typeof rustBackend.initialize === 'function') {
         await rustBackend.initialize();
@@ -173,19 +174,19 @@ export class ServiceFactory {
 
       this.runtimeContext.rustBackend = rustBackend;
 
+      // Also expose the backend to the unified tool registry so tool handlers can use it
       try {
         unifiedToolRegistry.setRustBackend(rustBackend);
-        setGlobalToolIntegrationRustBackend(rustBackend);
+  // Also set the backend on the global ToolIntegration if present
+  setGlobalToolIntegrationRustBackend(rustBackend);
       } catch (e) {
-        this.logger.warn('Failed to set rustBackend on unifiedToolRegistry', e);
+        this.logger?.warn('Failed to set rustBackend on unifiedToolRegistry', e);
       }
 
-      this.logger.info('RustExecutionBackend initialized and attached to RuntimeContext');
-      return rustBackend;
+      this.logger?.info('RustExecutionBackend initialized and attached to RuntimeContext');
     } catch (err) {
-      this.logger.warn('Failed to create or initialize RustExecutionBackend', err);
-      this.logger.info('RustExecutionBackend not available; TypeScript fallback will be used');
-      return null;
+      this.logger?.warn('Failed to create or initialize RustExecutionBackend', err);
+      this.logger?.info('RustExecutionBackend not available; TypeScript fallback will be used');
     }
   }
 }

@@ -22,25 +22,25 @@ export class ToolRegistry {
     if (!this.mcpManager) {
       return [];
     }
-    
+
     try {
       const registry = this.initializeRegistry();
       const allTools = Array.from(registry.values());
-      
+
       // If no user query provided, return essential tools only
       if (!userQuery || userQuery.trim().length === 0) {
         const essentialTools = this.getEssentialTools(registry);
         logger.info(`🎯 No query context - providing ${essentialTools.length} essential tools`);
         return essentialTools;
       }
-      
+
       // Apply contextual filtering based on user query
       const filteredTools = this.filterToolsByContext(userQuery, allTools);
-      
+
       logger.info(
         `🎯 Contextual filtering: ${filteredTools.length}/${allTools.length} tools selected for query context`
       );
-      
+
       return filteredTools;
     } catch (error) {
       logger.warn('Failed to get MCP tools for model:', error);
@@ -55,14 +55,12 @@ export class ToolRegistry {
   private getEssentialTools(registry: Map<string, ModelTool>): ModelTool[] {
     const essentialToolNames = [
       'filesystem_read_file',
-      'filesystem_list_directory', 
+      'filesystem_list_directory',
       'filesystem_get_file_info',
-      'filesystem_write_file'
+      'filesystem_write_file',
     ];
-    
-    return essentialToolNames
-      .map(name => registry.get(name))
-      .filter(Boolean) as ModelTool[];
+
+    return essentialToolNames.map(name => registry.get(name)).filter(Boolean) as ModelTool[];
   }
 
   /**
@@ -71,7 +69,7 @@ export class ToolRegistry {
   private filterToolsByContext(userQuery: string, allTools: ModelTool[]): ModelTool[] {
     const queryLower = userQuery.toLowerCase();
     const context = this.analyzeQueryContext(queryLower);
-    
+
     return allTools.filter(tool => this.isToolRelevantForContext(tool, context));
   }
 
@@ -80,64 +78,139 @@ export class ToolRegistry {
    */
   private analyzeQueryContext(queryLower: string): Set<string> {
     const contexts = new Set<string>();
-    
+
     // Always include filesystem as most queries need file access
     contexts.add('filesystem');
-    
+
     // File operations
-    if (this.matchesPatterns(queryLower, [
-      'read', 'write', 'create', 'delete', 'modify', 'edit', 'file', 'folder', 'directory',
-      'analyze', 'check', 'examine', 'look at', 'show me', 'list'
-    ])) {
+    if (
+      this.matchesPatterns(queryLower, [
+        'read',
+        'write',
+        'create',
+        'delete',
+        'modify',
+        'edit',
+        'file',
+        'folder',
+        'directory',
+        'analyze',
+        'check',
+        'examine',
+        'look at',
+        'show me',
+        'list',
+      ])
+    ) {
       contexts.add('filesystem');
     }
-    
+
     // Git operations
-    if (this.matchesPatterns(queryLower, [
-      'git', 'commit', 'branch', 'merge', 'pull', 'push', 'status', 'log', 'diff',
-      'repository', 'repo', 'version control'
-    ])) {
+    if (
+      this.matchesPatterns(queryLower, [
+        'git',
+        'commit',
+        'branch',
+        'merge',
+        'pull',
+        'push',
+        'status',
+        'log',
+        'diff',
+        'repository',
+        'repo',
+        'version control',
+      ])
+    ) {
       contexts.add('git');
     }
-    
+
     // Terminal/system operations
-    if (this.matchesPatterns(queryLower, [
-      'run', 'execute', 'command', 'terminal', 'shell', 'bash', 'npm', 'node',
-      'install', 'build', 'test', 'start', 'stop', 'process'
-    ])) {
+    if (
+      this.matchesPatterns(queryLower, [
+        'run',
+        'execute',
+        'command',
+        'terminal',
+        'shell',
+        'bash',
+        'npm',
+        'node',
+        'install',
+        'build',
+        'test',
+        'start',
+        'stop',
+        'process',
+      ])
+    ) {
       contexts.add('terminal');
     }
-    
+
     // Package management
-    if (this.matchesPatterns(queryLower, [
-      'package', 'dependency', 'npm', 'yarn', 'install', 'update', 'upgrade',
-      'requirements', 'dependencies', 'node_modules'
-    ])) {
+    if (
+      this.matchesPatterns(queryLower, [
+        'package',
+        'dependency',
+        'npm',
+        'yarn',
+        'install',
+        'update',
+        'upgrade',
+        'requirements',
+        'dependencies',
+        'node_modules',
+      ])
+    ) {
       contexts.add('packages');
     }
-    
+
     // Development/coding tasks
-    if (this.matchesPatterns(queryLower, [
-      'code', 'function', 'class', 'method', 'variable', 'import', 'export',
-      'typescript', 'javascript', 'python', 'refactor', 'optimize'
-    ])) {
+    if (
+      this.matchesPatterns(queryLower, [
+        'code',
+        'function',
+        'class',
+        'method',
+        'variable',
+        'import',
+        'export',
+        'typescript',
+        'javascript',
+        'python',
+        'refactor',
+        'optimize',
+      ])
+    ) {
       contexts.add('development');
     }
-    
+
     // Server/network operations
-    if (this.matchesPatterns(queryLower, [
-      'server', 'port', 'http', 'api', 'endpoint', 'request', 'response',
-      'curl', 'fetch', 'network', 'connection'
-    ])) {
+    if (
+      this.matchesPatterns(queryLower, [
+        'server',
+        'port',
+        'http',
+        'api',
+        'endpoint',
+        'request',
+        'response',
+        'curl',
+        'fetch',
+        'network',
+        'connection',
+      ])
+    ) {
       contexts.add('server');
     }
-    
+
     // If no specific context detected, include common contexts
-    if (contexts.size === 1) { // Only filesystem
+    if (contexts.size === 1) {
+      // Only filesystem
       contexts.add('development');
       contexts.add('terminal');
     }
-    
+
     return contexts;
   }
 
@@ -153,49 +226,59 @@ export class ToolRegistry {
    */
   private isToolRelevantForContext(tool: ModelTool, contexts: Set<string>): boolean {
     const toolName = tool.function.name.toLowerCase();
-    
+
     // Essential filesystem tools are always included
     if (toolName.startsWith('filesystem_') && contexts.has('filesystem')) {
       return true;
     }
-    
+
     // Git tools
     if (toolName.startsWith('git_') && contexts.has('git')) {
       return true;
     }
-    
+
     // Terminal tools
-    if ((toolName.startsWith('terminal_') || 
-         toolName.startsWith('execute_') ||
-         toolName.includes('command')) && contexts.has('terminal')) {
+    if (
+      (toolName.startsWith('terminal_') ||
+        toolName.startsWith('execute_') ||
+        toolName.includes('command')) &&
+      contexts.has('terminal')
+    ) {
       return true;
     }
-    
+
     // Package management tools
-    if ((toolName.includes('package') || 
-         toolName.includes('npm') ||
-         toolName.includes('dependency')) && contexts.has('packages')) {
+    if (
+      (toolName.includes('package') ||
+        toolName.includes('npm') ||
+        toolName.includes('dependency')) &&
+      contexts.has('packages')
+    ) {
       return true;
     }
-    
+
     // Server/network tools
-    if ((toolName.includes('server') ||
-         toolName.includes('http') ||
-         toolName.includes('curl') ||
-         toolName.includes('fetch')) && contexts.has('server')) {
+    if (
+      (toolName.includes('server') ||
+        toolName.includes('http') ||
+        toolName.includes('curl') ||
+        toolName.includes('fetch')) &&
+      contexts.has('server')
+    ) {
       return true;
     }
-    
+
     // Development-specific tools
-    if (contexts.has('development') && (
-      toolName.includes('code') ||
-      toolName.includes('format') ||
-      toolName.includes('lint') ||
-      toolName.includes('analyze')
-    )) {
+    if (
+      contexts.has('development') &&
+      (toolName.includes('code') ||
+        toolName.includes('format') ||
+        toolName.includes('lint') ||
+        toolName.includes('analyze'))
+    ) {
       return true;
     }
-    
+
     // Default: exclude tools that don't match any context
     return false;
   }

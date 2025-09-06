@@ -1,6 +1,6 @@
 /**
  * Smart Model Selection with User Preferences and Dynamic Capability Detection
- * 
+ *
  * Replaces hardcoded model priorities with user-configurable preferences
  * and dynamic capability detection using HuggingFace API.
  */
@@ -35,14 +35,14 @@ export class SmartModelSelector {
       preferredModel = process.env.MODEL_PREFERRED,
       requireFunctionCalling = process.env.MODEL_REQUIRE_FUNCTION_CALLING !== 'false',
       fallbackToBest = process.env.MODEL_FALLBACK_TO_BEST !== 'false',
-      provider
+      provider,
     } = options;
 
     logger.info('🤖 Smart model selection started', {
       preferredModel: preferredModel || 'none',
       requireFunctionCalling,
       fallbackToBest,
-      preferredProvider: provider || 'any'
+      preferredProvider: provider || 'any',
     });
 
     // Discover available models
@@ -53,13 +53,15 @@ export class SmartModelSelector {
       throw new Error('No AI models available');
     }
 
-    logger.info(`📋 Found ${availableModels.length} available models across ${[...new Set(availableModels.map(m => m.provider))].length} providers`);
+    logger.info(
+      `📋 Found ${availableModels.length} available models across ${[...new Set(availableModels.map(m => m.provider))].length} providers`
+    );
 
     // Step 1: Try user's preferred model
     if (preferredModel && preferredModel.trim()) {
       const result = await this.tryPreferredModel(
-        availableModels, 
-        preferredModel, 
+        availableModels,
+        preferredModel,
         requireFunctionCalling
       );
       if (result) return result;
@@ -83,7 +85,7 @@ export class SmartModelSelector {
     // Step 4: Simple fallback
     const fallbackModel = availableModels[0];
     logger.info(`⚠️ Using simple fallback: ${fallbackModel.name} (${fallbackModel.provider})`);
-    
+
     return {
       selectedModel: fallbackModel,
       provider: fallbackModel.provider,
@@ -94,15 +96,16 @@ export class SmartModelSelector {
    * Try to use the user's preferred model
    */
   private async tryPreferredModel(
-    availableModels: ModelInfo[], 
+    availableModels: ModelInfo[],
     preferredModelName: string,
     requireFunctionCalling: boolean
   ): Promise<ModelSelectionResult | null> {
-    const preferredModel = availableModels.find(m => 
-      m.name.toLowerCase().includes(preferredModelName.toLowerCase()) ||
-      m.id?.toLowerCase().includes(preferredModelName.toLowerCase())
+    const preferredModel = availableModels.find(
+      m =>
+        m.name.toLowerCase().includes(preferredModelName.toLowerCase()) ||
+        m.id?.toLowerCase().includes(preferredModelName.toLowerCase())
     );
-    
+
     if (!preferredModel) {
       logger.warn(`⚠️ Preferred model "${preferredModelName}" not found in available models`);
       return null;
@@ -112,22 +115,31 @@ export class SmartModelSelector {
     if (requireFunctionCalling) {
       try {
         const supportsFunctionCalling = await modelCapabilityService.supportsFunctionCalling(
-          preferredModel.name, 
+          preferredModel.name,
           preferredModel.provider
         );
-        
+
         if (!supportsFunctionCalling) {
-          logger.warn(`⚠️ Preferred model ${preferredModel.name} doesn't support function calling when required`);
+          logger.warn(
+            `⚠️ Preferred model ${preferredModel.name} doesn't support function calling when required`
+          );
           return null;
         }
-        
+
         logger.info(`✅ Using preferred model: ${preferredModel.name} (supports function calling)`);
       } catch (error) {
-        logger.warn(`⚠️ Could not verify function calling for preferred model ${preferredModel.name}:`, error);
-        logger.info(`✅ Using preferred model anyway: ${preferredModel.name} (function calling verification failed)`);
+        logger.warn(
+          `⚠️ Could not verify function calling for preferred model ${preferredModel.name}:`,
+          error
+        );
+        logger.info(
+          `✅ Using preferred model anyway: ${preferredModel.name} (function calling verification failed)`
+        );
       }
     } else {
-      logger.info(`✅ Using preferred model: ${preferredModel.name} (function calling not required)`);
+      logger.info(
+        `✅ Using preferred model: ${preferredModel.name} (function calling not required)`
+      );
     }
 
     return {
@@ -145,17 +157,22 @@ export class SmartModelSelector {
     requireFunctionCalling: boolean
   ): Promise<ModelSelectionResult | null> {
     const providerModels = availableModels.filter(m => m.provider === preferredProvider);
-    
+
     if (providerModels.length === 0) {
       logger.warn(`⚠️ No available models found for preferred provider: ${preferredProvider}`);
       return null;
     }
 
     // Score and select best model from preferred provider
-    const bestFromProvider = await this.selectBestFromModels(providerModels, requireFunctionCalling);
-    
+    const bestFromProvider = await this.selectBestFromModels(
+      providerModels,
+      requireFunctionCalling
+    );
+
     if (bestFromProvider) {
-      logger.info(`✅ Selected best model from preferred provider ${preferredProvider}: ${bestFromProvider.selectedModel.name}`);
+      logger.info(
+        `✅ Selected best model from preferred provider ${preferredProvider}: ${bestFromProvider.selectedModel.name}`
+      );
       return bestFromProvider;
     }
 
@@ -166,7 +183,7 @@ export class SmartModelSelector {
    * Select the best available model based on capability scoring
    */
   private async selectBestAvailable(
-    availableModels: ModelInfo[], 
+    availableModels: ModelInfo[],
     requireFunctionCalling: boolean
   ): Promise<ModelSelectionResult> {
     return await this.selectBestFromModels(availableModels, requireFunctionCalling);
@@ -182,7 +199,7 @@ export class SmartModelSelector {
     logger.info(`🎯 Scoring ${models.length} models for selection...`);
 
     const scoredModels = await Promise.all(
-      models.map(async (model) => {
+      models.map(async model => {
         let score = 0;
         const reasons = [];
 
@@ -217,7 +234,7 @@ export class SmartModelSelector {
               model.name,
               model.provider
             );
-            
+
             if (capabilities.functionCalling) {
               score += 15;
               reasons.push(`function-calling-${capabilities.confidence.toFixed(1)}`);
@@ -235,7 +252,6 @@ export class SmartModelSelector {
               score += 3;
               reasons.push('json-mode');
             }
-
           } catch (error) {
             logger.debug(`Could not check capabilities for ${model.name}:`, error);
             // Give moderate score for unknown capabilities
@@ -281,31 +297,34 @@ export class SmartModelSelector {
         return {
           model,
           score,
-          reasons: reasons.join(', ')
+          reasons: reasons.join(', '),
         };
       })
     );
 
     // Sort by score (highest first)
     scoredModels.sort((a, b) => b.score - a.score);
-    
+
     const bestModel = scoredModels[0];
-    
+
     logger.info(`✅ Selected best model: ${bestModel.model.name}`, {
       score: bestModel.score,
       reasons: bestModel.reasons,
-      provider: bestModel.model.provider
+      provider: bestModel.model.provider,
     });
 
     // Log top 3 for debugging
     if (scoredModels.length > 1) {
-      logger.debug('Top 3 model candidates:', scoredModels.slice(0, 3).map(m => ({
-        name: m.model.name,
-        score: m.score,
-        provider: m.model.provider
-      })));
+      logger.debug(
+        'Top 3 model candidates:',
+        scoredModels.slice(0, 3).map(m => ({
+          name: m.model.name,
+          score: m.score,
+          provider: m.model.provider,
+        }))
+      );
     }
-    
+
     return {
       selectedModel: bestModel.model,
       provider: bestModel.model.provider,
@@ -316,7 +335,9 @@ export class SmartModelSelector {
 /**
  * Quick selection function that uses smart selection logic
  */
-export async function smartQuickSelectModel(options: SmartSelectionOptions = {}): Promise<ModelSelectionResult> {
+export async function smartQuickSelectModel(
+  options: SmartSelectionOptions = {}
+): Promise<ModelSelectionResult> {
   const selector = new SmartModelSelector();
   return await selector.selectModel(options);
 }

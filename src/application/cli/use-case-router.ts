@@ -1,13 +1,13 @@
 /**
  * Use Case Router - Modularized Request Routing
- * 
+ *
  * Extracted from UnifiedCLICoordinator to handle use case routing and execution:
  * - Route requests to appropriate use cases based on intent and context
  * - Handle analysis, generation, prompt processing, and diagnostic operations
  * - Integrate with workflow orchestrator for complex operations
  * - Manage context enhancement and input processing
  * - Simple question routing and optimization
- * 
+ *
  * This module centralizes the routing logic for different types of CLI operations.
  */
 
@@ -85,7 +85,7 @@ export class UseCaseRouter {
    */
   public initialize(orchestrator: IWorkflowOrchestrator): void {
     this.orchestrator = orchestrator;
-    
+
     // Initialize dependency container and use cases
     const container = getDependencyContainer();
     container.initialize(orchestrator);
@@ -98,7 +98,9 @@ export class UseCaseRouter {
   /**
    * Route and execute a CLI operation
    */
-  public async executeOperation(request: Readonly<CLIOperationRequest>): Promise<CLIOperationResponse> {
+  public async executeOperation(
+    request: Readonly<CLIOperationRequest>
+  ): Promise<CLIOperationResponse> {
     if (!this.isInitialized || !this.orchestrator || !this.useCases) {
       throw new Error('UseCaseRouter not initialized. Call initialize() first.');
     }
@@ -275,9 +277,12 @@ export class UseCaseRouter {
 
       if (analysisRequest.directoryPath) {
         const analysisResult = await this.useCases.analyzeDirectoryUseCase.execute(analysisRequest);
-        const success = typeof analysisResult === 'object' && analysisResult !== null && 'success' in analysisResult
-          ? (analysisResult as { success: boolean }).success
-          : true;
+        const success =
+          typeof analysisResult === 'object' &&
+          analysisResult !== null &&
+          'success' in analysisResult
+            ? (analysisResult as { success: boolean }).success
+            : true;
         return {
           id: request.id,
           success,
@@ -290,9 +295,12 @@ export class UseCaseRouter {
         };
       } else {
         const analysisResult = await this.useCases.analyzeFileUseCase.execute(analysisRequest);
-        const success = typeof analysisResult === 'object' && analysisResult !== null && 'success' in analysisResult
-          ? (analysisResult as { success: boolean }).success
-          : true;
+        const success =
+          typeof analysisResult === 'object' &&
+          analysisResult !== null &&
+          'success' in analysisResult
+            ? (analysisResult as { success: boolean }).success
+            : true;
         return {
           id: request.id,
           success,
@@ -308,7 +316,11 @@ export class UseCaseRouter {
       // SIMPLIFIED: Always route to orchestrator with tools available
       // Let the AI and system prompt decide when and how to use tools
       logger.info('🎯 Routing to AI orchestrator (tools available, AI decides usage)');
-      const orchestratorResult = await this.executeViaOrchestrator(request, enhancedInput, options) as CLIOperationResponse;
+      const orchestratorResult = (await this.executeViaOrchestrator(
+        request,
+        enhancedInput,
+        options
+      )) as CLIOperationResponse;
       return orchestratorResult;
     }
   }
@@ -392,11 +404,9 @@ export class UseCaseRouter {
     return workflowResponse.result as CLIOperationResponse;
   }
 
-
-
   /**
    * Check if a prompt is requesting code generation
-   * 
+   *
    * NOTE: This method has been simplified to rely on AI intelligence rather than hardcoded patterns.
    * The AI system prompt should handle the decision of whether to generate code or provide explanations.
    */
@@ -412,7 +422,7 @@ export class UseCaseRouter {
       'generate file',
       'save to file',
       'write to disk',
-      'create new file'
+      'create new file',
     ];
     if (explicitFileCreation.some(pattern => lowerPrompt.includes(pattern))) {
       return true;
@@ -425,7 +435,7 @@ export class UseCaseRouter {
       'scaffold',
       'bootstrap',
       'create',
-      'build'
+      'build',
     ];
     if (strongGenerationKeywords.some(keyword => lowerPrompt.includes(keyword))) {
       return true;
@@ -444,7 +454,9 @@ export class UseCaseRouter {
   /**
    * Extract generation context from request
    */
-  private extractGenerationContext(_request: Readonly<CLIOperationRequest>): GenerationRequest['context'] {
+  private extractGenerationContext(
+    _request: Readonly<CLIOperationRequest>
+  ): GenerationRequest['context'] {
     return {
       projectType: 'general',
       language: 'typescript', // Default, could be enhanced with project detection

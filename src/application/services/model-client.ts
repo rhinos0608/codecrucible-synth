@@ -227,11 +227,11 @@ export class ModelClient extends EventEmitter implements IModelClient {
     context?: any
   ): Promise<ModelResponse> {
     const tokens: StreamToken[] = [];
-    
+
     // CRITICAL FIX: We need to get the full response including tool calls
     // First, make a non-streaming request to get the complete response with tool calls
     const fullResponse = await this.request({ ...request, stream: false });
-    
+
     // Then stream the tokens for display
     if (request.stream && fullResponse.content) {
       // If there's content to stream, simulate streaming for UX

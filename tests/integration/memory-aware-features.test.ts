@@ -7,7 +7,7 @@ import { OllamaProvider, OllamaConfig } from '../../src/providers/hybrid/ollama-
 
 describe('Memory-Aware Features Integration', () => {
   let ollamaProvider: OllamaProvider;
-  
+
   const testConfig: OllamaConfig = {
     endpoint: 'http://localhost:11434',
     defaultModel: 'llama3.1:8b',
@@ -30,12 +30,14 @@ describe('Memory-Aware Features Integration', () => {
         memoryPressure: 'medium',
       });
 
-      jest.spyOn(ollamaProvider as any, 'estimateMemoryForContext').mockImplementation((contextSize: number) => {
-        // Mock memory estimation based on context size
-        const modelBaseMemory = 4.4;
-        const kvCacheMemory = (contextSize * 32 * 2 * 4096 * 2) / (1024 ** 3);
-        return modelBaseMemory + kvCacheMemory + (modelBaseMemory + kvCacheMemory) * 0.2;
-      });
+      jest
+        .spyOn(ollamaProvider as any, 'estimateMemoryForContext')
+        .mockImplementation((contextSize: number) => {
+          // Mock memory estimation based on context size
+          const modelBaseMemory = 4.4;
+          const kvCacheMemory = (contextSize * 32 * 2 * 4096 * 2) / 1024 ** 3;
+          return modelBaseMemory + kvCacheMemory + (modelBaseMemory + kvCacheMemory) * 0.2;
+        });
 
       // Test context calculation for different scenarios
       const contextForAnalysis = (ollamaProvider as any).getContextLength('analysis', 20000);
@@ -64,10 +66,12 @@ describe('Memory-Aware Features Integration', () => {
         memoryPressure: 'high',
       });
 
-      jest.spyOn(ollamaProvider as any, 'estimateMemoryForContext').mockImplementation((contextSize: number) => {
-        // Mock high memory requirements
-        return contextSize / 8192 * 2.5; // Rough estimation
-      });
+      jest
+        .spyOn(ollamaProvider as any, 'estimateMemoryForContext')
+        .mockImplementation((contextSize: number) => {
+          // Mock high memory requirements
+          return (contextSize / 8192) * 2.5; // Rough estimation
+        });
 
       const context = (ollamaProvider as any).calculateAdaptiveContext(131072, 'analysis', 30000);
 
@@ -121,11 +125,13 @@ describe('Memory-Aware Features Integration', () => {
 
   describe('Robust JSON Parsing', () => {
     test('should parse standard JSON correctly', async () => {
-      const mockResponse = new Response(JSON.stringify({
-        response: 'Test response',
-        model: 'llama3.1:8b',
-        total_duration: 1000,
-      }));
+      const mockResponse = new Response(
+        JSON.stringify({
+          response: 'Test response',
+          model: 'llama3.1:8b',
+          total_duration: 1000,
+        })
+      );
 
       const result = await (ollamaProvider as any).parseRobustJSON(mockResponse);
 
@@ -163,8 +169,9 @@ Additional text that causes JSON.parse to fail`;
 
       const mockResponse = new Response(memoryErrorResponse);
 
-      await expect((ollamaProvider as any).parseRobustJSON(mockResponse))
-        .rejects.toThrow('Insufficient GPU memory');
+      await expect((ollamaProvider as any).parseRobustJSON(mockResponse)).rejects.toThrow(
+        'Insufficient GPU memory'
+      );
     });
 
     test('should extract content using regex patterns as fallback', async () => {
@@ -197,8 +204,9 @@ Additional text that causes JSON.parse to fail`;
 
       const mockResponse = new Response(invalidResponse);
 
-      await expect((ollamaProvider as any).parseRobustJSON(mockResponse))
-        .rejects.toThrow(/JSON parsing failed/);
+      await expect((ollamaProvider as any).parseRobustJSON(mockResponse)).rejects.toThrow(
+        /JSON parsing failed/
+      );
     });
   });
 
@@ -220,9 +228,14 @@ Additional text that causes JSON.parse to fail`;
       process.env.ADAPTIVE_CONTEXT_ENABLED = 'true';
 
       const provider = new OllamaProvider(testConfig);
-      
+
       // Test that environment variables are used
-      const maxContext = (provider as any).parseEnvInt('MODEL_MAX_CONTEXT_WINDOW', 131072, 1024, 131072);
+      const maxContext = (provider as any).parseEnvInt(
+        'MODEL_MAX_CONTEXT_WINDOW',
+        131072,
+        1024,
+        131072
+      );
       expect(maxContext).toBe(64000);
 
       const threshold = (provider as any).parseEnvFloat('MEMORY_THRESHOLD', 0.8, 0.0, 1.0);
@@ -236,7 +249,12 @@ Additional text that causes JSON.parse to fail`;
       const provider = new OllamaProvider(testConfig);
 
       // Should fallback to defaults
-      const maxContext = (provider as any).parseEnvInt('MODEL_MAX_CONTEXT_WINDOW', 131072, 1024, 131072);
+      const maxContext = (provider as any).parseEnvInt(
+        'MODEL_MAX_CONTEXT_WINDOW',
+        131072,
+        1024,
+        131072
+      );
       expect(maxContext).toBe(131072);
 
       const threshold = (provider as any).parseEnvFloat('MEMORY_THRESHOLD', 0.8, 0.0, 1.0);
@@ -269,9 +287,7 @@ Additional text that causes JSON.parse to fail`;
         model => model.memoryRequirement <= memoryProfile.availableGPU * 0.8
       );
 
-      expect(suitableModels).toContainEqual(
-        expect.objectContaining({ name: 'qwen2.5-coder:3b' })
-      );
+      expect(suitableModels).toContainEqual(expect.objectContaining({ name: 'qwen2.5-coder:3b' }));
     });
   });
 });
@@ -314,7 +330,7 @@ describe('Memory Management Performance', () => {
       const startTime = Date.now();
       const memory = (provider as any).estimateMemoryForContext(size);
       const duration = Date.now() - startTime;
-      
+
       return { size, memory, duration };
     });
 

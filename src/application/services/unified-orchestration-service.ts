@@ -42,15 +42,7 @@ interface BackendCapableSystem {
 
 export interface OrchestrationRequest {
   readonly id: string;
-  readonly type:
-    | 'analyze'
-    | 'generate'
-    | 'refactor'
-    | 'test'
-    | 'document'
-    | 'debug'
-    | 'optimize'
-    | 'serve';
+  readonly type: 'analyze' | 'generate' | 'refactor' | 'test' | 'document' | 'debug' | 'optimize' | 'serve';
   readonly input: string | object;
   options?: {
     mode?: 'fast' | 'balanced' | 'thorough';
@@ -245,19 +237,14 @@ export class UnifiedOrchestrationService extends EventEmitter {
       ];
       for (const op of agentOps) {
         this.commandBus.register(
-          new AgentOperationHandler(
-            `agent:${op}`,
-            async (req): Promise<unknown> => this.processAgentRequest(req)
-          ) as any
+          new AgentOperationHandler(`agent:${op}`, async (req): Promise<unknown> => this.processAgentRequest(req)) as any
         );
       }
 
       // Initialize Plugin System
       this.pluginManager = new PluginManager({
         registerCommand: (name: string, handler: Function) => {
-          this.commandRegistry?.register(name, handler as (...args: any[]) => any, {
-            plugin: 'plugin',
-          });
+          this.commandRegistry?.register(name, handler as (...args: any[]) => any, { plugin: 'plugin' });
           this.eventBus.emit('plugin:command_registered', { name });
         },
       });
@@ -369,30 +356,19 @@ export class UnifiedOrchestrationService extends EventEmitter {
   private async processAgentRequest(request: OrchestrationRequest): Promise<unknown> {
     // Map OrchestrationRequest types to AgentRequest types
     const typeMapping: Record<OrchestrationRequest['type'], string> = {
-      analyze: 'analyze',
-      generate: 'generate',
-      refactor: 'refactor',
-      test: 'test',
-      document: 'document',
-      debug: 'debug',
-      optimize: 'optimize',
-      serve: 'file-operation', // Map serve to file-operation since serve isn't supported by AgentRequest
+      'analyze': 'analyze',
+      'generate': 'generate', 
+      'refactor': 'refactor',
+      'test': 'test',
+      'document': 'document',
+      'debug': 'debug',
+      'optimize': 'optimize',
+      'serve': 'file-operation' // Map serve to file-operation since serve isn't supported by AgentRequest
     };
 
     const agentRequest = {
       id: request.id,
-      type: typeMapping[request.type] as
-        | 'analyze'
-        | 'generate'
-        | 'refactor'
-        | 'test'
-        | 'document'
-        | 'debug'
-        | 'optimize'
-        | 'research'
-        | 'git-operation'
-        | 'file-operation'
-        | 'collaborate',
+      type: typeMapping[request.type] as 'analyze' | 'generate' | 'refactor' | 'test' | 'document' | 'debug' | 'optimize' | 'research' | 'git-operation' | 'file-operation' | 'collaborate',
       input: typeof request.input === 'string' ? request.input : JSON.stringify(request.input),
       priority: request.options?.priority || 'medium',
       constraints: {
@@ -725,10 +701,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
   /**
    * Synthesize integrated result from multiple components
    */
-  synthesizeIntegratedResult(
-    results: unknown[],
-    options: Record<string, unknown> = {}
-  ): {
+  synthesizeIntegratedResult(results: unknown[], options: Record<string, unknown> = {}): {
     success: boolean;
     content?: string;
     confidence?: number;
@@ -838,9 +811,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
   private combineResults(results: unknown[], options: Record<string, unknown>): string {
     // Simple combination strategy - in a real implementation this would be more sophisticated
     const contents = results
-      .map(
-        r => (r as any)?.content || (r as any)?.result || (r as any)?.response || JSON.stringify(r)
-      )
+      .map(r => (r as any)?.content || (r as any)?.result || (r as any)?.response || JSON.stringify(r))
       .filter(c => c && typeof c === 'string');
 
     if (options.synthesisStrategy === 'concatenate') {
@@ -881,16 +852,16 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
   private calculateCompleteness(results: unknown[]): number {
     // Simple heuristic - percentage of results that have substantial content
-    const substantialResults = results.filter((r: unknown) => {
-      const result = r as {
-        content?: string;
-        result?: unknown;
-      };
-      return (
-        (result.content && result.content.length > 100) ||
-        (result.result && JSON.stringify(result.result).length > 100)
-      );
-    });
+    const substantialResults = results.filter(
+      (r: unknown) => {
+        const result = r as {
+          content?: string;
+          result?: unknown;
+        };
+        return (result.content && result.content.length > 100) || 
+               (result.result && JSON.stringify(result.result).length > 100);
+      }
+    );
     return results.length > 0 ? substantialResults.length / results.length : 0;
   }
 

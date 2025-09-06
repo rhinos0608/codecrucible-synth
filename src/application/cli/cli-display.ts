@@ -100,7 +100,7 @@ export class CLIDisplay {
     ];
 
     console.log(chalk.cyan('📋 Recommended Models:'));
-    models.forEach((model: Readonly<typeof models[number]>) => {
+    models.forEach((model: Readonly<(typeof models)[number]>) => {
       const perfColor =
         model.performance === 'Very High'
           ? 'green'

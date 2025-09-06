@@ -1,5 +1,8 @@
 import { logger } from '../../infrastructure/logging/unified-logger.js';
-import { ModelInfo, modelDiscoveryService } from '../../infrastructure/discovery/model-discovery-service.js';
+import {
+  ModelInfo,
+  modelDiscoveryService,
+} from '../../infrastructure/discovery/model-discovery-service.js';
 import { unifiedResultFormatter } from '../../infrastructure/formatting/unified-result-formatter.js';
 
 /**
@@ -21,10 +24,7 @@ export function formatOutput(result: unknown): string {
   // Handle objects that might have response or content properties
   if (isOutputLike(result) && !Array.isArray(result)) {
     // Check for nested message.content pattern
-    if (
-      typeof result.message === 'object' &&
-      'content' in result.message
-    ) {
+    if (typeof result.message === 'object' && 'content' in result.message) {
       return formatOutput((result.message as { content?: unknown }).content);
     }
 
@@ -39,7 +39,7 @@ export function formatOutput(result: unknown): string {
       return result.text;
     }
   }
-  
+
   // Use centralized result formatter for consistent output
   const formatted = unifiedResultFormatter.formatResult(result, {
     includeMetadata: false,
@@ -47,7 +47,7 @@ export function formatOutput(result: unknown): string {
     highlightErrors: true,
     format: 'text',
     maxLength: 50000,
-    maxDepth: 10
+    maxDepth: 10,
   });
 
   // CRITICAL FIX: Add fallback for empty/null results to prevent blank responses
@@ -56,15 +56,15 @@ export function formatOutput(result: unknown): string {
     if (result === null || result === undefined) {
       return '✅ Operation completed successfully (no output generated)';
     }
-    
+
     if (typeof result === 'boolean') {
       return `✅ Result: ${result}`;
     }
-    
+
     if (typeof result === 'number') {
       return `✅ Result: ${result}`;
     }
-    
+
     // If result is an object but content is empty, try to show something meaningful
     if (typeof result === 'object') {
       const str = JSON.stringify(result, null, 2);
@@ -72,7 +72,7 @@ export function formatOutput(result: unknown): string {
         return str;
       }
     }
-    
+
     return '✅ Operation completed successfully';
   }
 
@@ -102,7 +102,7 @@ export class OutputFormatter {
         includeUnavailable: true,
         timeout: 8000,
         cache: true,
-        providers: ['ollama', 'lm-studio', 'claude', 'huggingface']
+        providers: ['ollama', 'lm-studio', 'claude', 'huggingface'],
       });
 
       if (models.length === 0) {
@@ -124,13 +124,13 @@ export class OutputFormatter {
           const status = model.isAvailable ? '✅' : '⚠️';
           const sizeInfo = model.size ? ` (${model.size})` : '';
           const familyInfo = model.family ? ` [${model.family}]` : '';
-          
+
           console.log(`  ${status} ${model.name}${sizeInfo}${familyInfo}`);
-          
+
           if (model.capabilities && model.capabilities.length > 0) {
             console.log(`     → ${model.capabilities.join(', ')}`);
           }
-          
+
           if (!model.isAvailable) {
             console.log(`     → Last checked: ${model.lastChecked?.toLocaleTimeString()}`);
           }
@@ -140,31 +140,30 @@ export class OutputFormatter {
       // Show summary statistics
       const available = models.filter((m: Readonly<ModelInfo>) => m.isAvailable).length;
       const total = models.length;
-      
+
       console.log(`\n📊 Summary: ${available}/${total} models available`);
-      
+
       if (available === 0) {
         console.log('\n💡 Tip: Start your model providers to see available models:');
         console.log('  • ollama serve');
         console.log('  • Open LM Studio and load a model');
       }
-
     } catch (error) {
       console.error('❌ Error discovering models:', (error as Error).message);
       console.log('\n📋 Fallback models (may not be available):');
       console.log('  ⚠️ llama3.1:8b (Ollama)');
       console.log('  ⚠️ deepseek-coder:6.7b (Ollama)');
       console.log('  ⚠️ local-model (LM Studio)');
-      
+
       logger.error('Model discovery failed:', error);
     }
   }
 
   private groupModelsByProvider(models: ReadonlyArray<ModelInfo>): Record<string, ModelInfo[]> {
     const grouped: Record<string, ModelInfo[]> = {};
-    
+
     for (const model of models) {
-      (grouped[model.provider] ??= []);
+      grouped[model.provider] ??= [];
       grouped[model.provider].push(model);
     }
 

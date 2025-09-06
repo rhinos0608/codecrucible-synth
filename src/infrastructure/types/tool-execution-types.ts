@@ -1,6 +1,6 @@
 /**
  * Tool Execution Type Definitions
- * 
+ *
  * Provides strict typing for tool execution to replace 'any' usage
  * Follows domain-driven design with comprehensive type safety
  */
@@ -52,7 +52,7 @@ export interface ToolExecutionContext {
   // Tool-specific metadata
   toolName?: string;
   executionMode?: 'sync' | 'async' | 'stream';
-  
+
   // Generic extensibility
   metadata?: Record<string, any>;
 }
@@ -129,12 +129,15 @@ export interface ToolDefinition {
   description: string;
   parameters: {
     type: 'object';
-    properties: Record<string, {
-      type: string;
-      description?: string;
-      required?: boolean;
-      default?: any;
-    }>;
+    properties: Record<
+      string,
+      {
+        type: string;
+        description?: string;
+        required?: boolean;
+        default?: any;
+      }
+    >;
     required?: string[];
   };
   handler: (args: ToolExecutionArgs, context: ToolExecutionContext) => Promise<ToolExecutionResult>;
@@ -164,21 +167,34 @@ export interface ToolExecutionOptions {
 }
 
 // Union types for different tool categories
-export type FileSystemToolArgs = Pick<ToolExecutionArgs, 'path' | 'directory' | 'filePath' | 'content' | 'recursive' | 'encoding'>;
-export type GitToolArgs = Pick<ToolExecutionArgs, 'repository' | 'branch' | 'commitMessage' | 'path'>;
+export type FileSystemToolArgs = Pick<
+  ToolExecutionArgs,
+  'path' | 'directory' | 'filePath' | 'content' | 'recursive' | 'encoding'
+>;
+export type GitToolArgs = Pick<
+  ToolExecutionArgs,
+  'repository' | 'branch' | 'commitMessage' | 'path'
+>;
 export type CommandToolArgs = Pick<ToolExecutionArgs, 'command' | 'args' | 'workingDirectory'>;
-export type SearchToolArgs = Pick<ToolExecutionArgs, 'query' | 'pattern' | 'path' | 'includeHidden'>;
+export type SearchToolArgs = Pick<
+  ToolExecutionArgs,
+  'query' | 'pattern' | 'path' | 'includeHidden'
+>;
 
 // Type guards for runtime type checking
 export function isFileOperationResult(result: ToolExecutionResult): result is FileOperationResult {
   return result.success && typeof result.data === 'string';
 }
 
-export function isDirectoryListingResult(result: ToolExecutionResult): result is DirectoryListingResult {
+export function isDirectoryListingResult(
+  result: ToolExecutionResult
+): result is DirectoryListingResult {
   return result.success && Array.isArray(result.data);
 }
 
-export function isCommandExecutionResult(result: ToolExecutionResult): result is CommandExecutionResult {
+export function isCommandExecutionResult(
+  result: ToolExecutionResult
+): result is CommandExecutionResult {
   return result.success && typeof result.data === 'string' && 'exitCode' in (result.metadata || {});
 }
 

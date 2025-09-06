@@ -1,6 +1,6 @@
 /**
  * Centralized Path Utilities
- * 
+ *
  * Provides robust, cross-platform path normalization and validation
  * Consolidates scattered path logic throughout the codebase
  * Follows security-first principles with comprehensive validation
@@ -35,16 +35,35 @@ export interface PathNormalizationOptions {
  */
 export class PathUtilities {
   private static readonly DANGEROUS_PATTERNS = [
-    /\.\.[\/\\]/g,    // Parent directory traversal
-    /[<>:"|?*]/g,     // Windows forbidden characters
-    /[\x00-\x1f]/g,   // Control characters
-    /\.{3,}/g,        // Multiple consecutive dots
+    /\.\.[\/\\]/g, // Parent directory traversal
+    /[<>:"|?*]/g, // Windows forbidden characters
+    /[\x00-\x1f]/g, // Control characters
+    /\.{3,}/g, // Multiple consecutive dots
   ];
 
   private static readonly WINDOWS_RESERVED_NAMES = new Set([
-    'CON', 'PRN', 'AUX', 'NUL',
-    'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
-    'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9',
+    'CON',
+    'PRN',
+    'AUX',
+    'NUL',
+    'COM1',
+    'COM2',
+    'COM3',
+    'COM4',
+    'COM5',
+    'COM6',
+    'COM7',
+    'COM8',
+    'COM9',
+    'LPT1',
+    'LPT2',
+    'LPT3',
+    'LPT4',
+    'LPT5',
+    'LPT6',
+    'LPT7',
+    'LPT8',
+    'LPT9',
   ]);
 
   /**
@@ -59,7 +78,7 @@ export class PathUtilities {
       allowAbsolute = true,
       allowRelative = true,
       basePath = process.cwd(),
-      maxDepth = 10
+      maxDepth = 10,
     } = options;
 
     let normalized = filePath.trim();
@@ -92,7 +111,7 @@ export class PathUtilities {
           return './' + normalized;
         }
       }
-      
+
       return path.normalize(normalized);
     }
 
@@ -114,7 +133,7 @@ export class PathUtilities {
   static resolveSafePath(filePath: string, basePath: string = process.cwd()): string {
     const normalized = this.normalizeAIPath(filePath);
     const resolved = path.resolve(basePath, normalized);
-    
+
     // Ensure the resolved path stays within the base path
     const relativePath = path.relative(basePath, resolved);
     if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
@@ -128,7 +147,10 @@ export class PathUtilities {
   /**
    * Comprehensive path validation with detailed feedback
    */
-  static async validatePath(filePath: string, options: PathNormalizationOptions = {}): Promise<PathValidationResult> {
+  static async validatePath(
+    filePath: string,
+    options: PathNormalizationOptions = {}
+  ): Promise<PathValidationResult> {
     const result: PathValidationResult = {
       isValid: true,
       normalizedPath: filePath,
@@ -137,7 +159,7 @@ export class PathUtilities {
       isDirectory: false,
       exists: false,
       warnings: [],
-      securityIssues: []
+      securityIssues: [],
     };
 
     try {
@@ -176,12 +198,13 @@ export class PathUtilities {
       const pathDepth = result.normalizedPath.split('/').length;
       if (options.maxDepth && pathDepth > options.maxDepth) {
         result.isValid = false;
-        result.securityIssues.push(`Path depth exceeds maximum (${pathDepth} > ${options.maxDepth})`);
+        result.securityIssues.push(
+          `Path depth exceeds maximum (${pathDepth} > ${options.maxDepth})`
+        );
       }
 
       // Set overall validity
       result.isValid = result.securityIssues.length === 0;
-
     } catch (error) {
       result.isValid = false;
       result.warnings.push(`Validation error: ${(error as Error).message}`);
@@ -195,7 +218,9 @@ export class PathUtilities {
    */
   static hasPathTraversal(filePath: string): boolean {
     const normalized = path.normalize(filePath);
-    return normalized.includes('..') || normalized.startsWith('../') || /[\/\\]\.\./.test(normalized);
+    return (
+      normalized.includes('..') || normalized.startsWith('../') || /[\/\\]\.\./.test(normalized)
+    );
   }
 
   /**
@@ -222,11 +247,11 @@ export class PathUtilities {
 
     // Remove/replace dangerous characters
     let sanitized = filename
-      .replace(/[<>:"|?*]/g, '_')           // Windows forbidden chars
-      .replace(/[\x00-\x1f\x7f]/g, '')     // Control characters
-      .replace(/[\/\\]/g, '_')             // Path separators
-      .replace(/\.+$/, '')                 // Trailing dots
-      .replace(/\s+$/, '')                 // Trailing spaces
+      .replace(/[<>:"|?*]/g, '_') // Windows forbidden chars
+      .replace(/[\x00-\x1f\x7f]/g, '') // Control characters
+      .replace(/[\/\\]/g, '_') // Path separators
+      .replace(/\.+$/, '') // Trailing dots
+      .replace(/\s+$/, '') // Trailing spaces
       .trim();
 
     // Handle Windows reserved names
@@ -253,27 +278,28 @@ export class PathUtilities {
   }
 
   /**
-   * Check if path is within allowed directory boundaries  
+   * Check if path is within allowed directory boundaries
    */
   static isWithinBoundaries(filePath: string, allowedPaths: string[]): boolean {
     try {
       const normalizedPath = path.resolve(this.normalizeAIPath(filePath));
-      
+
       // If no allowed paths specified, default to current working directory
       const pathsToCheck = allowedPaths.length > 0 ? allowedPaths : [process.cwd()];
-      
+
       return pathsToCheck.some(allowedPath => {
         const normalizedAllowed = path.resolve(allowedPath);
-        
+
         // Check if the path is exactly the allowed path or a subdirectory
         if (normalizedPath === normalizedAllowed) {
           return true; // Exact match is always allowed
         }
-        
+
         // Check if it's a subdirectory
         const relativePath = path.relative(normalizedAllowed, normalizedPath);
-        const isSubdirectory = !relativePath.startsWith('..') && !path.isAbsolute(relativePath) && relativePath !== '';
-        
+        const isSubdirectory =
+          !relativePath.startsWith('..') && !path.isAbsolute(relativePath) && relativePath !== '';
+
         // Additional check for Windows-style absolute paths that resolve to the same location
         if (process.platform === 'win32') {
           try {
@@ -286,7 +312,7 @@ export class PathUtilities {
             // Ignore resolution errors and continue with other checks
           }
         }
-        
+
         return isSubdirectory;
       });
     } catch (error) {
@@ -316,7 +342,7 @@ export class PathUtilities {
       const normalizedSegments = pathSegments
         .filter(segment => segment && typeof segment === 'string')
         .map(segment => this.normalizeAIPath(segment));
-      
+
       return path.join(...normalizedSegments);
     } catch (error) {
       logger.warn(`Error joining paths [${pathSegments.join(', ')}]:`, error);
@@ -340,7 +366,7 @@ export class PathUtilities {
         targetDir.toLowerCase(),
         targetDir.toUpperCase(),
         targetDir.charAt(0).toUpperCase() + targetDir.slice(1).toLowerCase(),
-        targetDir.charAt(0).toLowerCase() + targetDir.slice(1).toUpperCase()
+        targetDir.charAt(0).toLowerCase() + targetDir.slice(1).toUpperCase(),
       ];
 
       for (const variation of variations) {
@@ -382,5 +408,5 @@ export const {
   sanitizeFilename,
   isWithinBoundaries,
   getDirname,
-  joinPaths
+  joinPaths,
 } = PathUtilities;

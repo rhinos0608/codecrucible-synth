@@ -20,13 +20,13 @@ export interface MCPToolResult {
  * @returns Combined text from all content entries
  */
 export function extractAllContentText(
-  content: MCPContentItem[] | undefined, 
+  content: MCPContentItem[] | undefined,
   separator: string = '\n'
 ): string {
   if (!content || !Array.isArray(content)) {
     return '';
   }
-  
+
   return content
     .filter(item => item && typeof item.text === 'string')
     .map(item => item.text)
@@ -35,7 +35,7 @@ export function extractAllContentText(
 
 /**
  * Extract text content by type from MCP response
- * @param content Array of content items from MCP response  
+ * @param content Array of content items from MCP response
  * @param type Content type to filter for (default: 'text')
  * @param separator String to join multiple content entries (default: '\n')
  * @returns Combined text from matching content entries
@@ -48,7 +48,7 @@ export function extractContentByType(
   if (!content || !Array.isArray(content)) {
     return '';
   }
-  
+
   return content
     .filter(item => item && item.type === type && typeof item.text === 'string')
     .map(item => item.text)
@@ -64,9 +64,9 @@ export function extractFirstContentText(content: MCPContentItem[] | undefined): 
   if (!content || !Array.isArray(content) || content.length === 0) {
     return '';
   }
-  
+
   const firstItem = content[0];
-  return (firstItem && typeof firstItem.text === 'string') ? firstItem.text : '';
+  return firstItem && typeof firstItem.text === 'string' ? firstItem.text : '';
 }
 
 /**
@@ -80,13 +80,13 @@ export function robustContentExtraction(result: MCPToolResult): string {
   if (allContent.trim()) {
     return allContent;
   }
-  
+
   // Strategy 2: Try first content only (backward compatibility)
   const firstContent = extractFirstContentText(result.content);
   if (firstContent.trim()) {
     return firstContent;
   }
-  
+
   // Strategy 3: Check for error content
   if (result.isError && result.content) {
     const errorContent = extractContentByType(result.content, 'error', ' | ');
@@ -94,7 +94,7 @@ export function robustContentExtraction(result: MCPToolResult): string {
       return errorContent;
     }
   }
-  
+
   // Final fallback
   return '';
 }

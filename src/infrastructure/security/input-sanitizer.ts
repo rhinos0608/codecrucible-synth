@@ -254,7 +254,7 @@ export class InputSanitizer {
       violations.push(`Dangerous file extension: .${ext}`);
     }
 
-    // Normalize path separators using centralized cross-platform utilities  
+    // Normalize path separators using centralized cross-platform utilities
     sanitized = normalizePathSeparators(sanitized);
 
     return {

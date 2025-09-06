@@ -11,10 +11,7 @@ import { IModelClient, ModelRequest, ModelResponse } from './model-client.js';
 import { IMcpManager } from './mcp-manager.js';
 import { IUnifiedSecurityValidator } from '../services/unified-security-validator.js';
 import { IUnifiedConfigurationManager } from '../services/unified-configuration-manager.js';
-import {
-  ToolExecutionArgs,
-  ToolExecutionResult,
-} from './tool-execution.js';
+import { ToolExecutionArgs, ToolExecutionResult } from './tool-execution.js';
 
 // Specific workflow payload types
 export interface PromptPayload {
@@ -104,7 +101,11 @@ export interface IWorkflowOrchestrator {
   /**
    * Execute a tool with proper context and security
    */
-  executeTool(toolName: string, args: ToolExecutionArgs, context: WorkflowContext): Promise<ToolExecutionResult>;
+  executeTool(
+    toolName: string,
+    args: ToolExecutionArgs,
+    context: WorkflowContext
+  ): Promise<ToolExecutionResult>;
 
   /**
    * Process a model request with routing and fallbacks
@@ -156,7 +157,6 @@ export interface LivingSpiralCoordinatorInterface {
    */
   shutdown(): Promise<void>;
 }
-
 
 export interface OrchestratorDependencies {
   userInteraction: IUserInteraction;

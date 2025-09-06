@@ -1,6 +1,6 @@
 /**
  * Metrics Collector - Modularized Performance Tracking
- * 
+ *
  * Extracted from UnifiedCLICoordinator to handle comprehensive metrics collection:
  * - Operation performance tracking and timing
  * - System health monitoring and reporting
@@ -8,7 +8,7 @@
  * - Error tracking and recovery metrics
  * - Integration with observability systems
  * - Statistical analysis and reporting
- * 
+ *
  * This module provides detailed insights into CLI system performance and health.
  */
 
@@ -73,12 +73,12 @@ export interface MetricsSummary {
 export class MetricsCollector extends EventEmitter {
   private readonly observabilitySystem: ObservabilitySystem;
   private readonly options: Required<MetricsCollectorOptions>;
-  
+
   // Metrics storage
   private readonly operationMetrics: Map<string, OperationMetrics> = new Map();
   private systemHealthHistory: SystemHealthMetrics[] = [];
   private readonly activeOperations: Map<string, OperationMetrics> = new Map();
-  
+
   // Performance tracking
   private readonly globalStats = {
     totalOperations: 0,
@@ -131,7 +131,7 @@ export class MetricsCollector extends EventEmitter {
     metadata?: Readonly<Record<string, unknown>>
   ): TraceSpan | undefined {
     const startTime = performance.now();
-    
+
     const metrics: OperationMetrics = {
       operationId,
       operationType,
@@ -153,7 +153,7 @@ export class MetricsCollector extends EventEmitter {
     }
 
     this.emit('operation:started', { operationId, operationType, startTime });
-    
+
     if (this.options.enableDetailedMetrics) {
       logger.info(`📊 Started tracking operation ${operationId} (${operationType})`);
     }
@@ -211,15 +211,11 @@ export class MetricsCollector extends EventEmitter {
 
     // Record in observability system
     if (this.options.enableDetailedMetrics) {
-      this.observabilitySystem.recordTimer(
-        'cli.operation.duration',
-        duration,
-        {
-          operationType: activeMetrics.operationType,
-          operationId,
-          success: success.toString(),
-        }
-      );
+      this.observabilitySystem.recordTimer('cli.operation.duration', duration, {
+        operationType: activeMetrics.operationType,
+        operationId,
+        success: success.toString(),
+      });
 
       this.observabilitySystem.incrementCounter('cli.operation.count', {
         operationType: activeMetrics.operationType,
@@ -241,10 +237,10 @@ export class MetricsCollector extends EventEmitter {
     // Log performance information
     const statusSymbol = success ? '✅' : '❌';
     const memoryMB = currentMemory ? (currentMemory / 1024 / 1024).toFixed(2) : 'N/A';
-    
+
     logger.info(
       `${statusSymbol} Operation ${operationId} (${activeMetrics.operationType}): ` +
-      `${duration.toFixed(2)}ms, Memory: ${memoryMB}MB`
+        `${duration.toFixed(2)}ms, Memory: ${memoryMB}MB`
     );
   }
 
@@ -257,14 +253,14 @@ export class MetricsCollector extends EventEmitter {
 
     // Calculate error rate from recent operations
     const recentOpsCount = Math.min(this.globalStats.totalOperations, 100);
-    const errorRate = recentOpsCount > 0 
-      ? this.globalStats.failedOperations / this.globalStats.totalOperations
-      : 0;
+    const errorRate =
+      recentOpsCount > 0 ? this.globalStats.failedOperations / this.globalStats.totalOperations : 0;
 
     // Calculate average response time
-    const averageResponseTime = this.globalStats.totalOperations > 0
-      ? this.globalStats.totalProcessingTime / this.globalStats.totalOperations
-      : 0;
+    const averageResponseTime =
+      this.globalStats.totalOperations > 0
+        ? this.globalStats.totalProcessingTime / this.globalStats.totalOperations
+        : 0;
 
     const healthMetrics: SystemHealthMetrics = {
       timestamp,
@@ -292,19 +288,9 @@ export class MetricsCollector extends EventEmitter {
         'MB'
       );
 
-      this.observabilitySystem.recordMetric(
-        'system.sessions.active',
-        activeSessions,
-        {},
-        'count'
-      );
+      this.observabilitySystem.recordMetric('system.sessions.active', activeSessions, {}, 'count');
 
-      this.observabilitySystem.recordMetric(
-        'system.error.rate',
-        errorRate,
-        {},
-        'percentage'
-      );
+      this.observabilitySystem.recordMetric('system.error.rate', errorRate, {}, 'percentage');
     }
 
     // Clean up old health data
@@ -323,17 +309,19 @@ export class MetricsCollector extends EventEmitter {
 
     // Calculate operation type distribution
     for (const metrics of this.operationMetrics.values()) {
-      operationTypeDistribution[metrics.operationType] = 
+      operationTypeDistribution[metrics.operationType] =
         (operationTypeDistribution[metrics.operationType] || 0) + 1;
     }
 
-    const averageResponseTime = this.globalStats.totalOperations > 0
-      ? this.globalStats.totalProcessingTime / this.globalStats.totalOperations
-      : 0;
+    const averageResponseTime =
+      this.globalStats.totalOperations > 0
+        ? this.globalStats.totalProcessingTime / this.globalStats.totalOperations
+        : 0;
 
-    const errorRate = this.globalStats.totalOperations > 0
-      ? this.globalStats.failedOperations / this.globalStats.totalOperations
-      : 0;
+    const errorRate =
+      this.globalStats.totalOperations > 0
+        ? this.globalStats.failedOperations / this.globalStats.totalOperations
+        : 0;
 
     return {
       totalOperations: this.globalStats.totalOperations,
@@ -391,14 +379,15 @@ export class MetricsCollector extends EventEmitter {
   private calculateSystemLoad(): number {
     const activeOps = this.activeOperations.size;
     const recentHealth = this.systemHealthHistory.slice(-5);
-    
+
     if (recentHealth.length === 0) return 0;
 
     // Base load on active operations
     let load = Math.min(activeOps / 10, 1.0); // Normalize to 0-1
 
     // Adjust based on recent error rates
-    const avgErrorRate = recentHealth.reduce((sum, h) => sum + h.errorRate, 0) / recentHealth.length;
+    const avgErrorRate =
+      recentHealth.reduce((sum, h) => sum + h.errorRate, 0) / recentHealth.length;
     load += avgErrorRate * 0.5;
 
     // Adjust based on memory pressure
@@ -424,7 +413,9 @@ export class MetricsCollector extends EventEmitter {
       }
     }, this.options.healthCheckIntervalMs);
 
-    logger.info(`📈 Started health monitoring with ${this.options.healthCheckIntervalMs}ms interval`);
+    logger.info(
+      `📈 Started health monitoring with ${this.options.healthCheckIntervalMs}ms interval`
+    );
   }
 
   /**
@@ -432,7 +423,7 @@ export class MetricsCollector extends EventEmitter {
    */
   private cleanupOldMetrics(): void {
     const cutoffTime = performance.now() - this.options.metricsRetentionMs;
-    
+
     for (const [operationId, metrics] of this.operationMetrics.entries()) {
       if (metrics.endTime && metrics.endTime < cutoffTime) {
         this.operationMetrics.delete(operationId);
@@ -482,7 +473,7 @@ export class MetricsCollector extends EventEmitter {
    */
   public shutdown(): void {
     this.isShuttingDown = true;
-    
+
     logger.info('Shutting down MetricsCollector');
 
     // Stop health monitoring

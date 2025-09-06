@@ -10,7 +10,10 @@ import {
   LLMCapabilities,
   LLMStatus,
 } from '../../domain/interfaces/llm-interfaces.js';
-import { generateSystemPrompt, generateContextualSystemPrompt } from '../../domain/prompts/system-prompt.js';
+import {
+  generateSystemPrompt,
+  generateContextualSystemPrompt,
+} from '../../domain/prompts/system-prompt.js';
 
 export interface HuggingFaceConfig {
   apiKey: string;
@@ -30,7 +33,7 @@ export class HuggingFaceProvider implements LLMProvider {
   private responseTimeHistory: number[] = [];
   private errorCount = 0;
   private requestCount = 0;
-  
+
   // Rate limiting state
   private requestTimestamps: number[] = [];
   private readonly maxRequestsPerMinute: number;
@@ -40,7 +43,7 @@ export class HuggingFaceProvider implements LLMProvider {
     this.config = config;
     this.endpoint = config.endpoint || 'https://api-inference.huggingface.co/models';
     this.maxRequestsPerMinute = parseInt(process.env.HUGGINGFACE_MAX_REQUESTS_PER_MINUTE || '30');
-    
+
     if (!config.apiKey) {
       logger.warn('HuggingFace API key not provided - provider will be unavailable');
     }
@@ -63,14 +66,14 @@ export class HuggingFaceProvider implements LLMProvider {
       const response = await fetch(`${this.endpoint}/${this.config.defaultModel}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
+          Authorization: `Bearer ${this.config.apiKey}`,
           'Content-Type': 'application/json',
         },
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
-      
+
       if (response.ok) {
         logger.debug(`HuggingFace provider available at ${this.endpoint}`);
         return true;
@@ -91,23 +94,24 @@ export class HuggingFaceProvider implements LLMProvider {
    */
   async generateCode(prompt: string, options: any = {}): Promise<LLMResponse> {
     const startTime = Date.now();
-    
+
     try {
       this.requestCount++;
       this.currentLoad++;
-      
+
       // Check rate limiting
       await this.enforceRateLimit();
 
       const model = options.model || this.config.defaultModel;
-      const systemPrompt = options.systemPrompt || 
-                          generateSystemPrompt() ||
-                          'You are a helpful coding assistant. Generate clean, well-documented code.';
+      const systemPrompt =
+        options.systemPrompt ||
+        generateSystemPrompt() ||
+        'You are a helpful coding assistant. Generate clean, well-documented code.';
 
       // Format messages for text generation models
       const messages = [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt }
+        { role: 'user', content: prompt },
       ];
 
       const requestBody = {
@@ -122,7 +126,7 @@ export class HuggingFaceProvider implements LLMProvider {
         options: {
           wait_for_model: true,
           use_cache: false,
-        }
+        },
       };
 
       logger.debug('HuggingFace request', { model, promptLength: prompt.length });
@@ -133,7 +137,7 @@ export class HuggingFaceProvider implements LLMProvider {
       const response = await fetch(`${this.endpoint}/${model}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
+          Authorization: `Bearer ${this.config.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
@@ -144,11 +148,13 @@ export class HuggingFaceProvider implements LLMProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`HuggingFace API error: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(
+          `HuggingFace API error: ${response.status} ${response.statusText} - ${errorText}`
+        );
       }
 
       const result = await response.json();
-      
+
       // Handle different response formats from HuggingFace
       let content = '';
       if (Array.isArray(result)) {
@@ -163,7 +169,7 @@ export class HuggingFaceProvider implements LLMProvider {
 
       const responseTime = Date.now() - startTime;
       this.responseTimeHistory.push(responseTime);
-      
+
       // Keep history manageable
       if (this.responseTimeHistory.length > 100) {
         this.responseTimeHistory = this.responseTimeHistory.slice(-50);
@@ -181,26 +187,25 @@ export class HuggingFaceProvider implements LLMProvider {
           completionTokens: content.split(/\s+/).length,
           finishReason: 'stop',
           modelInfo: result.model_version || 'unknown',
-        }
+        },
       };
 
       logger.debug('HuggingFace response generated', {
         contentLength: content.length,
         responseTime,
-        model
+        model,
       });
 
       return llmResponse;
-
     } catch (error) {
       this.errorCount++;
       const responseTime = Date.now() - startTime;
       this.lastError = error instanceof Error ? error.message : String(error);
-      
+
       logger.error('HuggingFace code generation failed', {
         error: this.lastError,
         responseTime,
-        model: options.model || this.config.defaultModel
+        model: options.model || this.config.defaultModel,
       });
 
       throw new Error(`HuggingFace generation failed: ${this.lastError}`);
@@ -233,14 +238,14 @@ export class HuggingFaceProvider implements LLMProvider {
         'Research models',
         'Specialized tasks',
         'Multi-modal capabilities',
-        'Community models'
+        'Community models',
       ],
       optimalFor: [
         'Experimental workflows',
         'Specialized model access',
         'Research and prototyping',
         'Multi-language generation',
-        'Domain-specific tasks'
+        'Domain-specific tasks',
       ],
       responseTime: 'variable (2-30s depending on model)',
       contextWindow: 4096, // Varies by model
@@ -254,9 +259,10 @@ export class HuggingFaceProvider implements LLMProvider {
    */
   async getStatus(): Promise<LLMStatus> {
     const isOnline = await this.isAvailable();
-    const avgResponseTime = this.responseTimeHistory.length > 0
-      ? this.responseTimeHistory.reduce((a, b) => a + b, 0) / this.responseTimeHistory.length
-      : 0;
+    const avgResponseTime =
+      this.responseTimeHistory.length > 0
+        ? this.responseTimeHistory.reduce((a, b) => a + b, 0) / this.responseTimeHistory.length
+        : 0;
 
     return {
       available: isOnline,
@@ -298,12 +304,16 @@ export class HuggingFaceProvider implements LLMProvider {
     // Check if it's a chat model (contains 'chat' in name)
     if (model.toLowerCase().includes('chat') || model.toLowerCase().includes('instruct')) {
       // Format as conversation for chat models
-      return messages.map(msg => {
-        if (msg.role === 'system') return `### System\n${msg.content}`;
-        if (msg.role === 'user') return `### Human\n${msg.content}`;
-        if (msg.role === 'assistant') return `### Assistant\n${msg.content}`;
-        return msg.content;
-      }).join('\n\n') + '\n\n### Assistant\n';
+      return (
+        messages
+          .map(msg => {
+            if (msg.role === 'system') return `### System\n${msg.content}`;
+            if (msg.role === 'user') return `### Human\n${msg.content}`;
+            if (msg.role === 'assistant') return `### Assistant\n${msg.content}`;
+            return msg.content;
+          })
+          .join('\n\n') + '\n\n### Assistant\n'
+      );
     } else {
       // For non-chat models, combine all content
       return messages.map(msg => msg.content).join('\n');
@@ -336,7 +346,7 @@ export class HuggingFaceProvider implements LLMProvider {
    */
   private async enforceRateLimit(): Promise<void> {
     const now = Date.now();
-    
+
     // Remove timestamps older than the rate limit window
     this.requestTimestamps = this.requestTimestamps.filter(
       timestamp => now - timestamp < this.rateLimitWindow
@@ -345,7 +355,7 @@ export class HuggingFaceProvider implements LLMProvider {
     if (this.requestTimestamps.length >= this.maxRequestsPerMinute) {
       const oldestRequest = Math.min(...this.requestTimestamps);
       const waitTime = this.rateLimitWindow - (now - oldestRequest);
-      
+
       if (waitTime > 0) {
         logger.debug(`HuggingFace rate limit reached, waiting ${waitTime}ms`);
         await new Promise(resolve => setTimeout(resolve, waitTime));

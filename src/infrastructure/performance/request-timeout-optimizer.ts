@@ -67,7 +67,8 @@ export class RequestTimeoutOptimizer {
     executionMode?: 'fast' | 'quality' | 'balanced'
   ): { abortController: AbortController; timeout: number } {
     const abortController = new AbortController();
-    const optimizedTimeout = customTimeout || this.calculateOptimalTimeout(type, provider, executionMode);
+    const optimizedTimeout =
+      customTimeout || this.calculateOptimalTimeout(type, provider, executionMode);
 
     const requestData: RequestTimeoutData = {
       requestId,

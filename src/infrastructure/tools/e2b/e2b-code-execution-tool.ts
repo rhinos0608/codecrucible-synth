@@ -88,17 +88,13 @@ export class E2BCodeExecutionTool {
   async initialize(): Promise<void> {
     try {
       // SecurityValidator doesn't need initialization
-
+      
       // Initialize Rust backend if available
-      if (this.rustBackend) {
-        try {
-          await this.rustBackend.initialize();
-          logger.info('Rust execution backend initialized successfully');
-        } catch (error) {
-          logger.warn('Rust backend not available, falling back to terminal execution:', error);
-        }
-      } else {
-        logger.info('No Rust backend provided, using terminal execution only');
+      try {
+        await this.rustBackend.initialize();
+        logger.info('Rust execution backend initialized successfully');
+      } catch (error) {
+        logger.warn('Rust backend not available, falling back to terminal execution:', error);
       }
 
       logger.info('E2BCodeExecutionTool initialization complete');
@@ -272,9 +268,7 @@ export class E2BCodeExecutionTool {
       });
 
       if (result.isError) {
-        const { extractAllContentText } = await import('../mcp-content-utils.js');
-        const errorText = extractAllContentText(result.content);
-        throw new Error(`Dependency installation failed: ${errorText || 'Unknown error'}`);
+        throw new Error(`Dependency installation failed: ${result.content[0]?.text}`);
       }
 
       logger.info('Dependencies installed successfully');
@@ -288,10 +282,6 @@ export class E2BCodeExecutionTool {
     request: CodeExecutionRequest,
     environment: ExecutionEnvironment
   ): Promise<CodeExecutionResult> {
-    if (!this.rustBackend) {
-      throw new Error('Rust backend is not available for code execution');
-    }
-
     const startTime = Date.now();
 
     try {
@@ -316,8 +306,8 @@ export class E2BCodeExecutionTool {
           sessionId: request.sessionId || 'system',
           workingDirectory: environment.workingDirectory,
           permissions: [],
-          environment: {},
-        },
+          environment: {}
+        }
       });
 
       // Clean up temporary file
@@ -325,15 +315,11 @@ export class E2BCodeExecutionTool {
 
       return {
         success: result.success,
-        output: typeof result.result === 'string' ? result.result : String(result.result || ''),
+        output: result.result || '',
         error: result.error?.message,
         executionTime: result.executionTimeMs,
-        memoryUsed:
-          typeof result.metadata?.memoryUsage === 'number'
-            ? result.metadata.memoryUsage
-            : undefined,
-        exitCode:
-          typeof result.metadata?.exitCode === 'number' ? result.metadata.exitCode : undefined,
+        memoryUsed: result.metadata?.memoryUsage,
+        exitCode: result.metadata?.exitCode,
       };
     } catch (error) {
       logger.error('Rust backend execution failed:', error);
@@ -371,19 +357,15 @@ export class E2BCodeExecutionTool {
         await this.cleanupTemporaryFile(tempFile);
       }
 
-      const { extractAllContentText } = await import('../mcp-content-utils.js');
-      
       if (result.isError) {
-        const errorText = extractAllContentText(result.content);
         return {
           success: false,
-          error: errorText || 'Terminal execution failed',
+          error: result.content[0]?.text || 'Terminal execution failed',
           executionTime: Date.now() - startTime,
         };
       }
 
-      const allText = extractAllContentText(result.content);
-      const executionResult = JSON.parse(allText || '{}');
+      const executionResult = JSON.parse(result.content[0]?.text || '{}');
 
       return {
         success: executionResult.exitCode === 0,
@@ -460,10 +442,7 @@ export class E2BCodeExecutionTool {
       case 'cpp': {
         const cppFile = await this.createTemporaryFile(request.code, language, environment);
         const exe = cppFile.replace(/\.cpp$/, '');
-        return {
-          command: `g++ "${cppFile}" -O2 -std=c++17 -o "${exe}" && "${exe}"`,
-          tempFile: cppFile,
-        };
+        return { command: `g++ "${cppFile}" -O2 -std=c++17 -o "${exe}" && "${exe}"`, tempFile: cppFile };
       }
 
       case 'ruby': {
@@ -499,9 +478,7 @@ export class E2BCodeExecutionTool {
     });
 
     if (result.isError) {
-      const { extractAllContentText } = await import('../mcp-content-utils.js');
-      const errorText = extractAllContentText(result.content);
-      throw new Error(`Failed to create temporary file: ${errorText || 'Unknown error'}`);
+      throw new Error(`Failed to create temporary file: ${result.content[0]?.text}`);
     }
 
     return filepath;

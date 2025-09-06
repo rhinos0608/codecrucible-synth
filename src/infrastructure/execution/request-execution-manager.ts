@@ -24,18 +24,74 @@ import {
   getGlobalEnhancedToolIntegration,
 } from '../../infrastructure/tools/enhanced-tool-integration.js';
 import { getGlobalToolIntegration } from '../../infrastructure/tools/tool-integration.js';
+import { DomainAwareToolOrchestrator } from '../tools/domain-aware-tool-orchestrator.js';
 import { requestBatcher } from '../performance/intelligent-request-batcher.js';
 import { adaptiveTuner } from '../performance/adaptive-performance-tuner.js';
 import { requestTimeoutOptimizer } from '../performance/request-timeout-optimizer.js';
 import { RustExecutionBackend } from './rust-executor/index.js';
-import { contextualToolFilter, ToolFilterContext } from '../tools/contextual-tool-filter.js';
 
-// Import the extracted GlobalEvidenceCollector from dedicated module
-import { GlobalEvidenceCollector } from '../evidence/global-evidence-collector.js';
-import { unifiedResultFormatter } from '../formatting/unified-result-formatter.js';
+// EVIDENCE COLLECTION BRIDGE - Global system to capture tool results for evidence collection
+class GlobalEvidenceCollector {
+  private static instance: GlobalEvidenceCollector;
+  private toolResults: any[] = [];
+  private evidenceCollectors: Set<(toolResult: any) => void> = new Set();
+
+  static getInstance(): GlobalEvidenceCollector {
+    if (!GlobalEvidenceCollector.instance) {
+      GlobalEvidenceCollector.instance = new GlobalEvidenceCollector();
+    }
+    return GlobalEvidenceCollector.instance;
+  }
+
+  addToolResult(toolResult: any): void {
+    console.log('🚨 DEBUG: addToolResult called! Collectors:', this.evidenceCollectors.size);
+    logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool result captured', {
+      hasResult: !!toolResult,
+      success: toolResult?.success,
+      hasOutput: !!toolResult?.output,
+      collectorCount: this.evidenceCollectors.size,
+    });
+
+    this.toolResults.push(toolResult);
+
+    // Notify all registered evidence collectors
+    this.evidenceCollectors.forEach(collector => {
+      try {
+        console.log('🚨 DEBUG: Calling collector callback');
+        collector(toolResult);
+      } catch (error) {
+        console.error('🚨 ERROR: Evidence collector callback failed:', error);
+        logger.warn('Evidence collector callback failed:', error);
+      }
+    });
+  }
+
+  registerEvidenceCollector(callback: (toolResult: any) => void): void {
+    console.log('🚨 DEBUG: registerEvidenceCollector called!');
+    this.evidenceCollectors.add(callback);
+    logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Evidence collector registered', {
+      totalCollectors: this.evidenceCollectors.size,
+    });
+  }
+
+  unregisterEvidenceCollector(callback: (toolResult: any) => void): void {
+    this.evidenceCollectors.delete(callback);
+  }
+
+  getToolResults(): any[] {
+    return [...this.toolResults];
+  }
+
+  clearToolResults(): void {
+    this.toolResults = [];
+  }
+}
+
+// Export the GlobalEvidenceCollector for use by other modules
+export { GlobalEvidenceCollector };
 
 export type ExecutionMode = 'fast' | 'quality' | 'balanced';
-export type ProviderType = 'ollama' | 'lm-studio' | 'claude' | 'huggingface' | 'auto';
+export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
 
 export interface ExecutionStrategy {
   mode: ExecutionMode;
@@ -93,16 +149,10 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   }> = [];
   private processManager: ActiveProcessManager;
   private providerRepository: any;
+  private domainOrchestrator: DomainAwareToolOrchestrator;
   private rustBackend: RustExecutionBackend | null;
   private isShuttingDown = false;
   private queueProcessor: NodeJS.Timeout | null = null;
-  
-  // FIXED: Add Rust backend readiness tracking
-  private rustBackendInitialized = false;
-  private rustBackendInitializationPromise: Promise<void> | null = null;
-  
-  // FIXED: Track signal listener registration to prevent duplicates
-  private static signalListenersRegistered = false;
 
   constructor(
     config: ExecutionConfig,
@@ -114,80 +164,49 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     this.config = config;
     this.processManager = processManager;
     this.providerRepository = providerRepository;
-    // Domain orchestrator removed - AI now intelligently selects tools
+    this.domainOrchestrator = new DomainAwareToolOrchestrator();
     this.rustBackend = rustBackend ?? null;
 
-    // FIXED: Initialize Rust backend synchronously with proper tracking
+    // If no injected backend, lazily create one
     if (!this.rustBackend) {
-      // Start initialization but track it properly
-      this.rustBackendInitializationPromise = this.initializeRustBackend();
-      
-      this.rustBackendInitializationPromise
-        .then(() => {
-          this.rustBackendInitialized = true;
-          logger.info('✅ RequestExecutionManager: Rust backend ready for requests');
-        })
-        .catch((e) => {
-          logger.warn('⚠️ RequestExecutionManager: Rust backend initialization failed, will proceed without it', e);
-          this.rustBackendInitialized = false; // Mark as failed but continue
+      try {
+        const { RustExecutionBackend } = require('./rust-executor/index.js');
+        this.rustBackend = new RustExecutionBackend({
+          enableProfiling: true,
+          maxConcurrency: 4,
+          timeoutMs: config.defaultTimeout,
+          logLevel: 'info',
         });
+        // Initialize asynchronously
+        this.initializeRustBackend();
+      } catch (e) {
+        // If import fails, leave rustBackend null and continue
+        logger.warn('RequestExecutionManager: Rust backend not available at construction', e);
+        this.rustBackend = null;
+      }
     } else {
-      // If an injected backend exists, initialize it synchronously
-      this.rustBackendInitializationPromise = this.initializeInjectedRustBackend();
-      
-      this.rustBackendInitializationPromise
-        .then(() => {
-          this.rustBackendInitialized = true;
-          logger.info('✅ RequestExecutionManager: Injected Rust backend ready for requests');
-        })
-        .catch((err: any) => {
-          logger.warn('⚠️ RequestExecutionManager: Injected Rust backend initialization failed', err);
-          this.rustBackendInitialized = false; // Mark as failed but continue
-        });
+      // If an injected backend exists, we may optionally initialize/verify it
+      try {
+        if (typeof (this.rustBackend as any).initialize === 'function') {
+          // Fire-and-forget initialization
+          (this.rustBackend as any).initialize().catch((err: any) =>
+            logger.warn('Injected rustBackend failed to initialize', err)
+          );
+        }
+      } catch (err) {
+        logger.warn('Error while initializing injected rustBackend', err);
+      }
     }
 
     // Start event-driven queue processor instead of infinite loop
     this.scheduleQueueProcessor();
 
-    // FIXED: Handle shutdown gracefully with duplicate listener prevention
-    if (!RequestExecutionManager.signalListenersRegistered) {
-      process.once('SIGTERM', async () => {
-        logger.info('Received SIGTERM, initiating graceful shutdown...');
-        await this.shutdown();
-      });
-      process.once('SIGINT', async () => {
-        logger.info('Received SIGINT, initiating graceful shutdown...');
-        await this.shutdown();
-      });
-      RequestExecutionManager.signalListenersRegistered = true;
-      logger.debug('Process signal listeners registered for graceful shutdown');
-    } else {
-      logger.debug('Process signal listeners already registered, skipping duplicate registration');
-    }
+    // Handle shutdown gracefully
+    process.once('SIGTERM', async () => this.shutdown());
+    process.once('SIGINT', async () => this.shutdown());
   }
 
   private async initializeRustBackend(): Promise<void> {
-    // If rustBackend doesn't exist, try to load it dynamically
-    if (!this.rustBackend) {
-      try {
-        // Use dynamic import for ESM compatibility
-        const rustModule = await import('./rust-executor/index.js');
-        const { RustExecutionBackend } = rustModule;
-        
-        this.rustBackend = new RustExecutionBackend({
-          enableProfiling: true,
-          maxConcurrency: 4,
-          timeoutMs: this.config.defaultTimeout,
-          logLevel: 'info',
-        });
-        
-        logger.info('RequestExecutionManager: Rust backend loaded dynamically');
-      } catch (e) {
-        logger.warn('RequestExecutionManager: Rust backend not available', e);
-        return;
-      }
-    }
-
     try {
       const initialized = await this.rustBackend.initialize();
       if (initialized === true) {
@@ -206,60 +225,9 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   }
 
   /**
-   * FIXED: Wait for Rust backend to be ready before processing requests
-   */
-  private async ensureRustBackendReady(): Promise<void> {
-    if (this.rustBackendInitializationPromise && !this.rustBackendInitialized) {
-      logger.debug('⏳ Waiting for Rust backend initialization to complete...');
-      try {
-        await this.rustBackendInitializationPromise;
-      } catch (error) {
-        logger.warn('⚠️ Rust backend initialization failed, continuing without it:', error);
-        // Continue without Rust backend - don't block requests
-      }
-    }
-  }
-
-  /**
-   * FIXED: Initialize injected Rust backend with proper error handling
-   */
-  private async initializeInjectedRustBackend(): Promise<void> {
-    if (!this.rustBackend) {
-      throw new Error('No injected Rust backend available');
-    }
-
-    try {
-      if (typeof (this.rustBackend as any).initialize === 'function') {
-        const initialized = await (this.rustBackend as any).initialize();
-        if (initialized === true) {
-          logger.info('🚀 RequestExecutionManager: Injected Rust backend initialized', {
-            available: this.rustBackend.isAvailable(),
-            strategy: this.rustBackend.getStrategy?.(),
-          });
-        } else {
-          logger.warn('RequestExecutionManager: Injected Rust backend initialized but reports not ready', {
-            initialized,
-            isAvailable: this.rustBackend?.isAvailable?.(),
-          });
-          throw new Error('Injected Rust backend initialized but not ready');
-        }
-      } else {
-        // If no initialize method, assume it's ready
-        logger.info('RequestExecutionManager: Injected Rust backend has no initialize method, assuming ready');
-      }
-    } catch (error) {
-      logger.error('RequestExecutionManager: Failed to initialize injected Rust backend', error);
-      throw error;
-    }
-  }
-
-  /**
    * Main request processing method
    */
   async processRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse> {
-    // FIXED: Ensure Rust backend is ready before processing requests
-    await this.ensureRustBackendReady();
-    
     const requestId = this.generateRequestId();
     const strategy = this.determineExecutionStrategy(request, context);
     const startTime = Date.now();
@@ -374,8 +342,8 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   ): Promise<ModelResponse> {
     const fallbackChain =
       strategy.provider === 'auto'
-        ? ['ollama', 'lm-studio', 'claude', 'huggingface'] // Default fallback chain - all providers now implemented
-        : [strategy.provider, 'ollama', 'lm-studio', 'claude', 'huggingface'].filter(
+        ? ['ollama', 'lm-studio', 'huggingface'] // Default fallback chain
+        : [strategy.provider, 'ollama', 'lm-studio', 'huggingface'].filter(
             (p, i, arr) => arr.indexOf(p) === i
           );
 
@@ -417,101 +385,54 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           provider.getModelName?.()
         );
 
-        // FIXED: Add provider capability check for tool support
-        if (!supportsTools && request.tools) {
-          logger.warn('⚠️ Model does not support tool calling but tools were requested', {
-            provider: providerType,
-            model: provider.getModelName?.() || 'unknown',
-            requestedTools: request.tools?.length || 0,
-            fallbackStrategy: 'proceeding_without_tools'
-          });
-          
-          // Notify user about tool limitations
-          this.emit('toolCapabilityWarning', {
-            provider: providerType,
-            model: provider.getModelName?.() || 'unknown',
-            message: `The selected model (${provider.getModelName?.() || 'unknown'}) does not support tool calls. Proceeding with natural language response only.`
-          });
-        }
-
-        // CONTEXTUAL TOOL FILTERING: Smart filtering based on request analysis
+        // DOMAIN-AWARE TOOL SELECTION: Smart filtering based on request analysis
         let tools: any[] = [];
         let domainInfo = '';
-        let filterReasoning = '';
 
-        if (toolIntegration && supportsTools) {
+        if (supportsTools && toolIntegration) {
           const allTools = await toolIntegration.getLLMFunctions();
 
-          // Build context for tool filtering
-          const filterContext: ToolFilterContext = {
-            prompt: request.prompt || '',
-            userId: (request.context as any)?.userId,
-            sessionId: (request as any).sessionId || (request.context as any)?.sessionId,
-            riskLevel: this.inferRiskLevel(request),
-            previousTools: (request.context as any)?.previousTools || [],
-            fileContext: {
-              workingDirectory: request.context?.workingDirectory || process.cwd(),
-              recentFiles: (request.context as any)?.recentFiles || [],
-              projectType: this.inferProjectType(request),
-            },
-          };
+          // Use domain orchestrator to select relevant tools only
+          const domainResult = this.domainOrchestrator.getToolsForPrompt(
+            request.prompt || '',
+            allTools
+          );
 
-          // Apply contextual filtering to reduce prompt bloat and security risks
-          const filterResult = contextualToolFilter.filterTools(allTools, filterContext);
-          tools = filterResult.tools;
-          domainInfo = `contextual-${filterResult.categories.join('-')}`;
-          filterReasoning = filterResult.reasoning;
+          tools = domainResult.tools;
+          domainInfo = `${domainResult.analysis.primaryDomain} (${(domainResult.analysis.confidence * 100).toFixed(1)}%)`;
 
-          logger.info('🎯 REQUEST-EXECUTION-MANAGER: Contextual tool filtering applied', {
+          logger.info('🎯 REQUEST-EXECUTION-MANAGER: Domain-aware tool selection', {
             prompt: `${request.prompt?.substring(0, 80)}...`,
+            primaryDomain: domainResult.analysis.primaryDomain,
+            confidence: domainResult.analysis.confidence.toFixed(2),
             originalToolCount: allTools.length,
-            filteredToolCount: tools.length,
-            categories: filterResult.categories,
-            confidence: filterResult.confidence.toFixed(2),
-            reasoning: filterReasoning,
-            approach: 'contextual-intelligent-filtering',
+            selectedToolCount: tools.length,
+            toolNames: tools.map(t => t.function?.name || t.name),
+            reasoning: domainResult.reasoning,
           });
-        } else {
-          // FIXED: Log fallback behavior when tools are not available
-          if (!supportsTools) {
-            logger.info('🚫 REQUEST-EXECUTION-MANAGER: Model does not support tools, proceeding with natural language only', {
-              provider: providerType,
-              model: provider.getModelName?.() || 'unknown',
-              toolIntegration: !!toolIntegration,
-              fallbackStrategy: 'natural_language_only'
-            });
-          } else if (!toolIntegration) {
-            logger.info('⚠️ REQUEST-EXECUTION-MANAGER: No tool integration available, proceeding with natural language only', {
-              provider: providerType,
-              model: provider.getModelName?.() || 'unknown',
-              fallbackStrategy: 'natural_language_only'
-            });
-          }
         }
 
-        // ENHANCED DEBUG: Show contextual tool filtering status
-        logger.info('🔧 ENHANCED TOOL DEBUG: Contextual tool filtering status', {
+        // ENHANCED DEBUG: Show domain-aware tool selection results
+        logger.info('🔧 ENHANCED TOOL DEBUG: Domain-aware request execution status', {
           provider: providerType,
           model: provider.getModelName?.() || 'unknown',
           supportsTools,
           hasEnhanced: !!enhancedToolIntegration,
           hasBasic: !!getGlobalToolIntegration(),
           hasIntegration: !!toolIntegration,
-          filteredToolCount: tools.length,
-          approach: 'contextual-intelligent-filtering',
+          selectedToolCount: tools.length,
           domainInfo,
         });
 
         if (tools.length > 0) {
-          logger.info('✅ CONTEXTUALLY FILTERED TOOLS provided for AI selection', {
+          logger.info('🎯 DOMAIN-SELECTED TOOLS for request execution', {
             toolNames: tools.map(t => t.function?.name || t.name),
-            approach: 'contextual-filtering',
-            toolCount: tools.length,
-            reasoning: filterReasoning,
+            domain: domainInfo,
+            sampleTool: tools[0],
           });
         } else {
-          logger.warn('⚠️ NO TOOLS AVAILABLE after contextual filtering', {
-            integrationStatus: 'failed-after-filtering',
+          logger.warn('⚠️ NO DOMAIN TOOLS SELECTED for request execution', {
+            domain: domainInfo,
           });
         }
 
@@ -532,9 +453,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           requestTimeoutOptimizer.createOptimizedTimeout(
             requestId,
             requestType,
-            providerType, // Provider type for historical data lookup
-            undefined, // No custom timeout
-            strategy.mode // Execution mode for timeout priority adjustments
+            providerType === 'fast' ? 'low' : providerType === 'quality' ? 'high' : 'medium'
           );
 
         // Add abort signal to request
@@ -543,49 +462,16 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           abortSignal: abortController.signal,
         };
 
-        // Route to streaming or regular processing based on request.stream flag
-        let response;
-        if (request.stream && request.onStreamingToken) {
-          // Check if provider supports streaming via ProviderAdapter interface
-          const supportsStreaming = this.providerSupportsStreaming(provider, providerType);
-          
-          if (supportsStreaming) {
-            logger.debug(`Provider ${providerType} supports streaming, using stream method`);
-            // Use the streaming interface properly
-            response = await Promise.race([
-              this.handleStreamingRequest(provider, requestWithAbort, request.onStreamingToken),
-              this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
-            ]);
-          } else {
-            // FIXED: Fallback to regular processing if provider doesn't support streaming
-            logger.warn(`Provider ${providerType} does not support streaming, falling back to regular request method`);
-            response = await Promise.race([
-              provider.request(requestWithAbort), // FIXED: Use correct method name from ProviderAdapter interface
-              this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
-            ]);
-          }
-        } else {
-          // FIXED: Use correct method name for regular processing
-          response = await Promise.race([
-            provider.request(requestWithAbort), // FIXED: Use correct method name from ProviderAdapter interface
-            this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
-          ]);
-        }
+        const response = await Promise.race([
+          provider.processRequest(requestWithAbort, context),
+          this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
+        ]);
 
         // Mark request as completed successfully
         requestTimeoutOptimizer.completeRequest(requestId);
 
         // Check if response contains tool calls that need to be executed
-        logger.debug('RequestExecutionManager: Checking response for tool calls', {
-          responseKeys: Object.keys(response),
-          hasToolCalls: !!response.toolCalls,
-          toolCallsLength: response.toolCalls?.length
-        });
-        
         if (response.toolCalls && response.toolCalls.length > 0) {
-          logger.debug('RequestExecutionManager: Entering tool execution path', {
-            toolCallCount: response.toolCalls.length
-          });
           logger.debug('Tool execution: Found tool calls in request execution', {
             count: response.toolCalls.length,
           });
@@ -593,7 +479,6 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           if (toolIntegration) {
             try {
               const toolResults = [];
-              const toolExecutionStartTime = Date.now(); // Track tool execution timing
 
               // Execute each tool call
               for (const toolCall of response.toolCalls) {
@@ -626,58 +511,34 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
                 globalCollector.addToolResult(result);
               }
 
-              // If we have tool results, format them using centralized formatter
+              // If we have tool results, format them into a readable response
               if (toolResults.length > 0) {
-                const formattedResults = unifiedResultFormatter.formatMultipleToolResults(
-                  toolResults, 
-                  response.toolCalls, 
-                  {
-                    includeMetadata: true,
-                    preferMarkdown: true,
-                    highlightErrors: true
-                  }
-                );
-                
-                response.content = formattedResults.content;
-                
-                // Calculate aggregated metadata from tool executions
-                const toolExecutionTime = Date.now() - toolExecutionStartTime;
-                const totalTokens = this.calculateTotalTokens(toolResults);
-                const toolWarnings = formattedResults.toolResults
-                  .filter(tr => tr.metadata?.warnings?.length)
-                  .flatMap(tr => tr.metadata?.warnings || []);
-                
-                // Set comprehensive metadata from actual tool execution
-                response.metadata = {
-                  tokens: totalTokens,
-                  latency: toolExecutionTime,
-                  toolExecutionStats: {
-                    toolCount: formattedResults.summary.totalTools,
-                    successCount: formattedResults.summary.successCount,
-                    errorCount: formattedResults.summary.errorCount,
-                    totalExecutionTime: toolExecutionTime,
-                    averageExecutionTime: Math.round(toolExecutionTime / formattedResults.summary.totalTools)
-                  },
-                  toolWarnings: toolWarnings.length > 0 ? toolWarnings : undefined,
-                  executedTools: formattedResults.toolResults.map(tr => tr.toolName),
-                  ...response.metadata // Preserve any existing metadata
-                };
-                
-                // Log details for all tool executions with rich metadata
-                logger.info(
-                  '🔧 TOOL EXECUTION: Tools successfully executed in request execution',
-                  {
-                    toolCount: toolResults.length,
-                    totalTokens,
-                    executionTime: toolExecutionTime,
-                    summary: formattedResults.summary,
-                    toolResults: formattedResults.toolResults.map(tr => ({
-                      toolName: tr.toolName,
-                      success: tr.success,
-                      hasWarnings: !!tr.metadata?.warnings?.length
-                    }))
-                  }
-                );
+                const firstResult = toolResults[0];
+
+                if (firstResult.success && firstResult.output) {
+                  // Return the actual tool result as the content
+                  const content = firstResult.output.content || firstResult.output;
+                  response.content = content;
+                  response.metadata = {
+                    tokens: 0,
+                    latency: 0,
+                    ...response.metadata,
+                  };
+
+                  logger.info(
+                    '🔧 TOOL EXECUTION: Tool successfully executed in request execution',
+                    {
+                      toolName:
+                        response.toolCalls[0]?.name || response.toolCalls[0]?.function?.name,
+                      resultContent: content,
+                    }
+                  );
+                } else if (firstResult.error) {
+                  response.content = `Error executing tool: ${firstResult.error}`;
+                  logger.error('Tool execution error in request execution', {
+                    error: firstResult.error,
+                  });
+                }
               }
             } catch (error) {
               logger.error('Error during tool execution in request execution', {
@@ -752,7 +613,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     }
 
     if (request.tools && request.tools.length > 0) {
-      strategy.provider = 'ollama'; // FIXED: Prefer Ollama for tool use (LM Studio connection issues)
+      strategy.provider = 'lm-studio'; // Prefer LM Studio for tool use
       strategy.timeout = this.config.complexityTimeouts.complex;
     }
 
@@ -849,61 +710,6 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         reject(new Error(`Request timed out after ${timeoutMs}ms`));
       }, timeoutMs);
     });
-  }
-
-  /**
-   * Handle streaming request using provider adapter's stream method
-   */
-  private async handleStreamingRequest(
-    provider: any,
-    request: ModelRequest,
-    onStreamingToken: (token: any) => void
-  ): Promise<ModelResponse> {
-    let fullContent = '';
-    let lastToken: any = null;
-
-    try {
-      // Check if provider has stream method before calling it
-      if (!provider.stream || typeof provider.stream !== 'function') {
-        throw new Error(`Provider ${provider.name || 'unknown'} does not support streaming`);
-      }
-      
-      // Use the provider adapter's stream method
-      const streamIterator = provider.stream(request);
-      
-      for await (const token of streamIterator) {
-        lastToken = token;
-        if (token.content) {
-          fullContent += token.content;
-        }
-        
-        // Call the streaming callback
-        onStreamingToken(token);
-        
-        // Break if we receive a completion token
-        if (token.isComplete) {
-          break;
-        }
-      }
-
-      // Return a complete response based on the streaming data
-      return {
-        id: `stream_${Date.now()}`,
-        content: fullContent,
-        model: request.model || 'unknown',
-        provider: provider.name || 'unknown',
-        usage: {
-          promptTokens: 0, // Could be estimated
-          completionTokens: fullContent.split(/\s+/).length,
-          totalTokens: fullContent.split(/\s+/).length,
-        },
-        responseTime: Date.now(),
-        finishReason: 'stop',
-      };
-    } catch (error) {
-      logger.error('Streaming request failed:', error);
-      throw new Error(`Streaming failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
   }
 
   /**
@@ -1049,129 +855,39 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
    * Check if provider/model combination supports tools
    */
   private modelSupportsTools(provider: ProviderType, model?: string): boolean {
-    // FIXED: Implement precise capability detection instead of optimistic assumptions
-    
-    if (provider === 'claude') {
-      return true; // Claude models support tool calling
-    }
-    
-    if (provider === 'huggingface') {
-      // Most HuggingFace models don't support function calling
-      // Only specific instruction-tuned models do
-      const supportedHFModels = [
-        'microsoft/DialoGPT',
-        'microsoft/CodeGPT',
-        'facebook/blenderbot',
-      ];
-      
-      if (model) {
-        const modelLower = model.toLowerCase();
-        const isSupported = supportedHFModels.some(supported => 
-          modelLower.includes(supported.toLowerCase())
-        );
-        logger.debug('🔍 HuggingFace tool capability check', { 
-          model: modelLower,
-          isSupported,
-          reason: isSupported ? 'Model in known supported list' : 'Model not in supported list'
-        });
-        return isSupported;
-      }
-      return false; // Conservative default for HF
-    }
-
     if (provider === 'lm-studio') {
-      // FIXED: Not all LM Studio models support function calling
-      // Check if the loaded model is function-calling capable
-      if (!model) {
-        logger.warn('🔍 LM Studio tool capability: No model specified, assuming no tool support for safety');
-        return false;
-      }
-      
-      const modelLower = model.toLowerCase();
-      
-      // LM Studio models that commonly support function calling
-      const supportedPatterns = [
-        'llama',        // Most llama models
-        'mistral',      // Mistral models
-        'qwen',         // Qwen models
-        'hermes',       // OpenHermes models
-        'openai',       // OpenAI-compatible models
-        'gpt',          // GPT-based models
-        'functionary',  // Functionary models (designed for function calling)
-        'nexusraven',   // NexusRaven models
-      ];
-      
-      const isSupported = supportedPatterns.some(pattern => modelLower.includes(pattern));
-      
-      logger.debug('🔍 LM Studio tool capability check', { 
-        model: modelLower,
-        isSupported,
-        reason: isSupported ? 'Model matches known function-calling pattern' : 'Model does not match known patterns'
-      });
-      
-      return isSupported;
+      return true; // LM Studio generally supports OpenAI-compatible function calling
     }
 
     if (provider === 'ollama') {
-      // FIXED: Implement precise model-specific capability detection for Ollama
+      // If no specific model provided, assume auto-selection will pick a supported model
       if (!model) {
-        logger.warn('🔍 Ollama tool capability: No model specified, assuming no tool support for safety');
-        return false;
+        logger.debug(
+          'No specific model provided, assuming auto-selection will pick supported model'
+        );
+        return true; // Trust that auto-selection picks qwen2.5-coder which supports tools
       }
-      
-      const modelLower = model.toLowerCase();
-      
-      // Known Ollama models that support function calling
-      const supportedModelFamilies = [
-        'llama3',       // llama3, llama3.1, llama3.2
-        'qwen2',        // qwen2, qwen2.5
-        'qwq',          // QwQ models
-        'mistral',      // Mistral models
-        'codellama',    // CodeLlama models
-        'hermes',       // OpenHermes models
-        'nexusraven',   // NexusRaven function calling models
-        'functionary',  // Functionary models
+
+      // Only certain Ollama models support function calling
+      const model_name = model.toLowerCase();
+      const supportedModels = [
+        'llama3',
+        'llama3.1',
+        'llama3.2',
+        'qwen2.5',
+        'qwq',
+        'mistral',
+        'codellama',
       ];
-      
-      // Extract model size for additional validation
-      const sizeMatch = modelLower.match(/(\d+(?:\.\d+)?)b/);
-      const modelSize = sizeMatch ? parseFloat(sizeMatch[1]) : 0;
-      
-      // Check if model family supports tools
-      const familySupported = supportedModelFamilies.some(family => 
-        modelLower.includes(family)
+
+      const isSupported = supportedModels.some(supportedModel =>
+        model_name.includes(supportedModel)
       );
-      
-      // Additional size-based heuristic: very small models may not support complex function calling
-      const sizeAppropriate = !modelSize || modelSize >= 1.0; // At least 1B parameters
-      
-      const isSupported = familySupported && sizeAppropriate;
-      
-      logger.debug('🔍 Ollama tool capability check', { 
-        model: modelLower,
-        detectedSize: modelSize || 'unknown',
-        familySupported,
-        sizeAppropriate,
-        isSupported,
-        reason: isSupported 
-          ? 'Model family supports tools and size is appropriate' 
-          : familySupported 
-            ? 'Model family supports tools but size may be too small'
-            : 'Model family does not support function calling'
-      });
-      
+      logger.debug('Model tool support check', { model: model_name, isSupported });
       return isSupported;
     }
 
-    // Conservative default - no tools for unknown providers
-    logger.debug('🔍 Unknown provider tool capability', { 
-      provider,
-      model: model || 'unknown',
-      isSupported: false,
-      reason: 'Unknown provider, defaulting to no tool support'
-    });
-    
-    return false;
+    return false; // Conservative default - no tools for unknown providers
   }
 
   /**
@@ -1182,8 +898,8 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
       activeRequests: this.activeRequests.size,
       queuedRequests: this.requestQueue.length,
       maxConcurrent: this.config.maxConcurrentRequests,
-      rustBackendAvailable: this.rustBackend?.isAvailable() ?? false,
-      rustBackendStats: this.rustBackend?.getPerformanceStats() ?? null,
+      rustBackendAvailable: this.rustBackend.isAvailable(),
+      rustBackendStats: this.rustBackend.getPerformanceStats(),
       config: this.config,
     };
   }
@@ -1192,202 +908,6 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
    * Get the Rust execution backend instance
    */
   getRustBackend(): RustExecutionBackend {
-    if (!this.rustBackend) {
-      throw new Error('Rust execution backend is not available');
-    }
     return this.rustBackend;
   }
-
-  /**
-   * Infer risk level from request content and context
-   */
-  private inferRiskLevel(request: ModelRequest): 'low' | 'medium' | 'high' {
-    const prompt = (request.prompt || '').toLowerCase();
-    
-    // High risk indicators
-    const highRiskKeywords = [
-      'delete', 'remove', 'rm ', 'uninstall', 'format', 'wipe', 'destroy',
-      'sudo', 'admin', 'root', 'chmod', 'chown', 'passwd', 'su ',
-      'exec', 'eval', 'shell', 'cmd', 'powershell', 'bash',
-      'curl', 'wget', 'download', 'install', 'git push', 'commit'
-    ];
-    
-    // Medium risk indicators
-    const mediumRiskKeywords = [
-      'write', 'create', 'modify', 'edit', 'change', 'update',
-      'move', 'copy', 'rename', 'mkdir', 'touch',
-      'config', 'settings', 'environment', 'variables'
-    ];
-
-    if (highRiskKeywords.some(keyword => prompt.includes(keyword))) {
-      return 'high';
-    }
-    
-    if (mediumRiskKeywords.some(keyword => prompt.includes(keyword))) {
-      return 'medium';
-    }
-    
-    // Check for file paths that might indicate system areas
-    if (prompt.includes('/etc/') || prompt.includes('/sys/') || prompt.includes('c:\\windows\\')) {
-      return 'high';
-    }
-    
-    return 'low';
-  }
-
-  /**
-   * Infer project type from request content and context
-   */
-  private inferProjectType(request: ModelRequest): string {
-    const prompt = (request.prompt || '').toLowerCase();
-    const context = request.context;
-    
-    // Check working directory for clues
-    if (context?.workingDirectory) {
-      const workDir = context.workingDirectory.toLowerCase();
-      if (workDir.includes('node_modules') || workDir.includes('package.json')) {
-        return 'javascript';
-      }
-      if (workDir.includes('.git')) {
-        return 'git-project';
-      }
-    }
-    
-    // Check for file extensions and patterns in prompt
-    const typeIndicators = [
-      { pattern: /\.(js|jsx|ts|tsx|json|package\.json)/, type: 'javascript' },
-      { pattern: /\.(py|python|requirements\.txt|setup\.py)/, type: 'python' },
-      { pattern: /\.(java|class|jar|maven|gradle)/, type: 'java' },
-      { pattern: /\.(rs|cargo\.toml|cargo\.lock)/, type: 'rust' },
-      { pattern: /\.(go|mod|sum)/, type: 'go' },
-      { pattern: /\.(php|composer\.json)/, type: 'php' },
-      { pattern: /\.(rb|gemfile|rakefile)/, type: 'ruby' },
-      { pattern: /\.(cpp|c|h|cmake|makefile)/, type: 'cpp' },
-      { pattern: /\.(html|css|scss|sass|vue|react)/, type: 'web' },
-      { pattern: /\.(md|readme|doc|docs)/, type: 'documentation' },
-    ];
-
-    for (const indicator of typeIndicators) {
-      if (indicator.pattern.test(prompt)) {
-        return indicator.type;
-      }
-    }
-
-    // Check for technology keywords
-    if (prompt.includes('react') || prompt.includes('vue') || prompt.includes('angular')) {
-      return 'web-framework';
-    }
-    
-    if (prompt.includes('docker') || prompt.includes('kubernetes') || prompt.includes('container')) {
-      return 'devops';
-    }
-
-    if (prompt.includes('database') || prompt.includes('sql') || prompt.includes('mongodb')) {
-      return 'database';
-    }
-
-    return 'general';
-  }
-
-  /**
-   * Calculate total tokens from tool execution results
-   */
-  private calculateTotalTokens(toolResults: any[]): number {
-    let totalTokens = 0;
-
-    for (const result of toolResults) {
-      try {
-        // Check for token count in various possible locations
-        if (result && typeof result === 'object') {
-          // Common token fields from different providers
-          const tokenSources = [
-            result.tokens,
-            result.metadata?.tokens,
-            result.usage?.totalTokens,
-            result.usage?.total_tokens,
-            result.tokenCount,
-            result.token_count
-          ];
-
-          for (const tokenSource of tokenSources) {
-            if (typeof tokenSource === 'number' && tokenSource > 0) {
-              totalTokens += tokenSource;
-              break; // Use first valid token count found
-            }
-          }
-
-          // If no token count found, estimate based on content length
-          if (!tokenSources.some(s => typeof s === 'number' && s > 0)) {
-            const content = this.extractContentForTokenEstimation(result);
-            if (content) {
-              // Rough estimation: ~4 characters per token
-              totalTokens += Math.ceil(content.length / 4);
-            }
-          }
-        }
-      } catch (error) {
-        logger.debug('Error calculating tokens for tool result:', error);
-        // Continue processing other results
-      }
-    }
-
-    return totalTokens;
-  }
-
-  /**
-   * Extract content from result for token estimation
-   */
-  private extractContentForTokenEstimation(result: any): string {
-    if (typeof result === 'string') {
-      return result;
-    }
-
-    if (result && typeof result === 'object') {
-      // Try common content fields
-      const contentFields = [
-        result.content,
-        result.output,
-        result.data,
-        result.text,
-        result.message
-      ];
-
-      for (const field of contentFields) {
-        if (typeof field === 'string') {
-          return field;
-        }
-      }
-
-      // Try JSON stringify as fallback
-      try {
-        return JSON.stringify(result);
-      } catch {
-        return '';
-      }
-    }
-
-    return String(result || '');
-  }
-
-  /**
-   * Properly detect if provider supports streaming via ProviderAdapter interface
-   */
-  private providerSupportsStreaming(provider: any, providerType: string): boolean {
-    // Check if provider has the stream method (ProviderAdapter interface)
-    if (provider && typeof provider.stream === 'function') {
-      logger.debug(`${providerType} supports streaming via ProviderAdapter.stream method`);
-      return true;
-    }
-
-    // Check if provider has streaming capability metadata
-    if (provider && provider.capabilities && provider.capabilities.supportsStreaming === true) {
-      logger.debug(`${providerType} supports streaming via capabilities metadata`);
-      return true;
-    }
-
-    // Don't rely on "known providers" - only check actual capabilities
-    logger.debug(`${providerType} does not support streaming (no stream method or capabilities metadata)`);
-    return false;
-  }
-
 }

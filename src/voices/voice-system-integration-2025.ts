@@ -68,7 +68,10 @@ export class VoiceSystemIntegration2025 {
   private readonly config: VoiceSystemConfig;
   private initialized: boolean = false;
 
-  public constructor(modelClient: IModelClient | null = null, config: Readonly<VoiceSystemConfig> = {}) {
+  public constructor(
+    modelClient: IModelClient | null = null,
+    config: Readonly<VoiceSystemConfig> = {}
+  ) {
     this.config = {
       useOptimizedSystem: true,
       fallbackToLegacy: true,
@@ -338,7 +341,10 @@ export class VoiceSystemIntegration2025 {
   /**
    * Process request with integrated routing
    */
-  async processWithIntegratedRouting(request: string, routing: RoutingOptions = {}): Promise<SynthesisResult> {
+  async processWithIntegratedRouting(
+    request: string,
+    routing: RoutingOptions = {}
+  ): Promise<SynthesisResult> {
     logger.info('Processing request with integrated routing');
 
     const selectedVoices = await this.selectVoices({
@@ -364,10 +370,14 @@ export class VoiceSystemIntegration2025 {
   /**
    * Synthesize multiple voices for a given request
    */
-  async synthesizeMultipleVoices(request: string, options: VoiceSynthesisOptions = {}): Promise<SynthesisResult> {
+  async synthesizeMultipleVoices(
+    request: string,
+    options: VoiceSynthesisOptions = {}
+  ): Promise<SynthesisResult> {
     logger.info('Synthesizing multiple voices for request');
 
-    const voices = options.requiredVoices || (await this.selectVoices(options as Record<string, unknown>));
+    const voices =
+      options.requiredVoices || (await this.selectVoices(options as Record<string, unknown>));
     const results: VoiceResult[] = [];
 
     for (const voice of voices) {
@@ -384,7 +394,8 @@ export class VoiceSystemIntegration2025 {
       content: results.map(r => r.content).join('\n\n'),
       voices: results,
       strategy: options.strategy || 'consensus',
-      confidence: results.length > 0 ? results.reduce((sum, r) => sum + r.confidence, 0) / results.length : 0,
+      confidence:
+        results.length > 0 ? results.reduce((sum, r) => sum + r.confidence, 0) / results.length : 0,
       processingTime: Date.now(),
     };
   }
@@ -405,7 +416,11 @@ export class VoiceSystemIntegration2025 {
     };
   }
 
-  private async synthesizeSingleVoice(voice: string, request: string, options: VoiceSynthesisOptions): Promise<VoiceResult> {
+  private async synthesizeSingleVoice(
+    voice: string,
+    request: string,
+    options: VoiceSynthesisOptions
+  ): Promise<VoiceResult> {
     // Calculate real confidence based on multiple factors
     const confidence = this.calculateVoiceConfidence(voice, request, options);
 
@@ -418,7 +433,11 @@ export class VoiceSystemIntegration2025 {
     };
   }
 
-  private calculateVoiceConfidence(voice: string, request: string, options: VoiceSynthesisOptions): number {
+  private calculateVoiceConfidence(
+    voice: string,
+    request: string,
+    options: VoiceSynthesisOptions
+  ): number {
     let confidence = 0.5; // Base confidence
 
     // Factor 1: Voice-request alignment
@@ -604,13 +623,18 @@ export class VoiceSystemIntegration2025 {
   /**
    * Synthesize responses from multiple voices with a specific strategy
    */
-  async synthesize(prompt: string, voices: string[], strategy: string = 'consensus'): Promise<SynthesisResult> {
+  async synthesize(
+    prompt: string,
+    voices: string[],
+    strategy: string = 'consensus'
+  ): Promise<SynthesisResult> {
     const results = await this.generateMultiVoiceSolutions(voices, prompt, {});
     return {
       content: results.map(r => r.content).join('\n\n'),
       voices: results,
       strategy,
-      confidence: results.length > 0 ? results.reduce((sum, r) => sum + r.confidence, 0) / results.length : 0,
+      confidence:
+        results.length > 0 ? results.reduce((sum, r) => sum + r.confidence, 0) / results.length : 0,
       processingTime: Date.now(),
     };
   }

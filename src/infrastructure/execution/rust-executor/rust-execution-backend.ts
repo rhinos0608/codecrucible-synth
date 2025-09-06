@@ -122,7 +122,7 @@ export class RustExecutionBackend {
     // Acquire lock and create initialization promise
     this.initializationLock = true;
     this.initializationPromise = this.doInitialize();
-    
+
     try {
       const result = await this.initializationPromise;
       return result;

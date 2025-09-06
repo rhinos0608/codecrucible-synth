@@ -5,7 +5,7 @@
 // Voice IDs - canonical identifiers for all voice archetypes
 export const VOICE_IDS = {
   EXPLORER: 'explorer',
-  MAINTAINER: 'maintainer', 
+  MAINTAINER: 'maintainer',
   ANALYZER: 'analyzer',
   DEVELOPER: 'developer',
   IMPLEMENTOR: 'implementor',
@@ -20,7 +20,7 @@ export const VOICE_IDS = {
 export const VOICE_NAMES = {
   [VOICE_IDS.EXPLORER]: 'Explorer',
   [VOICE_IDS.MAINTAINER]: 'Maintainer',
-  [VOICE_IDS.ANALYZER]: 'Analyzer', 
+  [VOICE_IDS.ANALYZER]: 'Analyzer',
   [VOICE_IDS.DEVELOPER]: 'Developer',
   [VOICE_IDS.IMPLEMENTOR]: 'Implementor',
   [VOICE_IDS.SECURITY]: 'Security',
@@ -35,7 +35,7 @@ export const VOICE_STYLES = {
   [VOICE_IDS.EXPLORER]: 'experimental',
   [VOICE_IDS.MAINTAINER]: 'conservative',
   [VOICE_IDS.ANALYZER]: 'analytical',
-  [VOICE_IDS.DEVELOPER]: 'pragmatic', 
+  [VOICE_IDS.DEVELOPER]: 'pragmatic',
   [VOICE_IDS.IMPLEMENTOR]: 'action-oriented',
   [VOICE_IDS.SECURITY]: 'defensive',
   [VOICE_IDS.ARCHITECT]: 'strategic',
@@ -62,32 +62,32 @@ export const VOICE_TEMPERATURES = {
 export const VOICE_GROUPS = {
   // Default voices for general tasks
   DEFAULT: [VOICE_IDS.DEVELOPER, VOICE_IDS.ANALYZER, VOICE_IDS.ARCHITECT],
-  
+
   // Analysis and investigation tasks
   ANALYSIS: [VOICE_IDS.ANALYZER, VOICE_IDS.ARCHITECT],
-  
+
   // Implementation and development tasks
   IMPLEMENTATION: [VOICE_IDS.DEVELOPER, VOICE_IDS.IMPLEMENTOR],
-  
+
   // Security-focused tasks
   SECURITY: [VOICE_IDS.SECURITY],
-  
+
   // High complexity architectural tasks
   ARCHITECTURE: [VOICE_IDS.ARCHITECT, VOICE_IDS.ANALYZER],
-  
+
   // Creative and innovative tasks
   INNOVATION: [VOICE_IDS.EXPLORER, VOICE_IDS.DESIGNER],
-  
-  // Quality and maintenance tasks  
+
+  // Quality and maintenance tasks
   QUALITY: [VOICE_IDS.GUARDIAN, VOICE_IDS.MAINTAINER],
-  
+
   // Performance optimization tasks
   OPTIMIZATION: [VOICE_IDS.OPTIMIZER, VOICE_IDS.ANALYZER],
-  
+
   // All available voices
   ALL: [
     VOICE_IDS.EXPLORER,
-    VOICE_IDS.MAINTAINER, 
+    VOICE_IDS.MAINTAINER,
     VOICE_IDS.ANALYZER,
     VOICE_IDS.DEVELOPER,
     VOICE_IDS.IMPLEMENTOR,
@@ -100,9 +100,9 @@ export const VOICE_GROUPS = {
 } as const;
 
 // Type definitions for type safety
-export type VoiceId = typeof VOICE_IDS[keyof typeof VOICE_IDS];
-export type VoiceName = typeof VOICE_NAMES[VoiceId];
-export type VoiceStyle = typeof VOICE_STYLES[VoiceId];
+export type VoiceId = (typeof VOICE_IDS)[keyof typeof VOICE_IDS];
+export type VoiceName = (typeof VOICE_NAMES)[VoiceId];
+export type VoiceStyle = (typeof VOICE_STYLES)[VoiceId];
 export type VoiceGroup = keyof typeof VOICE_GROUPS;
 
 // Validation helper

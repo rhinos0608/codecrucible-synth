@@ -1,6 +1,6 @@
 /**
  * Global Evidence Collector - Extracted from Request Execution Manager
- * 
+ *
  * Centralized system to capture tool results for evidence collection
  * Implements singleton pattern with observer pattern for collectors
  * Follows modular architecture principles with proper separation of concerns
@@ -52,13 +52,13 @@ export class GlobalEvidenceCollector {
       metadata: {
         hasOutput: !!toolResult?.output,
         resultType: typeof toolResult,
-        collectorCount: this.evidenceCollectors.size
-      }
+        collectorCount: this.evidenceCollectors.size,
+      },
     };
 
     logger.debug('Evidence collector: Adding tool result', {
       collectorCount: this.evidenceCollectors.size,
-      hasResult: !!toolResult
+      hasResult: !!toolResult,
     });
 
     logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool result captured', {
@@ -66,7 +66,7 @@ export class GlobalEvidenceCollector {
       success: toolResult?.success,
       hasOutput: !!toolResult?.output,
       collectorCount: this.evidenceCollectors.size,
-      timestamp: evidence.timestamp
+      timestamp: evidence.timestamp,
     });
 
     // Add to results with size management
@@ -87,7 +87,7 @@ export class GlobalEvidenceCollector {
 
     logger.debug('Evidence collector: Registering evidence collector');
     this.evidenceCollectors.add(callback);
-    
+
     logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Evidence collector registered', {
       totalCollectors: this.evidenceCollectors.size,
     });
@@ -98,7 +98,7 @@ export class GlobalEvidenceCollector {
    */
   unregisterEvidenceCollector(callback: EvidenceCollectorCallback): void {
     const wasDeleted = this.evidenceCollectors.delete(callback);
-    
+
     if (wasDeleted) {
       logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Evidence collector unregistered', {
         remainingCollectors: this.evidenceCollectors.size,
@@ -126,10 +126,10 @@ export class GlobalEvidenceCollector {
   clearToolResults(): void {
     const clearedCount = this.toolResults.length;
     this.toolResults = [];
-    
+
     logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool results cleared', {
       clearedCount,
-      remainingCollectors: this.evidenceCollectors.size
+      remainingCollectors: this.evidenceCollectors.size,
     });
   }
 
@@ -153,8 +153,10 @@ export class GlobalEvidenceCollector {
       activeCollectors: this.evidenceCollectors.size,
       successCount,
       errorCount,
-      oldestResult: timestamps.length > 0 ? new Date(Math.min(...timestamps.map(t => t.getTime()))) : undefined,
-      newestResult: timestamps.length > 0 ? new Date(Math.max(...timestamps.map(t => t.getTime()))) : undefined
+      oldestResult:
+        timestamps.length > 0 ? new Date(Math.min(...timestamps.map(t => t.getTime()))) : undefined,
+      newestResult:
+        timestamps.length > 0 ? new Date(Math.max(...timestamps.map(t => t.getTime()))) : undefined,
     };
   }
 
@@ -165,13 +167,13 @@ export class GlobalEvidenceCollector {
     if (maxResults < 1) {
       throw new Error('Max results must be at least 1');
     }
-    
+
     this.maxResults = maxResults;
     this.maintainMaxResults();
-    
+
     logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Max results updated', {
       maxResults,
-      currentResults: this.toolResults.length
+      currentResults: this.toolResults.length,
     });
   }
 
@@ -181,13 +183,13 @@ export class GlobalEvidenceCollector {
   shutdown(): void {
     const clearedResults = this.toolResults.length;
     const clearedCollectors = this.evidenceCollectors.size;
-    
+
     this.toolResults = [];
     this.evidenceCollectors.clear();
-    
+
     logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Shutdown completed', {
       clearedResults,
-      clearedCollectors
+      clearedCollectors,
     });
   }
 
@@ -202,9 +204,9 @@ export class GlobalEvidenceCollector {
         logger.debug('Evidence collector: Calling collector callback');
         collector(evidence.result); // Maintain backward compatibility by passing raw result
       } catch (error) {
-        logger.error('Evidence collector callback failed', { 
+        logger.error('Evidence collector callback failed', {
           error,
-          evidenceTimestamp: evidence.timestamp
+          evidenceTimestamp: evidence.timestamp,
         });
         logger.warn('Evidence collector callback failed:', error);
       }
@@ -218,11 +220,11 @@ export class GlobalEvidenceCollector {
     if (this.toolResults.length > this.maxResults) {
       const excess = this.toolResults.length - this.maxResults;
       this.toolResults = this.toolResults.slice(excess);
-      
+
       logger.debug('Evidence collector: Trimmed excess results', {
         removed: excess,
         remaining: this.toolResults.length,
-        maxResults: this.maxResults
+        maxResults: this.maxResults,
       });
     }
   }

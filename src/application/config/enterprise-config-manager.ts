@@ -54,7 +54,7 @@ export class EnterpriseConfigManager {
       logger.debug('EnterpriseConfigManager already initialized');
       return;
     }
-    
+
     await this.loadConfig();
     this.initialized = true;
   }
@@ -91,10 +91,10 @@ export class EnterpriseConfigManager {
   private async loadConfig(): Promise<void> {
     try {
       logger.debug(`Loading enterprise config from: ${this.configPath}`);
-      
+
       // Resolve the config path relative to the project root
       const resolvedPath = path.resolve(process.cwd(), this.configPath);
-      
+
       // Check if file exists
       try {
         await fs.access(resolvedPath);
@@ -104,11 +104,11 @@ export class EnterpriseConfigManager {
         await this.saveConfig();
         return;
       }
-      
+
       // Read and parse the config file
       const configData = await fs.readFile(resolvedPath, 'utf-8');
       const loadedConfig = JSON.parse(configData) as Partial<EnterpriseConfig>;
-      
+
       // Merge loaded config with defaults to ensure all fields exist
       this.config = {
         ...this.getDefaultConfig(),
@@ -118,7 +118,7 @@ export class EnterpriseConfigManager {
         backup: { ...this.getDefaultConfig().backup, ...loadedConfig.backup },
         compliance: { ...this.getDefaultConfig().compliance, ...loadedConfig.compliance },
       };
-      
+
       logger.info('Enterprise configuration loaded successfully');
     } catch (error) {
       logger.warn('Failed to load enterprise config, using defaults:', error);
@@ -160,18 +160,14 @@ export class EnterpriseConfigManager {
   public async saveConfig(): Promise<void> {
     try {
       const resolvedPath = path.resolve(process.cwd(), this.configPath);
-      
+
       // Ensure the directory exists
       const dir = path.dirname(resolvedPath);
       await fs.mkdir(dir, { recursive: true });
-      
+
       // Write the config file
-      await fs.writeFile(
-        resolvedPath,
-        JSON.stringify(this.config, null, 2),
-        'utf-8'
-      );
-      
+      await fs.writeFile(resolvedPath, JSON.stringify(this.config, null, 2), 'utf-8');
+
       logger.info('Enterprise configuration saved successfully');
     } catch (error) {
       logger.error('Failed to save enterprise config:', error);

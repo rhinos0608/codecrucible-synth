@@ -10,7 +10,11 @@ import { RuntimeContext } from './enterprise-voice-prompts.js';
 import { VoiceDefinition, createArchetypeDefinitions } from './archetype-definitions.js';
 import { selectVoices } from './voice-selector.js';
 import { CouncilMode, CouncilOrchestrator } from './council-orchestrator.js';
-import { VoiceOutput, synthesizePerspectives, formatSynthesisResult } from './perspective-synthesizer.js';
+import {
+  VoiceOutput,
+  synthesizePerspectives,
+  formatSynthesisResult,
+} from './perspective-synthesizer.js';
 import { CouncilDecisionEngine } from './collaboration/council-decision-engine.js';
 import { VOICE_GROUPS } from './voice-constants.js';
 
@@ -52,7 +56,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
       this.isGitRepository(),
       this.getCurrentBranch(),
     ]);
-    
+
     return {
       workingDirectory: process.cwd(),
       isGitRepo,
@@ -101,16 +105,19 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     options?: { requiredVoices?: string[]; councilMode?: CouncilMode }
   ): Promise<VoiceCoordinatorResult> {
     const selected = selectVoices(this.voices, options?.requiredVoices, this.logger);
-    
+
     // Parallel processing - all voices get perspectives concurrently
     this.logger.debug(`Processing ${selected.length} voices in parallel for synthesis`);
-    
-    const perspectivePromises = selected.map(voice => 
+
+    const perspectivePromises = selected.map(voice =>
       this.getVoicePerspective(voice.id, prompt)
         .then(perspective => ({ voiceId: voice.id, content: perspective.position }))
         .catch(error => {
           this.logger.warn(`Voice ${voice.id} failed during parallel processing:`, error);
-          return { voiceId: voice.id, content: `${voice.name || voice.id} perspective unavailable due to error: ${error.message || String(error)}` };
+          return {
+            voiceId: voice.id,
+            content: `${voice.name || voice.id} perspective unavailable due to error: ${error.message || String(error)}`,
+          };
         })
     );
 
@@ -124,7 +131,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
 
     const structuredSynthesis = synthesizePerspectives(voiceOutputs);
     const finalDecision = formatSynthesisResult(structuredSynthesis);
-    
+
     this.logger.info('Voices synthesized', {
       voices: selected.map(v => v.id).join(', '),
       consensusLevel: structuredSynthesis.consensusLevel,
@@ -177,7 +184,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     alternatives: string[];
   }> {
     const voice = this.voices.get(voiceId);
-    
+
     // If no voice found, return minimal response
     if (!voice) {
       this.logger.warn(`Voice ${voiceId} not found - returning static response`);
@@ -194,7 +201,9 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
 
     // If no model client available, return static response with voice characteristics
     if (!this._modelClient) {
-      this.logger.debug(`No model client available for ${voiceId} - returning static response with voice characteristics`);
+      this.logger.debug(
+        `No model client available for ${voiceId} - returning static response with voice characteristics`
+      );
       return {
         voiceId,
         position: `${voice.name} perspective: ${this.generateStaticPerspective(voice, prompt)}`,
@@ -209,9 +218,11 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     try {
       // Generate real perspective using model client
       const voicePerspectivePrompt = this.buildVoicePerspectivePrompt(voice, prompt);
-      
-      this.logger.debug(`Generating real perspective for ${voice.name} on: ${prompt.substring(0, 50)}...`);
-      
+
+      this.logger.debug(
+        `Generating real perspective for ${voice.name} on: ${prompt.substring(0, 50)}...`
+      );
+
       const response = await this._modelClient.request({
         prompt: voicePerspectivePrompt,
         model: 'default',
@@ -220,8 +231,11 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
       });
 
       // Parse the structured response
-      const parsedResponse = this.parseVoicePerspectiveResponse(response.content || String(response), voice);
-      
+      const parsedResponse = this.parseVoicePerspectiveResponse(
+        response.content || String(response),
+        voice
+      );
+
       return {
         voiceId,
         position: parsedResponse.position || `${voice.name} perspective on the given topic`,
@@ -231,10 +245,9 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
         concerns: parsedResponse.concerns || [],
         alternatives: parsedResponse.alternatives || [],
       };
-      
     } catch (error) {
       this.logger.error(`Failed to generate perspective for ${voiceId}:`, error);
-      
+
       // Fallback to enhanced static response
       return {
         voiceId,
@@ -252,14 +265,26 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     // Generate a more intelligent static response based on voice characteristics
     const voiceType = voice.name.toLowerCase();
     const promptLower = prompt.toLowerCase();
-    
-    if (voiceType.includes('security') && (promptLower.includes('security') || promptLower.includes('risk'))) {
+
+    if (
+      voiceType.includes('security') &&
+      (promptLower.includes('security') || promptLower.includes('risk'))
+    ) {
       return 'Focus on security implications and risk assessment';
-    } else if (voiceType.includes('architect') && (promptLower.includes('design') || promptLower.includes('structure'))) {
+    } else if (
+      voiceType.includes('architect') &&
+      (promptLower.includes('design') || promptLower.includes('structure'))
+    ) {
       return 'Emphasize architectural design patterns and system structure';
-    } else if (voiceType.includes('maintainer') && (promptLower.includes('maintain') || promptLower.includes('stability'))) {
+    } else if (
+      voiceType.includes('maintainer') &&
+      (promptLower.includes('maintain') || promptLower.includes('stability'))
+    ) {
       return 'Prioritize long-term maintainability and stability';
-    } else if (voiceType.includes('explorer') && (promptLower.includes('new') || promptLower.includes('innovate'))) {
+    } else if (
+      voiceType.includes('explorer') &&
+      (promptLower.includes('new') || promptLower.includes('innovate'))
+    ) {
       return 'Explore innovative approaches and emerging possibilities';
     } else {
       return `Apply ${voice.name} principles to evaluate and provide specialized insights`;
@@ -288,7 +313,10 @@ ALTERNATIVES: [Alternative approaches you would suggest, separated by |]
 Respond as ${voice.name} would, focusing on your specialized domain and perspective.`;
   }
 
-  private parseVoicePerspectiveResponse(response: string, voice: VoiceDefinition): {
+  private parseVoicePerspectiveResponse(
+    response: string,
+    voice: VoiceDefinition
+  ): {
     position?: string;
     confidence?: number;
     reasoning?: string;
@@ -297,14 +325,14 @@ Respond as ${voice.name} would, focusing on your specialized domain and perspect
     alternatives?: string[];
   } {
     const result: any = {};
-    
+
     try {
       // Parse structured response format
       const lines = response.split('\n');
-      
+
       for (const line of lines) {
         const trimmed = line.trim();
-        
+
         if (trimmed.startsWith('POSITION:')) {
           result.position = trimmed.replace('POSITION:', '').trim();
         } else if (trimmed.startsWith('CONFIDENCE:')) {
@@ -314,28 +342,42 @@ Respond as ${voice.name} would, focusing on your specialized domain and perspect
           result.reasoning = trimmed.replace('REASONING:', '').trim();
         } else if (trimmed.startsWith('SUPPORTING_EVIDENCE:')) {
           const evidence = trimmed.replace('SUPPORTING_EVIDENCE:', '').trim();
-          result.supportingEvidence = evidence ? evidence.split('|').map(s => s.trim()).filter(s => s) : [];
+          result.supportingEvidence = evidence
+            ? evidence
+                .split('|')
+                .map(s => s.trim())
+                .filter(s => s)
+            : [];
         } else if (trimmed.startsWith('CONCERNS:')) {
           const concerns = trimmed.replace('CONCERNS:', '').trim();
-          result.concerns = concerns ? concerns.split('|').map(s => s.trim()).filter(s => s) : [];
+          result.concerns = concerns
+            ? concerns
+                .split('|')
+                .map(s => s.trim())
+                .filter(s => s)
+            : [];
         } else if (trimmed.startsWith('ALTERNATIVES:')) {
           const alternatives = trimmed.replace('ALTERNATIVES:', '').trim();
-          result.alternatives = alternatives ? alternatives.split('|').map(s => s.trim()).filter(s => s) : [];
+          result.alternatives = alternatives
+            ? alternatives
+                .split('|')
+                .map(s => s.trim())
+                .filter(s => s)
+            : [];
         }
       }
-      
+
       // If no structured response found, treat entire response as position
       if (!result.position && response.trim()) {
         result.position = response.trim().substring(0, 200) + (response.length > 200 ? '...' : '');
       }
-      
     } catch (error) {
       this.logger.error('Error parsing voice perspective response:', error);
       result.position = response.substring(0, 200);
       result.confidence = 0.5;
       result.reasoning = 'Parsed from unstructured response';
     }
-    
+
     return result;
   }
 

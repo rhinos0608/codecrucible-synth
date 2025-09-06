@@ -1,12 +1,12 @@
 /**
  * Comprehensive System Prompt for CodeCrucible Synth
- * 
- * This system prompt is designed to replace rule-based tool selection with 
- * intelligent AI-driven decision making. It's based on research from successful 
+ *
+ * This system prompt is designed to replace rule-based tool selection with
+ * intelligent AI-driven decision making. It's based on research from successful
  * AI coding assistants including Claude Code, Cursor AI, and GitHub Copilot CLI.
- * 
+ *
  * Key principles implemented:
- * 1. Clear role definition and behavioral guidelines 
+ * 1. Clear role definition and behavioral guidelines
  * 2. Comprehensive tool usage patterns without hardcoded rules
  * 3. Context-aware decision making guidance
  * 4. Proactive tool usage encouragement
@@ -15,7 +15,7 @@
 
 /**
  * Generate the comprehensive system prompt for CodeCrucible Synth
- * 
+ *
  * This prompt serves as the intelligence layer that guides tool selection
  * without requiring hardcoded rule-based routing.
  */
@@ -186,19 +186,19 @@ Remember: You are not just executing commands - you are a thinking partner who u
  * Generate a context-aware system prompt with dynamic tool information
  * This allows the prompt to adapt based on available tools and user context
  */
-export function generateContextualSystemPrompt(availableTools: string[], userContext?: string): string {
+export function generateContextualSystemPrompt(
+  availableTools: string[],
+  userContext?: string
+): string {
   const basePrompt = generateSystemPrompt();
-  
+
   // Add dynamic tool availability information
-  const toolContext = availableTools.length > 0 
-    ? `\n\nCurrently Available Tools: ${availableTools.join(', ')}`
-    : '';
-  
+  const toolContext =
+    availableTools.length > 0 ? `\n\nCurrently Available Tools: ${availableTools.join(', ')}` : '';
+
   // Add user-specific context if provided
-  const contextualInfo = userContext 
-    ? `\n\nCurrent Context: ${userContext}`
-    : '';
-  
+  const contextualInfo = userContext ? `\n\nCurrent Context: ${userContext}` : '';
+
   return basePrompt + toolContext + contextualInfo;
 }
 

@@ -30,10 +30,10 @@ interface SpiralTestResult {
  * Test Living Spiral integration with optimized voice system
  */
 export class LivingSpiralIntegrationTest {
-  private voiceSystem: VoiceSystemIntegration2025;
-  private testResults: SpiralTestResult[] = [];
+  private readonly voiceSystem: VoiceSystemIntegration2025;
+  private readonly testResults: SpiralTestResult[] = [];
 
-  constructor() {
+  public constructor() {
     // Initialize with Living Spiral optimized configuration
     this.voiceSystem = new VoiceSystemIntegration2025(null, {
       useOptimizedSystem: true,
@@ -46,7 +46,7 @@ export class LivingSpiralIntegrationTest {
   /**
    * Run comprehensive Living Spiral integration tests
    */
-  async runIntegrationTests(): Promise<{
+  public async runIntegrationTests(): Promise<{
     overallSuccess: boolean;
     phaseResults: SpiralTestResult[];
     totalCostSavings: number;
@@ -295,7 +295,7 @@ export class LivingSpiralIntegrationTest {
   /**
    * Generate comprehensive test report
    */
-  public async generateTestReport(): Promise<{
+  public generateTestReport(): {
     testSummary: {
       totalPhases: number;
       successfulPhases: number;
@@ -319,8 +319,8 @@ export class LivingSpiralIntegrationTest {
       recommendationsGenerated: number;
     };
     conclusions: string[];
-  }> {
-    const analytics = (await this.voiceSystem.getSystemAnalytics()) as unknown as {
+  } {
+    const analytics = this.voiceSystem.getSystemAnalytics() as unknown as {
       systemOverview: {
         optimizationsActive: boolean;
         recommendationsGenerated: number;
@@ -438,7 +438,7 @@ export async function runLivingSpiralIntegrationTest(): Promise<{
 
   try {
     const results = await test.runIntegrationTests();
-    const report = await test.generateTestReport();
+    const report = test.generateTestReport();
 
     logger.info('🌀 Living Spiral Integration Test Complete', {
       success: results.overallSuccess,

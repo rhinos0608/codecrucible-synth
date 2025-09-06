@@ -9,22 +9,25 @@
 
 import { logger } from '../infrastructure/logging/unified-logger.js';
 import { mcpServerRegistry, MCPServerDefinition } from './core/mcp-server-registry.js';
-import { 
+import {
   enterpriseErrorHandler,
-  EnterpriseErrorHandler 
+  EnterpriseErrorHandler,
 } from '../infrastructure/error-handling/enterprise-error-handler.js';
-import { ErrorCategory, ErrorSeverity } from '../infrastructure/error-handling/structured-error-system.js';
+import {
+  ErrorCategory,
+  ErrorSeverity,
+} from '../infrastructure/error-handling/structured-error-system.js';
 import { mcpServerLifecycle } from './core/mcp-server-lifecycle.js';
 import { mcpServerSecurity, SecurityContext } from './core/mcp-server-security.js';
 import { mcpServerMonitoring } from './core/mcp-server-monitoring.js';
 import { unifiedToolRegistry } from '../infrastructure/tools/unified-tool-registry.js';
 import { SmitheryMCPServer, SmitheryMCPConfig } from './smithery-mcp-server.js';
 import { PathUtilities } from '../utils/path-utilities.js';
-import { 
-  ToolExecutionArgs, 
-  ToolExecutionContext, 
+import {
+  ToolExecutionArgs,
+  ToolExecutionContext,
   ToolExecutionResult,
-  ToolExecutionOptions 
+  ToolExecutionOptions,
 } from '../infrastructure/types/tool-execution-types.js';
 
 // Define proper types for server management
@@ -92,7 +95,6 @@ export interface ServerHealth {
     lastDiscovered: Date;
   } | null;
 }
-
 
 /**
  * Clean, focused MCP Server Manager using dependency injection
@@ -204,17 +206,14 @@ export class MCPServerManager {
       logger.info('✅ MCP Server Manager initialization completed');
     } catch (error) {
       // Use enterprise error handler for initialization failures
-      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
-        error as Error,
-        {
-          operation: 'mcp_initialization',
-          resource: 'mcp_servers',
-          context: { serverCount: 0, phase: 'startup' }
-        }
-      );
-      
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(error as Error, {
+        operation: 'mcp_initialization',
+        resource: 'mcp_servers',
+        context: { serverCount: 0, phase: 'startup' },
+      });
+
       logger.error('❌ MCP Server Manager initialization failed:', structuredError.message);
-      
+
       // Provide recovery suggestions
       if (structuredError.recoverable) {
         logger.info('🔄 Recovery may be possible. Check MCP server configurations.');
@@ -224,7 +223,7 @@ export class MCPServerManager {
           });
         }
       }
-      
+
       throw structuredError;
     }
   }
@@ -267,10 +266,10 @@ export class MCPServerManager {
           operation: 'server_access',
           resource: 'mcp_server',
           serverName,
-          context: { availableServers: mcpServerRegistry.getRegisteredServerIds() }
+          context: { availableServers: mcpServerRegistry.getRegisteredServerIds() },
         }
       );
-      
+
       throw error;
     }
 
@@ -287,8 +286,8 @@ export class MCPServerManager {
    * Ensures initialization is complete before tool execution
    */
   async executeTool(
-    toolName: string, 
-    args: ToolExecutionArgs, 
+    toolName: string,
+    args: ToolExecutionArgs,
     context: ToolExecutionContext = {},
     options: ToolExecutionOptions = {}
   ): Promise<ToolExecutionResult> {
@@ -299,7 +298,7 @@ export class MCPServerManager {
     }
     // Normalize paths before security validation to handle AI-generated paths
     const normalizedPath = this.normalizeAIPath(args.path || args.directory || args.filePath);
-    
+
     const securityContext: SecurityContext = {
       userId: context.userId,
       sessionId: context.sessionId,
@@ -346,33 +345,30 @@ export class MCPServerManager {
         data: result.data || result,
         output: {
           content: typeof result === 'string' ? result : JSON.stringify(result.data || result),
-          format: typeof result === 'string' ? 'text' : 'json'
+          format: typeof result === 'string' ? 'text' : 'json',
         },
         metadata: {
           executionTime: Date.now() - startTime,
           toolName,
           requestId: context.requestId,
           resourcesAccessed: normalizedPath ? [normalizedPath] : undefined,
-          warnings: securityResult?.reason ? [securityResult.reason] : undefined
-        }
+          warnings: securityResult?.reason ? [securityResult.reason] : undefined,
+        },
       };
 
       return executionResult;
     } catch (error) {
       // Use enterprise error handler for tool execution failures
-      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
-        error as Error,
-        {
-          operation: 'tool_execution',
-          resource: 'mcp_tool',
-          context: { 
-            toolName,
-            args: JSON.stringify(args).substring(0, 200),
-            serverId: this.getServerIdForTool(toolName)
-          }
-        }
-      );
-      
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(error as Error, {
+        operation: 'tool_execution',
+        resource: 'mcp_tool',
+        context: {
+          toolName,
+          args: JSON.stringify(args).substring(0, 200),
+          serverId: this.getServerIdForTool(toolName),
+        },
+      });
+
       // Record failed operation
       const serverId = this.getServerIdForTool(toolName);
       if (serverId) {
@@ -391,19 +387,19 @@ export class MCPServerManager {
         error: {
           code: error instanceof Error ? error.name : 'UnknownError',
           message: error instanceof Error ? error.message : String(error),
-          details: { 
-            toolName, 
+          details: {
+            toolName,
             args: JSON.stringify(args),
-            context: JSON.stringify(context)
+            context: JSON.stringify(context),
           },
-          stack: error instanceof Error ? error.stack : undefined
+          stack: error instanceof Error ? error.stack : undefined,
         },
         metadata: {
           executionTime: Date.now() - startTime,
           toolName,
           requestId: context.requestId,
-          warnings: securityResult?.reason ? [securityResult.reason] : undefined
-        }
+          warnings: securityResult?.reason ? [securityResult.reason] : undefined,
+        },
       };
 
       return errorResult;
@@ -490,30 +486,32 @@ export class MCPServerManager {
     };
   }> {
     const healthStatuses = mcpServerLifecycle.getHealthStatus();
-    
+
     // Get real capability counts
     const capabilities = await this.getServerCapabilities();
-    
+
     // Transform server health data to match expected format
     const servers = healthStatuses.map(healthStatus => {
       const serverMetrics = mcpServerMonitoring.getServerMetrics(healthStatus.serverId);
-      
+
       return {
         serverId: healthStatus.serverId,
         status: this.mapHealthToMcpStatus(healthStatus.status),
         uptime: Date.now() - (healthStatus.lastCheck?.getTime() || Date.now()),
-        successRate: serverMetrics 
-          ? (serverMetrics.metrics.successfulRequests / Math.max(1, serverMetrics.metrics.totalRequests)) * 100
+        successRate: serverMetrics
+          ? (serverMetrics.metrics.successfulRequests /
+              Math.max(1, serverMetrics.metrics.totalRequests)) *
+            100
           : 0,
-        lastSeen: healthStatus.lastCheck || new Date()
+        lastSeen: healthStatus.lastCheck || new Date(),
       };
     });
-    
+
     // Calculate overall health status
     const healthyCount = servers.filter(s => s.status === 'running').length;
     const totalCount = servers.length;
     let overall: 'healthy' | 'degraded' | 'critical';
-    
+
     if (totalCount === 0) {
       overall = 'critical';
     } else if (healthyCount === totalCount) {
@@ -523,17 +521,17 @@ export class MCPServerManager {
     } else {
       overall = 'critical';
     }
-    
+
     // Get Smithery stats if available
     const smitheryEnabled = !!this.smitheryServer;
     const smitheryTools = smitheryEnabled ? this.smitheryServer!.getAvailableTools().length : 0;
     const smitheryServers = smitheryEnabled ? 1 : 0;
-    
+
     // Get actual registry status based on server registrations
     const registryStats = mcpServerRegistry.getRegistrationStatus();
     const hasActiveServers = registryStats.ready > 0;
     const hasErrors = registryStats.failed > 0;
-    
+
     let registryStatus: 'active' | 'degraded' | 'inactive';
     if (hasActiveServers && !hasErrors) {
       registryStatus = 'active';
@@ -542,7 +540,7 @@ export class MCPServerManager {
     } else {
       registryStatus = 'inactive';
     }
-    
+
     return {
       overall,
       servers,
@@ -552,8 +550,8 @@ export class MCPServerManager {
         registryStatus,
         smitheryEnabled,
         smitheryTools,
-        smitheryServers
-      }
+        smitheryServers,
+      },
     };
   }
 
@@ -624,20 +622,21 @@ export class MCPServerManager {
   } {
     const actualSummary = mcpServerMonitoring.getMonitoringSummary();
     const servers = mcpServerMonitoring.getAllServerMetrics();
-    
+
     // Calculate interface-expected values from available data
     const successCount = servers.reduce((sum, s) => sum + s.metrics.successfulRequests, 0);
     const totalRequests = actualSummary.totalRequests;
     const errorCount = totalRequests - successCount;
-    const uptimePercentage = actualSummary.healthyServers / Math.max(1, actualSummary.totalServers) * 100;
-    
+    const uptimePercentage =
+      (actualSummary.healthyServers / Math.max(1, actualSummary.totalServers)) * 100;
+
     return {
       totalRequests,
       successCount,
       errorCount,
       averageLatency: actualSummary.avgResponseTime,
       uptimePercentage,
-      lastActivity: new Date() // Current time as approximation
+      lastActivity: new Date(), // Current time as approximation
     };
   }
 
@@ -691,19 +690,18 @@ export class MCPServerManager {
     if (!filePath || typeof filePath !== 'string') {
       return filePath;
     }
-    
+
     // Use centralized path utilities with intelligent normalization
     return PathUtilities.normalizeAIPath(filePath, {
       allowAbsolute: true,
       allowRelative: true,
       allowTraversal: false,
-      basePath: process.cwd()
+      basePath: process.cwd(),
     });
   }
 
   private inferOperation(toolName: string): SecurityContext['operation'] {
-    if (toolName.includes('git'))
-      return 'read'; // Git operations are read-like but work on directories
+    if (toolName.includes('git')) return 'read'; // Git operations are read-like but work on directories
     if (toolName.includes('read') || toolName.includes('list') || toolName.includes('get'))
       return 'read';
     if (toolName.includes('write') || toolName.includes('create') || toolName.includes('save'))
@@ -725,12 +723,12 @@ export class MCPServerManager {
    */
   private registerServersWithMonitoring(): void {
     const serverIds = ['filesystem', 'git', 'terminal', 'packageManager'];
-    
+
     for (const serverId of serverIds) {
       mcpServerMonitoring.registerServer(serverId);
       logger.debug(`Registered server ${serverId} with monitoring system`);
     }
-    
+
     logger.info(`Registered ${serverIds.length} servers with monitoring system`);
   }
 
@@ -772,9 +770,7 @@ export class MCPServerManager {
     }
   }
 
-  private mapHealthToMcpStatus(
-    health: string
-  ): 'running' | 'error' | 'stopped' {
+  private mapHealthToMcpStatus(health: string): 'running' | 'error' | 'stopped' {
     switch (health) {
       case 'healthy':
         return 'running';

@@ -75,8 +75,10 @@ export class NaturalLanguageInterface {
 
     // Find best matching intent
     const bestMatch = intentScores.reduce(
-      (best: Readonly<{ intent: CommandIntent; score: number }>, current: Readonly<{ intent: CommandIntent; score: number }>) =>
-        current.score > best.score ? current : best
+      (
+        best: Readonly<{ intent: CommandIntent; score: number }>,
+        current: Readonly<{ intent: CommandIntent; score: number }>
+      ) => (current.score > best.score ? current : best)
     );
 
     // Extract additional details
@@ -109,7 +111,20 @@ export class NaturalLanguageInterface {
     return [
       {
         intent: 'analyze',
-        keywords: ['analyze', 'review', 'audit', 'check', 'examine', 'inspect', 'look at', 'study', 'diagnose', 'diagnostic', 'troubleshoot', 'investigate'],
+        keywords: [
+          'analyze',
+          'review',
+          'audit',
+          'check',
+          'examine',
+          'inspect',
+          'look at',
+          'study',
+          'diagnose',
+          'diagnostic',
+          'troubleshoot',
+          'investigate',
+        ],
         patterns: [
           /analyze\s+(?:this|the|my)?\s*(.*)/i,
           /review\s+(?:this|the|my)?\s*(.*)/i,
@@ -133,7 +148,15 @@ export class NaturalLanguageInterface {
       },
       {
         intent: 'diagnose',
-        keywords: ['diagnose', 'diagnostic', 'troubleshoot', 'investigate', 'debug', 'find issue', 'find problem'],
+        keywords: [
+          'diagnose',
+          'diagnostic',
+          'troubleshoot',
+          'investigate',
+          'debug',
+          'find issue',
+          'find problem',
+        ],
         patterns: [
           /(?:diagnose|diagnostic|troubleshoot)\s+(?:the|this|these|my)?\s*(.*)/i,
           /(?:investigate|find)\s+(?:the|any)?\s*(?:issue|problem|bug|error)\s*(?:in|with|from)?\s*(.*)/i,
@@ -147,7 +170,7 @@ export class NaturalLanguageInterface {
           'troubleshoot TypeScript issues',
           'investigate type problems',
           'find issues in this code',
-          'what\'s wrong with this function',
+          "what's wrong with this function",
           'why is this component broken',
         ],
         weight: 0.95, // Higher weight than analyze for diagnostic queries
@@ -326,7 +349,9 @@ export class NaturalLanguageInterface {
       score += (keywordMatches.length / pattern.keywords.length) * 0.4;
 
       // Check regex pattern matches
-      const patternMatches = pattern.patterns.filter((regex: Readonly<RegExp>) => regex.test(input));
+      const patternMatches = pattern.patterns.filter((regex: Readonly<RegExp>) =>
+        regex.test(input)
+      );
       score += (patternMatches.length > 0 ? 1 : 0) * 0.4;
 
       // Apply weight multiplier

@@ -14,9 +14,7 @@ interface SafeCommandRegistry {
   readonly getCommand: (name: string) => PluginCommandEntry | undefined;
 }
 
-export class PluginDispatchHandler
-  implements CommandHandler<Readonly<PluginExecutePayload>>
-{
+export class PluginDispatchHandler implements CommandHandler<Readonly<PluginExecutePayload>> {
   public readonly type = 'plugin:execute';
 
   public constructor(private readonly registry: SafeCommandRegistry) {}

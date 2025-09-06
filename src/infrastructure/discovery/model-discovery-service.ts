@@ -1,6 +1,6 @@
 /**
  * Model Discovery Service
- * 
+ *
  * Dynamically discovers available models from various providers
  * Replaces hard-coded model lists with real-time provider queries
  * Supports Ollama, LM Studio, and other model providers
@@ -48,7 +48,7 @@ export class ModelDiscoveryService {
       includeUnavailable = false,
       timeout = 10000,
       cache = true,
-      providers = ['ollama', 'lm-studio', 'claude', 'huggingface']
+      providers = ['ollama', 'lm-studio', 'claude', 'huggingface'],
     } = options;
 
     const allModels: ModelInfo[] = [];
@@ -65,15 +65,15 @@ export class ModelDiscoveryService {
     }
 
     // Filter based on availability preference
-    const filteredModels = includeUnavailable 
-      ? allModels 
+    const filteredModels = includeUnavailable
+      ? allModels
       : allModels.filter(model => model.isAvailable);
 
     logger.info(`Discovered ${filteredModels.length} models from ${providers.length} providers`, {
       providers: providers.join(', '),
       includeUnavailable,
       totalFound: allModels.length,
-      available: filteredModels.length
+      available: filteredModels.length,
     });
 
     return filteredModels;
@@ -83,7 +83,7 @@ export class ModelDiscoveryService {
    * Discover models from a specific provider
    */
   async discoverModelsFromProvider(
-    provider: ProviderType, 
+    provider: ProviderType,
     options: { timeout?: number; cache?: boolean } = {}
   ): Promise<ModelInfo[]> {
     const { timeout = 10000, cache = true } = options;
@@ -124,7 +124,6 @@ export class ModelDiscoveryService {
 
       logger.debug(`Discovered ${models.length} models from ${provider}`);
       return models;
-
     } catch (error) {
       logger.error(`Error discovering models from ${provider}:`, error);
       return this.getFallbackModels(provider);
@@ -139,7 +138,7 @@ export class ModelDiscoveryService {
       const response = await fetch('http://localhost:11434/api/tags', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(timeout)
+        signal: AbortSignal.timeout(timeout),
       });
 
       if (!response.ok) {
@@ -162,8 +161,8 @@ export class ModelDiscoveryService {
               parametersSize: model.details?.parameter_size,
               quantization: model.details?.quantization_level,
               createdAt: model.created_at ? new Date(model.created_at) : undefined,
-              modifiedAt: model.modified_at ? new Date(model.modified_at) : undefined
-            }
+              modifiedAt: model.modified_at ? new Date(model.modified_at) : undefined,
+            },
           });
         }
       }
@@ -183,7 +182,7 @@ export class ModelDiscoveryService {
       const response = await fetch('http://localhost:1234/v1/models', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(timeout)
+        signal: AbortSignal.timeout(timeout),
       });
 
       if (!response.ok) {
@@ -202,8 +201,8 @@ export class ModelDiscoveryService {
             lastChecked: new Date(),
             capabilities: ['chat', 'completion'],
             metadata: {
-              createdAt: model.created ? new Date(model.created * 1000) : undefined
-            }
+              createdAt: model.created ? new Date(model.created * 1000) : undefined,
+            },
           });
         }
       }
@@ -222,54 +221,55 @@ export class ModelDiscoveryService {
     try {
       // Dynamic import to avoid circular dependencies
       const { HuggingFaceTool } = await import('../../mcp-tools/huggingface-tool.js');
-      
+
       const hfTool = new HuggingFaceTool({
         enabled: true,
         timeout,
-        baseUrl: 'https://huggingface.co/api'
+        baseUrl: 'https://huggingface.co/api',
       });
 
       // Search for popular coding and chat models
       const searchQueries = [
         { query: 'code', task: 'text-generation', limit: 10 },
         { query: 'chat', task: 'conversational', limit: 8 },
-        { query: 'assistant', task: 'text-generation', limit: 5 }
+        { query: 'assistant', task: 'text-generation', limit: 5 },
       ];
 
       const allModels: ModelInfo[] = [];
-      
+
       for (const searchQuery of searchQueries) {
         try {
           const models = await hfTool.searchModels(searchQuery.query, {
             task: searchQuery.task,
             sort: 'downloads',
             direction: 'desc',
-            limit: searchQuery.limit
+            limit: searchQuery.limit,
           });
-          
-          allModels.push(...models.map(model => ({
-            ...model,
-            provider: 'huggingface' as ProviderType,
-            isAvailable: true,
-            lastChecked: new Date(),
-            capabilities: this.inferCapabilities(model.name, searchQuery.task)
-          })));
+
+          allModels.push(
+            ...models.map(model => ({
+              ...model,
+              provider: 'huggingface' as ProviderType,
+              isAvailable: true,
+              lastChecked: new Date(),
+              capabilities: this.inferCapabilities(model.name, searchQuery.task),
+            }))
+          );
         } catch (searchError) {
           logger.debug(`HF search failed for query "${searchQuery.query}":`, searchError);
         }
       }
 
       // Remove duplicates and limit results
-      const uniqueModels = allModels.filter((model, index, self) => 
-        index === self.findIndex(m => m.name === model.name)
-      ).slice(0, 20);
+      const uniqueModels = allModels
+        .filter((model, index, self) => index === self.findIndex(m => m.name === model.name))
+        .slice(0, 20);
 
       logger.info(`Discovered ${uniqueModels.length} HuggingFace models dynamically`);
       return uniqueModels;
-
     } catch (error) {
       logger.warn('Dynamic HuggingFace discovery failed, using fallback models:', error);
-      
+
       // Fallback to curated list if API fails
       return [
         {
@@ -278,15 +278,15 @@ export class ModelDiscoveryService {
           family: 'DialoGPT',
           capabilities: ['chat', 'conversation'],
           isAvailable: true,
-          lastChecked: new Date()
+          lastChecked: new Date(),
         },
         {
-          name: 'microsoft/CodeBERT-base', 
+          name: 'microsoft/CodeBERT-base',
           provider: 'huggingface',
           family: 'CodeBERT',
           capabilities: ['code-completion', 'code-understanding'],
           isAvailable: true,
-          lastChecked: new Date()
+          lastChecked: new Date(),
         },
         {
           name: 'codellama/CodeLlama-7b-Instruct-hf',
@@ -294,8 +294,8 @@ export class ModelDiscoveryService {
           family: 'CodeLlama',
           capabilities: ['code-generation', 'instruct'],
           isAvailable: true,
-          lastChecked: new Date()
-        }
+          lastChecked: new Date(),
+        },
       ];
     }
   }
@@ -305,16 +305,18 @@ export class ModelDiscoveryService {
    */
   private inferCapabilities(modelName: string, task?: string): string[] {
     const capabilities = [];
-    
+
     if (task === 'text-generation') capabilities.push('text-generation');
     if (task === 'conversational') capabilities.push('chat', 'conversation');
-    
+
     // Infer from model name patterns
-    if (modelName.toLowerCase().includes('code')) capabilities.push('code-generation', 'code-completion');
-    if (modelName.toLowerCase().includes('chat') || modelName.toLowerCase().includes('dialog')) capabilities.push('chat');
+    if (modelName.toLowerCase().includes('code'))
+      capabilities.push('code-generation', 'code-completion');
+    if (modelName.toLowerCase().includes('chat') || modelName.toLowerCase().includes('dialog'))
+      capabilities.push('chat');
     if (modelName.toLowerCase().includes('instruct')) capabilities.push('instruct', 'assistant');
     if (modelName.toLowerCase().includes('embed')) capabilities.push('embedding');
-    
+
     return capabilities.length > 0 ? capabilities : ['general'];
   }
 
@@ -323,7 +325,7 @@ export class ModelDiscoveryService {
    */
   private getFallbackModels(provider: ProviderType): ModelInfo[] {
     const fallbacks: Record<ProviderType, ModelInfo[]> = {
-      'ollama': [
+      ollama: [
         {
           name: 'llama3.1:8b',
           provider: 'ollama',
@@ -331,7 +333,7 @@ export class ModelDiscoveryService {
           family: 'Llama',
           capabilities: ['function-calling', 'code-generation', 'chat'],
           isAvailable: false,
-          lastChecked: new Date()
+          lastChecked: new Date(),
         },
         {
           name: 'deepseek-coder:8b',
@@ -340,8 +342,8 @@ export class ModelDiscoveryService {
           family: 'DeepSeek',
           capabilities: ['code-generation', 'chat'],
           isAvailable: false,
-          lastChecked: new Date()
-        }
+          lastChecked: new Date(),
+        },
       ],
       'lm-studio': [
         {
@@ -349,28 +351,28 @@ export class ModelDiscoveryService {
           provider: 'lm-studio',
           capabilities: ['chat', 'completion'],
           isAvailable: false,
-          lastChecked: new Date()
-        }
+          lastChecked: new Date(),
+        },
       ],
-      'claude': [
+      claude: [
         {
           name: 'claude-3-sonnet-20240229',
           provider: 'claude',
           capabilities: ['chat', 'tool-calling'],
           isAvailable: false,
-          lastChecked: new Date()
-        }
+          lastChecked: new Date(),
+        },
       ],
-      'huggingface': [
+      huggingface: [
         {
           name: 'microsoft/DialoGPT-medium',
           provider: 'huggingface',
           capabilities: ['chat'],
           isAvailable: false,
-          lastChecked: new Date()
-        }
+          lastChecked: new Date(),
+        },
       ],
-      'auto': [] // Auto provider doesn't have specific models
+      auto: [], // Auto provider doesn't have specific models
     };
 
     return fallbacks[provider] || [];
@@ -419,13 +421,16 @@ export class ModelDiscoveryService {
       provider,
       modelCount: models.length,
       expiresIn: Math.max(0, (this.cacheExpiry.get(provider) || 0) - Date.now()),
-      isValid: this.isValidCache(provider)
+      isValid: this.isValidCache(provider),
     }));
 
     return {
       totalCachedProviders: this.modelCache.size,
-      totalCachedModels: Array.from(this.modelCache.values()).reduce((total, models) => total + models.length, 0),
-      cacheStatus
+      totalCachedModels: Array.from(this.modelCache.values()).reduce(
+        (total, models) => total + models.length,
+        0
+      ),
+      cacheStatus,
     };
   }
 }

@@ -33,8 +33,8 @@ export interface EnhancedToolDefinition {
 export interface ToolParameter {
   type: string;
   description: string;
-  examples?: any[];
-  default?: any;
+  examples?: unknown[];
+  default?: string | number | boolean | object | null;
   enum?: string[];
   format?: string;
   pattern?: string;
@@ -42,13 +42,13 @@ export interface ToolParameter {
   maxLength?: number;
   minimum?: number;
   maximum?: number;
-  items?: { type: string; [key: string]: any };
+  items?: { type: string; [key: string]: string | number | boolean | object | null };
   required?: boolean;
 }
 
 export interface ToolExample {
   description: string;
-  input: Record<string, any>;
+  input: Record<string, unknown>;
   expectedOutput: string;
   useCase: string;
 }
@@ -57,7 +57,7 @@ export class EnhancedMCPToolDefinitions {
   /**
    * Filesystem Operations - Following Claude Code's comprehensive file handling patterns
    */
-  static readonly FILESYSTEM_READ_FILE: EnhancedToolDefinition = {
+  public static readonly FILESYSTEM_READ_FILE: EnhancedToolDefinition = {
     name: 'filesystem_read_file',
     description:
       'Reads file contents from local filesystem with comprehensive error handling and security validation',
@@ -140,7 +140,7 @@ export class EnhancedMCPToolDefinitions {
     },
   };
 
-  static readonly FILESYSTEM_WRITE_FILE: EnhancedToolDefinition = {
+  public static readonly FILESYSTEM_WRITE_FILE: EnhancedToolDefinition = {
     name: 'filesystem_write_file',
     description: 'Writes content to files with chunking support and comprehensive safety checks',
     longDescription: `STANDARD PRACTICE: Always write files in chunks of 25-30 lines maximum. Uses modes: 'rewrite' (overwrites) or 'append' (adds to end). Includes automatic directory creation and safety validations.`,
@@ -223,7 +223,7 @@ export class EnhancedMCPToolDefinitions {
     },
   };
 
-  static readonly GIT_STATUS: EnhancedToolDefinition = {
+  public static readonly GIT_STATUS: EnhancedToolDefinition = {
     name: 'git_status',
     description:
       'Get comprehensive Git repository status including staged, unstaged, and untracked files',
@@ -281,7 +281,7 @@ export class EnhancedMCPToolDefinitions {
     },
   };
 
-  static readonly EXECUTE_COMMAND: EnhancedToolDefinition = {
+  public static readonly EXECUTE_COMMAND: EnhancedToolDefinition = {
     name: 'execute_command',
     description: 'Execute shell commands with comprehensive security, timeout, and error handling',
     longDescription: `Secure command execution with safety validations. Supports command chaining, timeout control, and comprehensive logging. CRITICAL: Always explain what command does before execution for user understanding.`,
@@ -378,7 +378,7 @@ export class EnhancedMCPToolDefinitions {
     },
   };
 
-  static readonly TERMINAL_CONTROLLER_SEARCH: EnhancedToolDefinition = {
+  public static readonly TERMINAL_CONTROLLER_SEARCH: EnhancedToolDefinition = {
     name: 'terminal_search_files',
     description:
       'Advanced file search with pattern matching, content search, and filtering capabilities',
@@ -476,7 +476,7 @@ export class EnhancedMCPToolDefinitions {
   /**
    * Get all enhanced tool definitions
    */
-  static getAllDefinitions(): Record<string, EnhancedToolDefinition> {
+  public static getAllDefinitions(): Record<string, EnhancedToolDefinition> {
     return {
       filesystem_read_file: this.FILESYSTEM_READ_FILE,
       filesystem_write_file: this.FILESYSTEM_WRITE_FILE,
@@ -489,14 +489,14 @@ export class EnhancedMCPToolDefinitions {
   /**
    * Get tool definition by name
    */
-  static getDefinition(toolName: string): EnhancedToolDefinition | null {
-    return this.getAllDefinitions()[toolName] || null;
+  public static getDefinition(toolName: string): EnhancedToolDefinition | null {
+    return this.getAllDefinitions()[toolName];
   }
 
   /**
    * Generate Claude Code style tool description for system prompts
    */
-  static generateSystemPromptDescription(toolName: string): string {
+  public static generateSystemPromptDescription(toolName: string): string {
     const def = this.getDefinition(toolName);
     if (!def) return '';
 
@@ -520,9 +520,9 @@ export class EnhancedMCPToolDefinitions {
   /**
    * Validate tool usage against definition
    */
-  static validateUsage(
+  public static validateUsage(
     toolName: string,
-    parameters: any
+    parameters: Readonly<Record<string, unknown>>
   ): {
     valid: boolean;
     errors: string[];
@@ -545,11 +545,8 @@ export class EnhancedMCPToolDefinitions {
 
     // Check parameter types and constraints
     for (const [paramName, paramValue] of Object.entries(parameters)) {
+      // paramDef is always defined because paramName comes from parameters
       const paramDef = def.parameters.properties[paramName];
-      if (!paramDef) {
-        warnings.push(`Unexpected parameter: ${paramName}`);
-        continue;
-      }
 
       // Type checking
       if (paramDef.type === 'string' && typeof paramValue !== 'string') {
@@ -571,7 +568,7 @@ export class EnhancedMCPToolDefinitions {
       }
 
       // Enum validation
-      if (paramDef.enum && !paramDef.enum.includes(paramValue as string)) {
+      if (paramDef.enum && typeof paramValue === 'string' && !paramDef.enum.includes(paramValue)) {
         errors.push(`Parameter ${paramName} must be one of: ${paramDef.enum.join(', ')}`);
       }
     }

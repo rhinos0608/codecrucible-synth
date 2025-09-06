@@ -357,7 +357,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
    */
   async createSession(workingDirectory: string = process.cwd()): Promise<CLISession> {
     const session = await this.sessionManager.createSession(workingDirectory);
-    
+
     // Ensure session has all required properties
     if (!session.workingDirectory) {
       session.workingDirectory = workingDirectory;
@@ -378,7 +378,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
         totalProcessingTime: 0,
       };
     }
-    
+
     return session;
   }
 

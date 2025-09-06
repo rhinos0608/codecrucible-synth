@@ -1,6 +1,6 @@
 /**
  * Domain-level Tool Execution Interface Definitions
- * 
+ *
  * Pure domain interfaces with no infrastructure dependencies
  * Following layered architecture - Domain layer must not import Infrastructure
  */

@@ -24,9 +24,7 @@ import { ILogger } from '../../domain/interfaces/logger.js';
 import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-user-interaction.js';
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
-import {
-  cleanupApprovalManager,
-} from '../../infrastructure/security/approval-modes-manager.js';
+import { cleanupApprovalManager } from '../../infrastructure/security/approval-modes-manager.js';
 import chalk from 'chalk';
 import { parseCommand, enrichContext, routeThroughTools, formatOutput } from '../cli/index.js';
 import { ApprovalHandler } from '../cli/approval-handler.js';
@@ -106,7 +104,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
     };
 
     this.coordinator = new UnifiedCLICoordinator(coordinatorOptions);
-    
+
     // Initialize modular components
     this.approvalHandler = new ApprovalHandler(this.userInteraction);
     this.interactiveSessionHandler = new InteractiveSessionHandler(this.userInteraction, {
@@ -116,10 +114,11 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
       defaultToDryRun: true,
       showWelcomeMessage: true,
     });
-    
+
     // Set up callbacks for interactive session handler
     this.interactiveSessionHandler.setCallbacks({
-      processPrompt: (prompt: string, options?: Record<string, unknown>) => this.processPrompt(prompt, options),
+      processPrompt: (prompt: string, options?: Record<string, unknown>) =>
+        this.processPrompt(prompt, options),
       getSuggestions: async () => {
         const suggestions = await this.getSuggestions();
         return suggestions.map(s => ({
@@ -129,9 +128,10 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         }));
       },
       showStatus: () => this.showStatus(),
-      execCommand: (name: string, args: readonly unknown[]) => this.execCommand(name, Array.from(args)),
+      execCommand: (name: string, args: readonly unknown[]) =>
+        this.execCommand(name, Array.from(args)),
     });
-    
+
     this.setupEventHandlers();
   }
 

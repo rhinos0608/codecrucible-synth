@@ -12,7 +12,7 @@ global.fetch = mockFetch as jest.MockedFunction<typeof fetch>;
 
 describe('LMStudioProvider - Unit Tests', () => {
   let provider: LMStudioProvider;
-  
+
   const mockConfig = {
     endpoint: 'http://localhost:1234',
     timeout: 30000,
@@ -37,7 +37,7 @@ describe('LMStudioProvider - Unit Tests', () => {
 
     it('should provide correct capabilities for speed-optimized tasks', () => {
       const capabilities = provider.getCapabilities();
-      
+
       expect(capabilities).toBeDefined();
       expect(capabilities.strengths).toContain('speed');
       expect(capabilities.strengths).toContain('templates');
@@ -75,14 +75,12 @@ describe('LMStudioProvider - Unit Tests', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          data: [
-            { id: 'qwen2.5-coder-7b-instruct', object: 'model' },
-          ],
+          data: [{ id: 'qwen2.5-coder-7b-instruct', object: 'model' }],
         }),
       } as Response);
 
       const isAvailable = await provider.isAvailable();
-      
+
       expect(isAvailable).toBe(true);
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:1234/v1/models',
@@ -98,7 +96,7 @@ describe('LMStudioProvider - Unit Tests', () => {
       mockFetch.mockRejectedValueOnce(new Error('ECONNREFUSED'));
 
       const isAvailable = await provider.isAvailable();
-      
+
       expect(isAvailable).toBe(false);
     });
 
@@ -109,15 +107,22 @@ describe('LMStudioProvider - Unit Tests', () => {
       });
 
       // Mock delayed response
-      mockFetch.mockImplementationOnce(() => 
-        new Promise(resolve => setTimeout(() => resolve({
-          ok: true,
-          json: async () => ({ data: [] }),
-        }), 1000))
+      mockFetch.mockImplementationOnce(
+        () =>
+          new Promise(resolve =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  json: async () => ({ data: [] }),
+                }),
+              1000
+            )
+          )
       );
 
       const isAvailable = await quickTimeoutProvider.isAvailable();
-      
+
       expect(isAvailable).toBe(false);
     });
   });
@@ -129,14 +134,16 @@ describe('LMStudioProvider - Unit Tests', () => {
         object: 'chat.completion',
         created: Date.now(),
         model: 'qwen2.5-coder-7b-instruct',
-        choices: [{
-          index: 0,
-          message: {
-            role: 'assistant',
-            content: 'function add(a, b) { return a + b; }',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'function add(a, b) { return a + b; }',
+            },
+            finish_reason: 'stop',
           },
-          finish_reason: 'stop',
-        }],
+        ],
         usage: {
           prompt_tokens: 15,
           completion_tokens: 12,
@@ -169,10 +176,12 @@ describe('LMStudioProvider - Unit Tests', () => {
       // Verify request format matches OpenAI API
       const callArgs = mockFetch.mock.calls[0];
       const requestBody = JSON.parse(callArgs![1]!.body as string);
-      expect(requestBody.messages).toEqual([{
-        role: 'user',
-        content: 'Create a function that adds two numbers',
-      }]);
+      expect(requestBody.messages).toEqual([
+        {
+          role: 'user',
+          content: 'Create a function that adds two numbers',
+        },
+      ]);
       expect(requestBody.temperature).toBe(0.7);
       expect(requestBody.max_tokens).toBe(1000);
       expect(requestBody.stream).toBe(false);
@@ -187,9 +196,9 @@ describe('LMStudioProvider - Unit Tests', () => {
       ];
 
       for (const invalidRequest of invalidRequests) {
-        await expect(provider.generateCode(invalidRequest as any))
-          .rejects
-          .toThrow('Invalid generation options');
+        await expect(provider.generateCode(invalidRequest as any)).rejects.toThrow(
+          'Invalid generation options'
+        );
       }
     });
 
@@ -206,9 +215,9 @@ describe('LMStudioProvider - Unit Tests', () => {
         }),
       } as Response);
 
-      await expect(provider.generateCode({ prompt: 'Test' }))
-        .rejects
-        .toThrow('LM Studio API error: 429 Too Many Requests');
+      await expect(provider.generateCode({ prompt: 'Test' })).rejects.toThrow(
+        'LM Studio API error: 429 Too Many Requests'
+      );
     });
 
     it('should handle malformed API responses', async () => {
@@ -217,9 +226,9 @@ describe('LMStudioProvider - Unit Tests', () => {
         json: async () => ({ invalid: 'response' }),
       } as Response);
 
-      await expect(provider.generateCode({ prompt: 'Test' }))
-        .rejects
-        .toThrow('Invalid response format');
+      await expect(provider.generateCode({ prompt: 'Test' })).rejects.toThrow(
+        'Invalid response format'
+      );
     });
   });
 
@@ -251,10 +260,13 @@ describe('LMStudioProvider - Unit Tests', () => {
       const tokens: string[] = [];
       const onToken = (token: string) => tokens.push(token);
 
-      const response = await provider.generateCodeStream({
-        prompt: 'Create a function',
-        stream: true,
-      }, onToken);
+      const response = await provider.generateCodeStream(
+        {
+          prompt: 'Create a function',
+          stream: true,
+        },
+        onToken
+      );
 
       expect(response.content).toBe('function add() {');
       expect(tokens).toEqual(['function', ' add', '() {']);
@@ -269,18 +281,19 @@ describe('LMStudioProvider - Unit Tests', () => {
         statusText: 'Service Unavailable',
       } as Response);
 
-      await expect(provider.generateCodeStream({
-        prompt: 'Test streaming',
-        stream: true,
-      }, jest.fn())).rejects.toThrow('Streaming error');
+      await expect(
+        provider.generateCodeStream(
+          {
+            prompt: 'Test streaming',
+            stream: true,
+          },
+          jest.fn()
+        )
+      ).rejects.toThrow('Streaming error');
     });
 
     it('should handle malformed SSE data', async () => {
-      const badStreamData = [
-        'data: invalid json{',
-        'data: {"incomplete": true',
-        'data: [DONE]',
-      ];
+      const badStreamData = ['data: invalid json{', 'data: {"incomplete": true', 'data: [DONE]'];
 
       const mockStream = new ReadableStream({
         start(controller) {
@@ -296,10 +309,13 @@ describe('LMStudioProvider - Unit Tests', () => {
         body: mockStream,
       } as Response);
 
-      const response = await provider.generateCodeStream({
-        prompt: 'Test',
-        stream: true,
-      }, jest.fn());
+      const response = await provider.generateCodeStream(
+        {
+          prompt: 'Test',
+          stream: true,
+        },
+        jest.fn()
+      );
 
       // Should handle malformed data gracefully
       expect(response.content).toBe('');
@@ -397,10 +413,12 @@ describe('LMStudioProvider - Unit Tests', () => {
     });
 
     it('should validate configuration updates', async () => {
-      await expect(provider.updateConfiguration({
-        endpoint: 'invalid-url',
-        timeout: -1,
-      })).rejects.toThrow('Invalid configuration update');
+      await expect(
+        provider.updateConfiguration({
+          endpoint: 'invalid-url',
+          timeout: -1,
+        })
+      ).rejects.toThrow('Invalid configuration update');
     });
   });
 
@@ -468,11 +486,18 @@ describe('LMStudioProvider - Unit Tests', () => {
       };
 
       // Mock slow responses to keep requests active
-      mockFetch.mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve({
-          ok: true,
-          json: async () => mockResponse,
-        }), 100))
+      mockFetch.mockImplementation(
+        () =>
+          new Promise(resolve =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  json: async () => mockResponse,
+                }),
+              100
+            )
+          )
       );
 
       const promises = [];
@@ -493,11 +518,18 @@ describe('LMStudioProvider - Unit Tests', () => {
         usage: { total_tokens: 5 },
       };
 
-      mockFetch.mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve({
-          ok: true,
-          json: async () => mockResponse,
-        }), 50))
+      mockFetch.mockImplementation(
+        () =>
+          new Promise(resolve =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  json: async () => mockResponse,
+                }),
+              50
+            )
+          )
       );
 
       // Start more requests than the limit
@@ -517,23 +549,25 @@ describe('LMStudioProvider - Unit Tests', () => {
 
     it('should update load tracking during concurrent requests', async () => {
       const slowPromise = new Promise(resolve => setTimeout(resolve, 200));
-      mockFetch.mockImplementationOnce(() => slowPromise.then(() => ({
-        ok: true,
-        json: async () => ({
-          choices: [{ message: { content: 'slow' }, finish_reason: 'stop' }],
-          usage: { total_tokens: 3 },
-        }),
-      })));
+      mockFetch.mockImplementationOnce(() =>
+        slowPromise.then(() => ({
+          ok: true,
+          json: async () => ({
+            choices: [{ message: { content: 'slow' }, finish_reason: 'stop' }],
+            usage: { total_tokens: 3 },
+          }),
+        }))
+      );
 
       const requestPromise = provider.generateCode({ prompt: 'Slow request' });
-      
+
       // Check load during request
       await new Promise(resolve => setTimeout(resolve, 50));
       const duringStatus = await provider.getStatus();
       expect(duringStatus.currentLoad).toBeGreaterThan(0);
 
       await requestPromise;
-      
+
       // Check load after request
       const afterStatus = await provider.getStatus();
       expect(afterStatus.currentLoad).toBe(0);
@@ -569,10 +603,10 @@ describe('LMStudioProvider - Unit Tests', () => {
     it('should validate and limit prompt length', async () => {
       // Test extremely long prompt
       const longPrompt = 'x'.repeat(50000);
-      
-      await expect(provider.generateCode({ prompt: longPrompt }))
-        .rejects
-        .toThrow('Prompt exceeds maximum length');
+
+      await expect(provider.generateCode({ prompt: longPrompt })).rejects.toThrow(
+        'Prompt exceeds maximum length'
+      );
     });
 
     it('should validate parameter ranges', async () => {
@@ -586,10 +620,12 @@ describe('LMStudioProvider - Unit Tests', () => {
       ];
 
       for (const params of invalidParameters) {
-        await expect(provider.generateCode({
-          prompt: 'Test',
-          ...params,
-        } as any)).rejects.toThrow('Invalid generation options');
+        await expect(
+          provider.generateCode({
+            prompt: 'Test',
+            ...params,
+          } as any)
+        ).rejects.toThrow('Invalid generation options');
       }
     });
   });
@@ -617,9 +653,9 @@ describe('LMStudioProvider - Unit Tests', () => {
       expect(status.currentLoad).toBe(0);
 
       // New requests should fail after shutdown
-      await expect(provider.generateCode({ prompt: 'After shutdown' }))
-        .rejects
-        .toThrow('Provider has been shut down');
+      await expect(provider.generateCode({ prompt: 'After shutdown' })).rejects.toThrow(
+        'Provider has been shut down'
+      );
     });
 
     it('should cancel in-flight requests on shutdown', async () => {
@@ -631,10 +667,10 @@ describe('LMStudioProvider - Unit Tests', () => {
       mockFetch.mockImplementationOnce(() => pendingPromise);
 
       const requestPromise = provider.generateCode({ prompt: 'Long request' });
-      
+
       // Shutdown while request is pending
       await provider.shutdown();
-      
+
       // Complete the mock request
       resolveRequest({
         ok: true,

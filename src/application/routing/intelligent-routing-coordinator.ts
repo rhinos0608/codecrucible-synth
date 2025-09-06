@@ -20,7 +20,7 @@
 import { EventEmitter } from 'events';
 import {
   IProviderSelectionStrategy,
-  ProviderType,
+  ProviderType as ProviderUnion,
   SelectionResult,
 } from '../../providers/provider-selection-strategy.js';
 import { logger } from '../../infrastructure/logging/logger.js';
@@ -39,6 +39,12 @@ import {
 import { ProcessingRequest } from '../../domain/entities/request.js';
 import { Model } from '../../domain/entities/model.js';
 import { Voice } from '../../domain/entities/voice.js';
+import {
+  ModelName,
+  ProviderType,
+  VoiceStyle,
+  VoiceTemperature,
+} from '../../domain/value-objects/voice-values.js';
 
 // Core imports
 import {
@@ -169,8 +175,10 @@ export class IntelligentRoutingCoordinator
   // Analytics and learning
   private readonly routingHistory: Map<string, IntelligentRoutingDecision> = new Map();
   private readonly performanceHistory: Map<string, RoutingPerformance> = new Map();
-  private readonly routingCache: Map<string, { decision: IntelligentRoutingDecision; timestamp: number }> =
-    new Map();
+  private readonly routingCache: Map<
+    string,
+    { decision: IntelligentRoutingDecision; timestamp: number }
+  > = new Map();
 
   // Configuration
   private readonly CACHE_TTL = 300000; // 5 minutes
@@ -193,7 +201,9 @@ export class IntelligentRoutingCoordinator
    * Main routing coordination method
    * Orchestrates intelligent routing across all systems
    */
-  public async routeRequest(context: Readonly<RoutingContext>): Promise<IntelligentRoutingDecision> {
+  public async routeRequest(
+    context: Readonly<RoutingContext>
+  ): Promise<IntelligentRoutingDecision> {
     const startTime = Date.now();
     const routingId = this.generateRoutingId();
 
@@ -904,7 +914,9 @@ export class IntelligentRoutingCoordinator
     });
 
     // Voice fallbacks (supporting voices can be fallbacks for primary)
-    (voiceSelection.supportingVoices as readonly typeof voiceSelection.supportingVoices[0][]).forEach((voice) => {
+    (
+      voiceSelection.supportingVoices as readonly (typeof voiceSelection.supportingVoices)[0][]
+    ).forEach(voice => {
       fallbackChain.push({
         type: 'voice',
         option: voice.id,
@@ -972,8 +984,8 @@ export class IntelligentRoutingCoordinator
   ): IntelligentRoutingDecision {
     // Simple failsafe decision using defaults
     const primaryModel = new Model(
-      new ModelName('fallback-model'),
-      'ollama' as ProviderType,
+      ModelName.create('fallback-model'),
+      ProviderType.create('ollama'),
       [],
       {
         maxTokens: 2048,
@@ -987,12 +999,12 @@ export class IntelligentRoutingCoordinator
     const primaryVoice = new Voice(
       'default',
       'Default Voice',
-      VoiceStyle.DEFAULT,
-      VoiceTemperature.DEFAULT,
-      1.0,
-      [],
-      'neutral', // personality: string
-      0.5 // Add additional argument(s) as required by the Voice constructor signature
+      VoiceStyle.create('practical'),
+      VoiceTemperature.balanced(),
+      'General-purpose assistant',
+      ['general'],
+      'neutral',
+      true
     );
 
     return {
@@ -1011,10 +1023,10 @@ export class IntelligentRoutingCoordinator
         reasoning: 'Failsafe voice selection',
       },
       providerSelection: {
-        provider: 'ollama' as ProviderType,
+        provider: 'ollama' as ProviderUnion,
         reason: 'Failsafe provider selection',
         confidence: 0.5,
-        fallbackChain: ['lm-studio' as ProviderType],
+        fallbackChain: ['lm-studio' as ProviderUnion],
       },
       routingStrategy: 'single-model',
       confidence: 0.3,
@@ -1202,7 +1214,17 @@ export class IntelligentRoutingCoordinator
     return phasePerformance;
   }
 
-  private optimizeProviderStrategy(analytics: { readonly strategyPerformance: ReadonlyMap<string, { readonly successRate: number; readonly avgLatency: number; readonly avgCost: number; requests: number }> }): void {
+  private optimizeProviderStrategy(analytics: {
+    readonly strategyPerformance: ReadonlyMap<
+      string,
+      {
+        readonly successRate: number;
+        readonly avgLatency: number;
+        readonly avgCost: number;
+        requests: number;
+      }
+    >;
+  }): void {
     // Analyze provider performance and update strategy
     const bestStrategy = Array.from(analytics.strategyPerformance.entries()).sort(
       ([strategyA, a], [strategyB, b]) => b.successRate - a.successRate
@@ -1417,26 +1439,24 @@ export class IntelligentRoutingCoordinator
   /**
    * Create fallback routing decision when primary routing fails
    */
-  private createFallbackRoutingDecision(content: string, context: {
-    requestId?: string;
-    phase?: 'collapse' | 'council' | 'synthesis' | 'rebirth' | 'reflection';
-  }): IntelligentRoutingDecision {
+  private createFallbackRoutingDecision(
+    content: string,
+    context: {
+      requestId?: string;
+      phase?: 'collapse' | 'council' | 'synthesis' | 'rebirth' | 'reflection';
+    }
+  ): IntelligentRoutingDecision {
     const routingId = `fallback-${Date.now()}`;
 
     return {
       modelSelection: {
-        primaryModel: new Model(
-          new ModelName('default'),
-          'ollama',
-          [],
-          {
-            maxTokens: 2048,
-            contextWindow: 2048,
-            isMultimodal: false,
-            estimatedLatency: 5000,
-            qualityRating: 0.6,
-          }
-        ),
+        primaryModel: new Model(ModelName.create('default'), ProviderType.create('ollama'), [], {
+          maxTokens: 2048,
+          contextWindow: 2048,
+          isMultimodal: false,
+          estimatedLatency: 5000,
+          qualityRating: 0.6,
+        }),
         fallbackModels: [],
         selectionReason: 'Fallback model selection',
         routingStrategy: RoutingStrategy.SHARED,
@@ -1447,29 +1467,19 @@ export class IntelligentRoutingCoordinator
         primaryVoice: new Voice(
           'maintainer',
           'Maintainer',
-          'maintainer',
-          0.7,
-          1.0,
-          [],
-          0.5,
-          0.5,
-          0.5,
-          0.5,
-          0.5,
-          0.5,
-          0.5,
-          0.5,
-          0.5,
-          0.5,
-          0.5,
-          0.5
+          VoiceStyle.create('conservative'),
+          VoiceTemperature.create(0.5),
+          'Reliable, stability-focused assistant',
+          ['stability', 'quality', 'testing', 'reliability'],
+          'Careful and methodical',
+          true
         ),
         supportingVoices: [],
         synthesisMode: SynthesisMode.SINGLE,
         reasoning: 'Fallback to stable voice',
       },
       providerSelection: {
-        provider: ProviderType.OLLAMA,
+        provider: 'ollama' as ProviderUnion,
         confidence: 0.5,
         reason: 'Fallback provider selection',
         fallbackChain: [],

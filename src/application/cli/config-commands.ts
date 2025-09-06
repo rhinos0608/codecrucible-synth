@@ -301,7 +301,10 @@ export class ConfigCommands {
   /**
    * Export current configuration in specified format
    */
-  public async export(filePath: string, options: Readonly<ConfigCommandOptions> = {}): Promise<void> {
+  public async export(
+    filePath: string,
+    options: Readonly<ConfigCommandOptions> = {}
+  ): Promise<void> {
     try {
       await this.configManager.initialize();
       const config = this.configManager.getConfiguration();

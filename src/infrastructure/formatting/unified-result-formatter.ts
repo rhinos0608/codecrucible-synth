@@ -1,6 +1,6 @@
 /**
  * Unified Result Formatter
- * 
+ *
  * Centralized formatting for tool results, responses, and outputs
  * Eliminates inconsistent formatting across the codebase
  * Provides rich, structured formatting with metadata extraction
@@ -64,7 +64,7 @@ export class UnifiedResultFormatter {
       preferMarkdown = false,
       showTimestamps = false,
       highlightErrors = true,
-      format = 'text'
+      format = 'text',
     } = options;
 
     const warnings: string[] = [];
@@ -91,7 +91,6 @@ export class UnifiedResultFormatter {
         content = content.substring(0, maxLength - 3) + '...';
         warnings.push(`Content truncated to ${maxLength} characters`);
       }
-
     } catch (error) {
       content = `[Error formatting result: ${(error as Error).message}]`;
       extractionStrategy = 'error';
@@ -101,13 +100,15 @@ export class UnifiedResultFormatter {
     const formattedResult: FormattedResult = {
       content,
       format,
-      metadata: includeMetadata ? {
-        originalType: typeof result,
-        extractionStrategy,
-        hasWarnings: warnings.length > 0,
-        warnings,
-        processedAt: new Date()
-      } : undefined
+      metadata: includeMetadata
+        ? {
+            originalType: typeof result,
+            extractionStrategy,
+            hasWarnings: warnings.length > 0,
+            warnings,
+            processedAt: new Date(),
+          }
+        : undefined,
     };
 
     return formattedResult;
@@ -117,18 +118,18 @@ export class UnifiedResultFormatter {
    * Format multiple tool results with summary and organization
    */
   formatMultipleToolResults(
-    toolResults: any[], 
-    toolCalls?: any[], 
+    toolResults: any[],
+    toolCalls?: any[],
     options: FormattingOptions = {}
   ): MultiToolFormattedResult {
     const { includeMetadata = false } = options;
-    
+
     if (toolResults.length === 0) {
       return {
         content: 'Tool executed successfully but returned no data',
         format: 'text',
         toolResults: [],
-        summary: { totalTools: 0, successCount: 0, errorCount: 0 }
+        summary: { totalTools: 0, successCount: 0, errorCount: 0 },
       };
     }
 
@@ -156,12 +157,14 @@ export class UnifiedResultFormatter {
         toolName,
         success: !hasError,
         content: formattedResult.content,
-        metadata: includeMetadata ? {
-          resultType: typeof result,
-          extractionStrategy: formattedResult.metadata?.extractionStrategy,
-          warnings: formattedResult.metadata?.warnings,
-          processedAt: formattedResult.metadata?.processedAt
-        } : undefined
+        metadata: includeMetadata
+          ? {
+              resultType: typeof result,
+              extractionStrategy: formattedResult.metadata?.extractionStrategy,
+              warnings: formattedResult.metadata?.warnings,
+              processedAt: formattedResult.metadata?.processedAt,
+            }
+          : undefined,
       });
 
       // Format content with proper separation for multiple tools
@@ -174,7 +177,7 @@ export class UnifiedResultFormatter {
     });
 
     const content = contentParts.join('\n\n---\n\n');
-    
+
     return {
       content,
       format: options.format || 'text',
@@ -182,15 +185,17 @@ export class UnifiedResultFormatter {
       summary: {
         totalTools: toolResults.length,
         successCount,
-        errorCount
+        errorCount,
       },
-      metadata: includeMetadata ? {
-        originalType: 'array',
-        extractionStrategy: 'multi-tool',
-        hasWarnings: formattedToolResults.some(tr => tr.metadata?.warnings?.length > 0),
-        warnings: formattedToolResults.flatMap(tr => tr.metadata?.warnings || []),
-        processedAt: new Date()
-      } : undefined
+      metadata: includeMetadata
+        ? {
+            originalType: 'array',
+            extractionStrategy: 'multi-tool',
+            hasWarnings: formattedToolResults.some(tr => tr.metadata?.warnings?.length > 0),
+            warnings: formattedToolResults.flatMap(tr => tr.metadata?.warnings || []),
+            processedAt: new Date(),
+          }
+        : undefined,
     };
   }
 
@@ -198,26 +203,28 @@ export class UnifiedResultFormatter {
    * Format ToolExecutionResult with structured output
    */
   formatToolExecutionResult(
-    result: ToolExecutionResult, 
+    result: ToolExecutionResult,
     options: FormattingOptions = {}
   ): FormattedResult {
     const { includeMetadata = true, highlightErrors = true } = options;
 
     if (!result.success && result.error) {
-      const errorContent = highlightErrors 
+      const errorContent = highlightErrors
         ? `❌ **Error**: ${result.error.message}\n\n${result.error.details ? `**Details**: ${JSON.stringify(result.error.details, null, 2)}\n\n` : ''}${result.error.stack ? `**Stack**: \`\`\`\n${result.error.stack}\n\`\`\`` : ''}`
         : `Error: ${result.error.message}`;
 
       return {
         content: errorContent,
         format: 'markdown',
-        metadata: includeMetadata ? {
-          originalType: 'ToolExecutionResult',
-          extractionStrategy: 'error-result',
-          hasWarnings: true,
-          warnings: result.warnings || [],
-          processedAt: new Date()
-        } : undefined
+        metadata: includeMetadata
+          ? {
+              originalType: 'ToolExecutionResult',
+              extractionStrategy: 'error-result',
+              hasWarnings: true,
+              warnings: result.warnings || [],
+              processedAt: new Date(),
+            }
+          : undefined,
       };
     }
 
@@ -251,13 +258,15 @@ export class UnifiedResultFormatter {
     return {
       content,
       format: options.format || 'text',
-      metadata: includeMetadata ? {
-        originalType: 'ToolExecutionResult',
-        extractionStrategy: 'structured-result',
-        hasWarnings: (result.warnings?.length || 0) > 0,
-        warnings: result.warnings || [],
-        processedAt: new Date()
-      } : undefined
+      metadata: includeMetadata
+        ? {
+            originalType: 'ToolExecutionResult',
+            extractionStrategy: 'structured-result',
+            hasWarnings: (result.warnings?.length || 0) > 0,
+            warnings: result.warnings || [],
+            processedAt: new Date(),
+          }
+        : undefined,
     };
   }
 
@@ -267,8 +276,8 @@ export class UnifiedResultFormatter {
    * Extract content using comprehensive deep extraction strategies
    */
   private extractContent(
-    result: unknown, 
-    maxDepth: number, 
+    result: unknown,
+    maxDepth: number,
     maxLength: number,
     highlightErrors: boolean
   ): { content: string; strategy: string; warnings: string[] } {
@@ -278,22 +287,46 @@ export class UnifiedResultFormatter {
     if (maxDepth <= 0) {
       // Try to extract at least basic information even at max depth
       if (typeof result === 'string') {
-        return { content: result.substring(0, 200) + (result.length > 200 ? '...' : ''), strategy: 'depth-limited-string', warnings: ['Maximum extraction depth reached'] };
+        return {
+          content: result.substring(0, 200) + (result.length > 200 ? '...' : ''),
+          strategy: 'depth-limited-string',
+          warnings: ['Maximum extraction depth reached'],
+        };
       }
       if (typeof result === 'number' || typeof result === 'boolean') {
-        return { content: String(result), strategy: 'depth-limited-primitive', warnings: ['Maximum extraction depth reached'] };
+        return {
+          content: String(result),
+          strategy: 'depth-limited-primitive',
+          warnings: ['Maximum extraction depth reached'],
+        };
       }
       if (result === null || result === undefined) {
-        return { content: '', strategy: 'depth-limited-null', warnings: ['Maximum extraction depth reached'] };
+        return {
+          content: '',
+          strategy: 'depth-limited-null',
+          warnings: ['Maximum extraction depth reached'],
+        };
       }
       if (Array.isArray(result)) {
-        return { content: `[Array with ${result.length} items]`, strategy: 'depth-limited-array', warnings: ['Maximum extraction depth reached'] };
+        return {
+          content: `[Array with ${result.length} items]`,
+          strategy: 'depth-limited-array',
+          warnings: ['Maximum extraction depth reached'],
+        };
       }
       if (typeof result === 'object' && result !== null) {
         const keys = Object.keys(result).slice(0, 5);
-        return { content: `{Object with keys: ${keys.join(', ')}${Object.keys(result).length > 5 ? '...' : ''}}`, strategy: 'depth-limited-object', warnings: ['Maximum extraction depth reached'] };
+        return {
+          content: `{Object with keys: ${keys.join(', ')}${Object.keys(result).length > 5 ? '...' : ''}}`,
+          strategy: 'depth-limited-object',
+          warnings: ['Maximum extraction depth reached'],
+        };
       }
-      return { content: '[Max depth reached - complex structure]', strategy: 'depth-limited-fallback', warnings: ['Maximum extraction depth reached'] };
+      return {
+        content: '[Max depth reached - complex structure]',
+        strategy: 'depth-limited-fallback',
+        warnings: ['Maximum extraction depth reached'],
+      };
     }
 
     // Strategy 1: Handle primitives with enhanced type detection
@@ -336,11 +369,18 @@ export class UnifiedResultFormatter {
       }
 
       // Mixed arrays with intelligent formatting
-      const formatted = result.map((item, index) => {
-        const itemContent = this.extractContent(item, maxDepth - 1, maxLength / result.length, highlightErrors);
-        const prefix = result.length > 10 ? `[${index}]` : `${index + 1}.`;
-        return `${prefix} ${itemContent.content}`;
-      }).join('\n');
+      const formatted = result
+        .map((item, index) => {
+          const itemContent = this.extractContent(
+            item,
+            maxDepth - 1,
+            maxLength / result.length,
+            highlightErrors
+          );
+          const prefix = result.length > 10 ? `[${index}]` : `${index + 1}.`;
+          return `${prefix} ${itemContent.content}`;
+        })
+        .join('\n');
 
       return { content: formatted, strategy: 'mixed-array-format', warnings };
     }
@@ -350,19 +390,42 @@ export class UnifiedResultFormatter {
       const record = result as Record<string, unknown>;
 
       // Enhanced MCP-style responses with deep traversal
-      const extractionResult = this.extractFromMCPPatterns(record, maxDepth, highlightErrors, warnings);
+      const extractionResult = this.extractFromMCPPatterns(
+        record,
+        maxDepth,
+        highlightErrors,
+        warnings
+      );
       if (extractionResult) return extractionResult;
 
       // API Response patterns
-      const apiResult = this.extractFromAPIPatterns(record, maxDepth, maxLength, highlightErrors, warnings);
+      const apiResult = this.extractFromAPIPatterns(
+        record,
+        maxDepth,
+        maxLength,
+        highlightErrors,
+        warnings
+      );
       if (apiResult) return apiResult;
 
       // Database/ORM result patterns
-      const dbResult = this.extractFromDatabasePatterns(record, maxDepth, maxLength, highlightErrors, warnings);
+      const dbResult = this.extractFromDatabasePatterns(
+        record,
+        maxDepth,
+        maxLength,
+        highlightErrors,
+        warnings
+      );
       if (dbResult) return dbResult;
 
       // File system result patterns
-      const fsResult = this.extractFromFileSystemPatterns(record, maxDepth, maxLength, highlightErrors, warnings);
+      const fsResult = this.extractFromFileSystemPatterns(
+        record,
+        maxDepth,
+        maxLength,
+        highlightErrors,
+        warnings
+      );
       if (fsResult) return fsResult;
 
       // Error objects with enhanced detection
@@ -374,16 +437,20 @@ export class UnifiedResultFormatter {
     }
 
     // Strategy 4: Last resort with type information
-    return { content: String(result), strategy: 'string-coercion', warnings: ['Used string coercion'] };
+    return {
+      content: String(result),
+      strategy: 'string-coercion',
+      warnings: ['Used string coercion'],
+    };
   }
 
   /**
    * Extract content from homogeneous object arrays
    */
   private extractObjectArray(
-    array: any[], 
-    maxDepth: number, 
-    maxLength: number, 
+    array: any[],
+    maxDepth: number,
+    maxLength: number,
     highlightErrors: boolean,
     warnings: string[]
   ): { content: string; strategy: string; warnings: string[] } {
@@ -394,29 +461,39 @@ export class UnifiedResultFormatter {
     // Sample first object to determine structure
     const firstItem = array[0] as Record<string, unknown>;
     const keys = Object.keys(firstItem);
-    
+
     // If objects have few keys, show as table
     if (keys.length <= 5 && array.length <= 20) {
-      const formatted = array.map((item, index) => {
-        const itemContent = this.extractContent(item, maxDepth, maxLength / array.length, highlightErrors);
-        return `[${index}] ${itemContent.content}`;
-      }).join('\n');
-      
+      const formatted = array
+        .map((item, index) => {
+          const itemContent = this.extractContent(
+            item,
+            maxDepth,
+            maxLength / array.length,
+            highlightErrors
+          );
+          return `[${index}] ${itemContent.content}`;
+        })
+        .join('\n');
+
       return { content: formatted, strategy: 'object-array-table', warnings };
     }
 
     // For large arrays, show summary
     const summary = `Array of ${array.length} objects with keys: ${keys.slice(0, 3).join(', ')}${keys.length > 3 ? '...' : ''}`;
-    const firstFew = array.slice(0, 3).map((item, index) => {
-      const itemContent = this.extractContent(item, maxDepth, maxLength / 3, highlightErrors);
-      return `[${index}] ${itemContent.content}`;
-    }).join('\n');
-    
+    const firstFew = array
+      .slice(0, 3)
+      .map((item, index) => {
+        const itemContent = this.extractContent(item, maxDepth, maxLength / 3, highlightErrors);
+        return `[${index}] ${itemContent.content}`;
+      })
+      .join('\n');
+
     const content = `${summary}\n\nFirst ${Math.min(3, array.length)} items:\n${firstFew}`;
     if (array.length > 3) {
       warnings.push(`Showing first 3 of ${array.length} array items`);
     }
-    
+
     return { content, strategy: 'object-array-summary', warnings };
   }
 
@@ -424,8 +501,8 @@ export class UnifiedResultFormatter {
    * Extract from MCP-style patterns with deep traversal
    */
   private extractFromMCPPatterns(
-    record: Record<string, unknown>, 
-    maxDepth: number, 
+    record: Record<string, unknown>,
+    maxDepth: number,
     highlightErrors: boolean,
     warnings: string[]
   ): { content: string; strategy: string; warnings: string[] } | null {
@@ -436,12 +513,16 @@ export class UnifiedResultFormatter {
       if (typeof value === 'string' && value.trim()) {
         return { content: value, strategy: `mcp-${prop}`, warnings };
       }
-      
+
       // Deep traverse if property is object
       if (value && typeof value === 'object' && maxDepth > 1) {
         const deepResult = this.extractContent(value, maxDepth - 1, 10000, highlightErrors);
         if (deepResult.content && deepResult.content.trim()) {
-          return { content: deepResult.content, strategy: `mcp-deep-${prop}`, warnings: [...warnings, ...deepResult.warnings] };
+          return {
+            content: deepResult.content,
+            strategy: `mcp-deep-${prop}`,
+            warnings: [...warnings, ...deepResult.warnings],
+          };
         }
       }
     }
@@ -449,19 +530,21 @@ export class UnifiedResultFormatter {
     // Nested content patterns with enhanced detection
     if (record.content && typeof record.content === 'object') {
       const content = record.content as Record<string, unknown>;
-      
+
       // Multi-level text extraction
       if (typeof content.text === 'string') {
         return { content: content.text, strategy: 'nested-content-text', warnings };
       }
-      
+
       // Content arrays
       if (Array.isArray(content)) {
         const textContent = content
-          .map(c => typeof c === 'object' && c !== null ? (c as any).text || (c as any).content : String(c))
+          .map(c =>
+            typeof c === 'object' && c !== null ? (c as any).text || (c as any).content : String(c)
+          )
           .filter(text => text && typeof text === 'string')
           .join('\n');
-        
+
         if (textContent) {
           return { content: textContent, strategy: 'nested-content-array', warnings };
         }
@@ -475,8 +558,8 @@ export class UnifiedResultFormatter {
    * Extract from common API response patterns
    */
   private extractFromAPIPatterns(
-    record: Record<string, unknown>, 
-    maxDepth: number, 
+    record: Record<string, unknown>,
+    maxDepth: number,
     maxLength: number,
     highlightErrors: boolean,
     warnings: string[]
@@ -484,62 +567,96 @@ export class UnifiedResultFormatter {
     // OpenAI-compatible API patterns (LM Studio, OpenAI, etc.)
     if (record.choices && Array.isArray(record.choices) && record.choices.length > 0) {
       const choice = record.choices[0] as any;
-      
+
       // Handle message.content pattern
       if (choice.message && typeof choice.message === 'object' && choice.message.content) {
-        const content = typeof choice.message.content === 'string' 
-          ? choice.message.content 
-          : String(choice.message.content);
+        const content =
+          typeof choice.message.content === 'string'
+            ? choice.message.content
+            : String(choice.message.content);
         return { content, strategy: 'openai-message-content', warnings };
       }
-      
+
       // Handle direct text in choice
       if (typeof choice.text === 'string' && choice.text.trim()) {
         return { content: choice.text, strategy: 'openai-choice-text', warnings };
       }
-      
+
       // Handle delta content (streaming responses)
       if (choice.delta && typeof choice.delta === 'object' && choice.delta.content) {
-        const content = typeof choice.delta.content === 'string' 
-          ? choice.delta.content 
-          : String(choice.delta.content);
+        const content =
+          typeof choice.delta.content === 'string'
+            ? choice.delta.content
+            : String(choice.delta.content);
         return { content, strategy: 'openai-delta-content', warnings };
       }
-      
+
       // Fallback: extract from the choice object
       const choiceResult = this.extractContent(choice, maxDepth - 1, maxLength, highlightErrors);
       if (choiceResult.content && choiceResult.content.trim()) {
-        return { content: choiceResult.content, strategy: 'openai-choice-fallback', warnings: [...warnings, ...choiceResult.warnings] };
+        return {
+          content: choiceResult.content,
+          strategy: 'openai-choice-fallback',
+          warnings: [...warnings, ...choiceResult.warnings],
+        };
       }
     }
 
     // REST API patterns
     if (record.data && typeof record.data === 'object') {
       const dataResult = this.extractContent(record.data, maxDepth - 1, maxLength, highlightErrors);
-      return { content: dataResult.content, strategy: 'api-data', warnings: [...warnings, ...dataResult.warnings] };
+      return {
+        content: dataResult.content,
+        strategy: 'api-data',
+        warnings: [...warnings, ...dataResult.warnings],
+      };
     }
 
     // GraphQL patterns
     if (record.data && record.errors) {
-      const dataResult = this.extractContent(record.data, maxDepth - 1, maxLength / 2, highlightErrors);
-      const errorsResult = this.extractContent(record.errors, maxDepth - 1, maxLength / 2, highlightErrors);
+      const dataResult = this.extractContent(
+        record.data,
+        maxDepth - 1,
+        maxLength / 2,
+        highlightErrors
+      );
+      const errorsResult = this.extractContent(
+        record.errors,
+        maxDepth - 1,
+        maxLength / 2,
+        highlightErrors
+      );
       const content = `Data: ${dataResult.content}\n\nErrors: ${errorsResult.content}`;
-      return { content, strategy: 'graphql-response', warnings: [...warnings, ...dataResult.warnings, ...errorsResult.warnings] };
+      return {
+        content,
+        strategy: 'graphql-response',
+        warnings: [...warnings, ...dataResult.warnings, ...errorsResult.warnings],
+      };
     }
 
     // Paginated responses
     if (record.items && Array.isArray(record.items)) {
-      const itemsResult = this.extractContent(record.items, maxDepth - 1, maxLength, highlightErrors);
+      const itemsResult = this.extractContent(
+        record.items,
+        maxDepth - 1,
+        maxLength,
+        highlightErrors
+      );
       const metaInfo = [];
       if (record.total) metaInfo.push(`total: ${record.total}`);
       if (record.page) metaInfo.push(`page: ${record.page}`);
       if (record.limit) metaInfo.push(`limit: ${record.limit}`);
-      
-      const content = metaInfo.length > 0 
-        ? `${itemsResult.content}\n\n[${metaInfo.join(', ')}]`
-        : itemsResult.content;
-        
-      return { content, strategy: 'paginated-response', warnings: [...warnings, ...itemsResult.warnings] };
+
+      const content =
+        metaInfo.length > 0
+          ? `${itemsResult.content}\n\n[${metaInfo.join(', ')}]`
+          : itemsResult.content;
+
+      return {
+        content,
+        strategy: 'paginated-response',
+        warnings: [...warnings, ...itemsResult.warnings],
+      };
     }
 
     return null;
@@ -549,8 +666,8 @@ export class UnifiedResultFormatter {
    * Extract from database/ORM result patterns
    */
   private extractFromDatabasePatterns(
-    record: Record<string, unknown>, 
-    maxDepth: number, 
+    record: Record<string, unknown>,
+    maxDepth: number,
     maxLength: number,
     highlightErrors: boolean,
     warnings: string[]
@@ -561,27 +678,50 @@ export class UnifiedResultFormatter {
       const metaInfo = [];
       if (record.rowCount) metaInfo.push(`${record.rowCount} rows`);
       if (record.command) metaInfo.push(`command: ${record.command}`);
-      
-      const content = metaInfo.length > 0 
-        ? `${rowsResult.content}\n\n[${metaInfo.join(', ')}]`
-        : rowsResult.content;
-        
-      return { content, strategy: 'database-result', warnings: [...warnings, ...rowsResult.warnings] };
+
+      const content =
+        metaInfo.length > 0
+          ? `${rowsResult.content}\n\n[${metaInfo.join(', ')}]`
+          : rowsResult.content;
+
+      return {
+        content,
+        strategy: 'database-result',
+        warnings: [...warnings, ...rowsResult.warnings],
+      };
     }
 
     // ORM model instances
     if (record._id || record.id) {
-      const importantKeys = ['id', '_id', 'name', 'title', 'description', 'status', 'createdAt', 'updatedAt'];
+      const importantKeys = [
+        'id',
+        '_id',
+        'name',
+        'title',
+        'description',
+        'status',
+        'createdAt',
+        'updatedAt',
+      ];
       const displayData: Record<string, unknown> = {};
-      
+
       for (const key of importantKeys) {
         if (record[key] !== undefined) {
           displayData[key] = record[key];
         }
       }
-      
-      const displayResult = this.extractContent(displayData, maxDepth - 1, maxLength, highlightErrors);
-      return { content: displayResult.content, strategy: 'orm-model', warnings: [...warnings, ...displayResult.warnings] };
+
+      const displayResult = this.extractContent(
+        displayData,
+        maxDepth - 1,
+        maxLength,
+        highlightErrors
+      );
+      return {
+        content: displayResult.content,
+        strategy: 'orm-model',
+        warnings: [...warnings, ...displayResult.warnings],
+      };
     }
 
     return null;
@@ -591,8 +731,8 @@ export class UnifiedResultFormatter {
    * Extract from file system patterns
    */
   private extractFromFileSystemPatterns(
-    record: Record<string, unknown>, 
-    maxDepth: number, 
+    record: Record<string, unknown>,
+    maxDepth: number,
     maxLength: number,
     highlightErrors: boolean,
     warnings: string[]
@@ -604,14 +744,23 @@ export class UnifiedResultFormatter {
       if (record.size) fileInfo.push(`Size: ${record.size} bytes`);
       if (record.mtime) fileInfo.push(`Modified: ${record.mtime}`);
       if (record.mode) fileInfo.push(`Mode: ${record.mode}`);
-      
+
       return { content: fileInfo.join('\n'), strategy: 'file-stats', warnings };
     }
 
     // Directory listings
     if (record.files && Array.isArray(record.files)) {
-      const filesResult = this.extractContent(record.files, maxDepth - 1, maxLength, highlightErrors);
-      return { content: `Directory contents:\n${filesResult.content}`, strategy: 'directory-listing', warnings: [...warnings, ...filesResult.warnings] };
+      const filesResult = this.extractContent(
+        record.files,
+        maxDepth - 1,
+        maxLength,
+        highlightErrors
+      );
+      return {
+        content: `Directory contents:\n${filesResult.content}`,
+        strategy: 'directory-listing',
+        warnings: [...warnings, ...filesResult.warnings],
+      };
     }
 
     return null;
@@ -621,14 +770,14 @@ export class UnifiedResultFormatter {
    * Extract from error patterns with enhanced detection
    */
   private extractFromErrorPatterns(
-    record: Record<string, unknown>, 
+    record: Record<string, unknown>,
     highlightErrors: boolean,
     warnings: string[]
   ): { content: string; strategy: string; warnings: string[] } | null {
     // Standard error object
     if (record.error) {
       let errorContent = '';
-      
+
       if (typeof record.error === 'string') {
         errorContent = record.error;
       } else if (typeof record.error === 'object' && record.error !== null) {
@@ -639,16 +788,24 @@ export class UnifiedResultFormatter {
         if (errorObj.details) parts.push(`Details: ${JSON.stringify(errorObj.details)}`);
         errorContent = parts.join('\n');
       }
-      
+
       const finalContent = highlightErrors ? `❌ Error\n${errorContent}` : errorContent;
-      return { content: finalContent, strategy: 'error-object', warnings: [...warnings, 'Error result detected'] };
+      return {
+        content: finalContent,
+        strategy: 'error-object',
+        warnings: [...warnings, 'Error result detected'],
+      };
     }
 
     // Exception-like patterns
     if (record.message && record.stack) {
       const errorContent = `${record.message}\n\nStack trace:\n${record.stack}`;
       const finalContent = highlightErrors ? `❌ Exception\n${errorContent}` : errorContent;
-      return { content: finalContent, strategy: 'exception-object', warnings: [...warnings, 'Exception detected'] };
+      return {
+        content: finalContent,
+        strategy: 'exception-object',
+        warnings: [...warnings, 'Exception detected'],
+      };
     }
 
     return null;
@@ -658,26 +815,46 @@ export class UnifiedResultFormatter {
    * Extract from generic object with intelligent key prioritization
    */
   private extractFromGenericObject(
-    record: Record<string, unknown>, 
-    maxDepth: number, 
+    record: Record<string, unknown>,
+    maxDepth: number,
     maxLength: number,
     warnings: string[]
   ): { content: string; strategy: string; warnings: string[] } {
     // Prioritize human-readable keys
     const priorityKeys = [
-      'title', 'name', 'label', 'description', 'summary', 'overview',
-      'value', 'result', 'output', 'response', 'body', 'payload',
-      'status', 'state', 'phase', 'progress'
+      'title',
+      'name',
+      'label',
+      'description',
+      'summary',
+      'overview',
+      'value',
+      'result',
+      'output',
+      'response',
+      'body',
+      'payload',
+      'status',
+      'state',
+      'phase',
+      'progress',
     ];
-    
+
     // Find the most important content first
     for (const key of priorityKeys) {
       const value = record[key];
-      if (value && (typeof value === 'string' || typeof value === 'number') && String(value).trim()) {
-        const otherKeys = Object.keys(record).filter(k => k !== key).slice(0, 3);
-        const content = otherKeys.length > 0 
-          ? `${key}: ${value}\n[Also contains: ${otherKeys.join(', ')}]`
-          : `${key}: ${value}`;
+      if (
+        value &&
+        (typeof value === 'string' || typeof value === 'number') &&
+        String(value).trim()
+      ) {
+        const otherKeys = Object.keys(record)
+          .filter(k => k !== key)
+          .slice(0, 3);
+        const content =
+          otherKeys.length > 0
+            ? `${key}: ${value}\n[Also contains: ${otherKeys.join(', ')}]`
+            : `${key}: ${value}`;
         return { content, strategy: 'object-priority-key', warnings };
       }
     }
@@ -685,7 +862,11 @@ export class UnifiedResultFormatter {
     // Fall back to JSON with depth limiting
     try {
       const json = this.limitedJsonStringify(record, maxDepth);
-      return { content: json, strategy: 'json-fallback', warnings: [...warnings, 'Used JSON fallback'] };
+      return {
+        content: json,
+        strategy: 'json-fallback',
+        warnings: [...warnings, 'Used JSON fallback'],
+      };
     } catch (error) {
       warnings.push(`JSON stringify failed: ${(error as Error).message}`);
       return { content: '[Object]', strategy: 'object-fallback', warnings };
@@ -714,7 +895,7 @@ export class UnifiedResultFormatter {
    */
   private isErrorResult(result: any): boolean {
     if (!result || typeof result !== 'object') return false;
-    
+
     return !!(
       result.error ||
       result.success === false ||

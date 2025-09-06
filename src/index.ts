@@ -18,11 +18,14 @@ import { createAdaptersFromProviders } from './application/services/adapter-fact
 // getGlobalEventBus intentionally not imported anymore – event bus is injected via RuntimeContext.
 import { getErrorMessage } from './utils/error-utils.js';
 import { logger } from './infrastructure/logging/logger.js';
-import { 
+import {
   enterpriseErrorHandler,
-  EnterpriseErrorHandler 
+  EnterpriseErrorHandler,
 } from './infrastructure/error-handling/enterprise-error-handler.js';
-import { ErrorCategory, ErrorSeverity } from './infrastructure/error-handling/structured-error-system.js';
+import {
+  ErrorCategory,
+  ErrorSeverity,
+} from './infrastructure/error-handling/structured-error-system.js';
 
 import { Command } from 'commander';
 import { readFile } from 'fs/promises';
@@ -107,8 +110,8 @@ export async function initialize(
       verbose: cliOptions.verbose,
     });
 
-        // Initialize MCP servers via bootstrap module
-    const { bootstrapMcpServers } = await import("./mcp-servers/mcp-bootstrap.js");
+    // Initialize MCP servers via bootstrap module
+    const { bootstrapMcpServers } = await import('./mcp-servers/mcp-bootstrap.js');
     const mcpServerManager = await bootstrapMcpServers();
     if (mcpServerManager) {
       const { initializeGlobalToolIntegration, getGlobalToolIntegration } = await import(
@@ -239,9 +242,9 @@ export async function initialize(
       logger.info('System capabilities display', {
         capabilities: 'Context Intelligence, Performance Optimization, Error Resilience',
         architecture: 'Dependency Injection, Event-Driven, Circular Dependencies Eliminated',
-        complexity: 'Reduced by 90% through unified coordination'
+        complexity: 'Reduced by 90% through unified coordination',
       });
-      
+
       // For CLI users, still show the output
       console.log(
         '🧠 Capabilities: Context Intelligence, Performance Optimization, Error Resilience'
@@ -336,42 +339,38 @@ async function runCLI(
   } catch (error) {
     // Use enterprise error handler for graceful failure
     try {
-      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
-        error as Error,
-        {
-          operation: 'cli_startup',
-          resource: 'main_application',
-          requestId: `cli-${Date.now()}`,
-          context: { args: args.join(' '), isInteractive }
-        }
-      );
-      
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(error as Error, {
+        operation: 'cli_startup',
+        resource: 'main_application',
+        requestId: `cli-${Date.now()}`,
+        context: { args: args.join(' '), isInteractive },
+      });
+
       // Display user-friendly error message
       logger.error('Application error occurred', {
         userMessage: structuredError.userMessage,
         suggestedActions: structuredError.suggestedActions,
         category: structuredError.category,
-        severity: structuredError.severity
+        severity: structuredError.severity,
       });
-      
+
       // User error message already logged by enterprise error handler
       console.error('❌ Application Error:', structuredError.userMessage);
-      
+
       if (structuredError.suggestedActions && structuredError.suggestedActions.length > 0) {
         console.error('💡 Suggested actions:');
         structuredError.suggestedActions.forEach(action => {
           console.error(`  • ${action}`);
         });
       }
-      
+
       // Set appropriate exit code based on error severity
       process.exitCode = structuredError.severity === ErrorSeverity.CRITICAL ? 1 : 2;
-      
     } catch (handlerError) {
       // Fallback to basic error handling if enterprise handler fails
       logger.fatal('Fatal error with handler failure', undefined, {
         originalError: getErrorMessage(error),
-        handlerError: getErrorMessage(handlerError)
+        handlerError: getErrorMessage(handlerError),
       });
       // Errors already logged by structured logger above
       console.error('❌ Fatal error:', getErrorMessage(error));
@@ -499,23 +498,21 @@ program
   .option('-l, --list', 'List all available models')
   .option('-s, --select', 'Interactive model selection')
   .option('-i, --interactive', 'Same as --select')
-  .action(async (options) => {
-    const { ModelsCommand, parseModelsArgs } = await import(
-      './application/cli/models-command.js'
-    );
+  .action(async options => {
+    const { ModelsCommand, parseModelsArgs } = await import('./application/cli/models-command.js');
     const modelsCommand = new ModelsCommand();
-    
+
     // Convert Commander options to models command options
     const modelsOptions = {
       list: options.list,
       select: options.select || options.interactive,
-      interactive: options.interactive
+      interactive: options.interactive,
     };
-    
+
     await modelsCommand.execute(modelsOptions);
   });
 
-// Add status command to Commander program  
+// Add status command to Commander program
 program
   .command('status')
   .description('Show system status')

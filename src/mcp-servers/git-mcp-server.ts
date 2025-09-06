@@ -19,7 +19,7 @@ export type ToolHandler<TReq extends ToolRequest = ToolRequest, TRes = unknown> 
 class BaseMCPServer {
   protected tools: Record<string, ToolHandler> = {};
 
-  constructor(
+  public constructor(
     public id: string,
     public description: string
   ) {}
@@ -102,8 +102,8 @@ export interface GitLogRequest {
 }
 
 export interface GitAddRequest {
-  files: string[];
-  all?: boolean;
+  readonly files: readonly string[];
+  readonly all?: boolean;
 }
 
 export interface GitPushRequest {
@@ -178,10 +178,10 @@ export interface GitPullResponse {
  * Provides safe Git operations with user confirmation for destructive actions
  */
 export class GitMCPServer extends BaseMCPServer {
-  private approvalManager: ApprovalManager;
-  private workspaceRoot: string;
+  private readonly approvalManager: ApprovalManager;
+  private readonly workspaceRoot: string;
 
-  constructor(approvalManager: ApprovalManager, workspaceRoot: string) {
+  public constructor(approvalManager: ApprovalManager, workspaceRoot: Readonly<string>) {
     super('git-operations', 'Git version control operations with safety checks');
     this.approvalManager = approvalManager;
     this.workspaceRoot = workspaceRoot;
@@ -191,22 +191,19 @@ export class GitMCPServer extends BaseMCPServer {
       git_status: this.handleGitStatus.bind(this),
       git_diff: this.handleGitDiff.bind(this),
       git_log: this.handleGitLog.bind(this),
-      git_add: this.handleGitAdd.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_commit: this.handleGitCommit.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_push: this.handleGitPush.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_pull: this.handleGitPull.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_branch: this.handleGitBranch.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_checkout: this.handleGitCheckout.bind(this) as unknown as ToolHandler<
-        ToolRequest,
-        unknown
-      >,
-      git_merge: this.handleGitMerge.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_rebase: this.handleGitRebase.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_reset: this.handleGitReset.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_tag: this.handleGitTag.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_remote: this.handleGitRemote.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_stash: this.handleGitStash.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
-      git_clean: this.handleGitClean.bind(this) as unknown as ToolHandler<ToolRequest, unknown>,
+      git_add: this.handleGitAdd.bind(this) as unknown as ToolHandler,
+      git_commit: this.handleGitCommit.bind(this) as unknown as ToolHandler,
+      git_push: this.handleGitPush.bind(this) as unknown as ToolHandler,
+      git_pull: this.handleGitPull.bind(this) as unknown as ToolHandler,
+      git_branch: this.handleGitBranch.bind(this) as unknown as ToolHandler,
+      git_checkout: this.handleGitCheckout.bind(this) as unknown as ToolHandler,
+      git_merge: this.handleGitMerge.bind(this) as unknown as ToolHandler,
+      git_rebase: this.handleGitRebase.bind(this) as unknown as ToolHandler,
+      git_reset: this.handleGitReset.bind(this) as unknown as ToolHandler,
+      git_tag: this.handleGitTag.bind(this) as unknown as ToolHandler,
+      git_remote: this.handleGitRemote.bind(this) as unknown as ToolHandler,
+      git_stash: this.handleGitStash.bind(this) as unknown as ToolHandler,
+      git_clean: this.handleGitClean.bind(this) as unknown as ToolHandler,
     } satisfies Record<string, ToolHandler>;
 
     logger.info('Git MCP server initialized', { workspaceRoot });
@@ -215,7 +212,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Get Git repository status
    */
-  async handleGitStatus(): Promise<ToolResponse<GitStatus>> {
+  public async handleGitStatus(): Promise<ToolResponse<GitStatus>> {
     try {
       const isRepo = await this.isGitRepository();
       if (!isRepo) {
@@ -243,7 +240,9 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Get Git diff
    */
-  async handleGitDiff(args: GitDiffRequest): Promise<ToolResponse<GitDiffResult[]>> {
+  public async handleGitDiff(
+    args: Readonly<GitDiffRequest>
+  ): Promise<ToolResponse<GitDiffResult[]>> {
     try {
       const { files = [], staged = false, commit } = args;
 
@@ -273,7 +272,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Get Git log
    */
-  async handleGitLog(args: GitLogRequest): Promise<ToolResponse<GitCommitInfo[]>> {
+  public async handleGitLog(args: Readonly<GitLogRequest>): Promise<ToolResponse<GitCommitInfo[]>> {
     try {
       const { limit = 10, since, author, grep } = args;
 
@@ -303,7 +302,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Add files to Git staging area
    */
-  async handleGitAdd(args: GitAddRequest): Promise<ToolResponse<GitAddResponse>> {
+  public async handleGitAdd(args: Readonly<GitAddRequest>): Promise<ToolResponse<GitAddResponse>> {
     try {
       const { files, all = false } = args;
 
@@ -340,7 +339,7 @@ export class GitMCPServer extends BaseMCPServer {
 
       return {
         success: true,
-        data: { staged: all ? 'all files' : files },
+        data: { staged: all ? 'all files' : [...files] },
       };
     } catch (error) {
       logger.error('Git add failed:', error);
@@ -354,8 +353,8 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Commit changes
    */
-  async handleGitCommit(
-    args: CommitArgs
+  public async handleGitCommit(
+    args: Readonly<CommitArgs>
   ): Promise<ToolResponse<{ hash: string; message: string; amend: boolean; files: string[] }>> {
     try {
       const { message, files, amend = false, signoff = false } = args;
@@ -408,7 +407,7 @@ export class GitMCPServer extends BaseMCPServer {
           hash: commitHash,
           message,
           amend,
-          files: files || status.staged,
+          files: files ?? status.staged,
         },
       };
     } catch (error) {
@@ -423,13 +422,15 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Push changes to remote
    */
-  async handleGitPush(args: GitPushRequest): Promise<ToolResponse<GitPushResponse>> {
+  public async handleGitPush(
+    args: Readonly<GitPushRequest>
+  ): Promise<ToolResponse<GitPushResponse>> {
     try {
       const { remote = 'origin', branch, force = false, setUpstream = false } = args;
 
       const operation: Operation = {
         type: 'git-operation',
-        target: `${remote}/${branch || 'current branch'}`,
+        target: `${remote}/${branch ?? 'current branch'}`,
         description: `Push changes to remote repository${force ? ' (force push)' : ''}`,
         metadata: { remote, branch, force, setUpstream },
       };
@@ -461,7 +462,7 @@ export class GitMCPServer extends BaseMCPServer {
         success: true,
         data: {
           remote,
-          branch: branch || 'current',
+          branch: branch ?? 'current',
           output: stdout + stderr,
         },
       };
@@ -477,13 +478,15 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Pull changes from remote
    */
-  async handleGitPull(args: GitPullRequest): Promise<ToolResponse<GitPullResponse>> {
+  public async handleGitPull(
+    args: Readonly<GitPullRequest>
+  ): Promise<ToolResponse<GitPullResponse>> {
     try {
       const { remote = 'origin', branch, rebase = false } = args;
 
       const operation: Operation = {
         type: 'git-operation',
-        target: `${remote}/${branch || 'current branch'}`,
+        target: `${remote}/${branch ?? 'current branch'}`,
         description: `Pull changes from remote repository${rebase ? ' (with rebase)' : ''}`,
         metadata: { remote, branch, rebase },
       };
@@ -514,7 +517,7 @@ export class GitMCPServer extends BaseMCPServer {
         success: true,
         data: {
           remote,
-          branch: branch || 'current',
+          branch: branch ?? 'current',
           rebase,
           output: stdout + stderr,
         },
@@ -531,8 +534,8 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Branch operations
    */
-  async handleGitBranch(
-    args: BranchArgs
+  public async handleGitBranch(
+    args: Readonly<BranchArgs>
   ): Promise<ToolResponse<{ currentBranch: string; action?: string; branch?: string }>> {
     try {
       const { name, checkout = false, delete: deleteBranch = false, remote } = args;
@@ -600,8 +603,8 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Checkout branch or commit
    */
-  async handleGitCheckout(
-    args: GitCheckoutRequest
+  public async handleGitCheckout(
+    args: Readonly<GitCheckoutRequest>
   ): Promise<
     ToolResponse<{ target: string; createBranch: boolean; force: boolean; output: string }>
   > {
@@ -646,8 +649,8 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Reset repository state
    */
-  async handleGitReset(
-    args: GitResetRequest
+  public async handleGitReset(
+    args: Readonly<GitResetRequest>
   ): Promise<ToolResponse<{ mode: string; target: string; output: string }>> {
     try {
       const { mode = 'mixed', target = 'HEAD' } = args;
@@ -698,8 +701,8 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git merges
    */
-  async handleGitMerge(
-    args: MergeArgs
+  public async handleGitMerge(
+    args: Readonly<MergeArgs>
   ): Promise<
     ToolResponse<{ branch: string; strategy: string; noFastForward?: boolean; output?: string }>
   > {
@@ -757,8 +760,8 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git rebase
    */
-  async handleGitRebase(
-    args: GitRebaseRequest
+  public async handleGitRebase(
+    args: Readonly<GitRebaseRequest>
   ): Promise<
     ToolResponse<{ action?: string; target?: string; interactive?: boolean; output?: string }>
   > {
@@ -830,8 +833,8 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git tags
    */
-  async handleGitTag(
-    args: TagArgs
+  public async handleGitTag(
+    args: Readonly<TagArgs>
   ): Promise<ToolResponse<{ name: string; message?: string; action?: string; tag?: string }>> {
     try {
       const { name, message, delete: deleteTag = false, push = false } = args;
@@ -900,7 +903,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git remote operations
    */
-  async handleGitRemote(args: GitRemoteRequest): Promise<
+  public async handleGitRemote(args: Readonly<GitRemoteRequest>): Promise<
     ToolResponse<{
       remotes?: string[];
       remote?: string;
@@ -957,7 +960,7 @@ export class GitMCPServer extends BaseMCPServer {
           };
 
         default:
-          return { success: false, error: `Unknown action: ${action}` };
+          return { success: false, error: `Unknown action: ${String(action)}` };
       }
     } catch (error) {
       logger.error('Git remote operation failed:', error);
@@ -971,7 +974,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git stash operations
    */
-  async handleGitStash(args: GitStashRequest): Promise<
+  public async handleGitStash(args: Readonly<GitStashRequest>): Promise<
     ToolResponse<{
       action?: string;
       message?: string;
@@ -1041,7 +1044,7 @@ export class GitMCPServer extends BaseMCPServer {
           };
 
         default:
-          return { success: false, error: `Unknown stash action: ${action}` };
+          return { success: false, error: `Unknown stash action: ${String(action)}` };
       }
     } catch (error) {
       logger.error('Git stash operation failed:', error);
@@ -1055,7 +1058,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git clean operations
    */
-  async handleGitClean(args: GitCleanRequest): Promise<
+  public async handleGitClean(args: Readonly<GitCleanRequest>): Promise<
     ToolResponse<{
       dryRun: boolean;
       directories: boolean;
@@ -1172,8 +1175,8 @@ export class GitMCPServer extends BaseMCPServer {
         { cwd: this.workspaceRoot }
       );
       const [aheadStr, behindStr] = aheadBehind.trim().split('\t');
-      ahead = parseInt(aheadStr) || 0;
-      behind = parseInt(behindStr) || 0;
+      ahead = parseInt(aheadStr, 10) || 0;
+      behind = parseInt(behindStr, 10) || 0;
     } catch {
       // No upstream branch
     }

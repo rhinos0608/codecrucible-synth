@@ -191,7 +191,7 @@ export class ServerMode implements ServerModeInterface {
       // Setup graceful shutdown
       process.on('SIGINT', async () => {
         logger.info('Server shutdown initiated via SIGINT');
-      console.log(chalk.yellow('\n🛑 Shutting down server...'));
+        console.log(chalk.yellow('\n🛑 Shutting down server...'));
         if (this.unifiedServer) {
           await this.unifiedServer.stopAllServers();
         }

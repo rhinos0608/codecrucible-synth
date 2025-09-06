@@ -14,7 +14,7 @@ export function selectVoices(
   const ids = required && required.length > 0 ? required : Array.from(available.keys());
   const selected: VoiceDefinition[] = [];
   const missing: string[] = [];
-  
+
   for (const id of ids) {
     const voice = available.get(id);
     if (voice) {
@@ -23,12 +23,12 @@ export function selectVoices(
       missing.push(id);
     }
   }
-  
+
   // Warn about missing requested voices
   if (missing.length > 0 && required && required.length > 0) {
     const availableIds = Array.from(available.keys());
     const warningMessage = `Voice selection: ${missing.length} requested voices not found`;
-    
+
     if (logger) {
       logger.warn(warningMessage, {
         requestedVoices: required,
@@ -45,6 +45,6 @@ export function selectVoices(
       });
     }
   }
-  
+
   return selected;
 }

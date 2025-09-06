@@ -262,7 +262,10 @@ export interface ScalingPlan {
 export class MCPDiscoveryService {
   private serverRegistry: Map<string, MCPServerProfile> = new Map();
   private discoveryStrategies: DiscoveryStrategy[] = [];
-  private selectionStrategies: Map<SelectionStrategy, (server: MCPServerProfile, query: ServerDiscoveryQuery) => number> = new Map();
+  private selectionStrategies: Map<
+    SelectionStrategy,
+    (server: MCPServerProfile, query: ServerDiscoveryQuery) => number
+  > = new Map();
 
   constructor() {
     // Initialize default strategies
@@ -478,10 +481,10 @@ export class MCPDiscoveryService {
     this.selectionStrategies.set(
       SelectionStrategy.PERFORMANCE_OPTIMIZED,
       (server: MCPServerProfile, query: ServerDiscoveryQuery) => {
-        const latencyScore = Math.max(0, 1 - (server.performance.averageLatency / 1000));
+        const latencyScore = Math.max(0, 1 - server.performance.averageLatency / 1000);
         const throughputScore = Math.min(1, server.performance.throughput / 1000);
         const errorScore = 1 - server.performance.errorRate;
-        return (latencyScore * 0.5) + (throughputScore * 0.3) + (errorScore * 0.2);
+        return latencyScore * 0.5 + throughputScore * 0.3 + errorScore * 0.2;
       }
     );
 
@@ -492,7 +495,7 @@ export class MCPDiscoveryService {
         const availabilityScore = server.reliability.availabilityScore;
         const errorScore = 1 - server.performance.errorRate;
         const uptimeScore = Math.min(1, server.performance.uptime / (365 * 24 * 60)); // Normalize to 1 year
-        return (availabilityScore * 0.5) + (errorScore * 0.3) + (uptimeScore * 0.2);
+        return availabilityScore * 0.5 + errorScore * 0.3 + uptimeScore * 0.2;
       }
     );
 
@@ -542,9 +545,7 @@ export class MCPDiscoveryService {
       case DiscoveryStrategy.CAPABILITY_MATCH:
         // Return servers that have required capabilities
         return Array.from(this.serverRegistry.values()).filter(server =>
-          query.requiredCapabilities.every(cap =>
-            server.capabilities.some(sc => sc.type === cap)
-          )
+          query.requiredCapabilities.every(cap => server.capabilities.some(sc => sc.type === cap))
         );
 
       case DiscoveryStrategy.NETWORK_SCAN:

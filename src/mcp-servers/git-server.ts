@@ -25,14 +25,14 @@ interface GitResult {
 }
 
 export class GitMCPServer {
-  private server: Server;
-  private config: GitConfig;
+  private readonly server: Server;
+  private readonly config: GitConfig;
   private initialized: boolean = false;
 
-  constructor(config: GitConfig = {}) {
+  public constructor(config: Readonly<GitConfig> = {}) {
     this.config = {
-      repoPath: config.repoPath || process.cwd(),
-      allowedOperations: config.allowedOperations || [
+      repoPath: config.repoPath ?? process.cwd(),
+      allowedOperations: config.allowedOperations ?? [
         'status',
         'log',
         'diff',
@@ -45,8 +45,8 @@ export class GitMCPServer {
         'checkout',
         'merge',
       ],
-      blockedOperations: config.blockedOperations || ['reset --hard', 'force', 'clean -fd'],
-      maxDiffSize: config.maxDiffSize || 1000000, // 1MB diff limit
+      blockedOperations: config.blockedOperations ?? ['reset --hard', 'force', 'clean -fd'],
+      maxDiffSize: config.maxDiffSize ?? 1000000, // 1MB diff limit
     };
 
     this.server = new Server(
@@ -67,7 +67,7 @@ export class GitMCPServer {
 
   private setupRequestHandlers(): void {
     // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    this.server.setRequestHandler(ListToolsRequestSchema, () => {
       return {
         tools: [
           {
@@ -189,7 +189,7 @@ export class GitMCPServer {
     // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
-      const typedArgs = args as Record<string, any>;
+      const typedArgs = (args ?? {}) as { [key: string]: unknown };
 
       try {
         switch (name) {
@@ -256,16 +256,41 @@ export class GitMCPServer {
         maxBuffer: 10 * 1024 * 1024, // 10MB buffer
       });
       return { stdout, stderr, exitCode: 0 };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let stdout = '';
+      let stderr = '';
+      let exitCode = 1;
+
+      if (typeof error === 'object' && error !== null) {
+        if ('stdout' in error && typeof (error as { stdout?: unknown }).stdout === 'string') {
+          ({ stdout } = error as { stdout: string });
+        }
+        if ('stderr' in error && typeof (error as { stderr?: unknown }).stderr === 'string') {
+          ({ stderr } = error as { stderr: string });
+        } else if (
+          'message' in error &&
+          typeof (error as { message?: unknown }).message === 'string'
+        ) {
+          ({ message: stderr } = error as { message: string });
+        }
+        if ('code' in error && typeof (error as { code?: unknown }).code === 'number') {
+          exitCode = (error as { code: number }).code;
+        }
+      } else if (typeof error === 'string') {
+        stderr = error;
+      }
+
       return {
-        stdout: error.stdout || '',
-        stderr: error.stderr || error.message,
-        exitCode: error.code || 1,
+        stdout,
+        stderr,
+        exitCode,
       };
     }
   }
 
-  private async gitStatus(short?: boolean) {
+  private async gitStatus(
+    short?: boolean
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     const command = short ? 'git status -s' : 'git status';
     const result = await this.executeGitCommand(command);
     return {
@@ -274,7 +299,10 @@ export class GitMCPServer {
     };
   }
 
-  private async gitLog(limit?: number, oneline?: boolean) {
+  private async gitLog(
+    limit?: number,
+    oneline?: boolean
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     let command = 'git log';
     if (oneline) command += ' --oneline';
     if (limit) command += ` -n ${limit}`;
@@ -286,7 +314,10 @@ export class GitMCPServer {
     };
   }
 
-  private async gitDiff(staged?: boolean, commit?: string) {
+  private async gitDiff(
+    staged?: boolean,
+    commit?: string
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     let command = 'git diff';
     if (staged) command += ' --staged';
     if (commit) command += ` ${commit}`;
@@ -294,7 +325,8 @@ export class GitMCPServer {
     const result = await this.executeGitCommand(command);
 
     // Check diff size
-    if (result.stdout.length > this.config.maxDiffSize!) {
+    const maxDiffSize = this.config.maxDiffSize ?? 1000000;
+    if (result.stdout.length > maxDiffSize) {
       return {
         content: [
           { type: 'text', text: 'Diff too large. Use more specific file paths or commits.' },
@@ -309,7 +341,14 @@ export class GitMCPServer {
     };
   }
 
-  private async gitBranch(options: any) {
+  private async gitBranch(
+    options: Readonly<{
+      list?: boolean;
+      create?: string;
+      delete?: string;
+      current?: boolean;
+    }>
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     let command = 'git branch';
 
     if (options.list) {
@@ -329,7 +368,10 @@ export class GitMCPServer {
     };
   }
 
-  private async gitAdd(files?: string[], all?: boolean) {
+  private async gitAdd(
+    files?: readonly string[],
+    all?: boolean
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     let command = 'git add';
 
     if (all) {
@@ -352,7 +394,10 @@ export class GitMCPServer {
     };
   }
 
-  private async gitCommit(message: string, amend?: boolean) {
+  private async gitCommit(
+    message: string,
+    amend?: boolean
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     if (!message && !amend) {
       return {
         content: [{ type: 'text', text: 'Commit message required' }],
@@ -377,7 +422,11 @@ export class GitMCPServer {
     };
   }
 
-  private async gitPush(remote?: string, branch?: string, setUpstream?: boolean) {
+  private async gitPush(
+    remote?: string,
+    branch?: string,
+    setUpstream?: boolean
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     let command = 'git push';
 
     if (remote) command += ` ${remote}`;
@@ -391,7 +440,11 @@ export class GitMCPServer {
     };
   }
 
-  private async gitPull(remote?: string, branch?: string, rebase?: boolean) {
+  private async gitPull(
+    remote?: string,
+    branch?: string,
+    rebase?: boolean
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     let command = 'git pull';
 
     if (rebase) command += ' --rebase';
@@ -405,7 +458,11 @@ export class GitMCPServer {
     };
   }
 
-  private async gitCheckout(branch?: string, createNew?: boolean, files?: string[]) {
+  private async gitCheckout(
+    branch?: string,
+    createNew?: boolean,
+    files?: readonly string[]
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     let command = 'git checkout';
 
     if (createNew && branch) {
@@ -429,7 +486,7 @@ export class GitMCPServer {
     };
   }
 
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     if (this.initialized) return;
 
     // Check if current directory is a git repository
@@ -442,12 +499,12 @@ export class GitMCPServer {
     logger.info('Git MCP Server initialized');
   }
 
-  async shutdown(): Promise<void> {
+  public shutdown(): void {
     this.initialized = false;
     logger.info('Git MCP Server shutdown');
   }
 
-  getServer(): Server {
+  public getServer(): Server {
     return this.server;
   }
 }

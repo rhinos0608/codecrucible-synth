@@ -71,14 +71,16 @@ export class OllamaAdapter implements ProviderAdapter {
         },
         responseTime: providerResponse?.total_duration || undefined,
         finishReason: providerResponse?.done ? 'stop' : undefined,
-        toolCalls: providerResponse?.toolCalls ? providerResponse.toolCalls.map(tc => ({
-          id: tc.id,
-          type: tc.type as 'function',
-          function: {
-            name: tc.name,
-            arguments: tc.arguments,
-          },
-        })) : undefined,
+        toolCalls: providerResponse?.toolCalls
+          ? providerResponse.toolCalls.map(tc => ({
+              id: tc.id,
+              type: tc.type as 'function',
+              function: {
+                name: tc.name,
+                arguments: tc.arguments,
+              },
+            }))
+          : undefined,
       };
     } catch (error) {
       logger.error('OllamaAdapter request failed:', error);

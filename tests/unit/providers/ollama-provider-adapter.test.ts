@@ -12,7 +12,7 @@ global.fetch = mockFetch as jest.MockedFunction<typeof fetch>;
 
 describe('OllamaProvider - Unit Tests', () => {
   let provider: OllamaProvider;
-  
+
   const mockConfig = {
     endpoint: 'http://localhost:11434',
     timeout: 30000,
@@ -37,7 +37,7 @@ describe('OllamaProvider - Unit Tests', () => {
 
     it('should provide correct capabilities', () => {
       const capabilities = provider.getCapabilities();
-      
+
       expect(capabilities).toBeDefined();
       expect(capabilities.strengths).toContain('analysis');
       expect(capabilities.strengths).toContain('reasoning');
@@ -65,7 +65,7 @@ describe('OllamaProvider - Unit Tests', () => {
       } as Response);
 
       const isAvailable = await provider.isAvailable();
-      
+
       expect(isAvailable).toBe(true);
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:11434/api/tags',
@@ -80,7 +80,7 @@ describe('OllamaProvider - Unit Tests', () => {
       mockFetch.mockRejectedValueOnce(new Error('Connection refused'));
 
       const isAvailable = await provider.isAvailable();
-      
+
       expect(isAvailable).toBe(false);
     });
 
@@ -91,12 +91,10 @@ describe('OllamaProvider - Unit Tests', () => {
       });
 
       // Mock a slow response
-      mockFetch.mockImplementationOnce(() => 
-        new Promise(resolve => setTimeout(resolve, 2000))
-      );
+      mockFetch.mockImplementationOnce(() => new Promise(resolve => setTimeout(resolve, 2000)));
 
       const isAvailable = await longTimeoutProvider.isAvailable();
-      
+
       expect(isAvailable).toBe(false);
     });
   });
@@ -156,9 +154,9 @@ describe('OllamaProvider - Unit Tests', () => {
         maxTokens: -1, // Invalid: negative
       };
 
-      await expect(provider.generateText(invalidOptions as any))
-        .rejects
-        .toThrow('Invalid generation options');
+      await expect(provider.generateText(invalidOptions as any)).rejects.toThrow(
+        'Invalid generation options'
+      );
     });
 
     it('should handle generation API errors gracefully', async () => {
@@ -169,9 +167,11 @@ describe('OllamaProvider - Unit Tests', () => {
         text: async () => 'Server error occurred',
       } as Response);
 
-      await expect(provider.generateText({
-        prompt: 'Test prompt',
-      })).rejects.toThrow('Ollama API error: 500 Internal Server Error');
+      await expect(
+        provider.generateText({
+          prompt: 'Test prompt',
+        })
+      ).rejects.toThrow('Ollama API error: 500 Internal Server Error');
     });
   });
 
@@ -201,10 +201,13 @@ describe('OllamaProvider - Unit Tests', () => {
       const receivedTokens: string[] = [];
       const onToken = (token: string) => receivedTokens.push(token);
 
-      const response = await provider.generateTextStream({
-        prompt: 'Test streaming prompt',
-        stream: true,
-      }, onToken);
+      const response = await provider.generateTextStream(
+        {
+          prompt: 'Test streaming prompt',
+          stream: true,
+        },
+        onToken
+      );
 
       expect(response.text).toBe('Hello world!');
       expect(receivedTokens).toEqual(['Hello', ' world', '!']);
@@ -218,10 +221,15 @@ describe('OllamaProvider - Unit Tests', () => {
         statusText: 'Bad Request',
       } as Response);
 
-      await expect(provider.generateTextStream({
-        prompt: 'Test prompt',
-        stream: true,
-      }, jest.fn())).rejects.toThrow('Ollama streaming error');
+      await expect(
+        provider.generateTextStream(
+          {
+            prompt: 'Test prompt',
+            stream: true,
+          },
+          jest.fn()
+        )
+      ).rejects.toThrow('Ollama streaming error');
     });
   });
 
@@ -296,7 +304,7 @@ describe('OllamaProvider - Unit Tests', () => {
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('loaded');
-      
+
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:11434/api/generate',
         expect.objectContaining({
@@ -361,13 +369,15 @@ describe('OllamaProvider - Unit Tests', () => {
 
   describe('Error Handling and Validation', () => {
     it('should validate configuration on construction', () => {
-      expect(() => new OllamaProvider({} as any))
-        .toThrow('Invalid Ollama configuration');
-      
-      expect(() => new OllamaProvider({
-        endpoint: 'not-a-url',
-        timeout: 'invalid',
-      } as any)).toThrow('Invalid Ollama configuration');
+      expect(() => new OllamaProvider({} as any)).toThrow('Invalid Ollama configuration');
+
+      expect(
+        () =>
+          new OllamaProvider({
+            endpoint: 'not-a-url',
+            timeout: 'invalid',
+          } as any)
+      ).toThrow('Invalid Ollama configuration');
     });
 
     it('should handle network timeouts correctly', async () => {
@@ -377,15 +387,23 @@ describe('OllamaProvider - Unit Tests', () => {
       });
 
       // Mock slow response
-      mockFetch.mockImplementationOnce(() => 
-        new Promise(resolve => setTimeout(() => resolve({
-          ok: true,
-          json: async () => ({ response: 'slow' }),
-        }), 200))
+      mockFetch.mockImplementationOnce(
+        () =>
+          new Promise(resolve =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  json: async () => ({ response: 'slow' }),
+                }),
+              200
+            )
+          )
       );
 
-      await expect(shortTimeoutProvider.generateText({ prompt: 'Test' }))
-        .rejects.toThrow('Request timeout');
+      await expect(shortTimeoutProvider.generateText({ prompt: 'Test' })).rejects.toThrow(
+        'Request timeout'
+      );
     });
 
     it('should handle malformed API responses', async () => {
@@ -394,19 +412,20 @@ describe('OllamaProvider - Unit Tests', () => {
         json: async () => ({ invalid: 'response' }),
       } as Response);
 
-      await expect(provider.generateText({ prompt: 'Test' }))
-        .rejects.toThrow('Invalid response format');
+      await expect(provider.generateText({ prompt: 'Test' })).rejects.toThrow(
+        'Invalid response format'
+      );
     });
 
     it('should sanitize and validate prompts', async () => {
       // Test empty prompt
-      await expect(provider.generateText({ prompt: '' }))
-        .rejects.toThrow('Prompt cannot be empty');
+      await expect(provider.generateText({ prompt: '' })).rejects.toThrow('Prompt cannot be empty');
 
       // Test extremely long prompt
       const longPrompt = 'x'.repeat(100000);
-      await expect(provider.generateText({ prompt: longPrompt }))
-        .rejects.toThrow('Prompt too long');
+      await expect(provider.generateText({ prompt: longPrompt })).rejects.toThrow(
+        'Prompt too long'
+      );
 
       // Test prompt with potential injection
       const maliciousPrompt = '"; DROP TABLE users; --';
@@ -424,13 +443,20 @@ describe('OllamaProvider - Unit Tests', () => {
   describe('Concurrent Request Handling', () => {
     it('should enforce concurrent request limits', async () => {
       const promises: Promise<any>[] = [];
-      
+
       // Mock slow responses to keep requests active
-      mockFetch.mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve({
-          ok: true,
-          json: async () => ({ response: 'concurrent', done: true }),
-        }), 100))
+      mockFetch.mockImplementation(
+        () =>
+          new Promise(resolve =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  json: async () => ({ response: 'concurrent', done: true }),
+                }),
+              100
+            )
+          )
       );
 
       // Start more requests than the limit
@@ -439,7 +465,7 @@ describe('OllamaProvider - Unit Tests', () => {
       }
 
       const results = await Promise.allSettled(promises);
-      
+
       // Some requests should have been queued/limited
       const successful = results.filter(r => r.status === 'fulfilled').length;
       expect(successful).toBeGreaterThan(0);
@@ -448,20 +474,22 @@ describe('OllamaProvider - Unit Tests', () => {
     it('should track concurrent load correctly', async () => {
       // Start a slow request
       const slowPromise = new Promise(resolve => setTimeout(resolve, 200));
-      mockFetch.mockImplementationOnce(() => slowPromise.then(() => ({
-        ok: true,
-        json: async () => ({ response: 'slow', done: true }),
-      })));
+      mockFetch.mockImplementationOnce(() =>
+        slowPromise.then(() => ({
+          ok: true,
+          json: async () => ({ response: 'slow', done: true }),
+        }))
+      );
 
       const requestPromise = provider.generateText({ prompt: 'Slow request' });
-      
+
       // Check load during request
       await new Promise(resolve => setTimeout(resolve, 50));
       const status = await provider.getStatus();
       expect(status.currentLoad).toBeGreaterThan(0);
 
       await requestPromise;
-      
+
       // Check load after request
       const finalStatus = await provider.getStatus();
       expect(finalStatus.currentLoad).toBe(0);
@@ -488,8 +516,9 @@ describe('OllamaProvider - Unit Tests', () => {
       expect(status.currentLoad).toBe(0);
 
       // New requests should fail after shutdown
-      await expect(provider.generateText({ prompt: 'After shutdown' }))
-        .rejects.toThrow('Provider has been shut down');
+      await expect(provider.generateText({ prompt: 'After shutdown' })).rejects.toThrow(
+        'Provider has been shut down'
+      );
     });
   });
 });

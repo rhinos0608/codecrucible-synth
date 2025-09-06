@@ -10,7 +10,10 @@ import {
   LLMCapabilities,
   LLMStatus,
 } from '../../domain/interfaces/llm-interfaces.js';
-import { generateSystemPrompt, generateContextualSystemPrompt } from '../../domain/prompts/system-prompt.js';
+import {
+  generateSystemPrompt,
+  generateContextualSystemPrompt,
+} from '../../domain/prompts/system-prompt.js';
 
 export interface LMStudioConfig {
   endpoint: string;
@@ -30,7 +33,9 @@ export interface LMStudioOptions {
   stop?: string | string[];
   stream?: boolean;
   tools?: LMStudioTool[];
-  tool_choice?: string | { type: string; function?: { name: string; } };
+  tool_choice?: string | { type: string; function?: { name: string } };
+  taskType?: string;
+  timeout?: number;
   [key: string]: unknown;
 }
 
@@ -40,7 +45,7 @@ export interface LMStudioRequest {
   prompt?: string;
   options?: LMStudioOptions;
   tools?: LMStudioTool[];
-  tool_choice?: string | { type: string; function?: { name: string; } };
+  tool_choice?: string | { type: string; function?: { name: string } };
   stream?: boolean;
   temperature?: number;
   max_tokens?: number;
@@ -110,7 +115,7 @@ export interface LMStudioPayload {
   stop?: string | string[];
   stream?: boolean;
   tools?: LMStudioTool[];
-  tool_choice?: string | { type: string; function?: { name: string; } };
+  tool_choice?: string | { type: string; function?: { name: string } };
 }
 
 export class LMStudioProvider implements LLMProvider {
@@ -172,7 +177,11 @@ export class LMStudioProvider implements LLMProvider {
       const toolCalls = response.choices?.[0]?.message?.tool_calls;
 
       // Calculate confidence based on response quality indicators
-      const confidence = this.calculateConfidence(content, responseTime, options.taskType || 'default');
+      const confidence = this.calculateConfidence(
+        content,
+        responseTime,
+        options.taskType || 'default'
+      );
 
       return {
         content,
@@ -180,12 +189,17 @@ export class LMStudioProvider implements LLMProvider {
         responseTime,
         model: response.model || this.config.defaultModel,
         provider: this.name,
-        toolCalls: toolCalls ? toolCalls.map(tc => ({
-          id: tc.id || `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          type: 'function' as const,
-          name: tc.function?.name || 'unknown',
-          arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function?.arguments || {})
-        })) : undefined,
+        toolCalls: toolCalls
+          ? toolCalls.map(tc => ({
+              id: tc.id || `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              type: 'function' as const,
+              name: tc.function?.name || 'unknown',
+              arguments:
+                typeof tc.function?.arguments === 'string'
+                  ? tc.function.arguments
+                  : JSON.stringify(tc.function?.arguments || {}),
+            }))
+          : undefined,
         metadata: {
           tokens: response.usage?.total_tokens,
           promptTokens: response.usage?.prompt_tokens,
@@ -234,19 +248,28 @@ export class LMStudioProvider implements LLMProvider {
       const payload: LMStudioPayload = {
         model: requestOptions.model || this.config.defaultModel,
         messages: messages,
-        temperature: requestOptions.temperature ?? this.getTemperature(requestOptions.taskType || 'default'),
-        max_tokens: requestOptions.maxTokens ?? this.getMaxTokens(requestOptions.taskType || 'default'),
+        temperature:
+          requestOptions.temperature ?? this.getTemperature(requestOptions.taskType || 'default'),
+        max_tokens:
+          requestOptions.maxTokens ?? this.getMaxTokens(requestOptions.taskType || 'default'),
         stream: false,
       };
 
       // FIXED: Add tools to payload if provided
-      if (requestOptions.tools && Array.isArray(requestOptions.tools) && requestOptions.tools.length > 0) {
+      if (
+        requestOptions.tools &&
+        Array.isArray(requestOptions.tools) &&
+        requestOptions.tools.length > 0
+      ) {
         payload.tools = requestOptions.tools;
         payload.tool_choice = requestOptions.tool_choice || 'auto';
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), requestOptions.timeout || this.config.timeout || 60000);
+      const timeout = setTimeout(
+        () => controller.abort(),
+        requestOptions.timeout || this.config.timeout || 60000
+      );
 
       try {
         const response = await fetch(`${this.endpoint}/v1/chat/completions`, {
@@ -286,8 +309,8 @@ export class LMStudioProvider implements LLMProvider {
 
         // Calculate confidence based on response quality indicators
         const confidence = this.calculateConfidence(
-          choice.message?.content || '', 
-          responseTime, 
+          choice.message?.content || '',
+          responseTime,
           requestOptions.taskType
         );
 
@@ -333,15 +356,15 @@ export class LMStudioProvider implements LLMProvider {
       messages: [
         {
           role: 'system',
-          content: this.getSystemPrompt(options.taskType),
+          content: this.getSystemPrompt(options.taskType ?? 'general'),
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: this.getTemperature(options.taskType),
-      max_tokens: this.getMaxTokens(options.taskType),
+      temperature: this.getTemperature(options.taskType ?? 'general'),
+      max_tokens: this.getMaxTokens(options.taskType ?? 'general'),
       stream: false,
     };
 

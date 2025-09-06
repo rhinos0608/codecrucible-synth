@@ -14,10 +14,10 @@
 /**
  * Available tool registry keys - provides compile-time safety
  */
-export type ToolRegistryKey = 
+export type ToolRegistryKey =
   // Filesystem tools
   | 'filesystem_list'
-  | 'filesystem_read' 
+  | 'filesystem_read'
   | 'filesystem_write'
   | 'filesystem_stats'
   // Git tools
@@ -40,11 +40,11 @@ export type ToolRegistryKey =
 /**
  * Available tool function names - provides compile-time safety
  */
-export type ToolFunctionName = 
+export type ToolFunctionName =
   // Filesystem operations
   | 'filesystem_list_directory'
   | 'filesystem_read_file'
-  | 'filesystem_write_file' 
+  | 'filesystem_write_file'
   | 'filesystem_get_stats'
   // Git operations
   | 'git_status'
@@ -66,9 +66,9 @@ export type ToolFunctionName =
 /**
  * Tool categories for contextual filtering
  */
-export type ToolCategory = 
+export type ToolCategory =
   | 'core'
-  | 'filesystem' 
+  | 'filesystem'
   | 'development'
   | 'versionControl'
   | 'system'
@@ -82,18 +82,18 @@ export type ToolCategory =
  * Type-safe mapping from registry keys to function names
  */
 export type RegistryToFunctionMap = {
-  'filesystem_list': 'filesystem_list_directory';
-  'filesystem_read': 'filesystem_read_file';
-  'filesystem_write': 'filesystem_write_file';
-  'filesystem_stats': 'filesystem_get_stats';
-  'git_status': 'git_status';
-  'git_add': 'git_add'; 
-  'git_commit': 'git_commit';
-  'execute_command': 'execute_command';
-  'npm_install': 'npm_install';
-  'npm_run': 'npm_run';
-  'smithery_status': 'smithery_status';
-  'smithery_refresh': 'smithery_refresh';
+  filesystem_list: 'filesystem_list_directory';
+  filesystem_read: 'filesystem_read_file';
+  filesystem_write: 'filesystem_write_file';
+  filesystem_stats: 'filesystem_get_stats';
+  git_status: 'git_status';
+  git_add: 'git_add';
+  git_commit: 'git_commit';
+  execute_command: 'execute_command';
+  npm_install: 'npm_install';
+  npm_run: 'npm_run';
+  smithery_status: 'smithery_status';
+  smithery_refresh: 'smithery_refresh';
 };
 
 // ================================
@@ -141,7 +141,7 @@ export const TYPED_TOOL_CATALOG: Record<ToolRegistryKey, TypedToolDefinition> = 
   filesystem_write: {
     registryKey: 'filesystem_write',
     functionName: 'filesystem_write_file',
-    category: 'filesystem', 
+    category: 'filesystem',
     description: 'Write content to a file in the filesystem',
     isCore: false,
     riskLevel: 'medium',
@@ -180,7 +180,7 @@ export const TYPED_TOOL_CATALOG: Record<ToolRegistryKey, TypedToolDefinition> = 
   },
 
   git_commit: {
-    registryKey: 'git_commit', 
+    registryKey: 'git_commit',
     functionName: 'git_commit',
     category: 'versionControl',
     description: 'Commit staged changes to git repository',
@@ -251,7 +251,6 @@ export const TYPED_TOOL_CATALOG: Record<ToolRegistryKey, TypedToolDefinition> = 
  * Type-safe tool identifier utilities
  */
 export class TypedToolIdentifiers {
-  
   /**
    * Get all available tool registry keys
    */
@@ -269,9 +268,7 @@ export class TypedToolIdentifiers {
   /**
    * Get function name from registry key (type-safe)
    */
-  static getFunctionName<K extends ToolRegistryKey>(
-    registryKey: K
-  ): RegistryToFunctionMap[K] {
+  static getFunctionName<K extends ToolRegistryKey>(registryKey: K): RegistryToFunctionMap[K] {
     const tool = TYPED_TOOL_CATALOG[registryKey];
     return tool.functionName as RegistryToFunctionMap[K];
   }
@@ -298,7 +295,7 @@ export class TypedToolIdentifiers {
   }
 
   /**
-   * Get tools by risk level (type-safe) 
+   * Get tools by risk level (type-safe)
    */
   static getToolsByRiskLevel(riskLevel: 'low' | 'medium' | 'high'): TypedToolDefinition[] {
     return Object.values(TYPED_TOOL_CATALOG).filter(tool => tool.riskLevel === riskLevel);
@@ -322,9 +319,7 @@ export class TypedToolIdentifiers {
    * Find registry key by alias (type-safe)
    */
   static findRegistryKeyByAlias(alias: string): ToolRegistryKey | null {
-    const tool = Object.values(TYPED_TOOL_CATALOG).find(tool => 
-      tool.aliases.includes(alias)
-    );
+    const tool = Object.values(TYPED_TOOL_CATALOG).find(tool => tool.aliases.includes(alias));
     return tool ? tool.registryKey : null;
   }
 
@@ -342,7 +337,7 @@ export class TypedToolIdentifiers {
     const tools = Object.values(TYPED_TOOL_CATALOG);
     const categories = [...new Set(tools.map(t => t.category))];
     const riskLevels = [...new Set(tools.map(t => t.riskLevel))];
-    
+
     return {
       totalTools: tools.length,
       coreTools: tools.filter(t => t.isCore).length,
@@ -370,7 +365,7 @@ export class TypedToolIdentifiers {
 export type StrictToolRegistryKey = keyof typeof TYPED_TOOL_CATALOG;
 
 /**
- * Type that only accepts valid function names - prevents typos at compile time  
+ * Type that only accepts valid function names - prevents typos at compile time
  */
 export type StrictToolFunctionName = TypedToolDefinition['functionName'];
 

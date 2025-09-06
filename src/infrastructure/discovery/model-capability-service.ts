@@ -1,6 +1,6 @@
 /**
  * Model Capability Service
- * 
+ *
  * Dynamically detects model capabilities using HuggingFace API and local provider queries.
  * Replaces hardcoded capability assumptions with real-time capability detection.
  */
@@ -39,11 +39,18 @@ export class ModelCapabilityService {
   private hf: HfInference | null = null;
   private capabilityCache: Map<string, ModelCapabilities> = new Map();
   private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-  
+
   // Known function calling models (as fallback knowledge)
   private readonly KNOWN_FUNCTION_CALLING_MODELS = [
-    'llama3.1', 'llama3.2', 'mistral-', 'mixtral-', 'qwen2.5',
-    'deepseek', 'codellama', 'phi-3', 'gemma-2'
+    'llama3.1',
+    'llama3.2',
+    'mistral-',
+    'mixtral-',
+    'qwen2.5',
+    'deepseek',
+    'codellama',
+    'phi-3',
+    'gemma-2',
   ];
 
   constructor() {
@@ -60,23 +67,26 @@ export class ModelCapabilityService {
   /**
    * Get or detect capabilities for a model
    */
-  async getModelCapabilities(modelName: string, provider: string = 'unknown'): Promise<ModelCapabilities> {
+  async getModelCapabilities(
+    modelName: string,
+    provider: string = 'unknown'
+  ): Promise<ModelCapabilities> {
     // Check cache first
     const cacheKey = `${provider}:${modelName}`;
     const cached = this.capabilityCache.get(cacheKey);
-    
+
     if (cached && this.isCacheValid(cached)) {
-      logger.debug(`Using cached capabilities for ${modelName}`, { 
+      logger.debug(`Using cached capabilities for ${modelName}`, {
         capabilities: cached,
-        cacheAge: Date.now() - cached.lastChecked.getTime()
+        cacheAge: Date.now() - cached.lastChecked.getTime(),
       });
       return cached;
     }
 
     logger.info(`Detecting capabilities for model: ${modelName} (${provider})`);
-    
+
     let capabilities: ModelCapabilities;
-    
+
     try {
       // Try dynamic detection methods in order of preference
       if (this.hf && provider === 'huggingface') {
@@ -88,22 +98,24 @@ export class ModelCapabilityService {
       } else {
         capabilities = this.inferCapabilitiesFromName(modelName);
       }
-      
+
       // Cache the results
       this.capabilityCache.set(cacheKey, capabilities);
-      
+
       logger.info(`Capabilities detected for ${modelName}:`, {
         functionCalling: capabilities.functionCalling,
         toolUse: capabilities.toolUse,
         confidence: capabilities.confidence,
-        source: capabilities.source
+        source: capabilities.source,
       });
-      
+
       return capabilities;
-      
     } catch (error) {
       // Use debug instead of warn since falling back to inference is expected behavior
-      logger.debug(`Capability detection failed for ${modelName}, using inference fallback:`, error);
+      logger.debug(
+        `Capability detection failed for ${modelName}, using inference fallback:`,
+        error
+      );
       capabilities = this.inferCapabilitiesFromName(modelName);
       this.capabilityCache.set(cacheKey, capabilities);
       return capabilities;
@@ -122,23 +134,23 @@ export class ModelCapabilityService {
       // Get model info from HuggingFace using fetch directly
       const response = await fetch(`https://huggingface.co/api/models/${modelName}`, {
         headers: {
-          'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+          Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
         },
-        signal: AbortSignal.timeout(10000)
+        signal: AbortSignal.timeout(10000),
       });
 
       if (!response.ok) {
         throw new Error(`HuggingFace API returned ${response.status}`);
       }
 
-      const modelInfo = await response.json() as any;
+      const modelInfo = (await response.json()) as any;
       const tags = (modelInfo.tags || []) as string[];
       const pipeline = modelInfo.pipeline_tag as string;
       const config = (modelInfo.config || {}) as any;
-      
+
       // Analyze model configuration and tags for function calling capability
       const functionCalling = this.analyzeForFunctionCalling(tags, config, modelName);
-      
+
       const capabilities: ModelCapabilities = {
         functionCalling,
         toolUse: functionCalling, // Tool use is similar to function calling
@@ -151,11 +163,10 @@ export class ModelCapabilityService {
         multimodal: this.hasMultimodal(tags, pipeline),
         lastChecked: new Date(),
         confidence: 0.8, // High confidence from HF API
-        source: 'huggingface'
+        source: 'huggingface',
       };
 
       return capabilities;
-      
     } catch (error) {
       logger.debug(`HuggingFace API failed for ${modelName}:`, error);
       throw error;
@@ -172,7 +183,7 @@ export class ModelCapabilityService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: modelName }),
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(5000),
       });
 
       if (!response.ok) {
@@ -182,10 +193,10 @@ export class ModelCapabilityService {
       const modelInfo = await response.json();
       const template = modelInfo.template || '';
       const system = modelInfo.system || '';
-      
+
       // Analyze template and system prompt for function calling patterns
       const functionCalling = this.analyzeOllamaForFunctionCalling(template, system, modelName);
-      
+
       const capabilities: ModelCapabilities = {
         functionCalling,
         toolUse: functionCalling,
@@ -198,11 +209,10 @@ export class ModelCapabilityService {
         multimodal: false, // Most local Ollama models are text-only
         lastChecked: new Date(),
         confidence: 0.7, // Good confidence from local API
-        source: 'local_test'
+        source: 'local_test',
       };
 
       return capabilities;
-      
     } catch (error) {
       logger.debug(`Ollama API query failed for ${modelName}:`, error);
       throw error;
@@ -218,7 +228,7 @@ export class ModelCapabilityService {
       const response = await fetch('http://localhost:1234/v1/models', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(5000),
       });
 
       if (!response.ok) {
@@ -227,14 +237,14 @@ export class ModelCapabilityService {
 
       const data = await response.json();
       const model = data.data?.find((m: any) => m.id === modelName);
-      
+
       if (!model) {
         throw new Error(`Model ${modelName} not found in LM Studio`);
       }
 
       // Infer capabilities from model name and LM Studio context
       const functionCalling = this.inferFunctionCallingFromName(modelName);
-      
+
       const capabilities: ModelCapabilities = {
         functionCalling,
         toolUse: functionCalling,
@@ -247,11 +257,10 @@ export class ModelCapabilityService {
         multimodal: false, // Most LM Studio models are text-only
         lastChecked: new Date(),
         confidence: 0.6, // Medium confidence from name inference
-        source: 'inference'
+        source: 'inference',
       };
 
       return capabilities;
-      
     } catch (error) {
       logger.debug(`LM Studio API query failed for ${modelName}:`, error);
       throw error;
@@ -264,7 +273,7 @@ export class ModelCapabilityService {
   private inferCapabilitiesFromName(modelName: string): ModelCapabilities {
     const nameLower = modelName.toLowerCase();
     const functionCalling = this.inferFunctionCallingFromName(modelName);
-    
+
     return {
       functionCalling,
       toolUse: functionCalling,
@@ -277,7 +286,7 @@ export class ModelCapabilityService {
       multimodal: nameLower.includes('vision') || nameLower.includes('multimodal'),
       lastChecked: new Date(),
       confidence: 0.4, // Lower confidence for inference-based detection
-      source: 'fallback'
+      source: 'fallback',
     };
   }
 
@@ -286,20 +295,24 @@ export class ModelCapabilityService {
    */
   private analyzeForFunctionCalling(tags: string[], config: any, modelName: string): boolean {
     // Check for explicit function calling support in tags
-    if (tags.some(tag => 
-      tag.includes('function') || 
-      tag.includes('tool') || 
-      tag.includes('agent') ||
-      tag.includes('reasoning')
-    )) {
+    if (
+      tags.some(
+        tag =>
+          tag.includes('function') ||
+          tag.includes('tool') ||
+          tag.includes('agent') ||
+          tag.includes('reasoning')
+      )
+    ) {
       return true;
     }
 
     // Check config for function calling related settings
-    if (config.architectures?.some((arch: string) => 
-      arch.includes('ForCausalLM') || 
-      arch.includes('ForConditional')
-    )) {
+    if (
+      config.architectures?.some(
+        (arch: string) => arch.includes('ForCausalLM') || arch.includes('ForConditional')
+      )
+    ) {
       // These architectures can potentially do function calling
       return this.inferFunctionCallingFromName(modelName);
     }
@@ -310,13 +323,19 @@ export class ModelCapabilityService {
   /**
    * Analyze Ollama model template for function calling patterns
    */
-  private analyzeOllamaForFunctionCalling(template: string, system: string, modelName: string): boolean {
+  private analyzeOllamaForFunctionCalling(
+    template: string,
+    system: string,
+    modelName: string
+  ): boolean {
     // Look for function calling patterns in template
-    if (template.includes('tools') || 
-        template.includes('function') || 
-        template.includes('{{.Tools}}') ||
-        system.includes('function') ||
-        system.includes('tool')) {
+    if (
+      template.includes('tools') ||
+      template.includes('function') ||
+      template.includes('{{.Tools}}') ||
+      system.includes('function') ||
+      system.includes('tool')
+    ) {
       return true;
     }
 
@@ -329,10 +348,8 @@ export class ModelCapabilityService {
    */
   private inferFunctionCallingFromName(modelName: string): boolean {
     const nameLower = modelName.toLowerCase();
-    
-    return this.KNOWN_FUNCTION_CALLING_MODELS.some(pattern => 
-      nameLower.includes(pattern)
-    );
+
+    return this.KNOWN_FUNCTION_CALLING_MODELS.some(pattern => nameLower.includes(pattern));
   }
 
   /**
@@ -347,16 +364,14 @@ export class ModelCapabilityService {
   }
 
   private hasCodeGeneration(tags: string[], pipeline: string): boolean {
-    return tags.includes('code') || 
-           pipeline === 'text-generation' || 
-           tags.includes('programming');
+    return tags.includes('code') || pipeline === 'text-generation' || tags.includes('programming');
   }
 
   private hasCodeGenerationFromName(modelName: string): boolean {
     const nameLower = modelName.toLowerCase();
-    return nameLower.includes('code') || 
-           nameLower.includes('coding') || 
-           nameLower.includes('programmer');
+    return (
+      nameLower.includes('code') || nameLower.includes('coding') || nameLower.includes('programmer')
+    );
   }
 
   private hasReasoning(tags: string[], modelName: string): boolean {
@@ -365,22 +380,24 @@ export class ModelCapabilityService {
 
   private hasReasoningFromName(modelName: string): boolean {
     const nameLower = modelName.toLowerCase();
-    return nameLower.includes('reasoning') || 
-           nameLower.includes('think') || 
-           nameLower.includes('logic');
+    return (
+      nameLower.includes('reasoning') || nameLower.includes('think') || nameLower.includes('logic')
+    );
   }
 
   private hasMultimodal(tags: string[], pipeline: string): boolean {
-    return tags.includes('multimodal') || 
-           pipeline === 'image-to-text' || 
-           pipeline === 'visual-question-answering';
+    return (
+      tags.includes('multimodal') ||
+      pipeline === 'image-to-text' ||
+      pipeline === 'visual-question-answering'
+    );
   }
 
   /**
    * Check if cached capability is still valid
    */
   private isCacheValid(capabilities: ModelCapabilities): boolean {
-    return (Date.now() - capabilities.lastChecked.getTime()) < this.CACHE_TTL;
+    return Date.now() - capabilities.lastChecked.getTime() < this.CACHE_TTL;
   }
 
   /**
@@ -397,12 +414,18 @@ export class ModelCapabilityService {
   getCacheStats() {
     const now = Date.now();
     const entries = Array.from(this.capabilityCache.entries());
-    
+
     return {
       totalEntries: entries.length,
       validEntries: entries.filter(([_, cap]) => this.isCacheValid(cap)).length,
-      oldestEntry: entries.length > 0 ? Math.min(...entries.map(([_, cap]) => cap.lastChecked.getTime())) : null,
-      newestEntry: entries.length > 0 ? Math.max(...entries.map(([_, cap]) => cap.lastChecked.getTime())) : null
+      oldestEntry:
+        entries.length > 0
+          ? Math.min(...entries.map(([_, cap]) => cap.lastChecked.getTime()))
+          : null,
+      newestEntry:
+        entries.length > 0
+          ? Math.max(...entries.map(([_, cap]) => cap.lastChecked.getTime()))
+          : null,
     };
   }
 

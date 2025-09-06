@@ -44,12 +44,14 @@ export class CLICommands {
           false
         );
         logger.debug('HealthCheck completed', { healthResult });
-        
+
         if (healthResult.timedOut) {
           console.log(chalk.yellow('  ⚠️  Status: Timeout (may be initializing)'));
           console.log(chalk.gray('     Health check timed out after 3s'));
         } else if (healthResult.success) {
-          console.log(chalk.green(`  ✅ Status: ${healthResult.result ? 'Connected' : 'Disconnected'}`));
+          console.log(
+            chalk.green(`  ✅ Status: ${healthResult.result ? 'Connected' : 'Disconnected'}`)
+          );
         } else {
           console.log(chalk.yellow(`  ⚠️  Status: Error (${healthResult.error})`));
         }
@@ -195,11 +197,12 @@ export class CLICommands {
           models.forEach((model: unknown, index: number) => {
             // Type guard for ModelInfo
             const m = model as ModelInfo;
-            const displayName = typeof m.name === 'string'
-              ? m.name
-              : typeof m.id === 'string'
-                ? m.id
-                : String(index + 1);
+            const displayName =
+              typeof m.name === 'string'
+                ? m.name
+                : typeof m.id === 'string'
+                  ? m.id
+                  : String(index + 1);
 
             console.log(chalk.white(`  ${index + 1}. ${displayName}`));
 
@@ -211,12 +214,10 @@ export class CLICommands {
                 typeof m.modified_at === 'string' || typeof m.modified_at === 'number'
                   ? new Date(m.modified_at)
                   : m.modified_at instanceof Date
-                  ? m.modified_at
-                  : undefined;
+                    ? m.modified_at
+                    : undefined;
               if (date && !isNaN(date.getTime())) {
-                console.log(
-                  chalk.gray(`     Modified: ${date.toLocaleDateString()}`)
-                );
+                console.log(chalk.gray(`     Modified: ${date.toLocaleDateString()}`));
               }
             }
             if (typeof m.contextLength === 'number') {

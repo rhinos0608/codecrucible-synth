@@ -82,15 +82,15 @@ export class FilesystemTools {
         // Wait for completion with timeout and event-based approach
         const completionPromise = new Promise<void>((resolve, reject) => {
           let resolved = false;
-          
+
           // Event-based completion detection
           const checkCompletion = () => {
             if (resolved) return;
-            
+
             const activeSession = rustStreamingClient
               .getActiveSessionStats()
               .find(s => s.sessionId === sessionId);
-              
+
             if (!activeSession) {
               resolved = true;
               resolve();
@@ -99,7 +99,7 @@ export class FilesystemTools {
 
           // Set up periodic polling with reasonable interval
           const pollInterval = setInterval(checkCompletion, 100); // 100ms instead of 10ms
-          
+
           // Timeout mechanism to prevent indefinite hangs
           const timeout = setTimeout(() => {
             if (!resolved) {
@@ -107,16 +107,18 @@ export class FilesystemTools {
               clearInterval(pollInterval);
               logger.warn(`⏰ File read timeout for ${path} after 30 seconds`);
               rustStreamingClient.cancelStream(sessionId);
-              reject(new Error(`File read timeout: ${path} - operation took longer than 30 seconds`));
+              reject(
+                new Error(`File read timeout: ${path} - operation took longer than 30 seconds`)
+              );
             }
           }, 30000); // 30 second timeout
-          
+
           // Clean up on completion
           const cleanup = () => {
             clearInterval(pollInterval);
             clearTimeout(timeout);
           };
-          
+
           // Override resolve/reject to include cleanup
           const originalResolve = resolve;
           const originalReject = reject;

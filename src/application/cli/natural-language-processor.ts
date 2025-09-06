@@ -1,13 +1,13 @@
 /**
  * Natural Language Processor - Modularized NLP Capabilities
- * 
+ *
  * Extracted from UnifiedCLICoordinator to handle natural language understanding:
  * - Command intent detection and analysis
- * - Request complexity determination  
+ * - Request complexity determination
  * - Simple question identification
  * - Code generation request detection
  * - Natural language to operation type mapping
- * 
+ *
  * This module encapsulates all natural language processing logic for CLI commands.
  */
 
@@ -61,9 +61,7 @@ export class NaturalLanguageProcessor {
     const confidence = this.calculateConfidence(trimmed, intent);
 
     // Determine complexity if enabled
-    const complexity = this.options.complexityAnalysis 
-      ? this.determineComplexity(input)
-      : 'medium';
+    const complexity = this.options.complexityAnalysis ? this.determineComplexity(input) : 'medium';
 
     // Check for special request types
     const isCodeGeneration = this.isCodeGenerationRequest(input);
@@ -83,8 +81,8 @@ export class NaturalLanguageProcessor {
     if (confidence > this.options.confidenceThreshold) {
       logger.info(
         `🎯 NLP Analysis: Intent="${intent}" (${(confidence * 100).toFixed(0)}% confidence), ` +
-        `Type=${operationType}, CodeGen=${isCodeGeneration}, ` +
-        `Complexity=${complexity}`
+          `Type=${operationType}, CodeGen=${isCodeGeneration}, ` +
+          `Complexity=${complexity}`
       );
     }
 
@@ -97,33 +95,56 @@ export class NaturalLanguageProcessor {
   private extractIntent(input: string): string {
     const intentPatterns = {
       analyze: [
-        'analyze', 'review', 'examine', 'inspect', 'check', 'look at', 'understand',
-        'what does', 'explain', 'show me', 'tell me about'
+        'analyze',
+        'review',
+        'examine',
+        'inspect',
+        'check',
+        'look at',
+        'understand',
+        'what does',
+        'explain',
+        'show me',
+        'tell me about',
       ],
       diagnose: [
-        'diagnose', 'debug', 'fix', 'solve', 'resolve', 'troubleshoot',
-        'what\'s wrong', 'why is', 'error', 'issue', 'problem', 'broken'
+        'diagnose',
+        'debug',
+        'fix',
+        'solve',
+        'resolve',
+        'troubleshoot',
+        "what's wrong",
+        'why is',
+        'error',
+        'issue',
+        'problem',
+        'broken',
       ],
       generate: [
-        'create', 'generate', 'write', 'build', 'implement', 'make', 'add',
-        'new', 'develop'
+        'create',
+        'generate',
+        'write',
+        'build',
+        'implement',
+        'make',
+        'add',
+        'new',
+        'develop',
       ],
       refactor: [
-        'refactor', 'optimize', 'improve', 'restructure', 'reorganize',
-        'clean up', 'simplify'
+        'refactor',
+        'optimize',
+        'improve',
+        'restructure',
+        'reorganize',
+        'clean up',
+        'simplify',
       ],
-      test: [
-        'test', 'testing', 'verify', 'validate', 'check if', 'ensure'
-      ],
-      document: [
-        'document', 'documentation', 'readme', 'comments', 'explain'
-      ],
-      help: [
-        'help', 'how', 'what', 'when', 'where', 'why', 'guide', 'tutorial'
-      ],
-      chat: [
-        'chat', 'talk', 'discuss', 'conversation'
-      ]
+      test: ['test', 'testing', 'verify', 'validate', 'check if', 'ensure'],
+      document: ['document', 'documentation', 'readme', 'comments', 'explain'],
+      help: ['help', 'how', 'what', 'when', 'where', 'why', 'guide', 'tutorial'],
+      chat: ['chat', 'talk', 'discuss', 'conversation'],
     };
 
     // Find the intent with the highest match score
@@ -183,8 +204,16 @@ export class NaturalLanguageProcessor {
       simple: ['help', 'status', 'version', 'list', 'show', 'what', 'how'],
       medium: ['analyze', 'generate', 'create', 'fix', 'refactor', 'test'],
       complex: [
-        'implement', 'architecture', 'design', 'optimize', 'comprehensive',
-        'integration', 'system', 'framework', 'scalable', 'production'
+        'implement',
+        'architecture',
+        'design',
+        'optimize',
+        'comprehensive',
+        'integration',
+        'system',
+        'framework',
+        'scalable',
+        'production',
       ],
     };
 
@@ -207,7 +236,6 @@ export class NaturalLanguageProcessor {
     return 'simple';
   }
 
-
   /**
    * Check if a prompt is requesting code generation
    */
@@ -216,10 +244,30 @@ export class NaturalLanguageProcessor {
 
     // EXCLUDE: Help/advice/explanation questions should NEVER generate code files
     const helpPatterns = [
-      'how do i', 'how to', 'help me', 'explain', 'what is', 'what are',
-      'why', 'when', 'where', 'fix', 'debug', 'solve', 'resolve',
-      'error', 'issue', 'problem', 'trouble', 'advice', 'suggest',
-      'recommend', 'best practice', 'should i', 'can you', 'could you'
+      'how do i',
+      'how to',
+      'help me',
+      'explain',
+      'what is',
+      'what are',
+      'why',
+      'when',
+      'where',
+      'fix',
+      'debug',
+      'solve',
+      'resolve',
+      'error',
+      'issue',
+      'problem',
+      'trouble',
+      'advice',
+      'suggest',
+      'recommend',
+      'best practice',
+      'should i',
+      'can you',
+      'could you',
     ];
 
     // If it's a help/advice question, definitely not code generation
@@ -229,9 +277,19 @@ export class NaturalLanguageProcessor {
 
     // INCLUDE: Only explicit code creation requests with strong intent
     const strongGenerationKeywords = [
-      'create a', 'generate a', 'write a', 'build a', 'implement a',
-      'create class', 'create function', 'create component', 'create module',
-      'generate code', 'write code', 'build app', 'implement feature'
+      'create a',
+      'generate a',
+      'write a',
+      'build a',
+      'implement a',
+      'create class',
+      'create function',
+      'create component',
+      'create module',
+      'generate code',
+      'write code',
+      'build app',
+      'implement feature',
     ];
 
     // Check for strong generation patterns first
@@ -254,7 +312,7 @@ export class NaturalLanguageProcessor {
    * Map natural language intent to CLI operation type
    */
   private mapIntentToOperationType(
-    intent: string, 
+    intent: string,
     confidence: number
   ): 'analyze' | 'diagnose' | 'prompt' | 'execute' | 'navigate' | 'suggest' {
     // Only map with high confidence
@@ -262,7 +320,10 @@ export class NaturalLanguageProcessor {
       return 'prompt'; // Default fallback
     }
 
-    const intentToOperationMap: Record<string, 'analyze' | 'diagnose' | 'prompt' | 'execute' | 'navigate' | 'suggest'> = {
+    const intentToOperationMap: Record<
+      string,
+      'analyze' | 'diagnose' | 'prompt' | 'execute' | 'navigate' | 'suggest'
+    > = {
       analyze: 'analyze',
       diagnose: 'diagnose',
       review: 'analyze',
@@ -291,7 +352,9 @@ export class NaturalLanguageProcessor {
     const parameters: Record<string, unknown> = {};
 
     // Extract file paths
-    const filePathMatch = input.match(/([./\w-]+\.(ts|js|tsx|jsx|py|java|cpp|c|h|md|json|yaml|yml|txt))/i);
+    const filePathMatch = input.match(
+      /([./\w-]+\.(ts|js|tsx|jsx|py|java|cpp|c|h|md|json|yaml|yml|txt))/i
+    );
     if (filePathMatch) {
       const [, filePath] = filePathMatch;
       parameters.filePath = filePath;
@@ -305,7 +368,9 @@ export class NaturalLanguageProcessor {
     }
 
     // Extract language hints
-    const languageMatch = input.match(/\b(typescript|javascript|python|java|cpp?|rust|go|swift|kotlin)\b/i);
+    const languageMatch = input.match(
+      /\b(typescript|javascript|python|java|cpp?|rust|go|swift|kotlin)\b/i
+    );
     if (languageMatch) {
       parameters.language = languageMatch[1].toLowerCase();
     }

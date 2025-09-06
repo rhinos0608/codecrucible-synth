@@ -83,4 +83,3 @@ export interface IMcpManager {
     lastActivity?: Date;
   };
 }
-

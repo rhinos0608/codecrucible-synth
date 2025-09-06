@@ -3,13 +3,15 @@ console.log('Testing Rust executor initialization...');
 
 async function testRustExecutor() {
   try {
-    const { RustExecutionBackend } = await import('./dist/infrastructure/execution/rust-executor/rust-execution-backend.js');
+    const { RustExecutionBackend } = await import(
+      './dist/infrastructure/execution/rust-executor/rust-execution-backend.js'
+    );
     const backend = new RustExecutionBackend();
     console.log('✅ RustExecutionBackend created');
-    
+
     const initialized = await backend.initialize();
     console.log(`✅ Initialization result: ${initialized}`);
-    
+
     if (initialized) {
       console.log('✅ Rust executor initialized successfully - method name fix worked!');
       const stats = backend.getPerformanceStats();
@@ -17,7 +19,6 @@ async function testRustExecutor() {
     } else {
       console.log('⚠️ Rust executor not available, using fallback');
     }
-    
   } catch (error) {
     console.error('❌ Error during Rust executor test:', error.message);
     if (error.message.includes('getId is not a function')) {

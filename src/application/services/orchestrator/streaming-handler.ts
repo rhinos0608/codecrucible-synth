@@ -42,7 +42,7 @@ export async function executeWithStreaming(
 
   if (response.toolCalls && response.toolCalls.length > 0) {
     logger.info('🔧 DEBUGGING: Tool calls detected in streaming response:', {
-      toolCalls: response.toolCalls.map(tc => ({ id: tc.id, functionName: tc.function?.name }))
+      toolCalls: response.toolCalls.map(tc => ({ id: tc.id, functionName: tc.function?.name })),
     });
   }
 

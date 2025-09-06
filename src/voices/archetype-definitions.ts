@@ -1,10 +1,10 @@
 import { EnterpriseVoicePromptBuilder, RuntimeContext } from './enterprise-voice-prompts.js';
-import { 
-  VOICE_IDS, 
-  VOICE_NAMES, 
-  VOICE_STYLES, 
+import {
+  VOICE_IDS,
+  VOICE_NAMES,
+  VOICE_STYLES,
   VOICE_TEMPERATURES,
-  type VoiceId 
+  type VoiceId,
 } from './voice-constants.js';
 
 export interface VoiceDefinition {

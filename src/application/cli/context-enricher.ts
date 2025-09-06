@@ -38,7 +38,9 @@ const ENV_PREFIXES = ['CODECRUCIBLE_', 'SYNTH_'];
 
 function safeExec(cmd: string): string | undefined {
   try {
-    return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
   } catch {
     return undefined;
   }
@@ -46,7 +48,8 @@ function safeExec(cmd: string): string | undefined {
 
 function gatherGitMeta(root: string) {
   if (!fs.existsSync(path.join(root, '.git'))) return undefined;
-  const revision = safeExec('git describe --always --dirty') ?? safeExec('git rev-parse --short HEAD');
+  const revision =
+    safeExec('git describe --always --dirty') ?? safeExec('git rev-parse --short HEAD');
   const branch = safeExec('git rev-parse --abbrev-ref HEAD');
   const user = safeExec('git config user.name');
   const lastCommitDate = safeExec('git log -1 --format=%cI');
@@ -69,12 +72,14 @@ interface PackageJson {
   devDependencies?: Record<string, unknown>;
 }
 
-function gatherPackageJson(root: string): {
-  name?: string;
-  version?: string;
-  dependenciesCount?: number;
-  devDependenciesCount?: number;
-} | undefined {
+function gatherPackageJson(root: string):
+  | {
+      name?: string;
+      version?: string;
+      dependenciesCount?: number;
+      devDependenciesCount?: number;
+    }
+  | undefined {
   const pj = readJSON(path.join(root, 'package.json')) as PackageJson | undefined;
   if (!pj) return undefined;
   return {
@@ -86,11 +91,7 @@ function gatherPackageJson(root: string): {
 }
 
 function gatherConfig(root: string) {
-  const candidates = [
-    'codecrucible.config.json',
-    '.codecruciblerc',
-    '.codecruciblerc.json',
-  ];
+  const candidates = ['codecrucible.config.json', '.codecruciblerc', '.codecruciblerc.json'];
   for (const c of candidates) {
     const p = path.join(root, c);
     if (fs.existsSync(p)) {
@@ -133,14 +134,14 @@ function gatherDocs(root: string) {
   // Use case-insensitive path resolution for better cross-platform compatibility
   const docsDirCandidates = ['docs', 'Docs', 'documentation'];
   let docsDir: string | null = null;
-  
+
   for (const candidate of docsDirCandidates) {
     docsDir = PathUtilities.resolveCaseInsensitivePath(root, candidate);
     if (docsDir) {
       break;
     }
   }
-  
+
   if (!docsDir) {
     return { summaries: [], totalFiles: 0 };
   }
@@ -171,10 +172,7 @@ function gatherDocs(root: string) {
   return { summaries, totalFiles: files.length };
 }
 
-function createNotes(meta: {
-  docs: { totalFiles: number };
-  commandsLength: number;
-}) {
+function createNotes(meta: { docs: { totalFiles: number }; commandsLength: number }) {
   const notes: string[] = [];
   if (!meta.docs.totalFiles) notes.push('No docs directory detected');
   if (!meta.commandsLength) notes.push('No commands discovered in src/commands');

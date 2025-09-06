@@ -59,10 +59,10 @@ export class EnterpriseSystemPromptBuilder {
     }> = {}
   ): string {
     const cacheKey = this.getCacheKey(context, options);
-    
+
     // Clean expired cache entries periodically
     this.cleanupExpiredEntries();
-    
+
     // Check cache for valid entry
     const cached = this.getCachedEntry(cacheKey);
     if (cached) {
@@ -602,38 +602,38 @@ You are Guardian Voice, a specialized enterprise CLI agent focused on quality ga
   private static getCachedEntry(key: string): string | null {
     const entry = this.CACHE.get(key);
     if (!entry) return null;
-    
+
     const now = Date.now();
     if (now - entry.timestamp > this.CACHE_TTL_MS) {
       this.CACHE.delete(key);
       return null;
     }
-    
+
     // Update access count and timestamp for LRU tracking
     entry.accessCount++;
     entry.timestamp = now;
-    
+
     return entry.value;
   }
-  
+
   /**
    * Set cache entry with size limit enforcement
    */
   private static setCacheEntry(key: string, value: string): void {
     const now = Date.now();
-    
+
     // If at capacity, remove least recently used entries
     if (this.CACHE.size >= this.MAX_CACHE_SIZE && !this.CACHE.has(key)) {
       this.evictLeastRecentlyUsed();
     }
-    
+
     this.CACHE.set(key, {
       value,
       timestamp: now,
       accessCount: 1,
     });
   }
-  
+
   /**
    * Remove least recently used entries to make space
    */
@@ -641,34 +641,36 @@ You are Guardian Voice, a specialized enterprise CLI agent focused on quality ga
     // Find the least recently used entry (oldest timestamp, lowest access count)
     let lruKey: string | null = null;
     let lruEntry: CacheEntry | null = null;
-    
+
     for (const [key, entry] of this.CACHE.entries()) {
-      if (!lruEntry || 
-          entry.timestamp < lruEntry.timestamp ||
-          (entry.timestamp === lruEntry.timestamp && entry.accessCount < lruEntry.accessCount)) {
+      if (
+        !lruEntry ||
+        entry.timestamp < lruEntry.timestamp ||
+        (entry.timestamp === lruEntry.timestamp && entry.accessCount < lruEntry.accessCount)
+      ) {
         lruKey = key;
         lruEntry = entry;
       }
     }
-    
+
     if (lruKey) {
       this.CACHE.delete(lruKey);
     }
   }
-  
+
   /**
    * Clean up expired cache entries periodically
    */
   private static cleanupExpiredEntries(): void {
     const now = Date.now();
-    
+
     // Only run cleanup if enough time has passed
     if (now - this.lastCleanup < this.CLEANUP_INTERVAL_MS) {
       return;
     }
-    
+
     this.lastCleanup = now;
-    
+
     // Remove expired entries
     const expiredKeys: string[] = [];
     for (const [key, entry] of this.CACHE.entries()) {
@@ -676,20 +678,20 @@ You are Guardian Voice, a specialized enterprise CLI agent focused on quality ga
         expiredKeys.push(key);
       }
     }
-    
+
     for (const key of expiredKeys) {
       this.CACHE.delete(key);
     }
   }
 
   /**
-   * Clear cache (for testing or updates) 
+   * Clear cache (for testing or updates)
    */
   public static clearCache(): void {
     this.CACHE.clear();
     this.lastCleanup = 0;
   }
-  
+
   /**
    * Get cache statistics for monitoring
    */
@@ -702,14 +704,14 @@ You are Guardian Voice, a specialized enterprise CLI agent focused on quality ga
     const now = Date.now();
     let totalAccess = 0;
     let oldestTimestamp = now;
-    
+
     for (const entry of this.CACHE.values()) {
       totalAccess += entry.accessCount;
       if (entry.timestamp < oldestTimestamp) {
         oldestTimestamp = entry.timestamp;
       }
     }
-    
+
     return {
       size: this.CACHE.size,
       maxSize: this.MAX_CACHE_SIZE,

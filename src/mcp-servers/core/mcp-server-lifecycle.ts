@@ -131,7 +131,7 @@ export class MCPServerLifecycle extends EventEmitter {
 
     // Use Promise.allSettled but check for failures to fail fast
     const results = await Promise.allSettled(startPromises);
-    
+
     // Check for critical server failures
     const failures = results
       .map((result, index) => ({ result, serverId: sortedIds[index] }))
@@ -139,13 +139,13 @@ export class MCPServerLifecycle extends EventEmitter {
 
     if (failures.length > 0) {
       const failedServerIds = failures.map(({ serverId }) => serverId);
-      const errorMessages = failures.map(({ result }) => 
+      const errorMessages = failures.map(({ result }) =>
         result.status === 'rejected' ? result.reason.message || result.reason : 'Unknown error'
       );
-      
+
       const errorMsg = `Critical MCP servers failed to start: ${failedServerIds.join(', ')}. Errors: ${errorMessages.join('; ')}`;
       logger.error(`🚨 ${errorMsg}`);
-      
+
       // Fail fast - don't allow partial initialization
       throw new Error(errorMsg);
     }
@@ -170,10 +170,12 @@ export class MCPServerLifecycle extends EventEmitter {
       logger.error(`❌ Failed to start server ${serverId}:`, error);
       this.updateHealthStatus(serverId, 'unhealthy', error);
       this.emit('serverStartFailed', serverId, error);
-      
+
       // Re-throw the error so Promise.allSettled can detect the failure
       // This enables fail-fast behavior for critical server startup failures
-      throw new Error(`Server ${serverId} failed to start: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Server ${serverId} failed to start: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 

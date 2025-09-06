@@ -19,7 +19,7 @@ function loadPrebuiltBinding(name: string, fallbackPath?: string): any {
   try {
     // Try to load from optionalDependencies first (napi-rs approach)
     let packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}`;
-    
+
     if (process.platform === 'win32') {
       // Windows uses MSVC ABI
       const winPackageName = `@codecrucible/rust-executor-win32-${process.arch}-msvc`;
@@ -126,7 +126,7 @@ function detectLinuxABI(): string {
     if (fs.existsSync('/etc/alpine-release')) {
       return 'musl';
     }
-    
+
     // Check ldd version for musl
     const { execSync } = require('child_process');
     try {
@@ -140,7 +140,7 @@ function detectLinuxABI(): string {
   } catch {
     // Default to GNU if detection fails
   }
-  
+
   return 'gnu'; // Default to GNU
 }
 
@@ -155,7 +155,7 @@ export function generateBinaryNames(baseName: string): string[] {
   // Platform-specific with ABI (e.g., codecrucible-rust-executor.win32-x64-msvc.node)
   if (abi) {
     names.push(`${baseName}.${platform}-${arch}-${abi}.node`);
-    
+
     // For Linux, also try the opposite ABI as fallback
     if (platform === 'linux') {
       const alternateABI = abi === 'gnu' ? 'musl' : 'gnu';
@@ -274,13 +274,13 @@ export function loadRustExecutorSafely(baseDir?: string): {
     try {
       // Check if prebuilt package exists
       let packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}`;
-      
+
       // Add ABI suffix for platforms that need it
       const { abi } = getPlatformInfo();
       if (abi && (process.platform === 'win32' || process.platform === 'linux')) {
         packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}-${abi}`;
       }
-      
+
       require.resolve(packageName);
       source = 'prebuilt';
       binaryPath = packageName;
@@ -373,7 +373,7 @@ export function createFallbackRustExecutor(error: string): any {
           successful_requests: 0,
           failed_requests: 0,
           average_execution_time_ms: 0,
-          error: 'Rust module not available'
+          error: 'Rust module not available',
         });
       }
 

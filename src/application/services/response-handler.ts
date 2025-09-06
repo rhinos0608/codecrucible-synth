@@ -11,12 +11,12 @@ export class BasicResponseHandler implements ResponseHandler {
     logger.debug('ResponseHandler parsing response', {
       provider,
       responseType: typeof raw,
-      hasContent: !!(raw?.content),
-      hasResponse: !!(raw?.response),
-      hasText: !!(raw?.text),
+      hasContent: !!raw?.content,
+      hasResponse: !!raw?.response,
+      hasText: !!raw?.text,
       isString: typeof raw === 'string',
     });
-    
+
     // Handle direct ModelResponse objects
     if (raw && typeof raw === 'object' && 'content' in raw && 'model' in raw) {
       // Validate that content is not empty
@@ -26,16 +26,18 @@ export class BasicResponseHandler implements ResponseHandler {
           hasToolCalls: !!raw.toolCalls?.length,
           responseKeys: Object.keys(raw),
         });
-        
+
         // If we have tool calls but no content, that's potentially valid
         if (!raw.toolCalls?.length) {
-          throw new Error(`${provider} returned empty response content. The model may not be responding correctly.`);
+          throw new Error(
+            `${provider} returned empty response content. The model may not be responding correctly.`
+          );
         }
       }
-      
+
       return raw as ModelResponse;
     }
-    
+
     // Try to extract content from various response formats
     let content = '';
     if (typeof raw === 'string') {
@@ -47,20 +49,21 @@ export class BasicResponseHandler implements ResponseHandler {
       } else {
         content = raw.content || raw.text || raw.response || raw.message || '';
       }
-      
+
       // If content is still an object, try to extract from it
       if (content && typeof content === 'object') {
         const contentObj = content as any;
-        content = contentObj.content || contentObj.text || contentObj.response || JSON.stringify(content);
+        content =
+          contentObj.content || contentObj.text || contentObj.response || JSON.stringify(content);
       }
     } else {
       content = String(raw || '');
     }
-    
+
     // Validate that we have meaningful content - but allow empty content if tool calls are present
     if (!content || content.trim().length === 0) {
       const hasToolCalls = raw?.toolCalls?.length > 0;
-      
+
       if (hasToolCalls) {
         logger.debug('ResponseHandler: empty content but tool calls present - proceeding', {
           provider,
@@ -73,16 +76,18 @@ export class BasicResponseHandler implements ResponseHandler {
           responseType: typeof raw,
           responseKeys: raw && typeof raw === 'object' ? Object.keys(raw) : 'N/A',
         });
-        throw new Error(`${provider} returned no usable content. Check service availability and model configuration.`);
+        throw new Error(
+          `${provider} returned no usable content. Check service availability and model configuration.`
+        );
       }
     }
-    
+
     logger.debug('ResponseHandler extracted content', {
       provider,
       contentLength: content.length,
       contentPreview: content.substring(0, 100),
     });
-    
+
     return {
       id: raw?.id || `resp_${Date.now()}`,
       content,

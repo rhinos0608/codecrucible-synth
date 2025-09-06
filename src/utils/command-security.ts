@@ -11,19 +11,9 @@ try {
   allowedCommands = [];
 }
 
-const dangerousPatterns = [
-  /\brm\b/,
-  /\bsudo\b/,
-  /\bdel\b/,
-  /&&/,
-  /\|\|/,
-  /;|\n/,
-  /`/,
-];
+const dangerousPatterns = [/\brm\b/, /\bsudo\b/, /\bdel\b/, /&&/, /\|\|/, /;|\n/, /`/];
 
-export function validateCommand(
-  command: string
-): { isValid: boolean; reason?: string } {
+export function validateCommand(command: string): { isValid: boolean; reason?: string } {
   if (!command || command.trim() === '') {
     return { isValid: false, reason: 'Empty command' };
   }

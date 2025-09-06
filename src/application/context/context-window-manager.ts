@@ -127,21 +127,23 @@ export class ContextWindowManager {
       ]
     );
 
-    this.excludePatterns = options.excludePatterns ? Array.from(options.excludePatterns) : [
-      'node_modules/**',
-      '.git/**',
-      'dist/**',
-      'build/**',
-      'coverage/**',
-      '**/*.min.js',
-      '**/*.bundle.js',
-      '**/*.d.ts',
-      '.DS_Store',
-      'thumbs.db',
-      '*.log',
-      '.vscode/**',
-      '.idea/**',
-    ];
+    this.excludePatterns = options.excludePatterns
+      ? Array.from(options.excludePatterns)
+      : [
+          'node_modules/**',
+          '.git/**',
+          'dist/**',
+          'build/**',
+          'coverage/**',
+          '**/*.min.js',
+          '**/*.bundle.js',
+          '**/*.d.ts',
+          '.DS_Store',
+          'thumbs.db',
+          '*.log',
+          '.vscode/**',
+          '.idea/**',
+        ];
   }
 
   /**

@@ -5,10 +5,9 @@
 
 import { ToolIntegration, LLMFunction, ToolCall } from './tool-integration.js';
 import { DomainAwareToolOrchestrator } from './domain-aware-tool-orchestrator.js';
+import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 import { EventEmitter } from 'events';
-import { ExecutionCache, shouldCacheResult } from './execution-cache.js';
-import { PerformanceMonitor, ToolExecutionMetrics } from './performance-monitor.js';
 
 export interface EnhancedToolConfig {
   enableCaching: boolean;
@@ -19,6 +18,15 @@ export interface EnhancedToolConfig {
   timeout: number;
   retryAttempts: number;
   enableIntelligentRouting: boolean;
+}
+
+export interface ToolExecutionMetrics {
+  executionTime: number;
+  success: boolean;
+  toolName: string;
+  timestamp: number;
+  cacheHit?: boolean;
+  retryCount?: number;
 }
 
 export interface ToolExecutionContext {
@@ -33,12 +41,12 @@ export class EnhancedToolIntegration extends EventEmitter {
   private baseToolIntegration: ToolIntegration;
   private orchestrator: DomainAwareToolOrchestrator;
   private config: EnhancedToolConfig;
-  private executionCache: ExecutionCache = new ExecutionCache();
-  private performanceMonitor: PerformanceMonitor = new PerformanceMonitor();
+  private executionCache: Map<string, { result: any; timestamp: number; ttl: number }> = new Map();
+  private metrics: ToolExecutionMetrics[] = [];
   private activeExecutions: Set<string> = new Set();
   private cacheCleanupInterval?: NodeJS.Timeout;
 
-  constructor(baseToolIntegration: ToolIntegration, config?: Partial<EnhancedToolConfig>) {
+  constructor(config?: Partial<EnhancedToolConfig>, rustBackend?: any) {
     super();
 
     this.config = {
@@ -53,15 +61,40 @@ export class EnhancedToolIntegration extends EventEmitter {
       ...config,
     };
 
-    // SECURITY FIX: Always require baseToolIntegration to prevent MCP server duplication
-    if (!baseToolIntegration) {
-      throw new Error('EnhancedToolIntegration requires a baseToolIntegration parameter to prevent MCP server duplication and ensure consistent security configuration');
-    }
-    
-    this.baseToolIntegration = baseToolIntegration;
+    // Create a basic MCP manager for tool integration
+    const mcpConfig = {
+      filesystem: {
+        enabled: true,
+        restrictedPaths: [] as string[],
+        allowedPaths: [process.cwd()],
+      },
+      git: {
+        enabled: false,
+        autoCommitMessages: false,
+        safeModeEnabled: true,
+      },
+      terminal: {
+        enabled: false,
+        allowedCommands: [] as string[],
+        blockedCommands: ['rm', 'del', 'rmdir'],
+      },
+      packageManager: {
+        enabled: false,
+        autoInstall: false,
+        securityScan: true,
+      },
+      smithery: {
+        enabled: !!process.env.SMITHERY_API_KEY,
+        apiKey: process.env.SMITHERY_API_KEY,
+        enabledServers: [] as string[],
+        autoDiscovery: true,
+      },
+    };
+  const mcpManager = new MCPServerManager(mcpConfig);
+  this.baseToolIntegration = new ToolIntegration(mcpManager, rustBackend);
     this.orchestrator = new DomainAwareToolOrchestrator();
 
-    this.cacheCleanupInterval = this.executionCache.startCleanup();
+    this.setupCacheCleanup();
   }
 
   async executeToolCall(
@@ -81,10 +114,9 @@ export class EnhancedToolIntegration extends EventEmitter {
 
       // Check cache first
       if (this.config.enableCaching) {
-        const cacheKey = this.generateCacheKey(toolCall);
-        const cached = this.executionCache.getValid(cacheKey);
+        const cached = this.getCachedResult(toolCall);
         if (cached) {
-          this.performanceMonitor.record(toolCall.function.name, startTime, true, true);
+          this.recordMetrics(toolCall.function.name, startTime, true, true);
           return cached;
         }
       }
@@ -96,27 +128,22 @@ export class EnhancedToolIntegration extends EventEmitter {
         const toolPrompt = `${toolCall.function.name}: ${toolCall.function.arguments}`;
         const availableTools: any[] = [];
         const domainAnalysis = this.orchestrator.getToolsForPrompt(toolPrompt, availableTools);
-        // FIXED: Use structured logging instead of console.log
-        logger.debug('Domain analysis for intelligent routing:', { 
-          toolName: toolCall.function.name,
-          analysis: domainAnalysis,
-          availableToolsCount: availableTools.length
-        });
+        // Log domain analysis for debugging
+        console.log('Domain analysis:', domainAnalysis);
         result = await this.executeWithRetry(toolCall, context);
       } else {
         result = await this.executeWithRetry(toolCall, context);
       }
 
       // Cache result if caching is enabled
-      if (this.config.enableCaching && shouldCacheResult(result)) {
-        const cacheKey = this.generateCacheKey(toolCall);
-        this.executionCache.setResult(cacheKey, result, this.config.cacheTTL);
+      if (this.config.enableCaching && this.shouldCacheResult(result)) {
+        this.cacheResult(toolCall, result);
       }
 
-      this.performanceMonitor.record(toolCall.function.name, startTime, true, false);
+      this.recordMetrics(toolCall.function.name, startTime, true, false);
       return result;
     } catch (error) {
-      this.performanceMonitor.record(toolCall.function.name, startTime, false);
+      this.recordMetrics(toolCall.function.name, startTime, false);
       logger.error(`Enhanced tool execution failed for ${toolCall.function.name}:`, error);
       throw error;
     } finally {
@@ -161,7 +188,7 @@ export class EnhancedToolIntegration extends EventEmitter {
   }
 
   getExecutionMetrics(): ToolExecutionMetrics[] {
-    return this.performanceMonitor.getMetrics();
+    return [...this.metrics];
   }
 
   getPerformanceStats(): any {
@@ -169,8 +196,7 @@ export class EnhancedToolIntegration extends EventEmitter {
       return { enabled: false };
     }
 
-    const allMetrics = this.performanceMonitor.getMetrics();
-    const recentMetrics = allMetrics.filter(
+    const recentMetrics = this.metrics.filter(
       m => Date.now() - m.timestamp < 3600000 // Last hour
     );
 
@@ -242,8 +268,86 @@ export class EnhancedToolIntegration extends EventEmitter {
     return `${toolCall.function.name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
+  private getCachedResult(toolCall: ToolCall): any | null {
+    const cacheKey = this.generateCacheKey(toolCall);
+    const cached = this.executionCache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < cached.ttl) {
+      return cached.result;
+    }
+
+    if (cached) {
+      this.executionCache.delete(cacheKey);
+    }
+
+    return null;
+  }
+
+  private cacheResult(toolCall: ToolCall, result: any): void {
+    if (this.executionCache.size >= this.config.cacheSize) {
+      // Remove oldest entry
+      const oldestKey = this.executionCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.executionCache.delete(oldestKey);
+      }
+    }
+
+    const cacheKey = this.generateCacheKey(toolCall);
+    this.executionCache.set(cacheKey, {
+      result,
+      timestamp: Date.now(),
+      ttl: this.config.cacheTTL,
+    });
+  }
+
   private generateCacheKey(toolCall: ToolCall): string {
     return `${toolCall.function.name}_${this.hashString(toolCall.function.arguments)}`;
+  }
+
+  private shouldCacheResult(result: any): boolean {
+    // Don't cache error results or very large results
+    if (result instanceof Error || JSON.stringify(result).length > 100000) {
+      return false;
+    }
+    return true;
+  }
+
+  private recordMetrics(
+    toolName: string,
+    startTime: number,
+    success: boolean,
+    cacheHit: boolean = false
+  ): void {
+    if (!this.config.enablePerformanceMonitoring) return;
+
+    const metric: ToolExecutionMetrics = {
+      toolName,
+      executionTime: Date.now() - startTime,
+      success,
+      timestamp: Date.now(),
+      cacheHit,
+    };
+
+    this.metrics.push(metric);
+
+    // Keep only last 10000 metrics
+    if (this.metrics.length > 10000) {
+      this.metrics.shift();
+    }
+
+    this.emit('toolExecuted', metric);
+  }
+
+  private setupCacheCleanup(): void {
+    // Clean up expired cache entries every 10 minutes
+    this.cacheCleanupInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [key, cached] of this.executionCache.entries()) {
+        if (now - cached.timestamp > cached.ttl) {
+          this.executionCache.delete(key);
+        }
+      }
+    }, 600000);
   }
 
   dispose(): void {
@@ -270,8 +374,7 @@ export class EnhancedToolIntegration extends EventEmitter {
       // Fallback: return empty array if no base implementation
       return [];
     } catch (error) {
-      // FIXED: Use structured logging instead of console.warn
-      logger.warn('Failed to get LLM functions from base tool integration:', error);
+      console.warn('Failed to get LLM functions:', error);
       return [];
     }
   }

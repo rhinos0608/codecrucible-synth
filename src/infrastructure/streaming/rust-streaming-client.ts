@@ -208,14 +208,18 @@ export class RustStreamingClient extends EventEmitter {
     }
 
     // Check if session is still active (prevent processing after cancellation)
-    if (session.state === 'cancelled' || session.state === 'error' || session.state === 'completed') {
+    if (
+      session.state === 'cancelled' ||
+      session.state === 'error' ||
+      session.state === 'completed'
+    ) {
       logger.debug(`Ignoring chunk for ${session.state} session: ${sessionId}`);
       this.cleanupSession(sessionId);
       return;
     }
 
     const startTime = Date.now();
-    
+
     // Reset timeout on activity to prevent killing active streams
     this.resetSessionTimeout(sessionId);
 
@@ -342,21 +346,26 @@ export class RustStreamingClient extends EventEmitter {
     const timeout = setTimeout(() => {
       const session = this.activeSessions.get(sessionId);
       if (session && session.state === 'streaming') {
-        logger.warn(`Session ${sessionId} timed out after ${this.SESSION_TIMEOUT_MS}ms - terminating`);
+        logger.warn(
+          `Session ${sessionId} timed out after ${this.SESSION_TIMEOUT_MS}ms - terminating`
+        );
         session.state = 'error';
         session.error = 'Session timeout - stream abandoned';
-        
+
         const processor = this.processors.get(sessionId);
         if (processor) {
           processor.onError(session.error, session).catch(error => {
-            logger.error(`Error calling processor onError for timed out session ${sessionId}:`, error);
+            logger.error(
+              `Error calling processor onError for timed out session ${sessionId}:`,
+              error
+            );
           });
         }
-        
+
         this.cleanupSession(sessionId);
       }
     }, this.SESSION_TIMEOUT_MS);
-    
+
     this.sessionTimeouts.set(sessionId, timeout);
   }
 
@@ -384,10 +393,10 @@ export class RustStreamingClient extends EventEmitter {
    */
   private cleanupSession(sessionId: string): void {
     const session = this.activeSessions.get(sessionId);
-    
+
     // Clear session timeout to prevent memory leaks
     this.clearSessionTimeout(sessionId);
-    
+
     // Tell Rust to terminate the stream before cleanup
     if (session && this.rustExecutor && this.isRustAvailable()) {
       try {
@@ -402,7 +411,7 @@ export class RustStreamingClient extends EventEmitter {
 
     this.activeSessions.delete(sessionId);
     this.processors.delete(sessionId);
-    
+
     logger.debug(`🧹 Cleaned up session: ${sessionId}`);
   }
 

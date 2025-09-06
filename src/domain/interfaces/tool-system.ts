@@ -87,10 +87,9 @@ export interface ITool {
   /**
    * Validate arguments against the tool's parameter schema
    */
-  validateArguments: (args: Readonly<Record<string, unknown>>) => {
-    valid: boolean;
-    errors?: string[];
-  };
+  validateArguments: (
+    args: Readonly<Record<string, unknown>>
+  ) => { valid: boolean; errors?: string[] };
 
   /**
    * Check if the tool can be executed in the given context
@@ -145,16 +144,12 @@ export interface IToolExecutor {
   /**
    * Execute multiple tools in sequence
    */
-  executeSequence: (
-    requests: ReadonlyArray<Readonly<ToolExecutionRequest>>
-  ) => Promise<ToolExecutionResult[]>;
+  executeSequence: (requests: ReadonlyArray<Readonly<ToolExecutionRequest>>) => Promise<ToolExecutionResult[]>;
 
   /**
    * Execute multiple tools in parallel
    */
-  executeParallel: (
-    requests: ReadonlyArray<Readonly<ToolExecutionRequest>>
-  ) => Promise<ToolExecutionResult[]>;
+  executeParallel: (requests: ReadonlyArray<Readonly<ToolExecutionRequest>>) => Promise<ToolExecutionResult[]>;
 }
 
 /**

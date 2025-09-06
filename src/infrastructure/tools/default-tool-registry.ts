@@ -1,10 +1,10 @@
 import { ModelTool } from '../../domain/interfaces/model-client.js';
 import { createLogger } from '../logging/logger-adapter.js';
-import { 
-  ToolRegistryKey, 
-  ToolFunctionName, 
+import {
+  ToolRegistryKey,
+  ToolFunctionName,
   TypedToolIdentifiers,
-  TYPED_TOOL_CATALOG 
+  TYPED_TOOL_CATALOG,
 } from './typed-tool-identifiers.js';
 import { IMcpManager } from '../../domain/interfaces/mcp-manager.js';
 
@@ -71,7 +71,11 @@ function createParametersForTool(registryKey: ToolRegistryKey): any {
       return {
         type: 'object',
         properties: {
-          files: { type: 'array', items: { type: 'string' }, description: 'Files to add to staging' },
+          files: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Files to add to staging',
+          },
           path: { type: 'string', description: 'Repository path (optional, defaults to cwd)' },
         },
         required: ['files'],
@@ -93,7 +97,10 @@ function createParametersForTool(registryKey: ToolRegistryKey): any {
         properties: {
           command: { type: 'string', description: 'The command to execute' },
           args: { type: 'array', items: { type: 'string' }, description: 'Command arguments' },
-          working_directory: { type: 'string', description: 'Working directory for command execution' },
+          working_directory: {
+            type: 'string',
+            description: 'Working directory for command execution',
+          },
         },
         required: ['command'],
       };
@@ -102,7 +109,11 @@ function createParametersForTool(registryKey: ToolRegistryKey): any {
       return {
         type: 'object',
         properties: {
-          packages: { type: 'array', items: { type: 'string' }, description: 'Packages to install' },
+          packages: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Packages to install',
+          },
           dev: { type: 'boolean', description: 'Install as dev dependencies' },
           path: { type: 'string', description: 'Project path (optional, defaults to cwd)' },
         },
@@ -194,11 +205,13 @@ export function createDefaultToolRegistry(
  * Type-safe tool lookup functions
  */
 export class DefaultToolRegistryHelpers {
-  
   /**
    * Get tool by registry key (type-safe)
    */
-  static getTool(registry: Map<ToolRegistryKey, ModelTool>, key: ToolRegistryKey): ModelTool | undefined {
+  static getTool(
+    registry: Map<ToolRegistryKey, ModelTool>,
+    key: ToolRegistryKey
+  ): ModelTool | undefined {
     return registry.get(key);
   }
 
@@ -220,17 +233,17 @@ export class DefaultToolRegistryHelpers {
    * Get tools by category (type-safe)
    */
   static getToolsByCategory(
-    registry: Map<ToolRegistryKey, ModelTool>, 
+    registry: Map<ToolRegistryKey, ModelTool>,
     category: string
   ): Array<{ key: ToolRegistryKey; tool: ModelTool }> {
     const result: Array<{ key: ToolRegistryKey; tool: ModelTool }> = [];
-    
+
     for (const [key, tool] of registry.entries()) {
       if (TYPED_TOOL_CATALOG[key].category === category) {
         result.push({ key, tool });
       }
     }
-    
+
     return result;
   }
 
@@ -256,10 +269,10 @@ export class DefaultToolRegistryHelpers {
   } {
     const expectedKeys = TypedToolIdentifiers.getAllRegistryKeys();
     const actualKeys = Array.from(registry.keys());
-    
+
     const missingTools = expectedKeys.filter(key => !registry.has(key));
     const extraTools = actualKeys.filter(key => !TypedToolIdentifiers.isValidRegistryKey(key));
-    
+
     return {
       isValid: missingTools.length === 0 && extraTools.length === 0,
       missingTools,
@@ -276,11 +289,13 @@ export function createLegacyToolRegistry(
 ): Map<string, ModelTool> {
   const typedRegistry = createDefaultToolRegistry(options);
   const legacyRegistry = new Map<string, ModelTool>();
-  
+
   for (const [key, tool] of typedRegistry.entries()) {
     legacyRegistry.set(key, tool);
   }
-  
-  logger.debug(`[DefaultToolRegistry] Created legacy compatibility registry with ${legacyRegistry.size} tools`);
+
+  logger.debug(
+    `[DefaultToolRegistry] Created legacy compatibility registry with ${legacyRegistry.size} tools`
+  );
   return legacyRegistry;
 }

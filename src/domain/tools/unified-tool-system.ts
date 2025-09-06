@@ -126,11 +126,7 @@ export abstract class BaseTool implements ITool {
     return `tool_${name.toLowerCase().replace(/\s+/g, '_')}`;
   }
 
-  private validateParameter(
-    paramName: string,
-    value: unknown,
-    paramDef: ParameterDefinition
-  ): string | null {
+  private validateParameter(paramName: string, value: unknown, paramDef: ParameterDefinition): string | null {
     // Type validation
     if (paramDef.type === 'string' && typeof value !== 'string') {
       return `Parameter ${paramName} must be a string`;
@@ -184,12 +180,10 @@ interface ParameterDefinition {
  */
 export interface ToolDecorator {
   name: string;
-  preProcess?:
-    | ((
-        args: Record<string, unknown>,
-        context: ToolExecutionContext
-      ) => Promise<Record<string, unknown>>)
-    | undefined;
+  preProcess?: ((
+    args: Record<string, unknown>,
+    context: ToolExecutionContext
+  ) => Promise<Record<string, unknown>>) | undefined;
   postProcess: (
     result: ToolExecutionResult,
     args: Record<string, unknown>,
@@ -494,10 +488,7 @@ export class RetryDecorator implements ToolDecorator {
  */
 export class PerformanceDecorator implements ToolDecorator {
   public readonly name = 'performance';
-  private readonly metrics = new Map<
-    string,
-    { count: number; totalTime: number; errors: number }
-  >();
+  private readonly metrics = new Map<string, { count: number; totalTime: number; errors: number }>();
 
   public async preProcess(
     args: Record<string, unknown>,
@@ -763,9 +754,7 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
     }
   }
 
-  public async executeSequence(
-    requests: readonly ToolExecutionRequest[]
-  ): Promise<ToolExecutionResult[]> {
+  public async executeSequence(requests: readonly ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
     const results: ToolExecutionResult[] = [];
 
     for (const request of requests) {
@@ -781,12 +770,8 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
     return results;
   }
 
-  public async executeParallel(
-    requests: readonly ToolExecutionRequest[]
-  ): Promise<ToolExecutionResult[]> {
-    const promises = requests.map(
-      async (request): Promise<ToolExecutionResult> => this.execute(request)
-    );
+  public async executeParallel(requests: readonly ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
+    const promises = requests.map(async (request): Promise<ToolExecutionResult> => this.execute(request));
     return Promise.all(promises);
   }
 

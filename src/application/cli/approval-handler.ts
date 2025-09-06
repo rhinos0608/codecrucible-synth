@@ -1,6 +1,6 @@
 /**
  * Approval Handler - Modularized Operation Approval
- * 
+ *
  * Extracted from UnifiedCLI to handle operation approval management:
  * - Operation approval using ApprovalModesManager
  * - Risk assessment and permission checks
@@ -58,7 +58,10 @@ export class ApprovalHandler {
     }
 
     // Add execute permission for command operations
-    if (operationInfo.operation.includes('execute') || operationInfo.operation.includes('command')) {
+    if (
+      operationInfo.operation.includes('execute') ||
+      operationInfo.operation.includes('command')
+    ) {
       permissions.push(ApprovalModesManager.permissions.executeWorkingDir());
     }
 
@@ -151,10 +154,30 @@ ${chalk.gray('Usage:')} approvals <mode> | approvals status | approvals clear
 
     // EXCLUDE: Help/advice/explanation questions
     const helpPatterns = [
-      'how do i', 'how to', 'help me', 'explain', 'what is', 'what are',
-      'why', 'when', 'where', 'fix', 'debug', 'solve', 'resolve',
-      'error', 'issue', 'problem', 'trouble', 'advice', 'suggest',
-      'recommend', 'best practice', 'should i', 'can you', 'could you',
+      'how do i',
+      'how to',
+      'help me',
+      'explain',
+      'what is',
+      'what are',
+      'why',
+      'when',
+      'where',
+      'fix',
+      'debug',
+      'solve',
+      'resolve',
+      'error',
+      'issue',
+      'problem',
+      'trouble',
+      'advice',
+      'suggest',
+      'recommend',
+      'best practice',
+      'should i',
+      'can you',
+      'could you',
     ];
 
     if (helpPatterns.some(pattern => lowerPrompt.includes(pattern))) {
@@ -163,9 +186,19 @@ ${chalk.gray('Usage:')} approvals <mode> | approvals status | approvals clear
 
     // INCLUDE: Strong code generation indicators
     const strongGenerationKeywords = [
-      'create a', 'generate a', 'write a', 'build a', 'implement a',
-      'create class', 'create function', 'create component', 'create module',
-      'generate code', 'write code', 'build app', 'implement feature',
+      'create a',
+      'generate a',
+      'write a',
+      'build a',
+      'implement a',
+      'create class',
+      'create function',
+      'create component',
+      'create module',
+      'generate code',
+      'write code',
+      'build app',
+      'implement feature',
     ];
 
     if (strongGenerationKeywords.some(keyword => lowerPrompt.includes(keyword))) {

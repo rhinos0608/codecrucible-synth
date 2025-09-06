@@ -62,7 +62,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
 
       logger.debug('Dry run mode configuration', {
         dryRun: request.options?.dryRun,
-        willSaveFiles: !request.options?.dryRun
+        willSaveFiles: !request.options?.dryRun,
       });
 
       // Check if AI chose inline display
@@ -245,7 +245,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
     logger.debug('Parsing generation result', {
       resultType: typeof result,
       textLength: resultText.length,
-      preview: resultText.substring(0, 500)
+      preview: resultText.substring(0, 500),
     });
 
     // Check if AI chose INLINE_DISPLAY format (code blocks without filename headers)
@@ -284,7 +284,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
 
         logger.debug('Found inline code block', {
           language,
-          contentLength: content?.length
+          contentLength: content?.length,
         });
 
         if (content) {
@@ -310,7 +310,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
 
     logger.debug('Files parsed successfully', {
       fileCount: files.length,
-      files: files.map(f => ({ path: f.path, type: f.type, contentLength: f.content.length }))
+      files: files.map(f => ({ path: f.path, type: f.type, contentLength: f.content.length })),
     });
 
     return files;
@@ -352,7 +352,10 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
 
     for (const file of files) {
       try {
-        logger.debug('Saving generated file', { path: file.path, contentLength: file.content.length });
+        logger.debug('Saving generated file', {
+          path: file.path,
+          contentLength: file.content.length,
+        });
 
         // Ensure directory exists
         const dir = dirname(file.path);

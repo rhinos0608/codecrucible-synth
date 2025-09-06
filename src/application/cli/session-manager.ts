@@ -1,12 +1,12 @@
 /**
  * CLI Session Manager - Modularized Session Management
- * 
+ *
  * Enhanced from basic session tracking to handle comprehensive CLI session lifecycle:
  * - Creating and managing CLI sessions with full context
  * - Session metrics tracking and performance monitoring
  * - Session cleanup and resource management
  * - Integration with event bus and workflow context
- * 
+ *
  * Maintains backward compatibility with existing simple interface while adding
  * advanced functionality extracted from UnifiedCLICoordinator.
  */
@@ -185,12 +185,12 @@ export class SessionManager extends EventEmitter {
     }
 
     const duration = performance.now() - session.startTime;
-    
+
     if (session.metrics) {
       logger.info(
         `Closing CLI session ${id} after ${duration.toFixed(2)}ms. ` +
-        `Commands executed: ${session.metrics.commandsExecuted}, ` +
-        `Errors recovered: ${session.metrics.errorsRecovered}`
+          `Commands executed: ${session.metrics.commandsExecuted}, ` +
+          `Errors recovered: ${session.metrics.errorsRecovered}`
       );
     }
 
@@ -209,7 +209,7 @@ export class SessionManager extends EventEmitter {
   public record(id: string, entry: string): void {
     const session = this.sessions.get(id);
     if (!session) return;
-    
+
     session.history.push(entry);
     if (session.history.length > this.options.historyLimit) {
       session.history.shift();
@@ -221,7 +221,9 @@ export class SessionManager extends EventEmitter {
    */
   public closeAllSessions(): void {
     const sessionIds = Array.from(this.sessions.keys());
-    sessionIds.forEach(id => { this.endSession(id); });
+    sessionIds.forEach(id => {
+      this.endSession(id);
+    });
   }
 
   /**
@@ -229,14 +231,16 @@ export class SessionManager extends EventEmitter {
    */
   private cleanupOldestSessions(count: number): void {
     const sessions = Array.from(this.sessions.values());
-    
+
     // Sort by start time (oldest first)
     sessions.sort((a: Readonly<CLISession>, b: Readonly<CLISession>) => a.startTime - b.startTime);
-    
+
     const sessionsToClose = sessions.slice(0, count);
-    
-    logger.info(`Cleaning up ${sessionsToClose.length} oldest sessions to make room for new sessions`);
-    
+
+    logger.info(
+      `Cleaning up ${sessionsToClose.length} oldest sessions to make room for new sessions`
+    );
+
     for (const session of sessionsToClose) {
       this.endSession(session.id);
     }
@@ -247,12 +251,13 @@ export class SessionManager extends EventEmitter {
    */
   public cleanupExpiredSessions(): void {
     const now = performance.now();
-    const expiredSessions = Array.from(this.sessions.values())
-      .filter((session: Readonly<CLISession>) => now - session.startTime > this.options.sessionTimeout);
+    const expiredSessions = Array.from(this.sessions.values()).filter(
+      (session: Readonly<CLISession>) => now - session.startTime > this.options.sessionTimeout
+    );
 
     if (expiredSessions.length > 0) {
       logger.info(`Cleaning up ${expiredSessions.length} expired sessions`);
-      
+
       for (const session of expiredSessions) {
         this.endSession(session.id);
       }
@@ -273,23 +278,29 @@ export class SessionManager extends EventEmitter {
     const now = performance.now();
 
     const totalCommandsExecuted = sessions.reduce(
-      (sum: number, session: Readonly<CLISession>) => sum + (session.metrics?.commandsExecuted ?? 0), 
+      (sum: number, session: Readonly<CLISession>) =>
+        sum + (session.metrics?.commandsExecuted ?? 0),
       0
     );
-    
+
     const totalErrorsRecovered = sessions.reduce(
-      (sum: number, session: Readonly<CLISession>) => sum + (session.metrics?.errorsRecovered ?? 0), 
+      (sum: number, session: Readonly<CLISession>) => sum + (session.metrics?.errorsRecovered ?? 0),
       0
     );
-    
+
     const totalProcessingTime = sessions.reduce(
-      (sum: number, session: Readonly<CLISession>) => sum + (session.metrics?.totalProcessingTime ?? 0), 
+      (sum: number, session: Readonly<CLISession>) =>
+        sum + (session.metrics?.totalProcessingTime ?? 0),
       0
     );
-    
-    const averageSessionDuration = sessions.length > 0 
-      ? sessions.reduce((sum: number, session: Readonly<CLISession>) => sum + (now - session.startTime), 0) / sessions.length
-      : 0;
+
+    const averageSessionDuration =
+      sessions.length > 0
+        ? sessions.reduce(
+            (sum: number, session: Readonly<CLISession>) => sum + (now - session.startTime),
+            0
+          ) / sessions.length
+        : 0;
 
     return {
       activeSessions: sessions.length,

@@ -56,14 +56,14 @@ export class MCPServerSecurity {
   private blockedOperations = 0; // Track actual blocked operations
   private blockedPathPatterns: RegExp[] = [];
   private riskLevelCounts = { low: 0, medium: 0, high: 0, critical: 0 }; // Track risk levels
-  
+
   // Throttling for verbose path debug logs
   private pathLogThrottler = {
     count: 0,
     lastLogged: 0,
     logInterval: 30000, // Log every 30 seconds max
-    sampleRate: 100,    // Log every 100th validation
-    warningThreshold: 1000 // Warn if high volume
+    sampleRate: 100, // Log every 100th validation
+    warningThreshold: 1000, // Warn if high volume
   };
 
   constructor(config: Partial<SecurityConfig> = {}) {
@@ -282,7 +282,7 @@ export class MCPServerSecurity {
     if (context.operation === 'read') {
       try {
         const stats = await fs.stat(sanitizedPath);
-        
+
         // If it's a directory, allow directory operations
         if (stats.isDirectory()) {
           riskFactors.push('Directory operation');
@@ -313,9 +313,9 @@ export class MCPServerSecurity {
       } catch (error) {
         // Path doesn't exist - provide specific error messages based on context
         const { reason, actionableAdvice } = this.generateSpecificPathError(sanitizedPath, context);
-        
+
         warnings.push(actionableAdvice);
-        
+
         return {
           allowed: false,
           reason,
@@ -376,13 +376,14 @@ export class MCPServerSecurity {
   private sanitizePath(filePath: string): string {
     // Use centralized path normalization with security features
     // Use the first allowed base path as the reference point
-    const basePath = this.config.allowedBasePaths.length > 0 ? this.config.allowedBasePaths[0] : process.cwd();
-    
+    const basePath =
+      this.config.allowedBasePaths.length > 0 ? this.config.allowedBasePaths[0] : process.cwd();
+
     return PathUtilities.normalizeAIPath(filePath, {
       allowAbsolute: true,
       allowRelative: true,
       allowTraversal: false,
-      basePath: basePath
+      basePath: basePath,
     });
   }
 
@@ -392,7 +393,7 @@ export class MCPServerSecurity {
   private checkPathTraversal(filePath: string): { safe: boolean; suspicious: boolean } {
     const hasTraversal = PathUtilities.hasPathTraversal(filePath);
     const isWithinBounds = PathUtilities.isWithinBoundaries(filePath, this.config.allowedBasePaths);
-    
+
     const safe = !hasTraversal && isWithinBounds;
     const suspicious = hasTraversal || !isWithinBounds;
 
@@ -538,7 +539,7 @@ export class MCPServerSecurity {
    * Generate specific error messages and actionable advice for missing paths
    */
   private generateSpecificPathError(
-    sanitizedPath: string, 
+    sanitizedPath: string,
     context: SecurityContext
   ): { reason: string; actionableAdvice: string } {
     const pathExtension = path.extname(sanitizedPath);
@@ -547,16 +548,18 @@ export class MCPServerSecurity {
     const resourceType = context.resourceType;
 
     // Determine likely intended type based on context clues
-    const isLikelyFile = hasExtension || 
-                         operation === 'read' || 
-                         resourceType === 'file' ||
-                         sanitizedPath.includes('.');
-    
-    const isLikelyDirectory = !hasExtension || 
-                              operation === 'list' || 
-                              resourceType === 'directory' ||
-                              sanitizedPath.endsWith('/') ||
-                              sanitizedPath.endsWith('\\');
+    const isLikelyFile =
+      hasExtension ||
+      operation === 'read' ||
+      resourceType === 'file' ||
+      sanitizedPath.includes('.');
+
+    const isLikelyDirectory =
+      !hasExtension ||
+      operation === 'list' ||
+      resourceType === 'directory' ||
+      sanitizedPath.endsWith('/') ||
+      sanitizedPath.endsWith('\\');
 
     // Generate specific error message
     let reason: string;
@@ -564,24 +567,23 @@ export class MCPServerSecurity {
 
     if (isLikelyFile && !isLikelyDirectory) {
       reason = `File does not exist: ${sanitizedPath}`;
-      
+
       // Provide specific advice for files
       const fileName = path.basename(sanitizedPath);
       const directory = path.dirname(sanitizedPath);
-      
+
       actionableAdvice = this.generateFileAdvice(fileName, directory, pathExtension, operation);
-      
     } else if (isLikelyDirectory && !isLikelyFile) {
       reason = `Directory does not exist: ${sanitizedPath}`;
-      
+
       // Provide specific advice for directories
       actionableAdvice = this.generateDirectoryAdvice(sanitizedPath, operation);
-      
     } else {
       // Ambiguous case - provide both possibilities
       reason = `Path does not exist: ${sanitizedPath}`;
-      actionableAdvice = `Check if this path should be a file or directory. ` +
-                        `Verify the path exists and you have access permissions.`;
+      actionableAdvice =
+        `Check if this path should be a file or directory. ` +
+        `Verify the path exists and you have access permissions.`;
     }
 
     return { reason, actionableAdvice };
@@ -590,7 +592,12 @@ export class MCPServerSecurity {
   /**
    * Generate specific advice for missing files
    */
-  private generateFileAdvice(fileName: string, directory: string, extension: string, operation: string): string {
+  private generateFileAdvice(
+    fileName: string,
+    directory: string,
+    extension: string,
+    operation: string
+  ): string {
     const advice: string[] = [];
 
     // Operation-specific advice
@@ -609,14 +616,14 @@ export class MCPServerSecurity {
     if (extension) {
       const commonExtensions: Record<string, string> = {
         '.js': 'JavaScript file',
-        '.ts': 'TypeScript file', 
+        '.ts': 'TypeScript file',
         '.json': 'JSON configuration file',
         '.md': 'Markdown documentation file',
         '.txt': 'text file',
         '.log': 'log file',
-        '.env': 'environment configuration file'
+        '.env': 'environment configuration file',
       };
-      
+
       const fileType = commonExtensions[extension.toLowerCase()];
       if (fileType) {
         advice.push(`Expected ${fileType}`);
@@ -678,20 +685,21 @@ export class MCPServerSecurity {
    * Throttled path validation logging to prevent spam
    */
   private logPathValidationThrottled(
-    filePath: string, 
-    hasTraversal: boolean, 
-    isWithinBounds: boolean, 
-    safe: boolean, 
+    filePath: string,
+    hasTraversal: boolean,
+    isWithinBounds: boolean,
+    safe: boolean,
     suspicious: boolean
   ): void {
     this.pathLogThrottler.count++;
     const now = Date.now();
-    
+
     // Check if we should log based on sample rate or time interval
     const shouldLogSample = this.pathLogThrottler.count % this.pathLogThrottler.sampleRate === 0;
-    const shouldLogTime = (now - this.pathLogThrottler.lastLogged) > this.pathLogThrottler.logInterval;
+    const shouldLogTime =
+      now - this.pathLogThrottler.lastLogged > this.pathLogThrottler.logInterval;
     const shouldLogSuspicious = suspicious; // Always log suspicious activity
-    
+
     if (shouldLogSample || shouldLogTime || shouldLogSuspicious) {
       // Use debug level instead of info to reduce noise
       const logLevel = suspicious ? 'warn' : 'debug';
@@ -704,26 +712,31 @@ export class MCPServerSecurity {
         validationCount: this.pathLogThrottler.count,
         ...(shouldLogSample && { reason: 'sample' }),
         ...(shouldLogTime && { reason: 'time-interval' }),
-        ...(shouldLogSuspicious && { reason: 'suspicious-activity' })
+        ...(shouldLogSuspicious && { reason: 'suspicious-activity' }),
       };
-      
+
       if (logLevel === 'warn') {
         logger.warn(`[SECURITY] Suspicious path validation:`, logData);
       } else {
         logger.debug(`[SECURITY] Path validation sample:`, logData);
       }
-      
+
       this.pathLogThrottler.lastLogged = now;
     }
-    
+
     // Warn about high volume of path validations (potential DoS or bug)
-    if (this.pathLogThrottler.count > 0 && 
-        this.pathLogThrottler.count % this.pathLogThrottler.warningThreshold === 0) {
+    if (
+      this.pathLogThrottler.count > 0 &&
+      this.pathLogThrottler.count % this.pathLogThrottler.warningThreshold === 0
+    ) {
       logger.warn(`[SECURITY] High volume of path validations detected`, {
         totalValidations: this.pathLogThrottler.count,
         timeElapsed: now - (this.pathLogThrottler.lastLogged - this.pathLogThrottler.logInterval),
-        avgPerSecond: Math.round(this.pathLogThrottler.count / ((now - (this.pathLogThrottler.lastLogged - this.pathLogThrottler.logInterval)) / 1000)),
-        possibleCause: 'DoS attack, infinite loop, or excessive file operations'
+        avgPerSecond: Math.round(
+          this.pathLogThrottler.count /
+            ((now - (this.pathLogThrottler.lastLogged - this.pathLogThrottler.logInterval)) / 1000)
+        ),
+        possibleCause: 'DoS attack, infinite loop, or excessive file operations',
       });
     }
   }

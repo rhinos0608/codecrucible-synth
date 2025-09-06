@@ -1,13 +1,13 @@
 /**
  * Workflow Display Manager - Modularized Progress Tracking
- * 
+ *
  * Extracted from UnifiedCLICoordinator to handle workflow visualization:
  * - Agentic workflow display management and progress tracking
  * - Step tracking and status updates
  * - Session-based workflow management
  * - Integration with streaming workflow systems
  * - Real-time progress feedback for CLI operations
- * 
+ *
  * This module provides transparent progress visualization for complex operations.
  */
 
@@ -76,7 +76,7 @@ export class WorkflowDisplayManager extends EventEmitter {
     complexity: 'simple' | 'medium' | 'complex' = 'medium'
   ): string {
     const sessionId = agenticWorkflowDisplay.startSession(input, complexity);
-    
+
     const session: WorkflowSession = {
       id: sessionId,
       input,
@@ -156,7 +156,7 @@ export class WorkflowDisplayManager extends EventEmitter {
     }
 
     step.progress = Math.max(0, Math.min(100, progress));
-    
+
     // Update the agentic workflow display
     agenticWorkflowDisplay.updateStepProgress(sessionId, stepId, progress, message);
 
@@ -232,14 +232,17 @@ export class WorkflowDisplayManager extends EventEmitter {
   /**
    * Complete a workflow session
    */
-  public completeSession(sessionId: string, result: Readonly<{
-    success: boolean;
-    qualityScore?: number;
-    operationType?: string;
-    tokensUsed?: number;
-    confidenceScore?: number;
-    error?: string;
-  }>): void {
+  public completeSession(
+    sessionId: string,
+    result: Readonly<{
+      success: boolean;
+      qualityScore?: number;
+      operationType?: string;
+      tokensUsed?: number;
+      confidenceScore?: number;
+      error?: string;
+    }>
+  ): void {
     const session = this.activeSessions.get(sessionId);
     if (!session) {
       logger.warn(`Attempted to complete non-existent session: ${sessionId}`);
@@ -256,10 +259,10 @@ export class WorkflowDisplayManager extends EventEmitter {
 
     const duration = session.endTime - session.startTime;
     const successSymbol = result.success ? '✅' : '❌';
-    
+
     logger.info(
       `${successSymbol} Workflow session ${sessionId} ${session.status} in ${duration.toFixed(2)}ms. ` +
-      `Steps: ${session.steps.length}, Quality: ${((result.qualityScore ?? 0) * 100).toFixed(0)}%`
+        `Steps: ${session.steps.length}, Quality: ${((result.qualityScore ?? 0) * 100).toFixed(0)}%`
     );
 
     this.emit('session:completed', { session, result });
@@ -316,7 +319,7 @@ export class WorkflowDisplayManager extends EventEmitter {
       'content analysis',
       'file analysis',
       'directory analysis',
-      'ai response'
+      'ai response',
     ];
 
     return streamingOperations.includes(operationType.toLowerCase());
@@ -326,7 +329,9 @@ export class WorkflowDisplayManager extends EventEmitter {
    * Get active workflow sessions
    */
   public getActiveSessions(): WorkflowSession[] {
-    return Array.from(this.activeSessions.values()).filter((s: Readonly<WorkflowSession>) => s.status === 'running');
+    return Array.from(this.activeSessions.values()).filter(
+      (s: Readonly<WorkflowSession>) => s.status === 'running'
+    );
   }
 
   /**
@@ -352,13 +357,19 @@ export class WorkflowDisplayManager extends EventEmitter {
     const failed = sessions.filter((s: Readonly<WorkflowSession>) => s.status === 'failed');
     const active = sessions.filter((s: Readonly<WorkflowSession>) => s.status === 'running');
 
-    const averageDuration = completed.length > 0
-      ? completed.reduce((sum: number, s: Readonly<WorkflowSession>) => sum + ((s.endTime ?? 0) - s.startTime), 0) / completed.length
-      : 0;
+    const averageDuration =
+      completed.length > 0
+        ? completed.reduce(
+            (sum: number, s: Readonly<WorkflowSession>) => sum + ((s.endTime ?? 0) - s.startTime),
+            0
+          ) / completed.length
+        : 0;
 
-    const averageStepsPerSession = sessions.length > 0
-      ? sessions.reduce((sum: number, s: Readonly<WorkflowSession>) => sum + s.steps.length, 0) / sessions.length
-      : 0;
+    const averageStepsPerSession =
+      sessions.length > 0
+        ? sessions.reduce((sum: number, s: Readonly<WorkflowSession>) => sum + s.steps.length, 0) /
+          sessions.length
+        : 0;
 
     return {
       totalSessions: sessions.length,
@@ -401,13 +412,14 @@ export class WorkflowDisplayManager extends EventEmitter {
     logger.info('Shutting down WorkflowDisplayManager');
 
     // Complete any running sessions
-    const runningSessions = Array.from(this.activeSessions.values())
-      .filter((s: Readonly<WorkflowSession>) => s.status === 'running');
+    const runningSessions = Array.from(this.activeSessions.values()).filter(
+      (s: Readonly<WorkflowSession>) => s.status === 'running'
+    );
 
     for (const session of runningSessions) {
       this.completeSession(session.id, {
         success: false,
-        error: 'System shutdown'
+        error: 'System shutdown',
       });
     }
 

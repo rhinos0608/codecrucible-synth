@@ -335,7 +335,7 @@ export class FileSecurityService {
       allowAbsolute: true,
       allowRelative: true,
       allowTraversal: false,
-      basePath: process.cwd()
+      basePath: process.cwd(),
     });
   }
 

@@ -54,14 +54,16 @@ export class LMStudioAdapter implements ProviderAdapter {
         },
         responseTime: response.responseTime,
         finishReason: response.finishReason || response.metadata?.finishReason || 'stop',
-        toolCalls: response.toolCalls ? response.toolCalls.map(tc => ({
-          id: tc.id,
-          type: tc.type as 'function',
-          function: {
-            name: tc.name,
-            arguments: tc.arguments,
-          },
-        })) : undefined,
+        toolCalls: response.toolCalls
+          ? response.toolCalls.map(tc => ({
+              id: tc.id,
+              type: tc.type as 'function',
+              function: {
+                name: tc.name,
+                arguments: tc.arguments,
+              },
+            }))
+          : undefined,
       };
     } catch (error) {
       logger.error('LMStudioAdapter request failed:', error);

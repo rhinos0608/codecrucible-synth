@@ -20,7 +20,7 @@ parentPort?.on('message', (rawTask: unknown) => {
     } catch (error) {
       parentPort?.postMessage({ id: task.id, error: (error as Error).message });
     }
-  })().catch((error) => {
+  })().catch(error => {
     parentPort?.postMessage({ id: (rawTask as AnalysisTask)?.id, error: (error as Error).message });
   });
 });

@@ -7,9 +7,7 @@
 import { ModelInfo, ModelSelector } from '../../infrastructure/user-interaction/model-selector.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { createCliTimeout } from '../../utils/timeout-utils.js';
-import { 
-  enterpriseErrorHandler
-} from '../../infrastructure/error-handling/enterprise-error-handler.js';
+import { enterpriseErrorHandler } from '../../infrastructure/error-handling/enterprise-error-handler.js';
 
 export interface ModelsCommandOptions {
   list?: boolean;
@@ -80,8 +78,8 @@ export class ModelsCommand {
       }
 
       // Group by provider
-      const groupedModels = models.reduce<Record<string, ReadonlyArray<typeof models[number]>>>(
-        (groups: Readonly<Record<string, ReadonlyArray<typeof models[number]>>>, model) => {
+      const groupedModels = models.reduce<Record<string, ReadonlyArray<(typeof models)[number]>>>(
+        (groups: Readonly<Record<string, ReadonlyArray<(typeof models)[number]>>>, model) => {
           const { provider } = model;
           // Create a new object to maintain immutability
           const updatedGroups = { ...groups };
@@ -113,24 +111,21 @@ export class ModelsCommand {
       console.log('\n💡 Use "cc models --select" to interactively choose a model');
     } catch (error) {
       // Use enterprise error handler for graceful model discovery failure
-      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
-        error as Error,
-        {
-          operation: 'model_discovery',
-          resource: 'ai_providers',
-          context: { command: 'models --list' }
-        }
-      );
-      
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(error as Error, {
+        operation: 'model_discovery',
+        resource: 'ai_providers',
+        context: { command: 'models --list' },
+      });
+
       console.log(`❌ ${structuredError.userMessage}`);
-      
+
       if (structuredError.suggestedActions && structuredError.suggestedActions.length > 0) {
         console.log('💡 Suggested actions:');
         structuredError.suggestedActions.forEach(action => {
           console.log(`  • ${action}`);
         });
       }
-      
+
       // Show specific guidance for model setup
       console.log('\n🛠️  Setup Guide:');
       console.log('  • Install Ollama: curl -fsSL https://ollama.ai/install.sh | sh');
@@ -170,21 +165,18 @@ export class ModelsCommand {
       }
     } catch (error) {
       // Use enterprise error handler for graceful model selection failure
-      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(
-        error as Error,
-        {
-          operation: 'model_selection',
-          resource: 'user_interaction',
-          context: { command: 'models --select' }
-        }
-      );
-      
+      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(error as Error, {
+        operation: 'model_selection',
+        resource: 'user_interaction',
+        context: { command: 'models --select' },
+      });
+
       console.log(`❌ ${structuredError.userMessage}`);
-      
+
       if (structuredError.retryable) {
         console.log('🔄 This operation can be retried. Please try again.');
       }
-      
+
       if (structuredError.suggestedActions && structuredError.suggestedActions.length > 0) {
         console.log('💡 Suggested actions:');
         structuredError.suggestedActions.forEach(action => {

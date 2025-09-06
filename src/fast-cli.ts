@@ -6,7 +6,7 @@
 import { getVersion } from './utils/version.js';
 import { logger } from './infrastructure/logging/logger.js';
 
-function showBasicHelp() {
+function showBasicHelp(): void {
   console.log('Usage:');
   console.log('  crucible [options] <prompt>');
   console.log('  cc [options] <prompt>');
@@ -43,133 +43,110 @@ function showBasicHelp() {
   console.log('  cc --voices explorer,developer "Analyze this codebase"');
 }
 
-async function showQuickStatus() {
-  console.log('📊 CodeCrucible Synth Status');
-  console.log('━'.repeat(40));
+async function showQuickStatus(): Promise<void> {
+  console.log('CodeCrucible Synth Status');
+  console.log('-'.repeat(40));
   console.log(`Version: ${await getVersion()}`);
   console.log(`Node.js: ${process.version}`);
   console.log(`Platform: ${process.platform}`);
 
-  // Quick Ollama check with 1 second timeout
   try {
     const controller = new AbortController();
-    const healthCheckTimeout = parseInt(process.env.HEALTH_CHECK_TIMEOUT || '3000', 10);
+    const healthCheckTimeout = Number.parseInt(process.env.HEALTH_CHECK_TIMEOUT || '3000', 10);
     const timeoutId = setTimeout(() => controller.abort(), healthCheckTimeout);
 
     const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || 'http://localhost:11434';
-    const response = await fetch(`${ollamaEndpoint}/api/tags`, {
-      signal: controller.signal,
-    });
-
+    const response = await fetch(`${ollamaEndpoint}/api/tags`, { signal: controller.signal });
     clearTimeout(timeoutId);
-
-    if (response.ok) {
-      console.log('✅ Ollama: Available');
-    } else {
-      console.log('❌ Ollama: Service error');
-    }
-  } catch (error) {
-    console.log('❌ Ollama: Not available');
+    console.log(response.ok ? 'Ollama: Available' : 'Ollama: Service error');
+  } catch {
+    console.log('Ollama: Not available');
   }
 
-  // Quick LM Studio check with 1 second timeout
   try {
     const controller = new AbortController();
-    const healthCheckTimeout = parseInt(process.env.HEALTH_CHECK_TIMEOUT || '3000', 10);
+    const healthCheckTimeout = Number.parseInt(process.env.HEALTH_CHECK_TIMEOUT || '3000', 10);
     const timeoutId = setTimeout(() => controller.abort(), healthCheckTimeout);
 
     const lmStudioEndpoint = process.env.LM_STUDIO_ENDPOINT || 'http://localhost:1234';
-    const response = await fetch(`${lmStudioEndpoint}/v1/models`, {
-      signal: controller.signal,
-    });
-
+    const response = await fetch(`${lmStudioEndpoint}/v1/models`, { signal: controller.signal });
     clearTimeout(timeoutId);
-
-    if (response.ok) {
-      console.log('✅ LM Studio: Available');
-    } else {
-      console.log('❌ LM Studio: Service error');
-    }
-  } catch (error) {
-    console.log('❌ LM Studio: Not available');
+    console.log(response.ok ? 'LM Studio: Available' : 'LM Studio: Service error');
+  } catch {
+    console.log('LM Studio: Not available');
   }
 
-  console.log('━'.repeat(40));
+  console.log('-'.repeat(40));
 }
 
-async function showAvailableModels() {
-  console.log('🤖 Available Models');
-  console.log('━'.repeat(40));
+async function showAvailableModels(): Promise<void> {
+  console.log('Available Models');
+  console.log('-'.repeat(40));
   console.log();
 
-  // Quick Ollama models check
+  // Ollama models
   try {
     const controller = new AbortController();
-    const modelListTimeout = parseInt(process.env.MODEL_LIST_TIMEOUT || '5000', 10);
+    const modelListTimeout = Number.parseInt(process.env.MODEL_LIST_TIMEOUT || '5000', 10);
     const timeoutId = setTimeout(() => controller.abort(), modelListTimeout);
 
     const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || 'http://localhost:11434';
-    const response = await fetch(`${ollamaEndpoint}/api/tags`, {
-      signal: controller.signal,
-    });
-
+    const response = await fetch(`${ollamaEndpoint}/api/tags`, { signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (response.ok) {
-      const data = await response.json();
-      console.log('📦 Ollama Models:');
-      if (data.models && data.models.length > 0) {
-        data.models.forEach((model: any) => {
-          console.log(`  • ${model.name}`);
-        });
+      type OllamaTags = { models?: Array<{ name: string }> };
+      const data: OllamaTags = await response.json();
+      console.log('Ollama Models:');
+      if (Array.isArray(data.models) && data.models.length > 0) {
+        for (const m of data.models) {
+          console.log(`  - ${m.name}`);
+        }
       } else {
         console.log('  No models installed');
       }
     }
-  } catch (error) {
-    console.log('❌ Ollama: Not available');
+  } catch {
+    console.log('Ollama: Not available');
   }
 
-  // Quick LM Studio models check
+  // LM Studio models
   try {
     const controller = new AbortController();
-    const modelListTimeout = parseInt(process.env.MODEL_LIST_TIMEOUT || '5000', 10);
+    const modelListTimeout = Number.parseInt(process.env.MODEL_LIST_TIMEOUT || '5000', 10);
     const timeoutId = setTimeout(() => controller.abort(), modelListTimeout);
 
     const lmStudioEndpoint = process.env.LM_STUDIO_ENDPOINT || 'http://localhost:1234';
-    const response = await fetch(`${lmStudioEndpoint}/v1/models`, {
-      signal: controller.signal,
-    });
-
+    const response = await fetch(`${lmStudioEndpoint}/v1/models`, { signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (response.ok) {
-      const data = await response.json();
+      type LMStudioModels = { data?: Array<{ id: string }> };
+      const data: LMStudioModels = await response.json();
       console.log();
-      console.log('🏛️ LM Studio Models:');
-      if (data.data && data.data.length > 0) {
-        data.data.forEach((model: any) => {
-          console.log(`  • ${model.id}`);
-        });
+      console.log('LM Studio Models:');
+      if (Array.isArray(data.data) && data.data.length > 0) {
+        for (const m of data.data) {
+          console.log(`  - ${m.id}`);
+        }
       } else {
         console.log('  No models loaded');
       }
     }
-  } catch (error) {
+  } catch {
     console.log();
-    console.log('❌ LM Studio: Not available');
+    console.log('LM Studio: Not available');
   }
 
   console.log();
-  console.log('━'.repeat(40));
-  console.log('💡 Use "crucible status" for full system status');
+  console.log('-'.repeat(40));
+  console.log('Use "crucible status" for full system status');
 }
 
-export async function fastMain() {
+export async function fastMain(): Promise<void> {
   try {
     const args = process.argv.slice(2);
 
-    // Fast commands that don't need AI models or full initialization
     if (args.includes('--help') || args.includes('-h')) {
       showBasicHelp();
       return;
@@ -180,40 +157,34 @@ export async function fastMain() {
       return;
     }
 
-    // Status command with minimal initialization
     if (args[0] === 'status') {
       await showQuickStatus();
       return;
     }
 
-    // Models command with minimal initialization
     if (args[0] === 'models') {
       await showAvailableModels();
       return;
     }
 
-    // For complex commands, delegate to the full system
-    console.log('🔄 Loading full system for complex operations...');
+    console.log('Loading full system for complex operations...');
     const { main } = await import('./index.js');
     return main();
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Fast CLI error occurred', { error: errorMessage });
-    console.error('❌ Error:', error);
+    console.error('Error:', error);
     process.exitCode = 1;
-    return;
   }
 }
 
-// Auto-run when executed directly
 if (
   process.argv[1] &&
   (process.argv[1].includes('fast-cli.js') || process.argv[1].endsWith('fast-cli.ts'))
 ) {
   fastMain().catch((error: unknown) => {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.fatal('Fast CLI fatal error', errorMessage);
-    // Error already logged by logger.fatal above
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.fatal('Fast CLI fatal error', err);
     console.error('Fatal error:', error);
     process.exitCode = 1;
   });

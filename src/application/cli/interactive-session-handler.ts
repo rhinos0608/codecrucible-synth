@@ -1,6 +1,6 @@
 /**
  * Interactive Session Handler - Modularized REPL Functionality
- * 
+ *
  * Extracted from UnifiedCLI to handle interactive session management:
  * - REPL (Read-Eval-Print Loop) functionality
  * - Interactive command processing and special commands
@@ -65,12 +65,14 @@ export class InteractiveSessionHandler {
   /**
    * Set callback functions for interactive operations
    */
-  public setCallbacks(callbacks: Readonly<{
-    processPrompt?: ProcessPromptFunction;
-    getSuggestions?: GetSuggestionsFunction;
-    showStatus?: ShowStatusFunction;
-    execCommand?: ExecCommandFunction;
-  }>): void {
+  public setCallbacks(
+    callbacks: Readonly<{
+      processPrompt?: ProcessPromptFunction;
+      getSuggestions?: GetSuggestionsFunction;
+      showStatus?: ShowStatusFunction;
+      execCommand?: ExecCommandFunction;
+    }>
+  ): void {
     this.processPrompt = callbacks.processPrompt;
     this.getSuggestions = callbacks.getSuggestions;
     this.showStatus = callbacks.showStatus;
@@ -80,7 +82,9 @@ export class InteractiveSessionHandler {
   /**
    * Start interactive REPL mode
    */
-  public async startInteractive(contextInfo?: Readonly<{ type?: string; language?: string; confidence?: number }>): Promise<void> {
+  public async startInteractive(
+    contextInfo?: Readonly<{ type?: string; language?: string; confidence?: number }>
+  ): Promise<void> {
     if (this.options.showWelcomeMessage) {
       await this.userInteraction.display('🚀 Starting interactive mode...', { type: 'info' });
       await this.userInteraction.display('Type "exit", "quit", or press Ctrl+C to quit.', {
@@ -118,8 +122,8 @@ export class InteractiveSessionHandler {
         // Process regular user input
         if (this.processPrompt) {
           // Interactive mode defaults to dry-run to avoid accidental writes
-          const response = await this.processPrompt(input.trim(), { 
-            dryRun: this.options.defaultToDryRun 
+          const response = await this.processPrompt(input.trim(), {
+            dryRun: this.options.defaultToDryRun,
           });
           await this.userInteraction.display(response);
         } else {
@@ -189,7 +193,7 @@ export class InteractiveSessionHandler {
   private async handleExecCommand(input: string): Promise<void> {
     const line = input.replace(/^\.?exec\s+/, '');
     const [name, ...rest] = line.split(/\s+/);
-    
+
     if (!name) {
       await this.userInteraction.error('Usage: exec <command> [args as JSON or tokens]');
       return;

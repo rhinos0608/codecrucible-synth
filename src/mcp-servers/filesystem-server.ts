@@ -6,7 +6,6 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import { logger } from '../infrastructure/logging/logger.js';
 import { PathUtilities } from '../utils/path-utilities.js';
 
@@ -18,16 +17,16 @@ interface FilesystemConfig {
 }
 
 export class FilesystemMCPServer {
-  private server: Server;
-  private config: FilesystemConfig;
+  private readonly server: Server;
+  private readonly config: FilesystemConfig;
   private initialized: boolean = false;
 
-  constructor(config: FilesystemConfig = {}) {
+  public constructor(config: Readonly<FilesystemConfig> = {}) {
     this.config = {
-      allowedPaths: config.allowedPaths || [process.cwd()],
-      blockedPaths: config.blockedPaths || ['node_modules', '.git', '.env'],
-      maxFileSize: config.maxFileSize || 10 * 1024 * 1024, // 10MB default
-      encoding: config.encoding || 'utf8',
+      allowedPaths: config.allowedPaths ?? [process.cwd()],
+      blockedPaths: config.blockedPaths ?? ['node_modules', '.git', '.env'],
+      maxFileSize: config.maxFileSize ?? 10 * 1024 * 1024, // 10MB default
+      encoding: config.encoding ?? 'utf8',
     };
 
     this.server = new Server(
@@ -48,7 +47,7 @@ export class FilesystemMCPServer {
 
   private setupRequestHandlers(): void {
     // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    this.server.setRequestHandler(ListToolsRequestSchema, () => {
       return {
         tools: [
           {
@@ -127,9 +126,9 @@ export class FilesystemMCPServer {
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async request => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      const typedArgs = args as Record<string, any>;
+      const typedArgs = args ?? {};
 
       try {
         switch (name) {
@@ -186,46 +185,53 @@ export class FilesystemMCPServer {
     const normalizedPath = PathUtilities.resolveSafePath(targetPath);
 
     // Check if path contains blocked patterns
-    for (const blocked of this.config.blockedPaths!) {
+    for (const blocked of this.config.blockedPaths ?? []) {
       if (normalizedPath.includes(blocked)) {
         return false;
       }
     }
 
     // Check if path is within allowed boundaries using centralized utilities
-    return PathUtilities.isWithinBoundaries(targetPath, this.config.allowedPaths!);
+    return PathUtilities.isWithinBoundaries(targetPath, this.config.allowedPaths ?? []);
   }
 
-  private async readFile(filePath: string, encoding?: BufferEncoding) {
+  private async readFile(filePath: string, encoding?: BufferEncoding): Promise<{ content: { type: string; text: string; }[]; isError: boolean; }> {
     if (!this.isPathAllowed(filePath)) {
       throw new Error(`Access denied: ${filePath}`);
     }
 
     const stats = await fs.stat(filePath);
-    if (stats.size > this.config.maxFileSize!) {
+    if (stats.size > (this.config.maxFileSize ?? 10 * 1024 * 1024)) {
       throw new Error(`File too large: ${stats.size} bytes`);
     }
 
-    const content = await fs.readFile(filePath, encoding || this.config.encoding);
+    const content = await fs.readFile(filePath, encoding ?? this.config.encoding);
     return {
       content: [{ type: 'text', text: content.toString() }],
       isError: false,
     };
   }
 
-  private async writeFile(filePath: string, content: string, encoding?: BufferEncoding) {
+  private async writeFile(
+    filePath: string,
+    content: string,
+    encoding?: BufferEncoding
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     if (!this.isPathAllowed(filePath)) {
       throw new Error(`Access denied: ${filePath}`);
     }
 
-    await fs.writeFile(filePath, content, encoding || this.config.encoding);
+    await fs.writeFile(filePath, content, encoding ?? this.config.encoding);
     return {
       content: [{ type: 'text', text: `File written: ${filePath}` }],
       isError: false,
     };
   }
 
-  private async listDirectory(dirPath: string, recursive?: boolean) {
+  private async listDirectory(
+    dirPath: string,
+    recursive?: boolean
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     if (!this.isPathAllowed(dirPath)) {
       throw new Error(`Access denied: ${dirPath}`);
     }
@@ -241,7 +247,7 @@ export class FilesystemMCPServer {
           const subEntries = await this.listDirectory(fullPath, true);
           // Extract all content from sub-directory listing
           const allSubContent = subEntries.content
-            .map(item => item.text)
+            .map((item: Readonly<{ type: string; text: string }>) => item.text)
             .join('\n');
           result.push(...allSubContent.split('\n').map(line => `  ${line}`));
         }
@@ -256,19 +262,24 @@ export class FilesystemMCPServer {
     };
   }
 
-  private async createDirectory(dirPath: string, recursive?: boolean) {
+  private async createDirectory(
+    dirPath: string,
+    recursive?: boolean
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     if (!this.isPathAllowed(dirPath)) {
       throw new Error(`Access denied: ${dirPath}`);
     }
 
-    await fs.mkdir(dirPath, { recursive: recursive || false });
+    await fs.mkdir(dirPath, { recursive: recursive ?? false });
     return {
       content: [{ type: 'text', text: `Directory created: ${dirPath}` }],
       isError: false,
     };
   }
 
-  private async deleteFile(filePath: string) {
+  private async deleteFile(
+    filePath: string
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     if (!this.isPathAllowed(filePath)) {
       throw new Error(`Access denied: ${filePath}`);
     }
@@ -280,7 +291,9 @@ export class FilesystemMCPServer {
     };
   }
 
-  private async getFileStats(filePath: string) {
+  private async getFileStats(
+    filePath: string
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     if (!this.isPathAllowed(filePath)) {
       throw new Error(`Access denied: ${filePath}`);
     }
@@ -308,18 +321,18 @@ export class FilesystemMCPServer {
     };
   }
 
-  async initialize(): Promise<void> {
+  public initialize(): void {
     if (this.initialized) return;
     this.initialized = true;
     logger.info('Filesystem MCP Server initialized');
   }
 
-  async shutdown(): Promise<void> {
+  public shutdown(): void {
     this.initialized = false;
     logger.info('Filesystem MCP Server shutdown');
   }
 
-  getServer(): Server {
+  public getServer(): Server {
     return this.server;
   }
 }

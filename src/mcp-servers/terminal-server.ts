@@ -409,7 +409,9 @@ export class TerminalMCPServer {
     if (variable) {
       const value = process.env[variable];
       return {
-        content: [{ type: 'text' as const, text: value ? `${variable}=${value}` : `${variable} not set` }],
+        content: [
+          { type: 'text' as const, text: value ? `${variable}=${value}` : `${variable} not set` },
+        ],
         isError: !value,
       };
     } else {
@@ -431,7 +433,10 @@ export class TerminalMCPServer {
       this.config.workingDirectory = path.resolve(dirPath);
       return {
         content: [
-          { type: 'text' as const, text: `Working directory set to: ${this.config.workingDirectory}` },
+          {
+            type: 'text' as const,
+            text: `Working directory set to: ${this.config.workingDirectory}`,
+          },
         ],
         isError: false,
       };

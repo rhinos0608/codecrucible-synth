@@ -153,7 +153,8 @@ export class MCPServerRegistry extends EventEmitter {
       // Track initialization metrics with NaN protection
       const initTime = Date.now() - startTime;
       const currentMemory = process.memoryUsage().heapUsed;
-      const memoryUsed = isNaN(currentMemory) || isNaN(initialMemory) ? 0 : currentMemory - initialMemory;
+      const memoryUsed =
+        isNaN(currentMemory) || isNaN(initialMemory) ? 0 : currentMemory - initialMemory;
 
       registration.initializationTime = initTime;
       registration.memoryUsage = memoryUsed;
@@ -391,15 +392,15 @@ export class MCPServerRegistry extends EventEmitter {
       return '0 B';
     }
     if (bytes === 0) return '0 B';
-    
+
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     // Ensure index is within bounds
     const sizeIndex = Math.min(Math.max(i, 0), sizes.length - 1);
     const value = bytes / Math.pow(k, sizeIndex);
-    
+
     return parseFloat(value.toFixed(2)) + ' ' + sizes[sizeIndex];
   }
 }

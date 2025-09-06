@@ -12,7 +12,7 @@ global.fetch = mockFetch as jest.MockedFunction<typeof fetch>;
 
 describe('HuggingFaceProvider - Unit Tests', () => {
   let provider: HuggingFaceProvider;
-  
+
   const mockConfig = {
     apiKey: 'hf_test_key_123',
     endpoint: 'https://api-inference.huggingface.co/models',
@@ -38,7 +38,7 @@ describe('HuggingFaceProvider - Unit Tests', () => {
 
     it('should provide cloud-focused capabilities', () => {
       const capabilities = provider.getCapabilities();
-      
+
       expect(capabilities).toBeDefined();
       expect(capabilities.strengths).toContain('variety');
       expect(capabilities.strengths).toContain('accessibility');
@@ -94,7 +94,7 @@ describe('HuggingFaceProvider - Unit Tests', () => {
         expect.stringContaining('gpt2'),
         expect.objectContaining({
           headers: expect.objectContaining({
-            'Authorization': 'Bearer hf_test_key_123',
+            Authorization: 'Bearer hf_test_key_123',
             'Content-Type': 'application/json',
           }),
         })
@@ -109,10 +109,12 @@ describe('HuggingFaceProvider - Unit Tests', () => {
         json: async () => ({ error: 'Invalid authentication credentials' }),
       } as Response);
 
-      await expect(provider.generateText({
-        prompt: 'Test',
-        model: 'gpt2',
-      })).rejects.toThrow('Authentication failed: Invalid authentication credentials');
+      await expect(
+        provider.generateText({
+          prompt: 'Test',
+          model: 'gpt2',
+        })
+      ).rejects.toThrow('Authentication failed: Invalid authentication credentials');
     });
 
     it('should handle rate limiting', async () => {
@@ -127,10 +129,12 @@ describe('HuggingFaceProvider - Unit Tests', () => {
         json: async () => ({ error: 'Rate limit exceeded' }),
       } as Response);
 
-      await expect(provider.generateText({
-        prompt: 'Test',
-        model: 'gpt2',
-      })).rejects.toThrow('Rate limit exceeded. Reset in 3600 seconds');
+      await expect(
+        provider.generateText({
+          prompt: 'Test',
+          model: 'gpt2',
+        })
+      ).rejects.toThrow('Rate limit exceeded. Reset in 3600 seconds');
     });
   });
 
@@ -204,10 +208,7 @@ describe('HuggingFaceProvider - Unit Tests', () => {
           model: testCase.model,
         });
 
-        expect(mockFetch).toHaveBeenCalledWith(
-          testCase.expectedUrl,
-          expect.any(Object)
-        );
+        expect(mockFetch).toHaveBeenCalledWith(testCase.expectedUrl, expect.any(Object));
 
         jest.clearAllMocks();
       }
@@ -216,7 +217,7 @@ describe('HuggingFaceProvider - Unit Tests', () => {
     it('should validate generation parameters', async () => {
       const invalidOptions = [
         { prompt: '', model: 'gpt2' }, // Empty prompt
-        { prompt: 'Test', model: '', }, // Empty model
+        { prompt: 'Test', model: '' }, // Empty model
         { prompt: 'Test', model: 'gpt2', temperature: -0.1 }, // Invalid temperature
         { prompt: 'Test', model: 'gpt2', temperature: 2.1 }, // Invalid temperature
         { prompt: 'Test', model: 'gpt2', topP: 0 }, // Invalid top_p
@@ -224,9 +225,9 @@ describe('HuggingFaceProvider - Unit Tests', () => {
       ];
 
       for (const invalidOption of invalidOptions) {
-        await expect(provider.generateText(invalidOption as any))
-          .rejects
-          .toThrow('Invalid generation parameters');
+        await expect(provider.generateText(invalidOption as any)).rejects.toThrow(
+          'Invalid generation parameters'
+        );
       }
     });
 
@@ -247,10 +248,7 @@ describe('HuggingFaceProvider - Unit Tests', () => {
       // Test array with multiple choices
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => [
-          { generated_text: 'Choice 1' },
-          { generated_text: 'Choice 2' },
-        ],
+        json: async () => [{ generated_text: 'Choice 1' }, { generated_text: 'Choice 2' }],
       } as Response);
 
       response = await provider.generateText({
@@ -332,9 +330,9 @@ describe('HuggingFaceProvider - Unit Tests', () => {
         json: async () => ({ error: 'Model not found' }),
       } as Response);
 
-      await expect(provider.getModelInfo('nonexistent/model'))
-        .rejects
-        .toThrow('Model not found: nonexistent/model');
+      await expect(provider.getModelInfo('nonexistent/model')).rejects.toThrow(
+        'Model not found: nonexistent/model'
+      );
     });
   });
 
@@ -350,13 +348,13 @@ describe('HuggingFaceProvider - Unit Tests', () => {
       } as Response);
 
       const isAvailable = await provider.isAvailable();
-      
+
       expect(isAvailable).toBe(true);
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/status'),
         expect.objectContaining({
           headers: expect.objectContaining({
-            'Authorization': 'Bearer hf_test_key_123',
+            Authorization: 'Bearer hf_test_key_123',
           }),
         })
       );
@@ -406,10 +404,12 @@ describe('HuggingFaceProvider - Unit Tests', () => {
         }),
       } as Response);
 
-      await expect(provider.generateText({
-        prompt: 'Test',
-        model: 'large-model',
-      })).rejects.toThrow('Model is currently loading. Estimated time: 120 seconds');
+      await expect(
+        provider.generateText({
+          prompt: 'Test',
+          model: 'large-model',
+        })
+      ).rejects.toThrow('Model is currently loading. Estimated time: 120 seconds');
     });
 
     it('should implement exponential backoff for retries', async () => {
@@ -445,10 +445,12 @@ describe('HuggingFaceProvider - Unit Tests', () => {
         json: async () => ({ unexpected: 'format' }),
       } as Response);
 
-      await expect(provider.generateText({
-        prompt: 'Test',
-        model: 'gpt2',
-      })).rejects.toThrow('Invalid response format from HuggingFace API');
+      await expect(
+        provider.generateText({
+          prompt: 'Test',
+          model: 'gpt2',
+        })
+      ).rejects.toThrow('Invalid response format from HuggingFace API');
     });
 
     it('should validate and sanitize prompts', async () => {
@@ -469,7 +471,7 @@ describe('HuggingFaceProvider - Unit Tests', () => {
           prompt,
           model: 'gpt2',
         });
-        
+
         expect(response).toBeDefined();
         // Should still work but with sanitized input
       }
@@ -496,21 +498,21 @@ describe('HuggingFaceProvider - Unit Tests', () => {
 
       expect(response.computeTime).toBe(2.345);
       expect(response.computeCharacters).toBe(256);
-      
+
       const status = await provider.getStatus();
       expect(status.responseTime).toBeGreaterThan(0);
       expect(status.responseTime).toBeLessThan(endTime - startTime + 100);
     });
 
     it('should handle concurrent requests appropriately', async () => {
-      mockFetch.mockImplementation(() => 
+      mockFetch.mockImplementation(() =>
         Promise.resolve({
           ok: true,
           json: async () => [{ generated_text: 'Concurrent response' }],
         } as Response)
       );
 
-      const promises = Array.from({ length: 5 }, (_, i) => 
+      const promises = Array.from({ length: 5 }, (_, i) =>
         provider.generateText({
           prompt: `Concurrent prompt ${i}`,
           model: 'gpt2',
@@ -518,7 +520,7 @@ describe('HuggingFaceProvider - Unit Tests', () => {
       );
 
       const results = await Promise.all(promises);
-      
+
       expect(results).toHaveLength(5);
       results.forEach(result => {
         expect(result.text).toBe('Concurrent response');
@@ -569,10 +571,12 @@ describe('HuggingFaceProvider - Unit Tests', () => {
       expect(results.every(r => r.status === 'fulfilled')).toBe(true);
 
       // New requests should fail
-      await expect(provider.generateText({
-        prompt: 'After shutdown',
-        model: 'gpt2',
-      })).rejects.toThrow('Provider has been shut down');
+      await expect(
+        provider.generateText({
+          prompt: 'After shutdown',
+          model: 'gpt2',
+        })
+      ).rejects.toThrow('Provider has been shut down');
     });
 
     it('should clear caches and reset state', async () => {
@@ -583,7 +587,7 @@ describe('HuggingFaceProvider - Unit Tests', () => {
       } as Response);
 
       await provider.getModelInfo('gpt2');
-      
+
       let status = await provider.getStatus();
       expect(status.requestCount).toBeGreaterThan(0);
 

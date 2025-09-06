@@ -17,8 +17,8 @@ import { EventEmitter } from 'events';
 import {
   StreamChunk,
   StreamConfig,
-  StreamingManager,
-} from '../../infrastructure/streaming/streaming-manager.js';
+  IStreamingManager,
+} from '../services/streaming-manager.js';
 import { AgenticWorkflowDisplay } from './agentic-workflow-display.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 
@@ -43,14 +43,14 @@ export interface StreamingProgress {
  * Integrates streaming responses with agentic workflow display
  */
 export class StreamingWorkflowIntegration extends EventEmitter {
-  private readonly streamingManager: StreamingManager;
+  private readonly streamingManager: IStreamingManager;
   private readonly workflowDisplay: AgenticWorkflowDisplay;
   private readonly activeStreams: Map<string, StreamingProgress> = new Map();
   private config: StreamingWorkflowConfig;
   private readonly progressIntervals: Map<string, NodeJS.Timeout> = new Map();
 
   public constructor(
-    streamingManager: StreamingManager,
+    streamingManager: IStreamingManager,
     workflowDisplay: AgenticWorkflowDisplay,
     config: StreamingWorkflowConfig = {}
   ) {

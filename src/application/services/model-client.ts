@@ -9,7 +9,7 @@ import {
 import { ProviderAdapter } from './provider-adapters.js';
 import { RequestProcessor, BasicRequestProcessor } from './request-processor.js';
 import { ResponseHandler, BasicResponseHandler } from './response-handler.js';
-import { StreamingManager, BasicStreamingManager } from './streaming-manager.js';
+import { IStreamingManager, StreamingManager } from './streaming-manager.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { logger as defaultLogger } from '../../infrastructure/logging/unified-logger.js';
 import { 
@@ -48,7 +48,7 @@ export interface ModelClientOptions {
   };
   requestProcessor?: RequestProcessor;
   responseHandler?: ResponseHandler;
-  streamingManager?: StreamingManager;
+  streamingManager?: IStreamingManager;
   logger?: ILogger;
 }
 
@@ -56,7 +56,7 @@ export class ModelClient extends EventEmitter implements IModelClient {
   private adapters: Map<string, ProviderAdapter>;
   private requestProcessor: RequestProcessor;
   private responseHandler: ResponseHandler;
-  private streamingManager: StreamingManager;
+  private streamingManager: IStreamingManager;
   private logger: ILogger;
 
   constructor(options: ModelClientOptions) {
@@ -64,7 +64,7 @@ export class ModelClient extends EventEmitter implements IModelClient {
     this.adapters = new Map(options.adapters.map(a => [a.name, a]));
     this.requestProcessor = options.requestProcessor ?? new BasicRequestProcessor();
     this.responseHandler = options.responseHandler ?? new BasicResponseHandler();
-    this.streamingManager = options.streamingManager ?? new BasicStreamingManager();
+    this.streamingManager = options.streamingManager ?? new StreamingManager();
     this.logger = options.logger ?? defaultLogger;
   }
 

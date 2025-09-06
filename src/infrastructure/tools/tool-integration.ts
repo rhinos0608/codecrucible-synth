@@ -165,8 +165,8 @@ export class ToolIntegration {
           name: tool.function.name,
           description: tool.function.description,
           inputSchema: {
-            properties: tool.function.parameters.properties || {},
-            required: tool.function.parameters.required || [],
+            properties: tool.function.parameters?.properties || {},
+            required: tool.function.parameters?.required || [],
           },
           // Execution will be handled by the unified tool system
           handler: null, // Will be resolved during execution

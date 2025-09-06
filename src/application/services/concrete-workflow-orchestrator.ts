@@ -22,8 +22,10 @@ import {
   ModelRequest,
   ModelTool,
   ModelResponse,
+  RequestContext,
 } from '../../domain/interfaces/model-client.js';
 import { IMcpManager } from '../../domain/interfaces/mcp-manager.js';
+import { ProjectContext } from '../../domain/types/unified-types.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import { randomUUID } from 'crypto';
@@ -87,12 +89,14 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
    */
   public async processModelRequest(
     request: ModelRequest,
-    context?: WorkflowContext
+    context?: ProjectContext
   ): Promise<ModelResponse> {
+    const executionContext = context ?? this.toProjectContext(request.context);
+
     if (this.requestExecutionManager && this.modelClient) {
       // Use RequestExecutionManager for advanced execution strategies
       logger.debug('Routing model request through RequestExecutionManager');
-      return await this.requestExecutionManager.processRequest(request, context);
+      return await this.requestExecutionManager.processRequest(request, executionContext);
     } else if (this.modelClient) {
       // Fallback to direct ModelClient
       logger.debug('Using direct ModelClient for request');
@@ -100,6 +104,29 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     } else {
       throw new Error('No model client available for request processing');
     }
+  }
+
+  private toProjectContext(ctx?: WorkflowContext | RequestContext): ProjectContext | undefined {
+    if (!ctx) return undefined;
+    return {
+      rootPath: ctx.workingDirectory,
+      language: [],
+      frameworks: [],
+      dependencies: new Map<string, string>(),
+      structure: {
+        directories: [],
+        files: new Map(),
+        entryPoints: [],
+        testDirectories: [],
+        configFiles: [],
+      },
+      documentation: {
+        readme: [],
+        guides: [],
+        api: [],
+        examples: [],
+      },
+    };
   }
 
   /**
@@ -152,8 +179,12 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
         ).ActiveProcessManager(hardwareSelector);
         // Create a proper provider repository adapter to bridge the interface mismatch
         const providerRepository = this.createProviderRepositoryAdapter(this.modelClient);
-        
-        this.requestExecutionManager = new RequestExecutionManager(config, processManager, providerRepository);
+
+        this.requestExecutionManager = new RequestExecutionManager(
+          config,
+          processManager,
+          providerRepository
+        );
         logger.info(
           '  - requestExecutionManager: ✅ Initialized with advanced execution strategies'
         );
@@ -333,13 +364,13 @@ User Request: ${userPrompt}`;
 
     // Prepare tools and prompt
     const { mcpTools, enhancedPrompt } = await this.prepareMCPToolsAndPrompt(request);
-    
+
     // Build model request
     const modelRequest = this.buildModelRequest(request, enhancedPrompt, mcpTools);
-    
+
     // Execute request (streaming or non-streaming)
     const response = await this.executeModelRequest(modelRequest);
-    
+
     // Handle tool calls if present
     return await this.processToolCalls(response, request, modelRequest);
   }
@@ -355,9 +386,8 @@ User Request: ${userPrompt}`;
     const originalPrompt = payload.input || payload.prompt;
 
     // Get MCP tools for AI model with smart selection (unless disabled)
-    const mcpTools = payload.options?.useTools !== false
-      ? await this.getMCPToolsForModel(originalPrompt)
-      : [];
+    const mcpTools =
+      payload.options?.useTools !== false ? await this.getMCPToolsForModel(originalPrompt) : [];
 
     // Create enhanced prompt with explicit tool usage instructions
     const enhancedPrompt = this.createEnhancedPrompt(originalPrompt, mcpTools.length > 0);
@@ -380,8 +410,8 @@ User Request: ${userPrompt}`;
    * Build the model request with all necessary parameters
    */
   private buildModelRequest(
-    request: WorkflowRequest, 
-    enhancedPrompt: string, 
+    request: WorkflowRequest,
+    enhancedPrompt: string,
     mcpTools: ModelTool[]
   ): ModelRequest {
     const { payload } = request;
@@ -411,8 +441,10 @@ User Request: ${userPrompt}`;
     }
 
     // Check provider streaming capability
-    if (modelRequest.provider && 
-        !providerCapabilityRegistry.supports(modelRequest.provider, 'streaming')) {
+    if (
+      modelRequest.provider &&
+      !providerCapabilityRegistry.supports(modelRequest.provider, 'streaming')
+    ) {
       logger.warn(
         `Provider ${modelRequest.provider} does not support streaming; falling back to non-streaming`
       );
@@ -427,26 +459,27 @@ User Request: ${userPrompt}`;
    * Process tool calls from the AI response if present
    */
   private async processToolCalls(
-    response: ModelResponse, 
-    request: WorkflowRequest, 
+    response: ModelResponse,
+    request: WorkflowRequest,
     modelRequest: ModelRequest
   ): Promise<ModelResponse> {
     logger.debug('ConcreteWorkflowOrchestrator: Checking for tool calls');
     logger.debug('ConcreteWorkflowOrchestrator: response keys:', Object.keys(response));
     logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls exists:', !!response.toolCalls);
-    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls length:', response.toolCalls?.length);
+    logger.debug(
+      'ConcreteWorkflowOrchestrator: response.toolCalls length:',
+      response.toolCalls?.length
+    );
 
-    if (response.toolCalls && 
-        response.toolCalls.length > 0 && 
-        this.toolExecutionRouter &&
-        (!modelRequest.provider || 
-         providerCapabilityRegistry.supports(modelRequest.provider, 'toolCalling'))) {
-      
-      return await this.toolExecutionRouter.handleToolCalls(
-        response,
-        request,
-        modelRequest,
-        req => this.processModelRequest(req)
+    if (
+      response.toolCalls &&
+      response.toolCalls.length > 0 &&
+      this.toolExecutionRouter &&
+      (!modelRequest.provider ||
+        providerCapabilityRegistry.supports(modelRequest.provider, 'toolCalling'))
+    ) {
+      return await this.toolExecutionRouter.handleToolCalls(response, request, modelRequest, req =>
+        this.processModelRequest(req)
       );
     }
 
@@ -480,11 +513,12 @@ User Request: ${userPrompt}`;
       maxTokens: payload.maxTokens,
       stream: payload.stream,
       provider: payload.provider,
-      context: payload.context,
-      ...payload // Spread any additional properties
+      ...payload, // Spread any additional properties
     };
 
-    return await this.processModelRequest(modelRequest);
+    const projectContext = this.toProjectContext(request.context);
+
+    return await this.processModelRequest(modelRequest, projectContext);
   }
 
   private async handleAnalysisRequest(request: WorkflowRequest): Promise<any> {
@@ -528,7 +562,6 @@ User Request: ${userPrompt}`;
       temperature: payload.options?.temperature || 0.3, // Lower temperature for analysis
       maxTokens: payload.options?.maxTokens || 32768, // Increased from 2000 for comprehensive responses
       tools: mcpTools, // Include MCP tools for analysis too
-      context: request.context,
     };
 
     // Log when enhanced analysis prompt is used
@@ -538,7 +571,8 @@ User Request: ${userPrompt}`;
       );
     }
 
-    const result = await this.processModelRequest(modelRequest);
+    const projectContext = this.toProjectContext(request.context);
+    const result = await this.processModelRequest(modelRequest, projectContext);
 
     // Handle any tool calls from the AI model during analysis
     if (result.toolCalls && result.toolCalls.length > 0) {
@@ -665,17 +699,17 @@ User Request: ${userPrompt}`;
   private createProviderRepositoryAdapter(modelClient: IModelClient): any {
     // Define which providers are actually available/implemented
     const availableProviders = new Set(['ollama', 'lm-studio', 'claude', 'huggingface']);
-    
+
     return {
       getProvider: (providerType: string) => {
         logger.debug(`Provider repository adapter: requested provider ${providerType}`);
-        
+
         // Check if provider is actually available before returning adapter
         if (!availableProviders.has(providerType)) {
           logger.warn(`Provider ${providerType} is not implemented or available`);
           return null; // Return null instead of falling back silently
         }
-        
+
         // Return an adapter that delegates to the modelClient for actual requests
         return {
           // Main method that RequestExecutionManager calls
@@ -685,10 +719,12 @@ User Request: ${userPrompt}`;
               ...request,
               provider: providerType,
             };
-            logger.debug(`Provider adapter: delegating processRequest to modelClient with provider: ${providerType}`);
+            logger.debug(
+              `Provider adapter: delegating processRequest to modelClient with provider: ${providerType}`
+            );
             return await modelClient.request(requestWithProvider);
           },
-          
+
           // Legacy request method for compatibility
           request: async (request: ModelRequest): Promise<ModelResponse> => {
             const requestWithProvider = {
@@ -697,24 +733,26 @@ User Request: ${userPrompt}`;
             };
             return await modelClient.request(requestWithProvider);
           },
-          
+
           // Streaming method that RequestExecutionManager expects for streaming support detection
-          stream: async function*(request: ModelRequest): AsyncIterable<any> {
+          stream: async function* (request: ModelRequest): AsyncIterable<any> {
             // Get the actual ProviderAdapter from ModelClient's internal adapters
             const adapters = (modelClient as any).adapters;
             if (adapters && adapters.has(providerType)) {
               const actualAdapter = adapters.get(providerType);
               if (actualAdapter && typeof actualAdapter.stream === 'function') {
-                logger.debug(`Provider repository adapter: delegating stream to actual ${providerType} adapter`);
+                logger.debug(
+                  `Provider repository adapter: delegating stream to actual ${providerType} adapter`
+                );
                 yield* actualAdapter.stream(request);
                 return;
               }
             }
-            
+
             // Fallback: if no streaming support, throw error to trigger fallback to processRequest
             throw new Error(`Provider ${providerType} does not support streaming`);
           },
-          
+
           // Methods that RequestExecutionManager expects
           getModelName: () => providerType,
           isAvailable: () => true, // Assume modelClient handles availability
@@ -723,13 +761,13 @@ User Request: ${userPrompt}`;
           getType: () => providerType,
         };
       },
-      
+
       // Provide other methods that RequestExecutionManager might expect
       listProviders: () => {
         // Return the same providers as availableProviders for consistency
         return Array.from(availableProviders);
       },
-      
+
       isProviderAvailable: (providerType: string) => true,
     };
   }

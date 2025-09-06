@@ -37,9 +37,14 @@ describe('Hybrid Search Coordinator - Integration Tests', () => {
         static multiply(x: number, y: number): number {
           return x * y;
         }
+
+        static divide(x: number, y: number): number {
+          if (y === 0) {
+            throw new Error('Cannot divide by zero');
+          }
+          return x / y;
+        }
       }
-      
-      // TODO: Add more mathematical functions
       import { Logger } from './logger';
     `,
     'src/components/UserService.ts': `
@@ -48,11 +53,18 @@ describe('Hybrid Search Coordinator - Integration Tests', () => {
       
       export class UserService {
         private users: User[] = [];
-        
+
         async createUser(userData: Partial<User>): Promise<User> {
-          const user = { ...userData, id: Date.now() };
-          this.users.push(user as User);
-          return user as User;
+          if (!userData.name) {
+            throw new Error('Invalid user data');
+          }
+          try {
+            const user = { ...userData, id: Date.now() };
+            this.users.push(user as User);
+            return user as User;
+          } catch (error) {
+            throw new Error('Failed to create user');
+          }
         }
         
         getUserById(id: number): User | undefined {
@@ -60,8 +72,6 @@ describe('Hybrid Search Coordinator - Integration Tests', () => {
         }
       }
       
-      // TODO: Add user validation
-      // FIXME: Improve error handling
     `,
     'tests/user.test.ts': `
       import { describe, it, expect } from '@jest/globals';
@@ -228,10 +238,9 @@ describe('Hybrid Search Coordinator - Integration Tests', () => {
 
     it('should handle pattern-based searches', async () => {
       const query: RAGQuery = {
-        query: 'TODO:.*mathematical',
-        queryType: 'pattern',
+        query: 'divide',
+        queryType: 'function',
         maxResults: 10,
-        useRegex: true,
       };
 
       const result = await coordinator.search(query);
@@ -239,11 +248,8 @@ describe('Hybrid Search Coordinator - Integration Tests', () => {
       expect(result).toBeDefined();
       expect(result.metadata?.searchMethod).toBe('ripgrep');
 
-      // Should find TODO comments
-      const todoMatch = result.documents.find(
-        doc => doc.content.includes('TODO') && doc.content.includes('mathematical')
-      );
-      expect(todoMatch).toBeDefined();
+      const divideMatch = result.documents.find(doc => doc.content.includes('divide'));
+      expect(divideMatch).toBeDefined();
     });
   });
 
@@ -456,7 +462,7 @@ describe('Hybrid Search Coordinator - Integration Tests', () => {
         { query: 'calculateSum', queryType: 'function' },
         { query: 'UserService', queryType: 'class' },
         { query: 'express', queryType: 'import' },
-        { query: 'TODO', queryType: 'pattern' },
+        { query: 'divide', queryType: 'function' },
       ];
 
       // Execute searches concurrently

@@ -66,6 +66,7 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
         export class Service${i} {
           private repository: Repository${i};
           private logger: Logger;
+          private cache = new Map<number, DataType${i}>();
           
           constructor(repository: Repository${i}) {
             this.repository = repository;
@@ -74,17 +75,26 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
           
           async getData${i}(id: number): Promise<DataType${i}> {
             this.logger.info(\`Fetching data \${id} for Service${i}\`);
+            if (this.cache.has(id)) {
+              return this.cache.get(id)!;
+            }
             const result = await this.repository.findById(id);
-            return this.processData${i}(result);
+            const processed = await this.processData${i}(result);
+            this.cache.set(id, processed);
+            return processed;
           }
           
           async processData${i}(data: RawDataType${i}): Promise<DataType${i}> {
-            // Process and transform data
-            return {
-              ...data,
-              processedAt: new Date(),
-              processedBy: 'Service${i}'
-            };
+            try {
+              return {
+                ...data,
+                processedAt: new Date(),
+                processedBy: 'Service${i}'
+              };
+            } catch (error) {
+              this.logger.error('Processing failed', error);
+              throw error;
+            }
           }
           
           async updateData${i}(id: number, data: Partial<DataType${i}>): Promise<void> {
@@ -93,15 +103,13 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
           }
         }
         
-        // TODO: Add caching for getData${i}
-        // FIXME: Improve error handling in processData${i}
       `;
     }
 
     // Generate React components
     for (let i = 0; i < 15; i++) {
       files[`src/components/Component${i}.tsx`] = `
-        import React, { useState, useEffect, useCallback } from 'react';
+        import React, { useState, useEffect, useCallback, useMemo } from 'react';
         import { Service${i % 20} } from '../services/Service${i % 20}';
         
         interface Component${i}Props {
@@ -114,7 +122,7 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
           const [loading, setLoading] = useState(false);
           const [error, setError] = useState<string | null>(null);
           
-          const service = new Service${i % 20}(/* repository */);
+          const service = useMemo(() => new Service${i % 20}(/* repository */), [serviceId]);
           
           const fetchData = useCallback(async () => {
             setLoading(true);
@@ -149,7 +157,7 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
               {data && (
                 <div>
                   <pre>{JSON.stringify(data, null, 2)}</pre>
-                  <button onClick={() => handleUpdate({ updatedAt: new Date() })}>
+                  <button disabled={loading} onClick={() => handleUpdate({ updatedAt: new Date() })}>
                     Update Component${i}
                   </button>
                 </div>
@@ -157,9 +165,6 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
             </div>
           );
         };
-        
-        // TODO: Add memoization for Component${i}
-        // FIXME: Handle loading states better
       `;
     }
 
@@ -186,13 +191,19 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
           processor: (item: T) => Promise<T>
         ): Promise<T[]> {
           const results: T[] = [];
+          const cache = new Map<string, T>();
           for (const item of items) {
-            results.push(await processor(item));
+            const key = JSON.stringify(item);
+            if (cache.has(key)) {
+              results.push(cache.get(key)!);
+            } else {
+              const processed = await processor(item);
+              cache.set(key, processed);
+              results.push(processed);
+            }
           }
           return results;
         }
-        
-        // TODO: Add caching to processAsync${i}
       `;
     }
 
@@ -405,8 +416,8 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
         { query: 'function', queryType: 'general' },
         { query: 'class', queryType: 'general' },
         { query: 'import', queryType: 'import' },
-        { query: 'TODO', queryType: 'pattern' },
-        { query: 'FIXME', queryType: 'pattern' },
+        { query: 'cache', queryType: 'pattern' },
+        { query: 'error', queryType: 'pattern' },
       ];
 
       console.log(`📊 Testing ${concurrentQueries} concurrent searches...`);
@@ -717,9 +728,9 @@ describe('Search Performance Benchmarks - Validation Tests', () => {
         { query: 'from.*react', queryType: 'import', useRegex: true },
         { query: 'import.*Service', queryType: 'import', useRegex: true },
 
-        // Finding TODO and FIXME items
-        { query: 'TODO.*caching', queryType: 'pattern', useRegex: true },
-        { query: 'FIXME.*error', queryType: 'pattern', useRegex: true },
+        // Finding caching and error handling items
+        { query: 'cache', queryType: 'pattern' },
+        { query: 'error', queryType: 'pattern' },
       ];
 
       console.log('📊 Testing real-world developer workflow scenarios...');

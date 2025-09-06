@@ -672,7 +672,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     }
 
     if (request.tools && request.tools.length > 0) {
-      strategy.provider = 'lm-studio'; // Prefer LM Studio for tool use
+      strategy.provider = 'ollama'; // FIXED: Prefer Ollama for tool use (LM Studio connection issues)
       strategy.timeout = this.config.complexityTimeouts.complex;
     }
 
@@ -997,7 +997,13 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
       const isSupported = supportedModels.some(supportedModel =>
         model_name.includes(supportedModel)
       );
-      logger.debug('Model tool support check', { model: model_name, isSupported });
+      logger.info('🔍 DEBUG: Model tool support check', { 
+        originalModel: model,
+        normalizedModel: model_name, 
+        supportedModels,
+        isSupported,
+        modelMatches: supportedModels.filter(supportedModel => model_name.includes(supportedModel))
+      });
       return isSupported;
     }
 

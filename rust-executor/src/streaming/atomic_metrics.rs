@@ -295,7 +295,7 @@ impl MetricsAggregator {
             // FIXED: Use proper Rust logging instead of eprintln! to reduce noise
             // No runtime available - metrics will be computed on-demand only
             // This is normal behavior when not in an async context
-            log::debug!("No Tokio runtime available for metrics aggregation. Using on-demand computation only.");
+            tracing::debug!("No Tokio runtime available for metrics aggregation. Using on-demand computation only.");
         }
     }
     

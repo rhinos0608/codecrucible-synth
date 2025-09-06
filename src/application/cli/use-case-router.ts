@@ -274,27 +274,10 @@ export class UseCaseRouter {
         return await this.useCases.analyzeFileUseCase.execute(analysisRequest);
       }
     } else {
-      // Check if this is a simple question that should go directly to AI
-      const originalInputStr = request.input as string;
-      const isSimpleQuestion = this.isSimpleQuestion(originalInputStr);
-
-      if (isSimpleQuestion) {
-        // Route simple questions directly to orchestrator for real AI responses
-        // BUT don't include tools for simple questions to enable pure streaming
-        logger.info('🎯 Routing simple question directly to AI orchestrator (no tools)');
-        return await this.executeViaOrchestratorWithoutTools(request, enhancedInput, options);
-      } else {
-        // General analysis request - use file analysis with content
-        const analysisRequest: AnalysisRequest = {
-          content: enhancedInput as string,
-          options: {
-            includeTests: options.includeTests,
-            includeDocumentation: options.includeDocumentation,
-            outputFormat: 'structured',
-          },
-        };
-        return await this.useCases.analyzeFileUseCase.execute(analysisRequest);
-      }
+      // SIMPLIFIED: Always route to orchestrator with tools available
+      // Let the AI and system prompt decide when and how to use tools
+      logger.info('🎯 Routing to AI orchestrator (tools available, AI decides usage)');
+      return await this.executeViaOrchestrator(request, enhancedInput, options);
     }
   }
 
@@ -375,122 +358,7 @@ export class UseCaseRouter {
     return workflowResponse.result;
   }
 
-  /**
-   * Execute via orchestrator without tools (for simple questions to enable pure streaming)
-   */
-  private async executeViaOrchestratorWithoutTools(
-    request: CLIOperationRequest,
-    enhancedInput: string | any,
-    options: UseCaseRouterOptions
-  ): Promise<any> {
-    if (!this.orchestrator) {
-      throw new Error('Orchestrator not available');
-    }
 
-    const workflowRequest: WorkflowRequest = {
-      id: request.id,
-      type: this.mapOperationType(request.type),
-      payload: {
-        input: enhancedInput,
-        originalInput: request.input,
-        options: {
-          ...options,
-          // CRITICAL FIX: Default to streaming for Ollama responses, but respect explicit false
-          stream: options.stream !== false,
-          // CRITICAL: Disable tools for simple questions to enable pure streaming
-          useTools: false,
-        },
-      },
-      context: request.session?.context,
-      metadata: {
-        routerVersion: '1.0.0-modular',
-        capabilities: {
-          contextIntelligence: options.enableContextIntelligence,
-          performanceOptimized: options.enablePerformanceOptimization,
-          errorResilience: options.enableErrorResilience,
-        },
-      },
-    };
-
-    const workflowResponse = await this.orchestrator.processRequest(workflowRequest);
-
-    if (!workflowResponse.success) {
-      throw workflowResponse.error || new Error('Workflow execution failed');
-    }
-
-    return workflowResponse.result;
-  }
-
-  /**
-   * Check if this is a simple question that should go directly to AI
-   * FIXED: Allow filesystem and tool-related questions to use tools
-   */
-  private isSimpleQuestion(input: string): boolean {
-    if (typeof input !== 'string') return false;
-
-    const inputLower = input.toLowerCase().trim();
-
-    // Simple math questions (these don't need tools)
-    if (/^\s*\d+\s*[+\-*\/]\s*\d+[\s?]*$/.test(inputLower)) return true;
-
-    // FIXED: Exclude filesystem-related questions from simple question routing
-    const filesystemKeywords = [
-      'folder', 'directory', 'file', 'files', 'dirs', 'folders',
-      'path', 'paths', 'contents', 'list', 'ls', 'find', 'search',
-      'src', 'docs', 'test', 'tests', 'build', 'dist', 'bin',
-      'config', 'package.json', 'tsconfig', 'readme', '.env',
-      'node_modules', '.git', '.github', 'scripts'
-    ];
-    
-    const hasFilesystemKeywords = filesystemKeywords.some(keyword => inputLower.includes(keyword));
-    if (hasFilesystemKeywords) {
-      logger.debug('Question contains filesystem keywords, enabling tools', { input: inputLower });
-      return false; // Allow tools for filesystem questions
-    }
-
-    // FIXED: Exclude command/tool execution questions
-    const toolKeywords = [
-      'run', 'execute', 'command', 'cmd', 'terminal', 'shell',
-      'npm', 'node', 'git', 'install', 'build', 'test', 'lint',
-      'compile', 'deploy', 'start', 'stop'
-    ];
-    
-    const hasToolKeywords = toolKeywords.some(keyword => inputLower.includes(keyword));
-    if (hasToolKeywords) {
-      logger.debug('Question contains tool keywords, enabling tools', { input: inputLower });
-      return false; // Allow tools for tool-related questions
-    }
-
-    // Simple "what is" questions (conceptual only, not filesystem)
-    if (inputLower.startsWith('what is') && inputLower.length < 50 && !hasFilesystemKeywords) return true;
-
-    // Simple questions with question words
-    const questionWords = ['what', 'who', 'when', 'where', 'why', 'how'];
-    const startsWithQuestion = questionWords.some(word => inputLower.startsWith(`${word} `));
-
-    // Direct questions under 100 characters that don't mention files, paths, or code
-    const isShort = inputLower.length < 100;
-    const noExplicitPaths = !inputLower.includes('./') && !inputLower.includes('../') && !inputLower.includes('C:\\');
-    const noCodeKeywords =
-      !inputLower.includes('function') &&
-      !inputLower.includes('class') &&
-      !inputLower.includes('import') &&
-      !inputLower.includes('export') &&
-      !inputLower.includes('const') &&
-      !inputLower.includes('let') &&
-      !inputLower.includes('var');
-
-    // Only route as simple if it's clearly conceptual/theoretical
-    const isConceptual = startsWithQuestion && isShort && noExplicitPaths && noCodeKeywords && !hasFilesystemKeywords && !hasToolKeywords;
-    
-    if (isConceptual) {
-      logger.debug('Question identified as simple conceptual question, disabling tools', { input: inputLower });
-    } else {
-      logger.debug('Question requires tools for proper response', { input: inputLower });
-    }
-    
-    return isConceptual;
-  }
 
   /**
    * Check if a prompt is requesting code generation

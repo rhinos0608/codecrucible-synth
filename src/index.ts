@@ -579,6 +579,37 @@ program
     }
   );
 
+// Add models command to Commander program
+program
+  .command('models')
+  .description('Manage AI models')
+  .option('-l, --list', 'List all available models')
+  .option('-s, --select', 'Interactive model selection')
+  .option('-i, --interactive', 'Same as --select')
+  .action(async (options) => {
+    const { ModelsCommand, parseModelsArgs } = await import(
+      './application/cli/models-command.js'
+    );
+    const modelsCommand = new ModelsCommand();
+    
+    // Convert Commander options to models command options
+    const modelsOptions = {
+      list: options.list,
+      select: options.select || options.interactive,
+      interactive: options.interactive
+    };
+    
+    await modelsCommand.execute(modelsOptions);
+  });
+
+// Add status command to Commander program  
+program
+  .command('status')
+  .description('Show system status')
+  .action(async () => {
+    await showStatus();
+  });
+
 // Auto-run when directly executed
 if (process.argv[1]?.includes('index.js') || process.argv[1]?.includes('index.ts')) {
   main().catch(error => {

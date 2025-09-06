@@ -261,17 +261,74 @@ export class ModelSelector {
 
 /**
  * Quick model selection for non-interactive environments
+ * FIXED: Prioritize working Ollama models over potentially broken LM Studio
  */
 export async function quickSelectModel(): Promise<ModelSelectionResult> {
   const selector = new ModelSelector();
   const models = await selector.discoverModels();
 
+  logger.info('🔍 DEBUG: quickSelectModel discovered models:', {
+    totalModels: models.length,
+    modelsByProvider: models.reduce((acc, m) => {
+      acc[m.provider] = (acc[m.provider] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+    availableModels: models.filter(m => m.available).length,
+    ollamaModels: models.filter(m => m.provider === 'ollama').length,
+    availableOllamaModels: models.filter(m => m.provider === 'ollama' && m.available).length
+  });
+
   if (models.length === 0) {
     throw new Error('No AI models available');
   }
 
-  // Return first available model
+  // Dynamic model selection - no hardcoded preferences
+  const ollamaModels = models.filter(m => m.provider === 'ollama' && m.available);
+  
+  if (ollamaModels.length > 0) {
+    // Select the largest model available (generally better for function calling)
+    // Parse model size from the size field (e.g., "4.6 GB" -> 4.6)
+    const modelsWithParsedSize = ollamaModels.map(m => {
+      let sizeInGB = 0;
+      if (m.size) {
+        const match = m.size.match(/(\d+\.?\d*)\s*(GB|MB)/i);
+        if (match) {
+          sizeInGB = parseFloat(match[1]);
+          if (match[2].toUpperCase() === 'MB') {
+            sizeInGB = sizeInGB / 1024;
+          }
+        }
+      }
+      return { ...m, sizeInGB };
+    });
+    
+    // Sort by size descending (larger models generally have better capabilities)
+    modelsWithParsedSize.sort((a, b) => b.sizeInGB - a.sizeInGB);
+    
+    const selectedModel = modelsWithParsedSize[0];
+    
+    logger.info('✅ Selected Ollama model:', selectedModel.name);
+    logger.info(`📊 Model size: ${selectedModel.size || 'unknown'} - larger models typically have better function calling`);
+    return {
+      selectedModel: selectedModel,
+      provider: selectedModel.provider,
+    };
+  }
+  
+  // Fallback to any Ollama model
+  const ollamaModel = models.find(m => m.provider === 'ollama' && m.available);
+  if (ollamaModel) {
+    logger.info('⚠️ Selected Ollama model (tool support unknown):', ollamaModel.name);
+    return {
+      selectedModel: ollamaModel,
+      provider: ollamaModel.provider,
+    };
+  }
+  
+  // Fallback to any other available model
   const firstModel = models.find(m => m.available) || models[0];
+  logger.info('⚠️ Using fallback model (Ollama not available):', firstModel.name);
+  logger.info('🔍 DEBUG: Available models for fallback:', models.filter(m => m.available).map(m => ({ name: m.name, provider: m.provider, available: m.available })));
   return {
     selectedModel: firstModel,
     provider: firstModel.provider,

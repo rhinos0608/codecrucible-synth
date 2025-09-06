@@ -19,7 +19,6 @@ export interface ParsedCommand {
   operationType?: 'analyze' | 'diagnose' | 'prompt' | 'execute' | 'navigate' | 'suggest';
   parameters?: Record<string, unknown>;
   isCodeGeneration?: boolean;
-  isSimpleQuestion?: boolean;
   complexity?: 'simple' | 'medium' | 'complex';
 }
 
@@ -68,7 +67,6 @@ export class NaturalLanguageProcessor {
 
     // Check for special request types
     const isCodeGeneration = this.isCodeGenerationRequest(input);
-    const isSimpleQuestion = this.isSimpleQuestion(input);
 
     // Map intent to operation type
     const operationType = this.mapIntentToOperationType(intent, confidence);
@@ -78,7 +76,6 @@ export class NaturalLanguageProcessor {
       confidence,
       operationType,
       isCodeGeneration,
-      isSimpleQuestion,
       complexity,
     };
 
@@ -86,7 +83,7 @@ export class NaturalLanguageProcessor {
     if (confidence > this.options.confidenceThreshold) {
       logger.info(
         `🎯 NLP Analysis: Intent="${intent}" (${(confidence * 100).toFixed(0)}% confidence), ` +
-        `Type=${operationType}, CodeGen=${isCodeGeneration}, Simple=${isSimpleQuestion}, ` +
+        `Type=${operationType}, CodeGen=${isCodeGeneration}, ` +
         `Complexity=${complexity}`
       );
     }
@@ -210,37 +207,6 @@ export class NaturalLanguageProcessor {
     return 'simple';
   }
 
-  /**
-   * Check if this is a simple question that should go directly to AI
-   */
-  private isSimpleQuestion(input: string): boolean {
-    if (typeof input !== 'string') return false;
-
-    const inputLower = input.toLowerCase().trim();
-
-    // Simple math questions
-    if (/^\s*\d+\s*[+\-*/]\s*\d+[\s?]*$/.test(inputLower.replace(/\//g, '/'))) return true;
-
-    // Simple "what is" questions
-    if (inputLower.startsWith('what is') && inputLower.length < 50) return true;
-
-    // Simple questions with question words
-    const questionWords = ['what', 'who', 'when', 'where', 'why', 'how'];
-    const startsWithQuestion = questionWords.some(word => inputLower.startsWith(`${word} `));
-
-    // Direct questions under 100 characters that don't mention files or code
-    const isShort = inputLower.length < 100;
-    const noFileReferences =
-      !inputLower.includes('.') && !inputLower.includes('/') && !inputLower.includes('\\');
-    const noCodeKeywords =
-      !inputLower.includes('function') &&
-      !inputLower.includes('class') &&
-      !inputLower.includes('import') &&
-      !inputLower.includes('module') &&
-      !inputLower.includes('component');
-
-    return startsWithQuestion && isShort && noFileReferences && noCodeKeywords;
-  }
 
   /**
    * Check if a prompt is requesting code generation

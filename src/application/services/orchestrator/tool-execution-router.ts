@@ -1,6 +1,6 @@
 import { WorkflowRequest } from '../../../domain/interfaces/workflow-orchestrator.js';
 import { ModelRequest, ModelResponse } from '../../../domain/interfaces/model-client.js';
-import { MCPServerManager } from '../../../mcp-servers/mcp-server-manager.js';
+import { IMcpManager } from '../../../domain/interfaces/mcp-manager.js';
 import { logger } from '../../../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../../../utils/error-utils.js';
 import { getGlobalEnhancedToolIntegration } from '../../../infrastructure/tools/enhanced-tool-integration.js';
@@ -9,7 +9,7 @@ import { getGlobalEnhancedToolIntegration } from '../../../infrastructure/tools/
  * Routes tool execution requests and handles follow-up model synthesis.
  */
 export class ToolExecutionRouter {
-  constructor(private mcpManager: MCPServerManager) {}
+  constructor(private mcpManager: IMcpManager) {}
 
   async handleToolCalls(
     response: ModelResponse,

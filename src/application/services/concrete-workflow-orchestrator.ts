@@ -23,6 +23,7 @@ import {
   ModelTool,
   ModelResponse,
 } from '../../domain/interfaces/model-client.js';
+import { IMcpManager } from '../../domain/interfaces/mcp-manager.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import { randomUUID } from 'crypto';
@@ -49,7 +50,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   private userInteraction!: IUserInteraction;
   private eventBus!: IEventBus;
   private modelClient?: IModelClient;
-  private mcpManager?: any;
+  private mcpManager?: IMcpManager;
   private requestExecutionManager?: RequestExecutionManager;
   private isInitialized = false;
   private toolRegistry?: ToolRegistry;
@@ -84,7 +85,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   /**
    * Helper method to route model requests through RequestExecutionManager when available
    */
-  public async processModelRequest(request: ModelRequest, context?: any): Promise<ModelResponse> {
+  public async processModelRequest(
+    request: ModelRequest,
+    context?: WorkflowContext
+  ): Promise<ModelResponse> {
     if (this.requestExecutionManager && this.modelClient) {
       // Use RequestExecutionManager for advanced execution strategies
       logger.debug('Routing model request through RequestExecutionManager');

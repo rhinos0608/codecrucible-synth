@@ -7,6 +7,10 @@
 
 import { IUserInteraction } from './user-interaction.js';
 import { IEventBus } from './event-bus.js';
+import { IModelClient, ModelRequest, ModelResponse } from './model-client.js';
+import { IMcpManager } from './mcp-manager.js';
+import { IUnifiedSecurityValidator } from '../services/unified-security-validator.js';
+import { IUnifiedConfigurationManager } from '../services/unified-configuration-manager.js';
 import {
   ToolExecutionArgs,
   ToolExecutionResult,
@@ -17,7 +21,7 @@ export interface PromptPayload {
   prompt: string;
   voiceId?: string;
   model?: string;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
 }
 
 export interface ToolExecutionPayload {
@@ -32,23 +36,23 @@ export interface ModelRequestPayload {
     role: 'user' | 'assistant' | 'system';
     content: string;
   }>;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
 }
 
 export interface AnalysisPayload {
   target: string;
   type: 'file' | 'directory' | 'codebase';
-  options?: Record<string, any>;
+  options?: Record<string, unknown>;
 }
 
-export type WorkflowPayload = Record<string, any>;
+export type WorkflowPayload = Record<string, unknown>;
 
 // Result types for different workflow operations
 export interface SpiralProcessResult {
   phases: Array<{
     name: string;
     output: string;
-    metadata: Record<string, any>;
+    metadata: Record<string, unknown>;
   }>;
   finalOutput: string;
   convergenceReached: boolean;
@@ -72,15 +76,15 @@ export interface WorkflowRequest {
   type: 'prompt' | 'tool-execution' | 'model-request' | 'analysis';
   payload: WorkflowPayload;
   context?: WorkflowContext;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface WorkflowResponse {
   id: string;
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: Error;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface WorkflowContext {
@@ -105,7 +109,7 @@ export interface IWorkflowOrchestrator {
   /**
    * Process a model request with routing and fallbacks
    */
-  processModelRequest(request: any, context?: any): Promise<any>;
+  processModelRequest(request: ModelRequest, context?: WorkflowContext): Promise<ModelResponse>;
 
   /**
    * Initialize the orchestrator with dependencies
@@ -125,22 +129,22 @@ export interface LivingSpiralCoordinatorInterface {
   /**
    * Execute the complete Living Spiral process
    */
-  executeSpiralProcess(initialPrompt: string): Promise<any>;
+  executeSpiralProcess(initialPrompt: string): Promise<unknown>;
 
   /**
    * Execute a single spiral iteration
    */
-  executeSpiralIteration(input: string, iteration: number): Promise<any>;
+  executeSpiralIteration(input: string, iteration: number): Promise<unknown>;
 
   /**
    * Check if convergence has been achieved
    */
-  checkConvergence(results: any[]): Promise<boolean>;
+  checkConvergence(results: unknown[]): Promise<boolean>;
 
   /**
    * Analyze code or files
    */
-  analyzeCode(filePath: string, context: WorkflowContext): Promise<any>;
+  analyzeCode(filePath: string, context: WorkflowContext): Promise<unknown>;
 
   /**
    * Initialize the orchestrator with dependencies
@@ -157,10 +161,10 @@ export interface LivingSpiralCoordinatorInterface {
 export interface OrchestratorDependencies {
   userInteraction: IUserInteraction;
   eventBus: IEventBus;
-  modelClient?: any;
-  mcpManager?: any;
-  securityValidator?: any;
-  configManager?: any;
+  modelClient?: IModelClient;
+  mcpManager?: IMcpManager;
+  securityValidator?: IUnifiedSecurityValidator;
+  configManager?: IUnifiedConfigurationManager;
   /**
    * Optional aggregated runtime context replacing scattered singletons.
    * When supplied, fields inside take precedence for orchestration internals.
@@ -173,7 +177,7 @@ export interface OrchestratorDependencies {
  */
 export interface WorkflowEvents {
   'workflow:started': { id: string; type: string };
-  'workflow:completed': { id: string; result: any };
+  'workflow:completed': { id: string; result: unknown };
   'workflow:failed': { id: string; error: Error };
   'workflow:progress': { id: string; message: string; progress?: number };
 }

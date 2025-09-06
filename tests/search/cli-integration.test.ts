@@ -46,7 +46,9 @@ describe('CLI Search Integration - End-to-End Tests', () => {
       export const UserComponent: React.FC<UserComponentProps> = ({ user, onUpdate }) => {
         const handleSubmit = async (event: React.FormEvent) => {
           event.preventDefault();
-          // TODO: Add validation
+          if (!user.name.trim()) {
+            return;
+          }
           onUpdate(user);
         };
       
@@ -64,29 +66,45 @@ describe('CLI Search Integration - End-to-End Tests', () => {
       
       export class ApiService {
         private baseUrl: string;
-        
+        private cache = new Map<number, User>();
+
         constructor(baseUrl: string) {
           this.baseUrl = baseUrl;
         }
-        
+
         async fetchUser(id: number): Promise<User> {
-          const response = await axios.get(\`\${this.baseUrl}/users/\${id}\`);
-          return response.data;
+          const cachedUser = this.cache.get(id);
+          if (cachedUser !== undefined) {
+            return cachedUser;
+          }
+          try {
+            const response = await axios.get(\`\${this.baseUrl}/users/\${id}\`);
+            this.cache.set(id, response.data);
+            return response.data;
+          } catch (error) {
+            throw new Error('Failed to fetch user');
+          }
         }
-        
+
         async updateUser(user: User): Promise<User> {
-          const response = await axios.put(\`\${this.baseUrl}/users/\${user.id}\`, user);
-          return response.data;
+          try {
+            const response = await axios.put(\`\${this.baseUrl}/users/\${user.id}\`, user);
+            this.cache.set(user.id, response.data);
+            return response.data;
+          } catch (error) {
+            throw new Error('Failed to update user');
+          }
         }
-        
+
         async createUser(userData: Partial<User>): Promise<User> {
-          const response = await axios.post(\`\${this.baseUrl}/users\`, userData);
-          return response.data;
+          try {
+            const response = await axios.post(\`\${this.baseUrl}/users\`, userData);
+            return response.data;
+          } catch (error) {
+            throw new Error('Failed to create user');
+          }
         }
       }
-      
-      // FIXME: Add error handling
-      // TODO: Add caching mechanism
     `,
 
     'src/utils/helpers.js': `

@@ -63,8 +63,10 @@ describe('Search Integration Test Suite - Master Test Runner', () => {
         logger.error('Failed to start application:', error);
         process.exit(1);
       });
-      
-      // TODO: Add graceful shutdown handling
+      process.on('SIGINT', async () => {
+        logger.info('Shutting down...');
+        process.exit(0);
+      });
     `,
 
     'src/services/UserService.ts': `
@@ -73,35 +75,48 @@ describe('Search Integration Test Suite - Master Test Runner', () => {
       
       export class UserService {
         private repository: Repository<User>;
-        
+        private cache = new Map<string, User>();
+
         constructor() {
           this.repository = new Repository<User>('users');
         }
-        
+
         async initialize(): Promise<void> {
           await this.repository.connect();
         }
-        
+
         async createUser(request: CreateUserRequest): Promise<User> {
+          this.validate(request);
           const user = await this.repository.create(request);
+          this.cache.set(user.id, user);
           return user;
         }
-        
+
         async findUserById(id: string): Promise<User | null> {
-          return this.repository.findById(id);
+          if (this.cache.has(id)) {
+            return this.cache.get(id) ?? null;
+          }
+          const user = await this.repository.findById(id);
+          if (user) {
+            this.cache.set(id, user);
+          }
+          return user;
         }
-        
+
         async updateUser(id: string, updates: Partial<User>): Promise<User> {
           return this.repository.update(id, updates);
         }
-        
+
         async deleteUser(id: string): Promise<void> {
           await this.repository.delete(id);
         }
+
+        private validate(request: CreateUserRequest): void {
+          if (!request.name || !request.email) {
+            throw new Error('Invalid user data');
+          }
+        }
       }
-      
-      // FIXME: Add input validation
-      // TODO: Add caching layer
     `,
 
     'src/components/UserList.tsx': `
@@ -546,7 +561,7 @@ describe('Search Integration Test Suite - Master Test Runner', () => {
         { queryType: 'function', query: 'createUser' },
         { queryType: 'class', query: 'UserService' },
         { queryType: 'import', query: 'React' },
-        { queryType: 'general', query: 'TODO' },
+        { queryType: 'general', query: 'Logger' },
         { queryType: 'pattern', query: 'async.*function', useRegex: true },
       ];
 

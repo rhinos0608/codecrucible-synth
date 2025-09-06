@@ -110,22 +110,37 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     if (!ctx) return undefined;
     return {
       rootPath: ctx.workingDirectory,
-      language: [],
-      frameworks: [],
-      dependencies: new Map<string, string>(),
-      structure: {
-        directories: [],
-        files: new Map(),
-        entryPoints: [],
-        testDirectories: [],
-        configFiles: [],
-      },
-      documentation: {
-        readme: [],
-        guides: [],
-        api: [],
-        examples: [],
-      },
+      language: Array.isArray((ctx as any).language) ? (ctx as any).language : [],
+      frameworks: Array.isArray((ctx as any).frameworks) ? (ctx as any).frameworks : [],
+      dependencies: (ctx as any).dependencies instanceof Map ? (ctx as any).dependencies : new Map<string, string>(),
+      structure: (ctx as any).structure
+        ? {
+            directories: Array.isArray((ctx as any).structure.directories) ? (ctx as any).structure.directories : [],
+            files: (ctx as any).structure.files instanceof Map ? (ctx as any).structure.files : new Map(),
+            entryPoints: Array.isArray((ctx as any).structure.entryPoints) ? (ctx as any).structure.entryPoints : [],
+            testDirectories: Array.isArray((ctx as any).structure.testDirectories) ? (ctx as any).structure.testDirectories : [],
+            configFiles: Array.isArray((ctx as any).structure.configFiles) ? (ctx as any).structure.configFiles : [],
+          }
+        : {
+            directories: [],
+            files: new Map(),
+            entryPoints: [],
+            testDirectories: [],
+            configFiles: [],
+          },
+      documentation: (ctx as any).documentation
+        ? {
+            readme: Array.isArray((ctx as any).documentation.readme) ? (ctx as any).documentation.readme : [],
+            guides: Array.isArray((ctx as any).documentation.guides) ? (ctx as any).documentation.guides : [],
+            api: Array.isArray((ctx as any).documentation.api) ? (ctx as any).documentation.api : [],
+            examples: Array.isArray((ctx as any).documentation.examples) ? (ctx as any).documentation.examples : [],
+          }
+        : {
+            readme: [],
+            guides: [],
+            api: [],
+            examples: [],
+          },
     };
   }
 

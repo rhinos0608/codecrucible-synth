@@ -25,7 +25,7 @@ export function createDefaultUnifiedClientConfig(): UnifiedClientConfig {
   return {
     providers,
     executionMode: 'auto' as const,
-    fallbackChain: fallbackChain as any,
+    fallbackChain,
     performanceThresholds: {
       fastModeMaxTokens: 1000,
       timeoutMs: 30000,

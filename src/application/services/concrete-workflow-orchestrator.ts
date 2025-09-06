@@ -75,10 +75,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     activeRequests: 0,
   };
 
-  constructor() {
+  constructor(providerCapabilities: Record<string, any> = { streaming: true, toolCalling: true }) {
     super();
-    // Register default provider capabilities
-    providerCapabilityRegistry.register('default', { streaming: true, toolCalling: true });
+    // Register default provider capabilities (now configurable)
+    providerCapabilityRegistry.register('default', providerCapabilities);
   }
 
   /**

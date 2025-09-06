@@ -94,7 +94,7 @@ describe('Search Integration Test Suite - Master Test Runner', () => {
 
         async findUserById(id: string): Promise<User | null> {
           if (this.cache.has(id)) {
-            return this.cache.get(id)!;
+            return this.cache.get(id) ?? null;
           }
           const user = await this.repository.findById(id);
           if (user) {

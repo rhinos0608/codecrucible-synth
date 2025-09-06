@@ -134,12 +134,6 @@ export class E2BTerminalTool {
         };
       }
 
-      const validationResult = await this.securityValidator.validateCode({
-        code: fullCommand,
-        language: 'bash',
-        environment: 'e2b_sandbox',
-      });
-
       // Execute via the process manager for interactive commands
       if (command.interactive) {
         const processResult = await this.processManager.execute({

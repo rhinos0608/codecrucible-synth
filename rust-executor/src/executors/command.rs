@@ -61,19 +61,6 @@ pub struct CommandResult {
     pub working_directory: Option<PathBuf>,
 }
 
-/// Default command whitelist for security - can be overridden via configuration
-const DEFAULT_ALLOWED_COMMANDS: &[&str] = &[
-    // Basic file operations
-    "ls", "dir", "cat", "head", "tail", "find", "grep", "wc", "sort", "uniq",
-    // Development tools
-    "git", "npm", "node", "python", "python3", "pip", "pip3", "rustc", "cargo",
-    // System information
-    "echo", "pwd", "which", "whereis", "uname", "whoami",
-    // Text processing
-    "sed", "awk", "cut", "tr", "jq",
-    // Archive operations
-    "tar", "zip", "unzip", "gzip", "gunzip",
-];
 
 /// Environment variable whitelist - only these can be set or accessed
 const ALLOWED_ENV_VARS: &[&str] = &[
@@ -154,6 +141,11 @@ impl CommandExecutor {
     fn load_command_whitelist(security_context: &SecurityContext) -> Vec<String> {
         let commands: Vec<String> = if !security_context.command_allowlist.is_empty() {
             security_context.command_allowlist.iter().cloned().collect()
+        } else if let Ok(list) = std::env::var("COMMAND_ALLOWLIST") {
+            list.split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
         } else if let Ok(path) = std::env::var("COMMAND_ALLOWLIST_FILE") {
             match Self::load_whitelist_from_file(Path::new(&path)) {
                 Ok(list) => list,
@@ -162,21 +154,8 @@ impl CommandExecutor {
                     Vec::new()
                 }
             }
-        } else if let Ok(default_path) = std::env::current_dir()
-            .map(|p| p.join("shared/command-allowlist.json"))
-        {
-            match Self::load_whitelist_from_file(default_path.as_path()) {
-                Ok(list) => list,
-                Err(_) => DEFAULT_ALLOWED_COMMANDS
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect(),
-            }
         } else {
-            DEFAULT_ALLOWED_COMMANDS
-                .iter()
-                .map(|s| s.to_string())
-                .collect()
+            Vec::new()
         };
 
         commands

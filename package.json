@@ -202,6 +202,7 @@
     "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.35.0",
     "@napi-rs/cli": "^3.1.5",
     "@types/archiver": "^6.0.3",
     "@types/better-sqlite3": "^7.6.8",
@@ -239,11 +240,7 @@
     "directories": {
       "output": "build/desktop"
     },
-    "files": [
-      "dist/**/*",
-      "config/**/*",
-      "node_modules/**/*"
-    ],
+    "files": ["dist/**/*", "config/**/*", "node_modules/**/*"],
     "mac": {
       "category": "public.app-category.developer-tools"
     },

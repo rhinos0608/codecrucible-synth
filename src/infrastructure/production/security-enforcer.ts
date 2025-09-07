@@ -95,8 +95,4 @@ export class SecurityEnforcer {
   public getMetrics(): SecurityMetrics {
     return this.metrics;
   }
-
-  public grantAccess(userId: string, permission: string): void {
-    this.access.grant(userId, permission);
-  }
 }

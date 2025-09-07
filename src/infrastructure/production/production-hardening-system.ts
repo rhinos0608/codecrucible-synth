@@ -7,8 +7,8 @@ import { SecurityEnforcer } from './security-enforcer.js';
 function deepMerge<T extends Record<string, any>>(base: T, override: Partial<T>): T {
   const result: Record<string, any> = { ...base };
   for (const key of Object.keys(override)) {
-    const baseVal = (base as any)[key];
-    const overrideVal = (override as any)[key];
+    const baseVal = base[key as keyof T];
+    const overrideVal = override[key as keyof Partial<T>];
     if (
       baseVal &&
       overrideVal &&

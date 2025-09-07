@@ -7,7 +7,6 @@
 
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
-import * as path from 'path';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 
 export enum LogLevel {
@@ -24,7 +23,7 @@ export interface LogEntry {
   level: LogLevel;
   message: string;
   context?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   error?: Error;
   traceId?: string;
   userId?: string;
@@ -47,18 +46,18 @@ export interface LoggerConfig {
 
 export interface LogDestination {
   type: 'console' | 'file' | 'syslog' | 'http' | 'event';
-  config: any;
-  filter?: (entry: LogEntry) => boolean;
+  config: unknown;
+  filter?: (entry: Readonly<LogEntry>) => boolean;
 }
 
 export class UnifiedLogger extends EventEmitter {
-  private config: LoggerConfig;
+  private readonly config: LoggerConfig;
   private fileStream?: fs.WriteStream;
   private auditStream?: fs.WriteStream;
 
-  constructor(
-    config?: Partial<LoggerConfig>,
-    private eventBus?: IEventBus
+  public constructor(
+    config?: Readonly<Partial<LoggerConfig>>,
+    private readonly eventBus?: Readonly<IEventBus>
   ) {
     super();
     this.config = {
@@ -86,23 +85,23 @@ export class UnifiedLogger extends EventEmitter {
     }
   }
 
-  debug(message: string, metadata?: any): void {
+  public debug(message: string, metadata?: Record<string, unknown>): void {
     this.log(LogLevel.DEBUG, message, metadata);
   }
 
-  trace(message: string, metadata?: any): void {
+  public trace(message: string, metadata?: Record<string, unknown>): void {
     this.log(LogLevel.DEBUG, message, metadata);
   }
 
-  info(message: string, metadata?: any): void {
+  public info(message: string, metadata?: Record<string, unknown>): void {
     this.log(LogLevel.INFO, message, metadata);
   }
 
-  warn(message: string, metadata?: any): void {
+  public warn(message: string, metadata?: Readonly<Record<string, unknown>>): void {
     this.log(LogLevel.WARN, message, metadata);
   }
 
-  error(message: string, error?: Error | any, metadata?: any): void {
+  public error(message: string, error?: Error, metadata?: Readonly<Record<string, unknown>>): void {
     if (error instanceof Error) {
       this.log(LogLevel.ERROR, message, { ...metadata, error: error.message, stack: error.stack });
     } else {
@@ -110,13 +109,13 @@ export class UnifiedLogger extends EventEmitter {
     }
   }
 
-  fatal(message: string, error?: Error, metadata?: any): void {
+  public fatal(message: string, error?: Error, metadata?: Readonly<Record<string, unknown>>): void {
     this.log(LogLevel.FATAL, message, { ...metadata, error });
     // Fatal errors might trigger system shutdown
     this.emit('fatal', { message, error, metadata });
   }
 
-  audit(action: string, result: 'success' | 'failure', metadata?: any): void {
+  public audit(action: string, result: 'success' | 'failure', metadata?: Readonly<Record<string, unknown>>): void {
     const entry: LogEntry = {
       timestamp: new Date(),
       level: LogLevel.AUDIT,
@@ -127,7 +126,7 @@ export class UnifiedLogger extends EventEmitter {
     this.writeAudit(entry);
   }
 
-  log(level: LogLevel, message: string, metadata?: any): void {
+  public log(level: LogLevel, message: string, metadata?: Record<string, unknown>): void {
     if (level < this.config.level) return;
 
     const entry: LogEntry = {
@@ -221,20 +220,20 @@ export class UnifiedLogger extends EventEmitter {
 
   private getContext(): string {
     // Get calling context from stack trace
-    const stack = new Error().stack;
+    const { stack } = new Error();
     if (!stack) return 'unknown';
 
     const lines = stack.split('\n');
-    const callerLine = lines[3]; // Skip Error, this method, and log method
-    const match = callerLine?.match(/at\s+(\S+)/);
+    const [, , , callerLine] = lines; // Skip Error, this method, and log method
+    const match = callerLine.match(/at\s+(\S+)/);
     return match ? match[1] : 'unknown';
   }
 
-  setLevel(level: LogLevel): void {
+  public setLevel(level: LogLevel): void {
     this.config.level = level;
   }
 
-  close(): void {
+  public close(): void {
     if (this.fileStream) {
       this.fileStream.end();
     }
@@ -259,7 +258,7 @@ export const logger = getGlobalLogger();
 
 // For backward compatibility
 export class Logger extends UnifiedLogger {
-  constructor(name: string, config?: Partial<LoggerConfig>) {
+  public constructor(name: string, config?: Readonly<Partial<LoggerConfig>>) {
     super({ ...config, context: name });
   }
 }

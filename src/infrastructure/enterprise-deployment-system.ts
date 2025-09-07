@@ -16,6 +16,7 @@ import { AWSProvider } from './cloud-providers/aws-provider.js';
 import { AzureProvider } from './cloud-providers/azure-provider.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import fetch from 'node-fetch';
 
 const execAsync = promisify(exec);
 
@@ -267,7 +268,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
     if (this.performanceMonitor) {
       this.performanceMonitor.on(
         'threshold-critical',
-        (event: { metric: string; value: number; threshold: number }) => {
+        (event: Readonly<{ metric: string; value: number; threshold: number }>) => {
           this.handlePerformanceThreshold(event);
         }
       );
@@ -284,8 +285,8 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
   /**
    * Deploy application version
    */
-  async deploy(
-    plan: DeploymentPlan
+  public async deploy(
+    plan: Readonly<DeploymentPlan>
   ): Promise<{ success: boolean; duration: number; error?: string }> {
     const startTime = Date.now();
 
@@ -372,7 +373,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
   /**
    * Execute deployment step
    */
-  private async executeDeploymentStep(step: DeploymentStep, plan: DeploymentPlan): Promise<void> {
+  private async executeDeploymentStep(step: Readonly<DeploymentStep>, plan: Readonly<DeploymentPlan>): Promise<void> {
     logger.info(`Executing deployment step: ${step.name}`, { step: step.id });
 
     const startTime = Date.now();
@@ -1139,11 +1140,11 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
     /**
      * Terminate the least utilized instance
      */
-    private async terminateLeastUtilizedInstance(healthyInstances: DeploymentInstance[]): Promise<void> {
+    private async terminateLeastUtilizedInstance(healthyInstances: Readonly<DeploymentInstance>[]): Promise<void> {
       if (healthyInstances.length <= this.config.scaling.minInstances) return;
 
       // Find instance with lowest combined CPU and memory utilization
-      const instanceToTerminate = healthyInstances.reduce((lowest, current) => {
+      const instanceToTerminate = healthyInstances.reduce((lowest: Readonly<DeploymentInstance>, current: Readonly<DeploymentInstance>) => {
         const lowestUtil = lowest.metrics.cpuUsage + lowest.metrics.memoryUsage;
         const currentUtil = current.metrics.cpuUsage + current.metrics.memoryUsage;
         return currentUtil < lowestUtil ? current : lowest;
@@ -1157,7 +1158,8 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
 
       try {
         // Graceful shutdown - mark as stopping and drain connections
-        instanceToTerminate.status = 'stopping';
+        const mutableInstance = { ...instanceToTerminate };
+        mutableInstance.status = 'stopping';
         this.loadBalancer?.disableInstance(instanceToTerminate);
 
         // Wait for connections to drain (max 30 seconds)
@@ -1225,7 +1227,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
     /**
      * Get comprehensive deployment status
      */
-    getDeploymentStatus(): {
+    public getDeploymentStatus(): {
       instances: DeploymentInstance[];
       scaling: {
         enabled: boolean;
@@ -1265,10 +1267,10 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
       };
     } {
       const instances = Array.from(this.instances.values());
-      const healthyInstances = instances.filter(i => i.healthStatus === 'healthy');
+      const healthyInstances = instances.filter((i: Readonly<DeploymentInstance>) => i.healthStatus === 'healthy');
       
       const health = instances.reduce(
-        (acc, instance) => {
+        (acc: { healthy: number; unhealthy: number; unknown: number }, instance: Readonly<DeploymentInstance>) => {
           acc[instance.healthStatus]++;
           return acc;
         },
@@ -1277,10 +1279,10 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
 
       // Calculate aggregate metrics
       const metrics = healthyInstances.length > 0 ? {
-        averageCpuUsage: healthyInstances.reduce((sum, i) => sum + i.metrics.cpuUsage, 0) / healthyInstances.length,
-        averageMemoryUsage: healthyInstances.reduce((sum, i) => sum + i.metrics.memoryUsage, 0) / healthyInstances.length,
-        totalRequestsPerSecond: healthyInstances.reduce((sum, i) => sum + i.metrics.requestsPerSecond, 0),
-        totalActiveConnections: healthyInstances.reduce((sum, i) => sum + i.metrics.activeConnections, 0),
+        averageCpuUsage: healthyInstances.reduce((sum: number, i: Readonly<DeploymentInstance>) => sum + i.metrics.cpuUsage, 0) / healthyInstances.length,
+        averageMemoryUsage: healthyInstances.reduce((sum: number, i: Readonly<DeploymentInstance>) => sum + i.metrics.memoryUsage, 0) / healthyInstances.length,
+        totalRequestsPerSecond: healthyInstances.reduce((sum: number, i: Readonly<DeploymentInstance>) => sum + i.metrics.requestsPerSecond, 0),
+        totalActiveConnections: healthyInstances.reduce((sum: number, i: Readonly<DeploymentInstance>) => sum + i.metrics.activeConnections, 0),
       } : {
         averageCpuUsage: 0,
         averageMemoryUsage: 0,
@@ -1290,8 +1292,8 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
 
       // Check cooldown status
       const now = Date.now();
-      const lastScaleUp = this.scalingEvents.filter(e => e.type === 'scale-up').pop();
-      const lastScaleDown = this.scalingEvents.filter(e => e.type === 'scale-down').pop();
+      const lastScaleUp = this.scalingEvents.filter((e: Readonly<ScalingEvent>) => e.type === 'scale-up').pop();
+      const lastScaleDown = this.scalingEvents.filter((e: Readonly<ScalingEvent>) => e.type === 'scale-down').pop();
 
       const cooldownStatus = {
         scaleUpReady: !lastScaleUp || (now - lastScaleUp.timestamp) >= this.config.scaling.scaleUpCooldown,
@@ -1314,7 +1316,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
         },
         health: {
           ...health,
-          lastCheckTime: Math.max(...instances.map(i => i.lastHealthCheck || 0), 0),
+          lastCheckTime: Math.max(...instances.map((i: Readonly<DeploymentInstance>) => i.lastHealthCheck ?? 0), 0),
         },
         loadBalancer: {
           strategy: this.config.loadBalancing.strategy,
@@ -1329,7 +1331,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
     /**
      * Stop deployment system and cleanup resources
      */
-    stop(): void {
+    public stop(): void {
       if (this.healthCheckInterval) {
         clearInterval(this.healthCheckInterval);
         this.healthCheckInterval = undefined;
@@ -1342,9 +1344,9 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
 
       // Gracefully stop all instances
       const instances = Array.from(this.instances.values());
-      instances.forEach(instance => {
+      instances.forEach((instance: Readonly<DeploymentInstance>) => {
         if (instance.status === 'running') {
-          instance.status = 'stopping';
+          (instance as DeploymentInstance).status = 'stopping';
         }
       });
 
@@ -1361,30 +1363,30 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
    * Production-ready Load Balancer implementation
    */
   class LoadBalancer {
-    private config: LoadBalancerConfig;
+    private readonly config: LoadBalancerConfig;
     private enabledInstances: DeploymentInstance[] = [];
     private currentIndex = 0;
-    private connectionCounts = new Map<string, number>();
-    private sessionMap = new Map<string, string>(); // session -> instance mapping
-    private instanceWeights = new Map<string, number>();
+    private readonly connectionCounts = new Map<string, number>();
+    private readonly sessionMap = new Map<string, string>(); // session -> instance mapping
+    private readonly instanceWeights = new Map<string, number>();
 
-    constructor(config: LoadBalancerConfig) {
+    public constructor(config: Readonly<LoadBalancerConfig>) {
       this.config = config;
-      this.enabledInstances = config.instances.filter(i => i.healthStatus === 'healthy');
+      this.enabledInstances = config.instances.filter((i: Readonly<DeploymentInstance>) => i.healthStatus === 'healthy');
       this.updateInstanceWeights();
     }
 
     /**
      * Get next instance based on load balancing strategy
      */
-    getNextInstance(clientIP?: string, sessionId?: string): DeploymentInstance | null {
+    public getNextInstance(clientIP?: string, sessionId?: string): DeploymentInstance | null {
       if (this.enabledInstances.length === 0) return null;
 
       // Handle session affinity
       if (this.config.sessionAffinity && sessionId) {
         const instanceId = this.sessionMap.get(sessionId);
         if (instanceId) {
-          const instance = this.enabledInstances.find(i => i.id === instanceId);
+          const instance = this.enabledInstances.find((i: Readonly<DeploymentInstance>) => i.id === instanceId);
           if (instance) return instance;
         }
       }
@@ -1423,20 +1425,20 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
     }
 
     private getLeastConnectionsInstance(): DeploymentInstance {
-      return this.enabledInstances.reduce((least, current) => {
-        const leastConnections = this.connectionCounts.get(least.id) || 0;
-        const currentConnections = this.connectionCounts.get(current.id) || 0;
-        return currentConnections < leastConnections ? current : least;
-      });
+      return this.enabledInstances.reduce(
+        (least: Readonly<DeploymentInstance>, current: Readonly<DeploymentInstance>) => {
+          const leastConnections = this.connectionCounts.get(least.id) ?? 0;
+          const currentConnections = this.connectionCounts.get(current.id) ?? 0;
+          return currentConnections < leastConnections ? current : least;
+        }
+      );
     }
 
     private getWeightedInstance(): DeploymentInstance {
-      // Calculate weights based on inverse of resource utilization
-      const weights = this.enabledInstances.map(instance => {
+      const weights = this.enabledInstances.map((instance: Readonly<DeploymentInstance>) => {
         const cpuWeight = Math.max(1, 100 - instance.metrics.cpuUsage);
         const memoryWeight = Math.max(1, 100 - instance.metrics.memoryUsage);
-        const connectionWeight = Math.max(1, 100 - (this.connectionCounts.get(instance.id) || 0));
-        
+        const connectionWeight = Math.max(1, 100 - (this.connectionCounts.get(instance.id) ?? 0));
         // Combined weight favoring instances with lower utilization
         return (cpuWeight + memoryWeight + connectionWeight) / 3;
       });
@@ -1488,17 +1490,17 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
       return (cpuAvailability + memoryAvailability) / 2 - connectionLoad;
     }
 
-    addInstance(instance: DeploymentInstance): void {
+    public addInstance(instance: Readonly<DeploymentInstance>): void {
       if (instance.healthStatus === 'healthy' && 
-          !this.enabledInstances.find(i => i.id === instance.id)) {
-        this.enabledInstances.push(instance);
+          !this.enabledInstances.find((i: Readonly<DeploymentInstance>) => i.id === instance.id)) {
+        this.enabledInstances.push(instance as DeploymentInstance);
         this.connectionCounts.set(instance.id, 0);
         this.updateInstanceWeights();
       }
     }
 
-    removeInstance(instance: DeploymentInstance): void {
-      this.enabledInstances = this.enabledInstances.filter(i => i.id !== instance.id);
+    public removeInstance(instance: Readonly<DeploymentInstance>): void {
+      this.enabledInstances = this.enabledInstances.filter((i: Readonly<DeploymentInstance>) => i.id !== instance.id);
       this.connectionCounts.delete(instance.id);
       this.instanceWeights.delete(instance.id);
       
@@ -1510,9 +1512,9 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
       }
     }
 
-    enableInstance(instance: DeploymentInstance): void {
-      if (!this.enabledInstances.find(i => i.id === instance.id)) {
-        this.enabledInstances.push(instance);
+    public enableInstance(instance: Readonly<DeploymentInstance>): void {
+      if (!this.enabledInstances.find((i: Readonly<DeploymentInstance>) => i.id === instance.id)) {
+        this.enabledInstances.push(instance as DeploymentInstance);
         if (!this.connectionCounts.has(instance.id)) {
           this.connectionCounts.set(instance.id, 0);
         }
@@ -1520,8 +1522,8 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
       }
     }
 
-    disableInstance(instance: DeploymentInstance): void {
-      this.enabledInstances = this.enabledInstances.filter(i => i.id !== instance.id);
+    public disableInstance(instance: Readonly<DeploymentInstance>): void {
+      this.enabledInstances = this.enabledInstances.filter((i: Readonly<DeploymentInstance>) => i.id !== instance.id);
       
       // Clean up session mappings for disabled instance
       for (const [sessionId, instanceId] of this.sessionMap.entries()) {
@@ -1531,32 +1533,32 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
       }
     }
 
-    incrementConnections(instanceId: string): void {
-      const current = this.connectionCounts.get(instanceId) || 0;
+    public incrementConnections(instanceId: string): void {
+      const current = this.connectionCounts.get(instanceId) ?? 0;
       this.connectionCounts.set(instanceId, current + 1);
       this.updateInstanceWeights();
     }
 
-    decrementConnections(instanceId: string): void {
-      const current = this.connectionCounts.get(instanceId) || 0;
+    public decrementConnections(instanceId: string): void {
+      const current = this.connectionCounts.get(instanceId) ?? 0;
       this.connectionCounts.set(instanceId, Math.max(0, current - 1));
       this.updateInstanceWeights();
     }
 
-    getInstanceStats(): Map<string, { connections: number; weight: number }> {
+    public getInstanceStats(): Map<string, { connections: number; weight: number }> {
       const stats = new Map<string, { connections: number; weight: number }>();
       
-      this.enabledInstances.forEach(instance => {
+      this.enabledInstances.forEach((instance: Readonly<DeploymentInstance>) => {
         stats.set(instance.id, {
-          connections: this.connectionCounts.get(instance.id) || 0,
-          weight: this.instanceWeights.get(instance.id) || 0,
+          connections: this.connectionCounts.get(instance.id) ?? 0,
+          weight: this.instanceWeights.get(instance.id) ?? 0,
         });
       });
       
       return stats;
     }
 
-    clearSession(sessionId: string): void {
+    public clearSession(sessionId: string): void {
       this.sessionMap.delete(sessionId);
     }
   }

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool } from './base-tool';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
@@ -28,7 +28,7 @@ export interface PackageJson {
   [key: string]: unknown;
 }
 
-export class BuildAutomatorTool extends BaseTool {
+export class BuildAutomatorTool extends BaseTool<typeof BuildProjectSchema.shape> {
   public constructor(private readonly agentContext: Readonly<{ workingDirectory: string }>) {
     super({
       name: 'buildProject',
@@ -290,7 +290,7 @@ const PackageManagerSchema = z.object({
   timeout: z.number().default(120000).describe('Operation timeout in milliseconds'),
 });
 
-export class PackageManagerTool extends BaseTool {
+export class PackageManagerTool extends BaseTool<typeof PackageManagerSchema.shape> {
   public constructor(private readonly agentContext: Readonly<{ workingDirectory: string }>) {
     super({
       name: 'managePackages',
@@ -516,7 +516,7 @@ const DeploySchema = z.object({
     .describe('Whether to perform a dry run without actual deployment'),
 });
 
-export class DeploymentTool extends BaseTool {
+export class DeploymentTool extends BaseTool<typeof DeploySchema.shape> {
   public constructor(private readonly agentContext: Readonly<{ workingDirectory: string }>) {
     super({
       name: 'deployProject',

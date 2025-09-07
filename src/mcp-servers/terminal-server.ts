@@ -308,24 +308,20 @@ export class TerminalMCPServer {
       }, timeoutMs);
 
       // Collect stdout
-      if (child.stdout) {
-        child.stdout.on('data', (data) => {
-          stdout += data?.toString() || '';
-          if (stdout.length > (this.config.maxOutputSize || 1024 * 1024)) {
-            child.kill('SIGTERM');
-          }
-        });
-      }
+      child.stdout.on('data', (data: Readonly<Buffer>) => {
+        stdout += data.toString() || '';
+        if (stdout.length > (this.config.maxOutputSize ?? 1024 * 1024)) {
+          child.kill('SIGTERM');
+        }
+      });
 
       // Collect stderr
-      if (child.stderr) {
-        child.stderr.on('data', (data) => {
-          stderr += data?.toString() || '';
-          if (stderr.length > (this.config.maxOutputSize || 1024 * 1024)) {
-            child.kill('SIGTERM');
-          }
-        });
-      }
+      child.stderr.on('data', (data: Readonly<Buffer>) => {
+        stderr += data.toString() || '';
+        if (stderr.length > (this.config.maxOutputSize ?? 1024 * 1024)) {
+          child.kill('SIGTERM');
+        }
+      });
 
       // Handle completion
       child.on('close', (code, signal) => {

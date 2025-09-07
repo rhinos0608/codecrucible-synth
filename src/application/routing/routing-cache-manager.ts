@@ -1,4 +1,4 @@
-import { RoutingContext, IntelligentRoutingDecision } from './routing-types.js';
+import { IntelligentRoutingDecision, RoutingContext } from './routing-types.js';
 
 export class RoutingCacheManager {
   private readonly cache = new Map<

@@ -67,6 +67,10 @@ export class SearchCacheManager {
     this.cleanup();
   }
 
+  public getCacheSize(): number {
+    return this.cache.size;
+  }
+
   private generateKey(query: RAGQuery): string {
     return `${query.query}_${query.queryType}_${query.maxResults || 'default'}_${query.useRegex || false}`;
   }

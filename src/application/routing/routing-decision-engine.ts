@@ -2,7 +2,7 @@ import { HybridLLMRouter } from '../../providers/hybrid/hybrid-llm-router.js';
 import { ModelSelection } from '../../domain/services/model-selection-service.js';
 import { VoiceSelection } from '../../domain/services/voice-orchestration-service.js';
 import { SelectionResult } from '../../providers/provider-selection-strategy.js';
-import { RoutingContext, IntelligentRoutingDecision } from './routing-types.js';
+import { IntelligentRoutingDecision, RoutingContext } from './routing-types.js';
 import { ModelSelectionCoordinator } from './model-selection-coordinator.js';
 import { VoiceIntegrationHandler } from './voice-integration-handler.js';
 
@@ -27,7 +27,7 @@ function buildFallbackChain(
     });
   }
   if (voices.supportingVoices && voices.supportingVoices.length > 0) {
-    const voice = voices.supportingVoices[0];
+    const [voice] = voices.supportingVoices;
     chain.push({ type: 'voice', option: voice.id ?? voice.name ?? 'unknown', reason: 'Supporting voice' });
   }
   return chain;
@@ -68,7 +68,7 @@ export class RoutingDecisionEngine {
       routingStrategy = 'single-model';
     }
 
-    const estimatedCost = modelSelection.estimatedCost;
+    const { estimatedCost } = modelSelection;
     const estimatedLatency = hybridRouting
       ? hybridRouting.estimatedResponseTime
       : modelSelection.estimatedLatency;

@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import type { CLIOperationRequest } from '../unified-cli-coordinator.js';
 
 export interface ICLIParser {
-  parse(args: readonly string[]): CLIOperationRequest;
+  parse: (args: readonly string[]) => CLIOperationRequest;
 }
 
 export class CLICommandParser implements ICLIParser {

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool } from './base-tool';
 import { promises as fs } from 'fs';
 import { dirname, extname, isAbsolute, join } from 'path';
-import { UnifiedModelClient } from '../../application/services/client.js';
+import { UnifiedModelClient } from '../../application/services/client';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -23,7 +23,7 @@ const GenerateTestSchema = z.object({
   includeMocking: z.boolean().default(true).describe('Whether to include mocking examples'),
 });
 
-export class TestGeneratorTool extends BaseTool {
+export class TestGeneratorTool extends BaseTool<typeof GenerateTestSchema.shape> {
   public constructor(
     private readonly agentContext: { workingDirectory: string },
     private readonly modelClient: UnifiedModelClient
@@ -237,7 +237,7 @@ const RunTestsSchema = z.object({
   timeout: z.number().default(30000).describe('Test timeout in milliseconds'),
 });
 
-export class TestRunnerTool extends BaseTool {
+export class TestRunnerTool extends BaseTool<typeof RunTestsSchema.shape> {
   constructor(private agentContext: { workingDirectory: string }) {
     super({
       name: 'runTests',
@@ -339,7 +339,7 @@ const AnalyzeCoverageSchema = z.object({
     .describe('Whether to include uncovered lines in the report'),
 });
 
-export class CoverageAnalyzerTool extends BaseTool {
+export class CoverageAnalyzerTool extends BaseTool<typeof AnalyzeCoverageSchema.shape> {
   constructor(private agentContext: { workingDirectory: string }) {
     super({
       name: 'analyzeCoverage',

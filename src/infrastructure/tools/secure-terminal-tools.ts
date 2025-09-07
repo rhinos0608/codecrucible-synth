@@ -16,9 +16,39 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
-import { SecureExecutionManager } from '../security/secure-execution-manager.js';
-import { logger } from '../logging/logger.js';
+import { BaseTool } from './base-tool';
+import { SecureExecutionManager } from '../security/secure-execution-manager';
+import { logger } from '../logging/logger';
+
+// Schema definitions
+const SecureTerminalExecuteSchema = z.object({
+  command: z.string().describe('Command to execute in secure sandbox'),
+  language: z
+    .enum(['bash', 'shell', 'python'])
+    .optional()
+    .default('bash')
+    .describe('Execution language/environment'),
+  workingDirectory: z.string().optional().describe('Working directory (sandboxed)'),
+  timeout: z.number().optional().default(30000).describe('Timeout in milliseconds (max 30s)'),
+  sessionId: z.string().optional().describe('Session ID for sandbox reuse'),
+});
+
+const SecureProcessManagementSchema = z.object({
+  action: z
+    .enum(['list', 'status'])
+    .describe('Process management action (kill operations not allowed for security)'),
+  sessionId: z.string().optional().describe('Sandbox session ID'),
+});
+
+const SecureShellEnvironmentSchema = z.object({
+  action: z.enum(['pwd', 'whoami', 'which', 'env']).describe('Environment query action'),
+  command: z.string().optional().describe('Command to locate with which'),
+  sessionId: z.string().optional().describe('Sandbox session ID'),
+});
+
+const TerminalExecuteSchema = z.object({
+  command: z.string(),
+});
 
 /**
  * Secure Terminal Command Execution Tool
@@ -26,21 +56,11 @@ import { logger } from '../logging/logger.js';
  * This tool replaces the unsafe TerminalExecuteTool with secure E2B execution.
  * All commands are executed in isolated E2B sandboxes with no access to the host system.
  */
-export class SecureTerminalExecuteTool extends BaseTool {
+export class SecureTerminalExecuteTool extends BaseTool<typeof SecureTerminalExecuteSchema.shape> {
   private readonly secureExecutionManager: SecureExecutionManager;
 
   public constructor(private readonly _agentContext: Readonly<{ workingDirectory: string }>) {
-    const parameters = z.object({
-      command: z.string().describe('Command to execute in secure sandbox'),
-      language: z
-        .enum(['bash', 'shell', 'python'])
-        .optional()
-        .default('bash')
-        .describe('Execution language/environment'),
-      workingDirectory: z.string().optional().describe('Working directory (sandboxed)'),
-      timeout: z.number().optional().default(30000).describe('Timeout in milliseconds (max 30s)'),
-      sessionId: z.string().optional().describe('Session ID for sandbox reuse'),
-    });
+    const parameters = SecureTerminalExecuteSchema;
 
     super({
       name: 'executeSecureCommand',
@@ -179,16 +199,11 @@ interface _SandboxStatusResult {
   error?: string;
 }
 
-export class SecureProcessManagementTool extends BaseTool {
+export class SecureProcessManagementTool extends BaseTool<typeof SecureProcessManagementSchema.shape> {
   private readonly secureExecutionManager: SecureExecutionManager;
 
   public constructor() {
-    const parameters = z.object({
-      action: z
-        .enum(['list', 'status'])
-        .describe('Process management action (kill operations not allowed for security)'),
-      sessionId: z.string().optional().describe('Sandbox session ID'),
-    });
+    const parameters = SecureProcessManagementSchema;
 
     super({
       name: 'manageSecureProcesses',
@@ -286,15 +301,11 @@ export class SecureProcessManagementTool extends BaseTool {
  * Provides safe environment information from sandbox only.
  * No access to host environment variables or system information.
  */
-export class SecureShellEnvironmentTool extends BaseTool {
+export class SecureShellEnvironmentTool extends BaseTool<typeof SecureShellEnvironmentSchema.shape> {
   private readonly secureExecutionManager: SecureExecutionManager;
 
   public constructor(private readonly _agentContext: Readonly<{ workingDirectory: string }>) {
-    const parameters = z.object({
-      action: z.enum(['pwd', 'whoami', 'which', 'env']).describe('Environment query action'),
-      command: z.string().optional().describe('Command to locate with which'),
-      sessionId: z.string().optional().describe('Sandbox session ID'),
-    });
+    const parameters = SecureShellEnvironmentSchema;
 
     super({
       name: 'secureShellEnvironment',
@@ -381,11 +392,9 @@ export class SecureShellEnvironmentTool extends BaseTool {
  * This class replaces the original TerminalExecuteTool to block
  * any remaining references to unsafe execution.
  */
-export class TerminalExecuteTool extends BaseTool {
+export class TerminalExecuteTool extends BaseTool<typeof TerminalExecuteSchema.shape> {
   public constructor(_agentContext: unknown) {
-    const parameters = z.object({
-      command: z.string(),
-    });
+    const parameters = TerminalExecuteSchema;
 
     super({
       name: 'blockedUnsafeTerminal',

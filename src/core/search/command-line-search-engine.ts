@@ -176,7 +176,7 @@ export class CommandLineSearchEngine {
   } {
     return {
       activeSearches: this.ripgrepExecutor.getActiveCount(),
-      cacheSize: this.cacheManager.cache.size || 0,
+      cacheSize: this.cacheManager.getCacheSize(),
       workspace: this.workspace,
       configuration: this.options,
     };
@@ -279,7 +279,8 @@ export class CommandLineSearchEngine {
     };
 
     // Apply file filtering
-    ripgrepOptions = FileFilterManager.applyFilters(ripgrepOptions, this.options.filterOptions);
+    const filteredOptions = FileFilterManager.applyFilters(ripgrepOptions as unknown as Record<string, unknown>, this.options.filterOptions);
+    ripgrepOptions = { ...ripgrepOptions, ...filteredOptions };
 
     // Execute ripgrep
     const executionStart = performance.now();

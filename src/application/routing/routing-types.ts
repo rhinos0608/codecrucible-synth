@@ -74,8 +74,8 @@ export interface RoutingAnalytics {
 }
 
 export interface IIntelligentRoutingCoordinator {
-  routeRequest(context: Readonly<RoutingContext>): Promise<IntelligentRoutingDecision>;
-  recordPerformance(routingId: string, performance: Readonly<RoutingPerformance>): void;
-  getAnalytics(): RoutingAnalytics;
-  optimizeRouting(): Promise<void>;
+  routeRequest: (context: Readonly<RoutingContext>) => Promise<IntelligentRoutingDecision>;
+  recordPerformance: (routingId: string, performance: Readonly<RoutingPerformance>) => void;
+  getAnalytics: () => RoutingAnalytics;
+  optimizeRouting: () => Promise<void>;
 }

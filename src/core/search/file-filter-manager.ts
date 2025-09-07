@@ -37,29 +37,29 @@ export class FileFilterManager {
   };
 
   public static applyFilters(
-    baseOptions: Readonly<FileFilterOptions>,
+    baseOptions: Record<string, unknown>,
     filterOptions: Readonly<FileFilterOptions>
-  ): FileFilterOptions {
-    const options: FileFilterOptions = { ...baseOptions };
+  ): Record<string, unknown> {
+    const options = { ...baseOptions };
 
     // Apply type-based filtering
     if (filterOptions.includeTypes && filterOptions.includeTypes.length > 0) {
       const extensions = this.expandTypes(filterOptions.includeTypes);
-      options.includeExtensions = extensions;
+      options.includeTypes = extensions;
     }
 
     if (filterOptions.excludeTypes && filterOptions.excludeTypes.length > 0) {
       const extensions = this.expandTypes(filterOptions.excludeTypes);
-      options.excludeExtensions = extensions;
+      options.excludeTypes = extensions;
     }
 
     // Apply extension filtering
     if (filterOptions.includeExtensions && filterOptions.includeExtensions.length > 0) {
-      options.includePatterns = filterOptions.includeExtensions.map(ext => `*.${ext}`);
+      options.includeFiles = filterOptions.includeExtensions.map(ext => `*.${ext}`);
     }
 
     if (filterOptions.excludeExtensions && filterOptions.excludeExtensions.length > 0) {
-      options.excludePatterns = filterOptions.excludeExtensions.map(ext => `*.${ext}`);
+      options.excludeFiles = filterOptions.excludeExtensions.map(ext => `*.${ext}`);
     }
 
     return options;

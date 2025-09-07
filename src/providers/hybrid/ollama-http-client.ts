@@ -6,7 +6,7 @@ export class OllamaHttpClient {
     this.baseUrl = baseUrl;
     this.defaultHeaders = {
       'Content-Type': 'application/json',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
     };
   }
 

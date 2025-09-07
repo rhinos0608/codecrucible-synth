@@ -1257,7 +1257,7 @@ export interface ServerResponse {
 }
 
 // Re-export SecurityValidationContext from security validator
-export type { SecurityValidationContext } from '../services/unified-security-validator.js';
+export type { SecurityValidationContext } from '../services/unified-agent/unified-security-validator';
 
 // Configuration source tracking interfaces
 export interface ConfigurationSource {

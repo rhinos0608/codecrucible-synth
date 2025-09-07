@@ -1,4 +1,4 @@
-import type { GitStatus, GitDiffResult } from './git-types.js';
+import type { GitDiffResult, GitStatus } from './git-types.js';
 
 const statusCache = new Map<string, GitStatus>();
 const diffCache = new Map<string, GitDiffResult[]>();

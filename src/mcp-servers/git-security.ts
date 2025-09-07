@@ -1,5 +1,6 @@
 export function validateBranchName(name: string): boolean {
-  return /^[\w\-\/]+$/.test(name);
+  // Allow alphanumeric, underscore, dash, and slash in branch names
+  return /^[\w\-/]+$/.test(name);
 }
 
 export function ensureSafeArg(arg: string): void {

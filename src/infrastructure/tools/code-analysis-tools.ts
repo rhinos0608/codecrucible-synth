@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool } from './base-tool';
 import { isAbsolute, join, relative } from 'path';
 // Cache for import results to prevent circular dependency issues
 const importCache = new Map<string, unknown>();
@@ -107,7 +107,7 @@ const LintCodeSchema = z.object({
   path: z.string().describe('The path to the file to lint.'),
 });
 
-export class LintCodeTool extends BaseTool {
+export class LintCodeTool extends BaseTool<typeof LintCodeSchema.shape> {
   private eslint: unknown;
   private eslintAvailable: boolean;
 
@@ -313,7 +313,7 @@ const GetAstSchema = z.object({
   path: z.string().describe('The path to the file to get the AST for.'),
 });
 
-export class GetAstTool extends BaseTool {
+export class GetAstTool extends BaseTool<typeof GetAstSchema.shape> {
   private ts: typeof import('typescript') | null;
   private tsAvailable: boolean;
 

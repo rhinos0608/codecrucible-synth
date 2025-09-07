@@ -22,10 +22,10 @@ interface Dependencies {
 }
 
 export interface ICLIOrchestrator {
-  processOperation(
+  processOperation: (
     request: Readonly<CLIOperationRequest>,
-    options: UnifiedCLIOptions
-  ): Promise<CLIOperationResponse>;
+    options: Readonly<UnifiedCLIOptions>
+  ) => Promise<CLIOperationResponse>;
 }
 
 export class CLIOrchestrator implements ICLIOrchestrator {
@@ -92,7 +92,7 @@ export class CLIOrchestrator implements ICLIOrchestrator {
                 ? request.input 
                 : String(request.input || ''),
             };
-            return useCaseRouter.executeOperation(adaptedRequest);
+            return await useCaseRouter.executeOperation(adaptedRequest);
           } catch (error) {
             // Fallback operation - adapt session format and try again
             const adaptedSession = request.session ? {

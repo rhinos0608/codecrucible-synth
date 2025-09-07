@@ -31,7 +31,7 @@ export class QueryBus {
       throw new Error(`No query handler registered for type: ${query.type}`);
     }
 
-    const invoke = (): Promise<unknown> => Promise.resolve(handler.handle(query));
+    const invoke = async (): Promise<unknown> => handler.handle(query);
     let pipeline: () => Promise<unknown> = invoke;
     for (let i = this.middleware.length - 1; i >= 0; i--) {
       const mw = this.middleware[i];

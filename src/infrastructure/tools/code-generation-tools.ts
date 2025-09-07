@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool } from './base-tool';
 import { promises as fs } from 'fs';
 import { dirname, isAbsolute, join } from 'path';
-import { UnifiedModelClient } from '../../application/services/client.js';
+import { UnifiedModelClient } from '../../application/services/client';
 
 const GenerateCodeSchema = z.object({
   specification: z.string().describe('Natural language description of what code to generate'),
@@ -17,7 +17,7 @@ const GenerateCodeSchema = z.object({
   context: z.string().optional().describe('Additional context about the project or existing code'),
 });
 
-export class CodeGeneratorTool extends BaseTool {
+export class CodeGeneratorTool extends BaseTool<typeof GenerateCodeSchema.shape> {
   private modelClient: UnifiedModelClient;
 
   constructor(
@@ -438,7 +438,7 @@ const ModifyCodeSchema = z.object({
     .describe('Whether to create a backup before modification'),
 });
 
-export class CodeModifierTool extends BaseTool {
+export class CodeModifierTool extends BaseTool<typeof ModifyCodeSchema.shape> {
   private readonly modelClient: UnifiedModelClient;
 
   public constructor(
@@ -573,7 +573,7 @@ const RefactorCodeSchema = z.object({
     .describe('Options for extraction refactorings'),
 });
 
-export class RefactoringTool extends BaseTool {
+export class RefactoringTool extends BaseTool<typeof RefactorCodeSchema.shape> {
   private readonly modelClient: UnifiedModelClient;
 
   public constructor(

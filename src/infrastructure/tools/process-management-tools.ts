@@ -1,15 +1,24 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool } from './base-tool';
 import { ChildProcess, exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { logger } from '../logging/logger.js';
-import { validateCommand } from '../../utils/command-security.js';
+import { logger } from '../logging/logger';
+import { validateCommand } from '../../utils/command-security';
+
+// Schema definitions
+const AdvancedProcessSchema = z.object({
+  action: z.enum(['start', 'interact', 'read', 'list', 'kill', 'status']),
+  sessionId: z.string().optional().describe('Session ID for existing processes'),
+  command: z.string().optional().describe('Command to execute'),
+  input: z.string().optional().describe('Input to send to process'),
+  timeout: z.number().optional().default(30000).describe('Timeout in milliseconds'),
+  interactive: z.boolean().optional().default(false).describe('Start interactive session'),
+  environment: z.record(z.string()).optional().describe('Environment variables'),
+});
 
 const execAsync = promisify(exec);
 
-type ProcessManagerArgs = z.infer<
-  ReturnType<typeof AdvancedProcessTool.prototype['getParameterSchema']>
->;
+type ProcessManagerArgs = z.infer<typeof AdvancedProcessSchema>;
 type ProcessManagerResult =
   | { error: string }
   | { success: boolean; sessionId?: string | null; command?: string; pid?: number; initialOutput?: string; isRunning?: boolean; interactive?: boolean; message?: string }
@@ -41,7 +50,7 @@ interface ProcessSessionSummary {
 /**
  * Advanced Process Management Tool with session support
  */
-export class AdvancedProcessTool extends BaseTool {
+export class AdvancedProcessTool extends BaseTool<typeof AdvancedProcessSchema.shape> {
   private readonly sessions: Map<string, ProcessSession> = new Map();
   private sessionCounter = 0;
 
@@ -62,15 +71,7 @@ export class AdvancedProcessTool extends BaseTool {
       name: 'advancedProcessTool',
       description: 'Advanced Process Management Tool with session support',
       category: 'Process Management',
-      parameters: z.object({
-        action: z.enum(['start', 'interact', 'read', 'list', 'kill', 'status']),
-        sessionId: z.string().optional().describe('Session ID for existing processes'),
-        command: z.string().optional().describe('Command to execute'),
-        input: z.string().optional().describe('Input to send to process'),
-        timeout: z.number().optional().default(30000).describe('Timeout in milliseconds'),
-        interactive: z.boolean().optional().default(false).describe('Start interactive session'),
-        environment: z.record(z.string()).optional().describe('Environment variables'),
-      }),
+      parameters: AdvancedProcessSchema,
     });
   }
 
@@ -471,7 +472,7 @@ const codeExecutionParameters = z.object({
 
 export type CodeExecutionArgs = z.infer<typeof codeExecutionParameters>;
 
-export class CodeExecutionTool extends BaseTool {
+export class CodeExecutionTool extends BaseTool<typeof codeExecutionParameters.shape> {
   public constructor(private readonly agentContext: Readonly<{ workingDirectory: string }>) {
     const parameters = codeExecutionParameters;
 

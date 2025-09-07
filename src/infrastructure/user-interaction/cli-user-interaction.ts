@@ -12,11 +12,11 @@ import {
 } from '../../domain/interfaces/user-interaction.js';
 import chalk from 'chalk';
 import ora, { Ora } from 'ora';
-import inquirer from 'inquirer';
+import inquirer, { InputQuestion } from 'inquirer';
 
 export class CLIUserInteraction implements IUserInteraction {
   private currentSpinner: Ora | null = null;
-  private _isVerbose: boolean;
+  private _isVerbose: boolean = false;
 
   public constructor(options: Readonly<{ verbose?: boolean }> = {}) {
     this._isVerbose = options.verbose ?? false;
@@ -54,7 +54,6 @@ export class CLIUserInteraction implements IUserInteraction {
       }
     }
   }
-
   public async warn(message: string): Promise<void> {
     await this.display(message, { type: 'warn' });
   }
@@ -92,27 +91,25 @@ export class CLIUserInteraction implements IUserInteraction {
       this.currentSpinner = null;
     }
 
-    const inquirerOptions: inquirer.InputQuestion = {
+    const inquirerOptions: InputQuestion<{ answer: string }> = {
       type: 'input',
       name: 'answer',
       message: question,
       default: options.defaultValue,
-    };
-
-    if (options.validation) {
-      inquirerOptions.validate = (input: string) => {
+      validate: (input: string): string | boolean => {
         if (options.required && !input.trim()) {
           return 'This field is required';
         }
+        if (options.validation) {
+          const result = options.validation(input);
+          if (result === true) return true;
+          if (typeof result === 'string') return result;
+          return 'Invalid input';
+        }
+        return true;
+      }
+    };
 
-        const result = options.validation!(input);
-        if (result === true) return true;
-        if (typeof result === 'string') return result;
-        return 'Invalid input';
-      };
-    }
-
-    const answers = await inquirer.prompt([inquirerOptions]);
     const answers = await inquirer.prompt<{ answer: string }>([inquirerOptions]);
     return answers.answer;
   }
@@ -124,7 +121,7 @@ export class CLIUserInteraction implements IUserInteraction {
       this.currentSpinner = null;
     }
 
-    const answers = await inquirer.prompt<{ confirmed: boolean }>([
+    const answers: { confirmed: boolean } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'confirmed',
@@ -143,7 +140,7 @@ export class CLIUserInteraction implements IUserInteraction {
       this.currentSpinner = null;
     }
 
-    const answers = await inquirer.prompt<{ selected: string }>([
+    const answers: { selected: string } = await inquirer.prompt([
       {
         type: 'list',
         name: 'selected',
@@ -158,7 +155,7 @@ export class CLIUserInteraction implements IUserInteraction {
   /**
    * Stop any active progress indicators
    */
-  stopProgress(): void {
+  public stopProgress(): void {
     if (this.currentSpinner) {
       this.currentSpinner.stop();
       this.currentSpinner = null;
@@ -168,7 +165,7 @@ export class CLIUserInteraction implements IUserInteraction {
   /**
    * Set verbose mode
    */
-  setVerbose(verbose: boolean): void {
+  public setVerbose(verbose: boolean): void {
     this._isVerbose = verbose;
   }
 

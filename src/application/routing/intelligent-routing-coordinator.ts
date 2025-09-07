@@ -1,13 +1,13 @@
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/logger.js';
-import { ModelParameters } from '../../domain/entities/model.js';
+import { Model, ModelParameters } from '../../domain/entities/model.js';
 import { ModelName, ProviderType } from '../../domain/value-objects/voice-values.js';
 import {
   IIntelligentRoutingCoordinator,
-  RoutingContext,
   IntelligentRoutingDecision,
-  RoutingPerformance,
   RoutingAnalytics,
+  RoutingContext,
+  RoutingPerformance,
 } from './routing-types.js';
 import { RoutingCacheManager } from './routing-cache-manager.js';
 import { RoutingAnalyticsTracker } from './routing-analytics.js';
@@ -29,7 +29,6 @@ import {
 } from '../../providers/provider-selection-strategy.js';
 import { HybridLLMRouter } from '../../providers/hybrid/hybrid-llm-router.js';
 import { PerformanceMonitor } from '../../utils/performance.js';
-import { Model } from '../../domain/entities/model.js';
 import { Voice } from '../../domain/entities/voice.js';
 
 // Logger already imported as singleton

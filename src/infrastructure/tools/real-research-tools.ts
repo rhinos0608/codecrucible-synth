@@ -1,6 +1,24 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
-import { logger } from '../logging/logger.js';
+import { BaseTool } from './base-tool';
+import { logger } from '../logging/logger';
+
+// Schema definitions
+const GoogleWebSearchSchema = z.object({
+  query: z.string().describe('Web search query'),
+});
+
+const RefDocumentationSearchSchema = z.object({
+  query: z.string().describe('Documentation search query'),
+});
+
+const RefReadUrlSchema = z.object({
+  url: z.string().describe('The URL to read'),
+});
+
+const ExaWebSearchSchema = z.object({
+  query: z.string().describe('Web search query'),
+  numResults: z.number().optional().default(5),
+});
 
 interface SearchResult {
   title: string;
@@ -44,15 +62,13 @@ interface MCPGlobal {
 
 declare const global: typeof globalThis & MCPGlobal;
 
-export class GoogleWebSearchTool extends BaseTool {
+export class GoogleWebSearchTool extends BaseTool<typeof GoogleWebSearchSchema.shape> {
   public constructor() {
     super({
       name: 'googleWebSearch',
       description: 'Search the web using Google search capabilities.',
       category: 'Research',
-      parameters: z.object({
-        query: z.string().describe('Web search query'),
-      }),
+      parameters: GoogleWebSearchSchema,
     });
   }
 
@@ -96,15 +112,13 @@ export class GoogleWebSearchTool extends BaseTool {
   }
 }
 
-export class RefDocumentationTool extends BaseTool {
+export class RefDocumentationTool extends BaseTool<typeof RefDocumentationSearchSchema.shape> {
   public constructor() {
     super({
       name: 'refDocumentationSearch',
       description: 'Search programming documentation and API references using Ref-Search.',
       category: 'Research',
-      parameters: z.object({
-        query: z.string().describe('Documentation search query'),
-      }),
+      parameters: RefDocumentationSearchSchema,
     });
   }
 
@@ -153,15 +167,13 @@ export class RefDocumentationTool extends BaseTool {
   }
 }
 
-export class RefReadUrlTool extends BaseTool {
+export class RefReadUrlTool extends BaseTool<typeof RefReadUrlSchema.shape> {
   constructor(private _agentContext: { workingDirectory: string }) {
     super({
       name: 'refReadUrl',
       description: 'Read the content of a URL returned from a Ref-Search result.',
       category: 'Research',
-      parameters: z.object({
-        url: z.string().describe('The URL to read'),
-      }),
+      parameters: RefReadUrlSchema,
     });
   }
 
@@ -226,16 +238,13 @@ export class RefReadUrlTool extends BaseTool {
   }
 }
 
-export class ExaWebSearchTool extends BaseTool {
+export class ExaWebSearchTool extends BaseTool<typeof ExaWebSearchSchema.shape> {
   public constructor() {
     super({
       name: 'exaWebSearch',
       description: 'Perform advanced web search using Exa AI.',
       category: 'Research',
-      parameters: z.object({
-        query: z.string().describe('Web search query'),
-        numResults: z.number().optional().default(5),
-      }),
+      parameters: ExaWebSearchSchema,
     });
   }
 

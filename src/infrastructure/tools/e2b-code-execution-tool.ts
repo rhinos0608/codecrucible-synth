@@ -1,15 +1,38 @@
-import { BaseTool } from './base-tool.js';
-import { E2BService, ExecutionResult } from './e2b/e2b-service.js';
-import { createLogger } from '../logging/logger-adapter.js';
-import { SecurityError } from '../security/security-types.js';
+import { BaseTool } from './base-tool';
+import { E2BService, ExecutionResult } from './e2b/e2b-service';
+import { createLogger } from '../logging/logger-adapter';
+import { SecurityError } from '../security/security-types';
 import { z } from 'zod';
+
+// Define the schema at the top level so we can reference it in the class generic
+const E2BExecuteCodeSchema = z.object({
+  code: z.string().describe('The code to execute'),
+  language: z
+    .enum(['python', 'javascript', 'bash'])
+    .default('python')
+    .describe('Programming language'),
+  sessionId: z.string().optional().describe('Session ID for maintaining state (optional)'),
+  installPackages: z
+    .array(z.string())
+    .optional()
+    .describe('Packages to install before execution'),
+  files: z
+    .array(
+      z.object({
+        path: z.string(),
+        content: z.string(),
+      })
+    )
+    .optional()
+    .describe('Files to upload before execution'),
+});
 
 /**
  * E2B Code Execution Tool - Secure sandboxed code execution
  *
  * Replaces unsafe direct code execution with secure E2B sandboxes
  */
-export class E2BCodeExecutionTool extends BaseTool {
+export class E2BCodeExecutionTool extends BaseTool<typeof E2BExecuteCodeSchema.shape> {
   private e2bService: E2BService;
   private sessionId: string;
 
@@ -21,27 +44,7 @@ export class E2BCodeExecutionTool extends BaseTool {
       description:
         'Execute code safely in an isolated E2B sandbox environment. Supports Python, JavaScript, and Bash.',
       category: 'execution',
-      parameters: z.object({
-        code: z.string().describe('The code to execute'),
-        language: z
-          .enum(['python', 'javascript', 'bash'])
-          .default('python')
-          .describe('Programming language'),
-        sessionId: z.string().optional().describe('Session ID for maintaining state (optional)'),
-        installPackages: z
-          .array(z.string())
-          .optional()
-          .describe('Packages to install before execution'),
-        files: z
-          .array(
-            z.object({
-              path: z.string(),
-              content: z.string(),
-            })
-          )
-          .optional()
-          .describe('Files to upload before execution'),
-      }),
+      parameters: E2BExecuteCodeSchema,
       examples: [
         'Execute Python code: { code: "print(\\"Hello, World!\\")", language: "python" }',
         'Execute with packages: { code: "import requests", language: "python", installPackages: ["requests"] }',
@@ -56,7 +59,7 @@ export class E2BCodeExecutionTool extends BaseTool {
   async execute(args: any): Promise<ExecutionResult & { sandbox: string; security: string }> {
     try {
       // ✅ SECURITY: Check authentication requirement from centralized security policies
-      const { SecurityPolicyLoader } = await import('../security/security-policy-loader.js');
+      const { SecurityPolicyLoader } = await import('../security/security-policy-loader');
       const policyLoader = SecurityPolicyLoader.getInstance();
       const authConfig = await policyLoader.getAuthConfig();
 

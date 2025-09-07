@@ -1,7 +1,34 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
-import { logger } from '../logging/logger.js';
-import { ExaSearchTool } from '../../mcp-tools/exa-search-tool.js';
+import { BaseTool } from './base-tool';
+import { logger } from '../logging/logger';
+import { ExaSearchTool } from '../../mcp-tools/exa-search-tool';
+
+// Schema definitions
+const RefDocumentationSchema = z.object({
+  query: z.string().describe('Documentation search query'),
+});
+
+const ExaWebSearchSchema = z.object({
+  query: z.string().describe('Web search query'),
+  numResults: z.number().optional().default(5),
+});
+
+const ExaDeepResearchSchema = z.object({
+  topic: z.string().describe('Research topic or question'),
+  depth: z.enum(['basic', 'detailed', 'comprehensive']).default('detailed'),
+});
+
+const ExaCompanyResearchSchema = z.object({
+  company: z.string().describe('Company name to research'),
+  aspects: z.array(z.string()).optional().describe('Specific aspects to research'),
+});
+
+const MCPServerSchema = z.object({
+  action: z.enum(['list', 'status', 'start', 'stop', 'call']),
+  server: z.string().optional().describe('Server name'),
+  method: z.string().optional().describe('Method to call'),
+  params: z.record(z.unknown()).optional().describe('Parameters for method call'),
+});
 
 // Shared Exa Search instance for real external search
 let exaSearchInstance: ExaSearchTool | null = null;
@@ -107,15 +134,13 @@ async function basicWebSearch(
 }
 
 // Ref Documentation Tool
-export class RefDocumentationTool extends BaseTool {
+export class RefDocumentationTool extends BaseTool<typeof RefDocumentationSchema.shape> {
   public constructor() {
     super({
       name: 'refDocumentationSearch',
       description: 'Search programming documentation and API references',
       category: 'Research',
-      parameters: z.object({
-        query: z.string().describe('Documentation search query'),
-      }),
+      parameters: RefDocumentationSchema,
     });
   }
 
@@ -155,16 +180,13 @@ export class RefDocumentationTool extends BaseTool {
 }
 
 // Exa Web Search Tool
-export class ExaWebSearchTool extends BaseTool {
+export class ExaWebSearchTool extends BaseTool<typeof ExaWebSearchSchema.shape> {
   public constructor() {
     super({
       name: 'exaWebSearch',
       description: 'Perform advanced web search using Exa AI',
       category: 'Research',
-      parameters: z.object({
-        query: z.string().describe('Web search query'),
-        numResults: z.number().optional().default(5),
-      }),
+      parameters: ExaWebSearchSchema,
     });
   }
 
@@ -254,16 +276,13 @@ export interface ExaResearchSearchResult {
   searchTime?: number;
 }
 
-export class ExaDeepResearchTool extends BaseTool {
+export class ExaDeepResearchTool extends BaseTool<typeof ExaDeepResearchSchema.shape> {
   public constructor(private readonly _agentContext: Readonly<{ workingDirectory: string }>) {
     super({
       name: 'exaDeepResearch',
       description: 'Conduct comprehensive research on complex topics',
       category: 'Research',
-      parameters: z.object({
-        topic: z.string().describe('Research topic or question'),
-        depth: z.enum(['basic', 'detailed', 'comprehensive']).default('detailed'),
-      }),
+      parameters: ExaDeepResearchSchema,
     });
   }
 
@@ -424,16 +443,13 @@ export class ExaDeepResearchTool extends BaseTool {
 }
 
 // Exa Company Research Tool
-export class ExaCompanyResearchTool extends BaseTool {
+export class ExaCompanyResearchTool extends BaseTool<typeof ExaCompanyResearchSchema.shape> {
   public constructor() {
     super({
       name: 'exaCompanyResearch',
       description: 'Research companies, startups, and business information',
       category: 'Research',
-      parameters: z.object({
-        company: z.string().describe('Company name to research'),
-        aspects: z.array(z.string()).optional().describe('Specific aspects to research'),
-      }),
+      parameters: ExaCompanyResearchSchema,
     });
   }
 
@@ -670,18 +686,13 @@ export class ExaCompanyResearchTool extends BaseTool {
 }
 
 // MCP Server Manager Tool
-export class MCPServerTool extends BaseTool {
+export class MCPServerTool extends BaseTool<typeof MCPServerSchema.shape> {
   public constructor() {
     super({
       name: 'mcpServer',
       description: 'Manage and interact with MCP servers',
       category: 'MCP',
-      parameters: z.object({
-        action: z.enum(['list', 'status', 'start', 'stop', 'call']),
-        server: z.string().optional().describe('Server name'),
-        method: z.string().optional().describe('Method to call'),
-        params: z.record(z.unknown()).optional().describe('Parameters for method call'),
-      }),
+      parameters: MCPServerSchema,
     });
   }
 

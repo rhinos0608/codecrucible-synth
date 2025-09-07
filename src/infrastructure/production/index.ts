@@ -1,3 +1,15 @@
+
+export * from './hardening-types.js';
+export * from './security-enforcer.js';
+export * from './vulnerability-scanner.js';
+export * from './access-control-manager.js';
+export * from './audit-logger.js';
+export * from './compliance-checker.js';
+export * from './threat-detector.js';
+export * from './incident-response.js';
+export * from './security-metrics.js';
+export * from './production-hardening-system.js';
+
 export * from './production-types.js';
 export * from './deployment-orchestrator.js';
 export * from './environment-manager.js';
@@ -8,3 +20,4 @@ export * from './backup-coordinator.js';
 export * from './metrics-collector.js';
 export * from './rollback-manager.js';
 export * from './production-integration-manager.js';
+

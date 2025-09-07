@@ -253,7 +253,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
   }
 
   async shutdown(): Promise<void> {
-    this.stop();
+    await this.stop();
   }
 
   getEnforcementStats(): {

@@ -34,7 +34,21 @@ export class SecurityEnforcer {
 
   public async enforce(ctx: EnforcementContext): Promise<void> {
     if (this.config.inputValidation.enabled && ctx.metadata?.input) {
-      const size = String(ctx.metadata.input).length;
+      let size: number;
+      const input = ctx.metadata.input;
+      if (typeof input === 'string') {
+        size = Buffer.byteLength(input, 'utf8');
+      } else if (Buffer.isBuffer(input)) {
+        size = input.length;
+      } else if (typeof input === 'object' && input !== null) {
+        try {
+          size = Buffer.byteLength(JSON.stringify(input), 'utf8');
+        } catch {
+          throw new Error('Input could not be serialized for size check');
+        }
+      } else {
+        size = Buffer.byteLength(String(input), 'utf8');
+      }
       if (size > this.config.inputValidation.maxInputSize) {
         throw new Error('Input too large');
       }

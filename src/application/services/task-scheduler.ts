@@ -15,4 +15,12 @@ export class TaskScheduler {
   public async schedule(request: OrchestrationRequest): Promise<void> {
     this.queue.push(request);
   }
+
+  /**
+   * Execute a single task using allocated resources.
+   * Currently a placeholder that simply resolves with task and resources.
+   */
+  public async executeTask(task: unknown, _resources: unknown): Promise<unknown> {
+    return task;
+  }
 }

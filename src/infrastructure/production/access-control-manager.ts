@@ -7,7 +7,8 @@ export class AccessControlManager {
     if (!this.accessMap.has(userId)) {
       this.accessMap.set(userId, new Set());
     }
-    this.accessMap.get(userId)!.add(permission);
+    const perms = this.accessMap.get(userId);
+    perms!.add(permission);
   }
 
   public checkAccess(userId: string, permission: string): void {

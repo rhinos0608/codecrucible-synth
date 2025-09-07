@@ -1,0 +1,31 @@
+import { ResourceSnapshot } from './resource-types.js';
+
+export class ScalingController {
+  private history: ResourceSnapshot[] = [];
+  private readonly window = 60; // keep last 60 seconds
+
+  record(snapshot: ResourceSnapshot): void {
+    this.history.push(snapshot);
+    if (this.history.length > this.window) {
+      this.history.shift();
+    }
+  }
+
+  evaluate(): 'scale_up' | 'scale_down' | 'stable' {
+    if (this.history.length === 0) return 'stable';
+
+    const cpuAvg =
+      this.history.reduce((sum, s) => sum + s.cpu.usagePercent, 0) / this.history.length;
+    const queueAvg =
+      this.history.reduce((sum, s) => sum + s.concurrency.queuedOperations, 0) /
+      this.history.length;
+
+    if (cpuAvg > 80 || queueAvg > 0) {
+      return 'scale_up';
+    }
+    if (cpuAvg < 20 && queueAvg === 0) {
+      return 'scale_down';
+    }
+    return 'stable';
+  }
+}

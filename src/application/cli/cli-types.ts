@@ -5,7 +5,7 @@
 
 import { UnifiedModelClient } from '../../application/services/client.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
-import { UnifiedAgentSystem } from '../../domain/services/unified-agent-system.js';
+import { UnifiedAgentSystem } from '../../domain/services/unified-agent/index.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../../config/config-manager.js';
 

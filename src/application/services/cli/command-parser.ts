@@ -11,7 +11,7 @@ export class CLICommandParser implements ICLIParser {
       id: randomUUID(),
       type: 'prompt',
       input: args.join(' '),
-    } as CLIOperationRequest;
+    };
   }
 }
 

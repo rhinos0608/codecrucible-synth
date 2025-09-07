@@ -94,29 +94,34 @@ export class ProductionResourceEnforcer extends EventEmitter {
   }
 
   /** Register a new operation with required resources. */
-  registerOperation(ctx: OperationResourceContext): void {
+  registerOperation(ctx: OperationResourceContext): boolean {
     if (this.activeOperations.size < this.limits.concurrency.maxConcurrentOperations) {
       ctx.state = 'running';
       ctx.startTime = Date.now();
       this.activeOperations.set(ctx.operationId, ctx);
-    } else if (this.operationQueue.length < this.limits.concurrency.maxQueueSize) {
+      this.emit('operation-started', ctx.operationId);
+      this.updateConcurrencyStats();
+      return true;
+    }
+    if (this.operationQueue.length < this.limits.concurrency.maxQueueSize) {
       ctx.state = 'pending';
       this.operationQueue.push(ctx);
-    } else {
-      this.rejectedOperations += 1;
-      const violation = this.quota.enforce(
-        ResourceType.CONCURRENCY,
-        this.operationQueue.length,
-        'queued',
-        ctx.operationId
-      );
-      if (violation) {
-        this.recordViolation(violation);
-      }
-      return;
+      this.updateConcurrencyStats();
+      return true;
     }
 
+    this.rejectedOperations += 1;
+    const violation = this.quota.enforce(
+      ResourceType.CONCURRENCY,
+      this.operationQueue.length,
+      'queued',
+      ctx.operationId
+    );
+    if (violation) {
+      this.recordViolation(violation);
+    }
     this.updateConcurrencyStats();
+    return false;
   }
 
   completeOperation(id: string): void {
@@ -160,6 +165,19 @@ export class ProductionResourceEnforcer extends EventEmitter {
     return this.violations;
   }
 
+  /**
+   * Executes an operation while enforcing concurrency limits.
+   *
+   * The operation is registered with the enforcer and may execute immediately
+   * or be queued depending on current resource usage. If queued, this method
+   * waits until the operation is promoted to running before invoking the
+   * provided callback. If the operation cannot be accepted, an error is thrown
+   * and the callback is never executed.
+   *
+   * @param operationId - Unique identifier for the operation.
+   * @param fn - Function to execute once resources are available.
+   * @param options - Optional resource requirements, priority, and timeout.
+   */
   async executeWithEnforcement<T>(
     operationId: string,
     fn: () => Promise<T> | T,
@@ -179,7 +197,24 @@ export class ProductionResourceEnforcer extends EventEmitter {
       state: 'pending',
     };
 
-    this.registerOperation(ctx);
+    const accepted = this.registerOperation(ctx);
+    if (!accepted) {
+      ctx.state = 'rejected';
+      throw new Error(`Operation ${operationId} rejected due to resource limits`);
+    }
+
+    if (ctx.state === 'pending') {
+      await new Promise<void>(resolve => {
+        const onStart = (id: string): void => {
+          if (id === operationId) {
+            this.off('operation-started', onStart);
+            resolve();
+          }
+        };
+        this.on('operation-started', onStart);
+      });
+    }
+
     try {
       const result = await fn();
       ctx.state = 'completed';
@@ -192,6 +227,28 @@ export class ProductionResourceEnforcer extends EventEmitter {
     }
   }
 
+  /**
+   * Triggers an emergency cleanup of all active and queued operations.
+   *
+   * This method should be called in critical situations where the system is in
+   * an unrecoverable state, such as severe resource violations, persistent
+   * instability, or when normal operation cannot continue safely.
+   *
+   * The cleanup process involves:
+   * - Clearing all active operations.
+   * - Emptying the operation queue.
+   * - Resetting the count of rejected operations.
+   * - Updating concurrency statistics.
+   * - Emitting an 'emergency-cleanup' event with the provided reason.
+   *
+   * Potential side effects:
+   * - Abrupt termination of all in-progress and queued operations, which may
+   *   result in loss of work or inconsistent state.
+   * - Listeners to the 'emergency-cleanup' event should handle any necessary
+   *   recovery or alerting.
+   *
+   * @param reason - A descriptive reason for triggering the emergency cleanup.
+   */
   async triggerEmergencyCleanup(reason: string): Promise<void> {
     this.activeOperations.clear();
     this.operationQueue = [];

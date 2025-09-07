@@ -28,6 +28,13 @@ export class ScalingController {
     }
   }
 
+  /**
+   * Analyzes recent resource snapshots to determine a scaling action.
+   *
+   * Scales up when average CPU usage or queue length exceeds configured
+   * thresholds. Scales down only when CPU usage falls below the down threshold
+   * and the queue is empty.
+   */
   evaluate(): 'scale_up' | 'scale_down' | 'stable' {
     if (this.history.length === 0) return 'stable';
 

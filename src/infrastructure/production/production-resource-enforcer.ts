@@ -15,6 +15,46 @@ import { HealthChecker } from './health-checker.js';
 import { AlertManager } from './alert-manager.js';
 import { CapacityPlanner } from './capacity-planner.js';
 
+const DEFAULT_LIMITS: ResourceLimits = {
+  memory: {
+    hardLimit: 1024,
+    softLimit: 768,
+    emergencyLimit: 900,
+    gcThreshold: 0.8,
+    leakDetectionEnabled: true,
+    maxAllocationSize: 256,
+  },
+  cpu: {
+    maxUsagePercent: 90,
+    throttleThreshold: 80,
+    measurementWindow: 1000,
+    throttleDelay: 100,
+    maxConcurrentCpuOps: 4,
+  },
+  concurrency: {
+    maxConcurrentOperations: 10,
+    maxQueueSize: 100,
+    operationTimeout: 60000,
+    priorityLevels: 3,
+    fairnessEnabled: true,
+    starvationPrevention: true,
+  },
+  network: {
+    maxConnections: 100,
+    maxBandwidthMbps: 1000,
+    connectionTimeout: 30000,
+    idleTimeout: 60000,
+    maxConcurrentRequests: 100,
+  },
+  filesystem: {
+    maxOpenFiles: 100,
+    maxDiskUsageMB: 1024,
+    tempFileQuotaMB: 100,
+    maxFileSize: 50,
+    ioThrottleThreshold: 80,
+  },
+};
+
 /**
  * ProductionResourceEnforcer
  *
@@ -39,9 +79,9 @@ export class ProductionResourceEnforcer extends EventEmitter {
   private operationQueue: OperationResourceContext[] = [];
   private rejectedOperations = 0;
 
-  constructor(private limits: ResourceLimits) {
+  constructor(private limits: ResourceLimits = DEFAULT_LIMITS) {
     super();
-    this.quota = new QuotaEnforcer(limits);
+    this.quota = new QuotaEnforcer(this.limits);
     this.monitor.on('snapshot', snap => this.handleSnapshot(snap));
   }
 
@@ -118,6 +158,58 @@ export class ProductionResourceEnforcer extends EventEmitter {
 
   getViolations(): ResourceViolation[] {
     return this.violations;
+  }
+
+  async executeWithEnforcement<T>(
+    operationId: string,
+    fn: () => Promise<T> | T,
+    options: {
+      resourceRequirements?: OperationResourceContext['resourceRequirements'];
+      priority?: number;
+      timeout?: number;
+    } = {}
+  ): Promise<T> {
+    const ctx: OperationResourceContext = {
+      operationId,
+      resourceRequirements: options.resourceRequirements || {},
+      priority: options.priority ?? 0,
+      startTime: Date.now(),
+      timeout: options.timeout ?? 0,
+      resourcesAllocated: new Map(),
+      state: 'pending',
+    };
+
+    this.registerOperation(ctx);
+    try {
+      const result = await fn();
+      ctx.state = 'completed';
+      return result;
+    } catch (error) {
+      ctx.state = 'failed';
+      throw error;
+    } finally {
+      this.completeOperation(operationId);
+    }
+  }
+
+  async triggerEmergencyCleanup(reason: string): Promise<void> {
+    this.activeOperations.clear();
+    this.operationQueue = [];
+    this.rejectedOperations = 0;
+    this.updateConcurrencyStats();
+    this.emit('emergency-cleanup', reason);
+  }
+
+  getEnforcementStats(): {
+    activeOperations: number;
+    queuedOperations: number;
+    rejectedOperations: number;
+  } {
+    return {
+      activeOperations: this.activeOperations.size,
+      queuedOperations: this.operationQueue.length,
+      rejectedOperations: this.rejectedOperations,
+    };
   }
 
   private handleSnapshot(snapshot: ResourceSnapshot): void {

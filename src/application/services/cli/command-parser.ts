@@ -7,11 +7,13 @@ export interface ICLIParser {
 
 export class CLICommandParser implements ICLIParser {
   public parse(args: readonly string[]): CLIOperationRequest {
-    return {
+    const request: CLIOperationRequest = {
       id: randomUUID(),
       type: 'prompt',
       input: args.join(' '),
     };
+
+    return request;
   }
 }
 

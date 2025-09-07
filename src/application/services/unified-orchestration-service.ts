@@ -118,7 +118,7 @@ export class UnifiedOrchestrationService {
     try {
       this.logger.info('Initializing Unified Orchestration Service...');
 
-      // Initialize configuration
+// Initialize configuration
       await this.configManager.initialize();
       this.config = this.configManager.getConfiguration();
 
@@ -223,8 +223,15 @@ export class UnifiedOrchestrationService {
           // Register with command bus for execution
           this.commandRegistry?.register(name, handler, { plugin: 'plugin' });
 
+
           // Also expose via dependency resolver so executePluginCommand works
           this.registerPlugin(name, handler);
+
+
+          this.registerPlugin(
+            name,
+            async (...args: unknown[]): Promise<unknown> => handler(...args)
+          );
 
           this.eventBus.emit('plugin:command_registered', { name });
         },

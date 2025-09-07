@@ -4,6 +4,27 @@ import { logger } from '../logging/logger.js';
 import type { ProductionHardeningConfig, ProductionStats } from './hardening-types.js';
 import { SecurityEnforcer } from './security-enforcer.js';
 
+function deepMerge<T extends Record<string, any>>(base: T, override: Partial<T>): T {
+  const result: Record<string, any> = { ...base };
+  for (const key of Object.keys(override)) {
+    const baseVal = (base as any)[key];
+    const overrideVal = (override as any)[key];
+    if (
+      baseVal &&
+      overrideVal &&
+      typeof baseVal === 'object' &&
+      typeof overrideVal === 'object' &&
+      !Array.isArray(baseVal) &&
+      !Array.isArray(overrideVal)
+    ) {
+      result[key] = deepMerge(baseVal, overrideVal);
+    } else if (overrideVal !== undefined) {
+      result[key] = overrideVal;
+    }
+  }
+  return result as T;
+}
+
 const defaultConfig: ProductionHardeningConfig = {
   security: {
     rateLimiting: { enabled: true, requestsPerMinute: 60, burstLimit: 10, banDuration: 60 },
@@ -44,6 +65,7 @@ export class ProductionHardeningSystem extends EventEmitter {
   };
   private readonly start = Date.now();
   private alerts: string[] = [];
+  private successfulOperations = 0;
 
   private constructor(private readonly config: ProductionHardeningConfig) {
     super();
@@ -54,7 +76,7 @@ export class ProductionHardeningSystem extends EventEmitter {
     config: Partial<ProductionHardeningConfig> = {}
   ): ProductionHardeningSystem {
     if (!this.instance) {
-      this.instance = new ProductionHardeningSystem({ ...defaultConfig, ...config });
+      this.instance = new ProductionHardeningSystem(deepMerge(defaultConfig, config));
     }
     return this.instance;
   }
@@ -88,16 +110,17 @@ export class ProductionHardeningSystem extends EventEmitter {
 
   private recordSuccess(duration: number): void {
     this.stats.totalOperations++;
+    this.successfulOperations++;
     const n = this.stats.totalOperations;
     this.stats.averageResponseTime = (this.stats.averageResponseTime * (n - 1) + duration) / n;
-    this.stats.successRate = (this.stats.successRate * (n - 1) + 1) / n;
+    this.stats.successRate = (this.successfulOperations / n) * 100;
   }
 
   private recordFailure(duration: number): void {
     this.stats.totalOperations++;
     const n = this.stats.totalOperations;
     this.stats.averageResponseTime = (this.stats.averageResponseTime * (n - 1) + duration) / n;
-    this.stats.successRate = (this.stats.successRate * (n - 1)) / n;
+    this.stats.successRate = (this.successfulOperations / n) * 100;
   }
 
   public async triggerEmergencyMode(reason: string): Promise<void> {

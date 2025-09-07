@@ -223,7 +223,7 @@ export class UnifiedOrchestrationService {
           this.commandRegistry?.register(name, handler, { plugin: 'plugin' });
           this.registerPlugin(
             name,
-            async (...args: unknown[]): Promise<unknown> => handler(...(args as unknown[]))
+            async (...args: unknown[]): Promise<unknown> => handler(...args)
           );
           this.eventBus.emit('plugin:command_registered', { name });
         },

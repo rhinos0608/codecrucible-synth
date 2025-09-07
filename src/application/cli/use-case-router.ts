@@ -30,12 +30,12 @@ import {
 export interface CLIOperationRequest {
   id: string;
   type: 'prompt' | 'analyze' | 'execute' | 'navigate' | 'suggest';
-  input: string;
+  input: string | object;
   options?: UseCaseRouterOptions;
   session?: {
     id: string;
-    workingDirectory: string;
-    context: WorkflowContext;
+    workingDirectory?: string;
+    context?: WorkflowContext;
   };
 }
 

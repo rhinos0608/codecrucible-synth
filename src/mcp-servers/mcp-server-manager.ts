@@ -236,21 +236,41 @@ export class MCPServerManager {
       await this.initialize();
     }
 
-    // Lifecycle manager handles the actual startup
-    await mcpServerLifecycle.startAll();
+    // Lifecycle manager handles the actual startup with error handling
+    try {
+      await mcpServerLifecycle.startAll();
+      logger.info('MCP servers started successfully via lifecycle manager');
+    } catch (error) {
+      logger.error('Failed to start MCP servers:', error);
+      // Continue with partial startup - some servers may have started successfully
+    }
 
     // Register servers with monitoring before starting monitoring to prevent warnings
-    this.registerServersWithMonitoring();
+    try {
+      this.registerServersWithMonitoring();
+    } catch (error) {
+      logger.error('Failed to register servers with monitoring:', error);
+    }
 
     // Start monitoring after servers are running and registered
-    mcpServerMonitoring.startMonitoring();
+    try {
+      mcpServerMonitoring.startMonitoring();
+    } catch (error) {
+      logger.error('Failed to start monitoring:', error);
+    }
 
     // Initialize Smithery if enabled
     if (this.config.smithery?.enabled) {
-      await this.initializeSmitheryServer();
+      try {
+        await this.initializeSmitheryServer();
+        logger.info('Smithery server initialized successfully');
+      } catch (error) {
+        logger.error('Failed to initialize Smithery server:', error);
+        // Continue without Smithery - not critical for core functionality
+      }
     }
 
-    logger.info('All MCP servers started via lifecycle manager');
+    logger.info('MCP server startup completed (some components may have failed)');
   }
 
   public async startServer(serverName: string): Promise<void> {

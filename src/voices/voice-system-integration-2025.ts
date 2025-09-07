@@ -39,7 +39,7 @@ export interface VoiceMetadata {
   alternatives?: string[];
   modelUsed?: string;
   tokensUsed?: number;
-  options?: any; // Voice-specific options
+  options?: Record<string, unknown>; // Voice-specific options
 }
 
 export interface VoiceResult {
@@ -233,21 +233,21 @@ export class VoiceSystemIntegration2025 {
   }
 
   private selectAdaptiveVoices(
-    voices: string[],
+    voices: readonly string[],
     count: number,
-    criteria: Record<string, unknown>
+    criteria: Readonly<Record<string, unknown>>
   ): string[] {
     // Adaptive selection based on criteria
     const priorities = this.calculateVoicePriorities(voices, criteria);
     return priorities
-      .sort((a, b) => b.priority - a.priority)
+      .sort((a: Readonly<{ voice: string; priority: number }>, b: Readonly<{ voice: string; priority: number }>) => b.priority - a.priority)
       .slice(0, count)
-      .map(v => v.voice);
+      .map((v: Readonly<{ voice: string; priority: number }>) => v.voice);
   }
 
   private calculateVoicePriorities(
-    voices: string[],
-    criteria: Record<string, unknown>
+    voices: readonly string[],
+    criteria: Readonly<Record<string, unknown>>
   ): Array<{ voice: string; priority: number }> {
     return voices.map(voice => ({
       voice,
@@ -255,7 +255,7 @@ export class VoiceSystemIntegration2025 {
     }));
   }
 
-  private calculateVoicePriority(voice: string, criteria: Record<string, unknown>): number {
+  private calculateVoicePriority(voice: string, criteria: Readonly<Record<string, unknown>>): number {
     let priority = 0.5; // Base priority
 
     // Simple priority calculation based on voice type and criteria
@@ -341,15 +341,15 @@ export class VoiceSystemIntegration2025 {
   /**
    * Process request with integrated routing
    */
-  async processWithIntegratedRouting(
+  public async processWithIntegratedRouting(
     request: string,
-    routing: RoutingOptions = {}
+    routing: Readonly<RoutingOptions> = {}
   ): Promise<SynthesisResult> {
     logger.info('Processing request with integrated routing');
 
     const selectedVoices = await this.selectVoices({
-      type: routing.type || 'general',
-      complexity: routing.complexity || 'medium',
+      type: routing.type ?? 'general',
+      complexity: routing.complexity ?? 'medium',
       ...routing,
     });
 
@@ -360,7 +360,7 @@ export class VoiceSystemIntegration2025 {
     return {
       ...result,
       routing: {
-        strategy: this.config.voiceSelectionStrategy || 'adaptive',
+        strategy: this.config.voiceSelectionStrategy ?? 'adaptive',
         selectedVoices,
         routingCriteria: routing,
       },
@@ -370,14 +370,14 @@ export class VoiceSystemIntegration2025 {
   /**
    * Synthesize multiple voices for a given request
    */
-  async synthesizeMultipleVoices(
+  public async synthesizeMultipleVoices(
     request: string,
-    options: VoiceSynthesisOptions = {}
+    options: Readonly<VoiceSynthesisOptions> = {}
   ): Promise<SynthesisResult> {
     logger.info('Synthesizing multiple voices for request');
 
     const voices =
-      options.requiredVoices || (await this.selectVoices(options as Record<string, unknown>));
+      options.requiredVoices ?? (await this.selectVoices(options as Record<string, unknown>));
     const results: VoiceResult[] = [];
 
     for (const voice of voices) {
@@ -391,11 +391,11 @@ export class VoiceSystemIntegration2025 {
     }
 
     return {
-      content: results.map(r => r.content).join('\n\n'),
+      content: (results as ReadonlyArray<VoiceResult>).map(r => r.content).join('\n\n'),
       voices: results,
-      strategy: options.strategy || 'consensus',
+      strategy: options.strategy ?? 'consensus',
       confidence:
-        results.length > 0 ? results.reduce((sum, r) => sum + r.confidence, 0) / results.length : 0,
+        results.length > 0 ? (results as ReadonlyArray<VoiceResult>).reduce((sum, r) => sum + r.confidence, 0) / results.length : 0,
       processingTime: Date.now(),
     };
   }
@@ -419,7 +419,7 @@ export class VoiceSystemIntegration2025 {
   private async synthesizeSingleVoice(
     voice: string,
     request: string,
-    options: VoiceSynthesisOptions
+    options: Readonly<VoiceSynthesisOptions>
   ): Promise<VoiceResult> {
     // Calculate real confidence based on multiple factors
     const confidence = this.calculateVoiceConfidence(voice, request, options);
@@ -429,14 +429,14 @@ export class VoiceSystemIntegration2025 {
       content: `Response from ${voice} archetype for: ${request.substring(0, 50)}...`,
       confidence,
       processingTime: this.estimateProcessingTime(voice, request.length),
-      metadata: { options },
+      metadata: { ...(options as Record<string, unknown>) },
     };
   }
 
   private calculateVoiceConfidence(
     voice: string,
     request: string,
-    options: VoiceSynthesisOptions
+    _options: Readonly<VoiceSynthesisOptions>
   ): number {
     let confidence = 0.5; // Base confidence
 
@@ -465,7 +465,7 @@ export class VoiceSystemIntegration2025 {
 
   private estimateProcessingTime(voice: string, requestLength: number): number {
     // Base time for voice initialization
-    let baseTime = 300;
+    const baseTime = 300;
 
     // Add time based on request length (words per minute processing)
     const wordsEstimate = requestLength / 5; // ~5 chars per word
@@ -479,14 +479,18 @@ export class VoiceSystemIntegration2025 {
 
   private getVoiceStrengths(voice: string): string[] {
     const strengths: Record<string, string[]> = {
-      Explorer: ['innovation', 'creativity', 'research', 'discovery'],
-      Maintainer: ['stability', 'quality', 'maintenance', 'reliability'],
-      Security: ['security', 'vulnerability', 'authentication', 'encryption'],
-      Architect: ['design', 'structure', 'scalability', 'patterns'],
-      Developer: ['implementation', 'coding', 'debugging', 'testing'],
-      Analyzer: ['performance', 'optimization', 'metrics', 'analysis'],
+      explorer: ['innovation', 'creativity', 'research', 'discovery'],
+      maintainer: ['stability', 'quality', 'maintenance', 'reliability'],
+      security: ['security', 'vulnerability', 'authentication', 'encryption'],
+      architect: ['design', 'structure', 'scalability', 'patterns'],
+      developer: ['implementation', 'coding', 'debugging', 'testing'],
+      analyzer: ['performance', 'optimization', 'metrics', 'analysis'],
+      implementor: [],
+      designer: [],
+      guardian: [],
+      optimizer: [],
     };
-    return strengths[voice] || [];
+    return strengths[voice.toLowerCase()] || [];
   }
 
   private extractRequestKeywords(request: string): string[] {
@@ -533,53 +537,64 @@ export class VoiceSystemIntegration2025 {
     );
 
     complexity += matches.length * 0.1;
-
-    return Math.min(1.0, complexity);
+    return Math.min(complexity, 1.0);
   }
 
   private getVoiceCapability(voice: string): number {
     const capabilities: Record<string, number> = {
-      Explorer: 0.8, // High capability for innovative tasks
-      Maintainer: 0.7, // Good for stability tasks
-      Security: 0.9, // Excellent for security tasks
-      Architect: 0.85, // Very good for design tasks
-      Developer: 0.75, // Good for implementation
-      Analyzer: 0.8, // High capability for analysis
+      explorer: 0.8, // High capability for innovative tasks
+      maintainer: 0.7, // Good for stability tasks
+      security: 0.9, // Excellent for security tasks
+      architect: 0.85, // Very good for design tasks
+      developer: 0.75, // Good for implementation
+      analyzer: 0.8, // High capability for analysis
+      implementor: 0.7,
+      designer: 0.75,
+      guardian: 0.7,
+      optimizer: 0.8,
     };
-    return capabilities[voice] || 0.6;
+    return capabilities[voice.toLowerCase()] || 0.7;
   }
 
   private getVoiceSuccessRate(voice: string): number {
     // In a real implementation, this would come from historical data
     // For now, return reasonable estimates based on voice characteristics
     const successRates: Record<string, number> = {
-      Explorer: 0.72, // Innovative but sometimes unpredictable
-      Maintainer: 0.85, // Very reliable
-      Security: 0.88, // Highly reliable for security tasks
-      Architect: 0.8, // Generally reliable design
-      Developer: 0.78, // Good practical results
-      Analyzer: 0.82, // Strong analytical results
+      explorer: 0.72, // Innovative but sometimes unpredictable
+      maintainer: 0.85, // Very reliable
+      security: 0.88, // Highly reliable for security tasks
+      architect: 0.8, // Generally reliable design
+      developer: 0.78, // Good practical results
+      analyzer: 0.82, // Strong analytical results
+      implementor: 0.77,
+      designer: 0.79,
+      guardian: 0.8,
+      optimizer: 0.81,
     };
-    return successRates[voice] || 0.75;
+    return successRates[voice.toLowerCase()] || 0.75;
   }
 
   private getVoiceProcessingOverhead(voice: string): number {
     // Different voices have different processing complexity
     const overheads: Record<string, number> = {
-      Explorer: 200, // Higher overhead for creative processing
-      Maintainer: 100, // Lower overhead for straightforward tasks
-      Security: 300, // Higher overhead for security analysis
-      Architect: 250, // Moderate overhead for design work
-      Developer: 150, // Moderate overhead for implementation
-      Analyzer: 180, // Moderate overhead for analysis
+      explorer: 200, // Higher overhead for creative processing
+      maintainer: 100, // Lower overhead for straightforward tasks
+      security: 300, // Higher overhead for security analysis
+      architect: 250, // Moderate overhead for design work
+      developer: 150, // Moderate overhead for implementation
+      analyzer: 180, // Moderate overhead for analysis
+      implementor: 160,
+      designer: 170,
+      guardian: 140,
+      optimizer: 190,
     };
-    return overheads[voice] || 150;
+    return overheads[voice.toLowerCase()] || 150;
   }
 
   /**
    * Generate optimization recommendations based on system performance
    */
-  async generateOptimizationRecommendations(): Promise<string[]> {
+  public generateOptimizationRecommendations(): string[] {
     return [
       'Consider increasing concurrent voice limit for better throughput',
       'Use adaptive voice selection for complex requests',
@@ -590,7 +605,7 @@ export class VoiceSystemIntegration2025 {
   /**
    * Recommend voices for a specific prompt
    */
-  recommendVoices(prompt: string, count: number = 3): string[] {
+  public recommendVoices(prompt: string, count: number = 3): string[] {
     const voices = this.getAvailableVoices();
     return this.selectAdaptiveVoices(voices, count, { prompt });
   }
@@ -598,10 +613,10 @@ export class VoiceSystemIntegration2025 {
   /**
    * Generate a response using a single voice
    */
-  async generateSingleVoiceResponse(
+  public async generateSingleVoiceResponse(
     voice: string,
     prompt: string,
-    options: VoiceSynthesisOptions = {}
+    options: Readonly<VoiceSynthesisOptions> = {}
   ): Promise<VoiceResult> {
     return this.synthesizeSingleVoice(voice, prompt, options);
   }
@@ -609,13 +624,13 @@ export class VoiceSystemIntegration2025 {
   /**
    * Generate solutions using multiple voices
    */
-  async generateMultiVoiceSolutions(
-    voices: string[],
+  public async generateMultiVoiceSolutions(
+    voices: readonly string[],
     prompt: string,
-    options: VoiceSynthesisOptions = {}
+    options: Readonly<VoiceSynthesisOptions> = {}
   ): Promise<VoiceResult[]> {
     const results = await Promise.all(
-      voices.map(voice => this.synthesizeSingleVoice(voice, prompt, options))
+      voices.map(async (voice: string) => this.synthesizeSingleVoice(voice, prompt, options))
     );
     return results;
   }
@@ -623,18 +638,18 @@ export class VoiceSystemIntegration2025 {
   /**
    * Synthesize responses from multiple voices with a specific strategy
    */
-  async synthesize(
+  public async synthesize(
     prompt: string,
-    voices: string[],
+    voices: readonly string[],
     strategy: string = 'consensus'
   ): Promise<SynthesisResult> {
     const results = await this.generateMultiVoiceSolutions(voices, prompt, {});
     return {
-      content: results.map(r => r.content).join('\n\n'),
+      content: (results as ReadonlyArray<VoiceResult>).map((r: Readonly<VoiceResult>) => r.content).join('\n\n'),
       voices: results,
       strategy,
       confidence:
-        results.length > 0 ? results.reduce((sum, r) => sum + r.confidence, 0) / results.length : 0,
+        results.length > 0 ? (results as ReadonlyArray<VoiceResult>).reduce((sum: number, r: Readonly<VoiceResult>) => sum + r.confidence, 0) / results.length : 0,
       processingTime: Date.now(),
     };
   }

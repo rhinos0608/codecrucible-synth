@@ -1,5 +1,4 @@
 import { logger } from '../infrastructure/logging/logger.js';
-import axios from 'axios';
 
 export interface HuggingFaceConfig {
   enabled: boolean;
@@ -69,6 +68,22 @@ export class HuggingFaceTool {
   }
 
   /**
+   * Helper method to make HTTP requests with 2025 best practices
+   */
+  private async makeRequest<T>(url: string): Promise<T> {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(this.config.timeout),
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return response.json() as Promise<T>;
+  }
+
+  /**
    * Search for models with advanced filtering
    */
   public async searchModels(
@@ -101,7 +116,7 @@ export class HuggingFaceTool {
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
       if (options.filter) params.append('filter', options.filter);
 
-      const response = await axios.get<{ 
+      const response = await this.makeRequest<{ 
         id: string;
         name?: string;
         description?: string;
@@ -112,15 +127,12 @@ export class HuggingFaceTool {
         library_name?: string;
         language?: string[];
         license?: string;
-      }[]>(`${this.config.baseUrl}/models?${params.toString()}`, {
-        headers: this.getHeaders(),
-        timeout: this.config.timeout,
-      });
+      }[]>(`${this.config.baseUrl}/models?${params.toString()}`);
 
       this.requestCount++;
 
-      return Array.isArray(response.data)
-        ? response.data.map((model) => this.processModelInfo(model))
+      return Array.isArray(response)
+        ? response.map((model) => this.processModelInfo(model))
         : [];
     } catch (error) {
       logger.error('Hugging Face model search failed:', error);
@@ -138,7 +150,7 @@ export class HuggingFaceTool {
     }
 
     try {
-      const response = await axios.get<{
+      const response = await this.makeRequest<{
         id: string;
         name?: string;
         description?: string;
@@ -149,14 +161,11 @@ export class HuggingFaceTool {
         library_name?: string;
         language?: string[];
         license?: string;
-      }>(`${this.config.baseUrl}/models/${modelId}`, {
-        headers: this.getHeaders(),
-        timeout: this.config.timeout,
-      });
+      }>(`${this.config.baseUrl}/models/${modelId}`);
 
       this.requestCount++;
 
-      return this.processModelInfo(response.data);
+      return this.processModelInfo(response);
     } catch (error) {
       logger.error('Failed to get model info:', error);
       this.handleError(error);
@@ -195,7 +204,7 @@ export class HuggingFaceTool {
       if (options.direction) params.append('direction', options.direction);
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
 
-      const response = await axios.get<Array<{
+      const response = await this.makeRequest<Array<{
         id: string;
         name?: string;
         description?: string;
@@ -205,15 +214,12 @@ export class HuggingFaceTool {
         size_categories?: string[];
         language?: string[];
         license?: string;
-      }>>(`${this.config.baseUrl}/datasets?${params.toString()}`, {
-        headers: this.getHeaders(),
-        timeout: this.config.timeout,
-      });
+      }>>(`${this.config.baseUrl}/datasets?${params.toString()}`);
 
       this.requestCount++;
 
-      return Array.isArray(response.data)
-        ? response.data.map((dataset) => this.processDatasetInfo(dataset))
+      return Array.isArray(response)
+        ? response.map((dataset) => this.processDatasetInfo(dataset))
         : [];
     } catch (error) {
       logger.error('Hugging Face dataset search failed:', error);
@@ -247,7 +253,7 @@ export class HuggingFaceTool {
       if (options.direction) params.append('direction', options.direction);
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
 
-      const response = await axios.get<Array<{
+      const response = await this.makeRequest<Array<{
         id: string;
         name?: string;
         description?: string;
@@ -255,15 +261,12 @@ export class HuggingFaceTool {
         sdk?: string;
         tags?: string[];
         runtime?: string;
-      }>>(`${this.config.baseUrl}/spaces?${params.toString()}`, {
-        headers: this.getHeaders(),
-        timeout: this.config.timeout,
-      });
+      }>>(`${this.config.baseUrl}/spaces?${params.toString()}`);
 
       this.requestCount++;
 
-      return Array.isArray(response.data)
-        ? response.data.map((space) => this.processSpaceInfo(space))
+      return Array.isArray(response)
+        ? response.map((space) => this.processSpaceInfo(space))
         : [];
     } catch (error) {
       logger.error('Hugging Face spaces search failed:', error);

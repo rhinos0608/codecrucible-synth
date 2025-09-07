@@ -11,10 +11,10 @@ import { VoiceDefinition, createArchetypeDefinitions } from './archetype-definit
 import { selectVoices } from './voice-selector.js';
 import { CouncilMode, CouncilOrchestrator } from './council-orchestrator.js';
 import {
-  VoiceOutput,
   formatSynthesisResult,
-  synthesizePerspectives,
   type SynthesisResult,
+  synthesizePerspectives,
+  VoiceOutput,
 } from './perspective-synthesizer.js';
 import { CouncilDecisionEngine } from './collaboration/council-decision-engine.js';
 import { VOICE_GROUPS } from './voice-constants.js';

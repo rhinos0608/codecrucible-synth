@@ -1176,13 +1176,14 @@ export class OllamaProvider implements LLMProvider {
               return responseText;
             },
           };
-          await this.parseRobustJSON(mockResponse as Response);
+          result = await this.parseRobustJSON(mockResponse as Response);
 
         }
 
         // CRITICAL DEBUG: Log the parsed result structure
         if (result && typeof result === 'object') {
-          const { message } = result;
+          const resultObj = result as { message?: { content?: string; tool_calls?: unknown[] }; content?: string; response?: string };
+          const { message } = resultObj;
           const messageContent = message && typeof message === 'object' ? (message as { content?: string }).content : undefined;
           const toolCalls = message && typeof message === 'object' ? (message as { tool_calls?: unknown[] }).tool_calls : undefined;
           logger.info('🔍 DEBUGGING: Ollama parsed result:', {
@@ -1230,11 +1231,12 @@ export class OllamaProvider implements LLMProvider {
           );
         }
 
-        const finalContent = result.message?.content || result.content || result.response;
+        const resultObj = result as { message?: { content?: string; tool_calls?: unknown[] }; content?: string; response?: string };
+        const finalContent = resultObj.message?.content || resultObj.content || resultObj.response;
         const hasValidToolCalls =
-          Array.isArray(result.message?.tool_calls) &&
-          result.message.tool_calls.length > 0 &&
-          !!result.message.tool_calls[0].function?.name;
+          Array.isArray(resultObj.message?.tool_calls) &&
+          resultObj.message.tool_calls.length > 0 &&
+          !!(resultObj.message.tool_calls[0] as { function?: { name?: string } }).function?.name;
 
         if (!finalContent && !hasValidToolCalls) {
           throw new Error(
@@ -1247,25 +1249,47 @@ export class OllamaProvider implements LLMProvider {
 
         // First, try structured tool_calls from result.message.tool_calls
         if (
-          Array.isArray(result.message?.tool_calls) &&
-          result.message.tool_calls.length > 0
+          Array.isArray(resultObj.message?.tool_calls) &&
+          resultObj.message.tool_calls.length > 0
         ) {
           logger.debug('Using structured tool_calls from Ollama response');
-          extractedToolCalls = result.message.tool_calls.map((toolCall: Readonly<OllamaToolCall>) => ({
-            id: toolCall.function.name || `tool_${Date.now()}`,
-            function: {
-              name: toolCall.function.name,
-              // CRITICAL FIX: Check if arguments are already a string to prevent double-encoding
-              arguments:
-                typeof toolCall.function.arguments === 'string'
-                  ? toolCall.function.arguments
-                  : JSON.stringify(toolCall.function.arguments),
-            },
-          }));
+          extractedToolCalls = resultObj.message.tool_calls.map((toolCall: unknown) => {
+            const typedToolCall = toolCall as OllamaToolCall;
+            logger.debug('🔍 Raw tool call structure from Ollama:', {
+              toolCall: JSON.stringify(toolCall),
+              hasFunction: !!typedToolCall.function,
+              functionName: typedToolCall.function?.name,
+              functionArguments: typedToolCall.function?.arguments,
+              functionArgumentsType: typeof typedToolCall.function?.arguments,
+            });
+            
+            // Defensive checks for the tool call structure
+            if (!typedToolCall.function) {
+              logger.error('❌ Tool call missing function property:', JSON.stringify(toolCall));
+              return null;
+            }
+            
+            if (!typedToolCall.function.name) {
+              logger.error('❌ Tool call missing function.name:', JSON.stringify(toolCall));
+              return null;
+            }
+            
+            return {
+              id: typedToolCall.function.name || `tool_${Date.now()}`,
+              function: {
+                name: typedToolCall.function.name || 'unknown',
+                // CRITICAL FIX: Check if arguments are already a string to prevent double-encoding
+                arguments:
+                  typeof typedToolCall.function?.arguments === 'string'
+                    ? typedToolCall.function.arguments
+                    : JSON.stringify(typedToolCall.function?.arguments || {}),
+              },
+            };
+          }).filter((toolCall): toolCall is NonNullable<typeof toolCall> => toolCall !== null);
         } else {
           // Fallback: Try to parse tool calls from content field
           logger.debug('No structured tool_calls found, trying to parse from content field');
-          const contentToolCalls = this.parseToolCallsFromContent(finalContent);
+          const contentToolCalls = this.parseToolCallsFromContent(finalContent || '');
           if (contentToolCalls.length > 0) {
             extractedToolCalls = contentToolCalls.map((toolCall: ParsedToolCall) => ({
               id: toolCall.function?.name || `tool_${Date.now()}`,

@@ -11,18 +11,13 @@ import { config } from 'dotenv';
 config();
 
 import { CLIOptions, UnifiedCLI } from './application/interfaces/unified-cli.js';
-import { ConcreteWorkflowOrchestrator } from './application/services/concrete-workflow-orchestrator.js';
 import { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-interaction.js';
 import { createAdaptersFromProviders } from './application/services/adapter-factory.js';
 // getGlobalEventBus intentionally not imported anymore – event bus is injected via RuntimeContext.
 import { getErrorMessage } from './utils/error-utils.js';
 import { logger } from './infrastructure/logging/logger.js';
-import {
-  enterpriseErrorHandler,
-} from './infrastructure/error-handling/enterprise-error-handler.js';
-import {
-  ErrorSeverity,
-} from './infrastructure/error-handling/structured-error-system.js';
+import { enterpriseErrorHandler } from './infrastructure/error-handling/enterprise-error-handler.js';
+import { ErrorSeverity } from './infrastructure/error-handling/structured-error-system.js';
 
 import { Command } from 'commander';
 import { readFile } from 'fs/promises';
@@ -89,7 +84,7 @@ export async function initialize(
 
     // Use ServiceFactory for proper dependency injection and component wiring
     const { ServiceFactory } = await import('./application/services/service-factory.js');
-    const serviceFactory = new ServiceFactory({
+    const serviceFactory: import('./application/services/service-factory.js').ServiceFactory = new ServiceFactory({
       correlationId: `cli-${Date.now()}`,
       logLevel: cliOptions.verbose ? 'debug' : 'info',
     });
@@ -123,15 +118,15 @@ export async function initialize(
       // Create a new EnhancedToolIntegration with the correct config shape
       const enhancedIntegration = new EnhancedToolIntegration({});
       // If EnhancedToolIntegration needs mcpServerManager, set it after construction
-      if ('setMcpServerManager' in enhancedIntegration && typeof enhancedIntegration.setMcpServerManager === 'function') {
+      if (
+        'setMcpServerManager' in enhancedIntegration &&
+        typeof enhancedIntegration.setMcpServerManager === 'function'
+      ) {
         enhancedIntegration.setMcpServerManager(mcpServerManager);
       }
       setGlobalEnhancedToolIntegration(enhancedIntegration);
       logger.info('✅ Enhanced tool integration initialized');
     }
-
-    // Create ConcreteWorkflowOrchestrator (implements IWorkflowOrchestrator interface)
-    const orchestrator = new ConcreteWorkflowOrchestrator();
 
     // Initialize proper UnifiedModelClient with dynamic model selection
     const { UnifiedModelClient } = await import('./application/services/model-client.js');
@@ -228,26 +223,31 @@ export async function initialize(
       const adapter: Adapter = {} as Adapter;
 
       // copy own enumerable properties
-      Object.keys(userInteraction).forEach((key) => {
+      Object.keys(userInteraction).forEach(key => {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        adapter[key] = ((userInteraction as unknown) as Record<string, unknown>)[key];
+        adapter[key] = (userInteraction as unknown as Record<string, unknown>)[key];
       });
 
       // copy prototype methods
       const proto = Object.getPrototypeOf(userInteraction) as object;
-      Object.getOwnPropertyNames(proto).forEach((name) => {
+      Object.getOwnPropertyNames(proto).forEach(name => {
         if (name === 'constructor') return;
         const desc = Object.getOwnPropertyDescriptor(proto, name);
         if (desc && typeof desc.value === 'function') {
           adapter[name] = (...args: readonly unknown[]): unknown =>
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-            ((userInteraction as unknown) as Record<string, (...args: readonly unknown[]) => unknown>)[name](...args);
+            (
+              userInteraction as unknown as Record<string, (...args: readonly unknown[]) => unknown>
+            )[name](...args);
         }
       });
 
       // Override select to accept readonly choices and delegate to the mutable implementation
       adapter.select = async (question: string, choices: readonly string[]): Promise<string> =>
-        (userInteraction.select as (q: string, c: string[]) => Promise<string>)(question, Array.from(choices));
+        (userInteraction.select as (q: string, c: string[]) => Promise<string>)(
+          question,
+          Array.from(choices)
+        );
 
       return adapter;
     })();
@@ -259,7 +259,10 @@ export async function initialize(
           type MCPServerManagerAdapter = {
             [K in keyof MCPServerManagerType]: MCPServerManagerType[K];
           } & {
-            executeCommandSecure: (command: string, args?: readonly string[] | undefined) => Promise<string>;
+            executeCommandSecure: (
+              command: string,
+              args?: readonly string[] | undefined
+            ) => Promise<string>;
             [key: string]: unknown;
           };
           const adapter: MCPServerManagerAdapter = {} as MCPServerManagerAdapter;
@@ -271,7 +274,12 @@ export async function initialize(
             if (desc && typeof desc.value === 'function') {
               adapter[name] = (...args: readonly unknown[]): unknown =>
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-                ((mcpServerManager as unknown) as Record<string, (...args: readonly unknown[]) => unknown>)[name](...args);
+                (
+                  mcpServerManager as unknown as Record<
+                    string,
+                    (...args: readonly unknown[]) => unknown
+                  >
+                )[name](...args);
             }
           });
 
@@ -279,19 +287,26 @@ export async function initialize(
             command: string,
             args?: readonly string[] | undefined
           ): Promise<string> =>
-            (mcpServerManager.executeCommandSecure as (c: string, a?: readonly string[] | undefined) => Promise<string>)(
-              command,
-              args ? Array.from(args) : undefined
-            );
+            (
+              mcpServerManager.executeCommandSecure as (
+                c: string,
+                a?: readonly string[] | undefined
+              ) => Promise<string>
+            )(command, args ? Array.from(args) : undefined);
 
           return adapter;
         })()
       : undefined;
+    // Explicitly type orchestrator as IWorkflowOrchestrator
+    const orchestrator = serviceFactory.createWorkflowOrchestrator(
+      mcpManagerAdapter as unknown as import('./domain/interfaces/mcp-manager.js').IMcpManager
+    ) as import('./domain/interfaces/workflow-orchestrator.js').IWorkflowOrchestrator;
 
     // Cast to unknown to bridge minor shape differences at compile-time;
     // adapters delegate to the real instances at runtime so behavior is preserved.
     await orchestrator.initialize({
-      userInteraction: userInteractionAdapter as unknown as import('./domain/interfaces/user-interaction.js').IUserInteraction,
+      userInteraction:
+        userInteractionAdapter as unknown as import('./domain/interfaces/user-interaction.js').IUserInteraction,
       eventBus,
       modelClient,
       mcpManager: mcpManagerAdapter
@@ -384,7 +399,7 @@ async function runCLI(
       cleanedUp = true;
       logger.info('Application shutdown initiated');
       console.log('\n🔄 Shutting down gracefully...');
-      await cli.shutdown();
+      cli.shutdown();
       // Dispose ServiceFactory and all its managed resources
       await serviceFactory.dispose();
       // Avoid forced exit to let stdout flush naturally
@@ -568,19 +583,21 @@ program
   .option('-l, --list', 'List all available models')
   .option('-s, --select', 'Interactive model selection')
   .option('-i, --interactive', 'Same as --select')
-  .action(async (options: Readonly<{ list?: boolean; select?: boolean; interactive?: boolean }>) => {
-    const { ModelsCommand } = await import('./application/cli/models-command.js');
-    const modelsCommand = new ModelsCommand();
+  .action(
+    async (options: Readonly<{ list?: boolean; select?: boolean; interactive?: boolean }>) => {
+      const { ModelsCommand } = await import('./application/cli/models-command.js');
+      const modelsCommand = new ModelsCommand();
 
-    // Convert Commander options to models command options
-    const modelsOptions = {
-      list: !!options.list,
-      select: !!options.select || !!options.interactive,
-      interactive: !!options.interactive,
-    };
+      // Convert Commander options to models command options
+      const modelsOptions = {
+        list: !!options.list,
+        select: !!options.select || !!options.interactive,
+        interactive: !!options.interactive,
+      };
 
-    await modelsCommand.execute(modelsOptions);
-  });
+      await modelsCommand.execute(modelsOptions);
+    }
+  );
 
 // Add status command to Commander program
 program

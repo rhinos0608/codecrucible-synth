@@ -2,9 +2,9 @@ import { performance } from 'perf_hooks';
 import { randomUUID } from 'crypto';
 import { EnterpriseSecurityFramework } from '../../../infrastructure/security/enterprise-security-framework.js';
 import { ResilientCLIWrapper } from '../../../infrastructure/resilience/resilient-cli-wrapper.js';
-import { MetricsCollector } from '../cli/metrics-collector.js';
-import { UseCaseRouter } from '../cli/use-case-router.js';
-import { SessionManager } from '../cli/session-manager.js';
+import { MetricsCollector } from '../../cli/metrics-collector.js';
+import { UseCaseRouter } from '../../cli/use-case-router.js';
+import { SessionManager } from '../../cli/session-manager.js';
 import { logger } from '../../../infrastructure/logging/unified-logger.js';
 import type {
   CLIOperationRequest,
@@ -83,7 +83,30 @@ export class CLIOrchestrator implements ICLIOrchestrator {
       }
 
       const resilientResult = await resilientWrapper.executeWithRecovery(
+
         async () => useCaseRouter.executeOperation(request),
+
+        async () => {
+          // Adapt session format to match UseCaseRouter expectations
+          const adaptedSession = request.session ? {
+            id: request.session.id,
+            workingDirectory: request.session.workingDirectory || process.cwd(),
+            context: request.session.context || {
+              sessionId: request.session.id,
+              workingDirectory: request.session.workingDirectory || process.cwd(),
+              permissions: ['read', 'write'],
+              securityLevel: 'medium' as const,
+            },
+          } : undefined;
+
+          const routerRequest = {
+            ...request,
+            input: typeof request.input === 'string' ? request.input : '',
+            session: adaptedSession,
+          };
+          return useCaseRouter.executeOperation(routerRequest);
+        },
+
         {
           name: `CLI-${request.type}`,
           component: 'UnifiedCLICoordinator',

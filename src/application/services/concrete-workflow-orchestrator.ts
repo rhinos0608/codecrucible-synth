@@ -29,9 +29,9 @@ import { logger } from '../../infrastructure/logging/logger.js';
 import { randomUUID } from 'crypto';
 import { RequestExecutionManager } from '../../infrastructure/execution/request-execution-manager.js';
 import { ToolRegistry } from './orchestrator/tool-registry.js';
-import { StreamingManager } from './orchestrator/streaming-manager.js';
-import { ToolExecutionRouter } from './orchestrator/tool-execution-router.js';
-import { providerCapabilityRegistry } from './provider-capability-registry.js';
+import type { IStreamingManager } from '../../domain/interfaces/streaming-manager.js';
+import type { IToolExecutionRouter } from '../../domain/interfaces/tool-execution-router.js';
+import type { IProviderCapabilityRegistry } from '../../domain/interfaces/provider-capability-registry.js';
 import type { ToolExecutionResult } from '../../domain/interfaces/tool-execution.js';
 import type { IModelProvider } from '../../domain/interfaces/model-client.js';
 import type { ProviderType, ProjectContext } from '../../domain/types/unified-types.js';
@@ -67,20 +67,25 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   /**
    * Adapter to provide a getProvider method for the modelClient.
    */
-  public static createProviderRepositoryAdapter(modelClient?: IModelClient): { getProvider: (providerType: ProviderType) => Provider | undefined } {
+  public static createProviderRepositoryAdapter(modelClient?: IModelClient): {
+    getProvider: (providerType: ProviderType) => Provider | undefined;
+  } {
     return {
       getProvider: (providerType: ProviderType): Provider | undefined => {
         // Create a Provider interface compatible with RequestExecutionManager
         if (modelClient) {
           return {
-            processRequest: async (request: Readonly<ModelRequest>, context?: Readonly<ProjectContext>) => {
+            processRequest: async (
+              request: Readonly<ModelRequest>,
+              context?: Readonly<ProjectContext>
+            ) => {
               return await modelClient.request(request);
             },
-            getModelName: () => 'unified-model-client' // Optional method
+            getModelName: () => 'unified-model-client', // Optional method
           } as Provider;
         }
         return undefined;
-      }
+      },
     };
   }
 
@@ -91,8 +96,9 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   private requestExecutionManager?: RequestExecutionManager;
   private isInitialized = false;
   private toolRegistry?: ToolRegistry;
-  private readonly streamingManager = new StreamingManager();
-  private toolExecutionRouter?: ToolExecutionRouter;
+  private readonly streamingManager: IStreamingManager;
+  private readonly toolExecutionRouter: IToolExecutionRouter;
+  private readonly providerCapabilityRegistry: IProviderCapabilityRegistry;
 
   // Request tracking
   private readonly activeRequests: Map<
@@ -114,19 +120,25 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   };
 
   public constructor(
+    streamingManager: IStreamingManager,
+    toolExecutionRouter: IToolExecutionRouter,
+    providerCapabilityRegistry: IProviderCapabilityRegistry,
     providerCapabilities: Readonly<ProviderCapabilities> = { streaming: true, toolCalling: true }
   ) {
     super();
+    this.streamingManager = streamingManager;
+    this.toolExecutionRouter = toolExecutionRouter;
+    this.providerCapabilityRegistry = providerCapabilityRegistry;
     // Register default provider capabilities (now configurable)
-    providerCapabilityRegistry.register('default', providerCapabilities);
+    this.providerCapabilityRegistry.register('default', providerCapabilities);
 
     // CRITICAL FIX: Register all supported providers with their capabilities
     // This fixes the tool execution issue where providers weren't recognized for tool calling
-    providerCapabilityRegistry.register('ollama', {
+    this.providerCapabilityRegistry.register('ollama', {
       streaming: true,
       toolCalling: true, // Ollama supports tool calling
     });
-    providerCapabilityRegistry.register('huggingface', {
+    this.providerCapabilityRegistry.register('huggingface', {
       streaming: false, // HuggingFace typically doesn't support streaming
       toolCalling: false, // Most HuggingFace models don't support tool calling
     });
@@ -139,7 +151,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     // Attempt to clean up any managed resources
     try {
       // If the requestExecutionManager has a shutdown/close method, call it
-      if (this.requestExecutionManager && typeof (this.requestExecutionManager as any).shutdown === 'function') {
+      if (
+        this.requestExecutionManager &&
+        typeof (this.requestExecutionManager as any).shutdown === 'function'
+      ) {
         await (this.requestExecutionManager as any).shutdown();
       }
       // If the modelClient has a shutdown/close method, call it
@@ -187,22 +202,22 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   /**
    * Converts a WorkflowContext to a ProjectContext for compatibility with RequestExecutionManager.
    */
-  private workflowContextToProjectContext(
-    context?: Readonly<WorkflowContext>
-  ): Readonly<{
-    workingDirectory: string;
-    config: Record<string, unknown>;
-    files: Array<{
-      path: string;
-      content: string;
-      type: string;
-      language?: string;
-    }>;
-    structure?: {
-      directories: string[];
-      fileTypes: Record<string, number>;
-    };
-  }> | undefined {
+  private workflowContextToProjectContext(context?: Readonly<WorkflowContext>):
+    | Readonly<{
+        workingDirectory: string;
+        config: Record<string, unknown>;
+        files: Array<{
+          path: string;
+          content: string;
+          type: string;
+          language?: string;
+        }>;
+        structure?: {
+          directories: string[];
+          fileTypes: Record<string, number>;
+        };
+      }>
+    | undefined {
     if (!context) return undefined;
     // Provide dummy config/files if missing to satisfy ProjectContext shape
     const { config, files, workingDirectory, structure } = context as {
@@ -235,9 +250,6 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       this.modelClient = dependencies.modelClient;
       this.mcpManager = dependencies.mcpManager;
       this.toolRegistry = new ToolRegistry(this.mcpManager);
-      if (this.mcpManager) {
-        this.toolExecutionRouter = new ToolExecutionRouter(this.mcpManager);
-      }
 
       // DEBUG: Verify critical dependencies
       logger.info('🔧 ConcreteWorkflowOrchestrator dependency injection:');
@@ -247,8 +259,9 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
 
       try {
         // Create a proper provider repository adapter to bridge the interface mismatch
-        const providerRepository: Readonly<{ getProvider: (providerType: ProviderType) => Provider | undefined }> =
-          ConcreteWorkflowOrchestrator.createProviderRepositoryAdapter(this.modelClient);
+        const providerRepository: Readonly<{
+          getProvider: (providerType: ProviderType) => Provider | undefined;
+        }> = ConcreteWorkflowOrchestrator.createProviderRepositoryAdapter(this.modelClient);
 
         const { HardwareAwareModelSelector } = await import(
           '../../infrastructure/performance/hardware-aware-model-selector.js'
@@ -305,7 +318,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   /**
    * Process a workflow request
    */
-  public async processRequest(request: WorkflowRequest, context?: WorkflowContext): Promise<WorkflowResponse> {
+  public async processRequest(
+    request: WorkflowRequest,
+    context?: WorkflowContext
+  ): Promise<WorkflowResponse> {
     const startTime = performance.now();
     this.metrics.totalRequests++;
     this.metrics.activeRequests++;
@@ -372,7 +388,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     const request: WorkflowRequest = {
       id: randomUUID(),
       type: 'tool-execution',
-      payload: { toolName, args } as Readonly<{ toolName: string; args: Readonly<Record<string, unknown>> }>,
+      payload: { toolName, args } as Readonly<{
+        toolName: string;
+        args: Readonly<Record<string, unknown>>;
+      }>,
       context,
     };
 
@@ -398,7 +417,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
             code: (response.error as { code: string }).code,
             message: (response.error as { message: string }).message,
             stack: (response.error as { stack?: string }).stack,
-            details: ((response.error as { details?: Record<string, unknown> }).details ?? {}),
+            details: (response.error as { details?: Record<string, unknown> }).details ?? {},
           };
         } else if (response.error instanceof Error) {
           errorObj = {
@@ -509,7 +528,9 @@ User Request: ${userPrompt}`;
 
     // Get MCP tools for AI model with smart selection (unless disabled)
     const mcpTools =
-      payloadTyped.options?.useTools !== false ? await this.getMCPToolsForModel(originalPrompt) : [];
+      payloadTyped.options?.useTools !== false
+        ? await this.getMCPToolsForModel(originalPrompt)
+        : [];
 
     // Create enhanced prompt with explicit tool usage instructions
     const enhancedPrompt = this.createEnhancedPrompt(originalPrompt, mcpTools.length > 0);
@@ -576,7 +597,7 @@ User Request: ${userPrompt}`;
     // Check provider streaming capability
     if (
       modelRequest.provider &&
-      !providerCapabilityRegistry.supports(modelRequest.provider, 'streaming')
+      !this.providerCapabilityRegistry.supports(modelRequest.provider, 'streaming')
     ) {
       logger.warn(
         `Provider ${modelRequest.provider} does not support streaming; falling back to non-streaming`
@@ -610,9 +631,8 @@ User Request: ${userPrompt}`;
     if (
       response.toolCalls &&
       response.toolCalls.length > 0 &&
-      this.toolExecutionRouter &&
       (!modelRequest.provider ||
-        providerCapabilityRegistry.supports(modelRequest.provider, 'toolCalling'))
+        this.providerCapabilityRegistry.supports(modelRequest.provider, 'toolCalling'))
     ) {
       return this.toolExecutionRouter.handleToolCalls(
         response,
@@ -640,11 +660,7 @@ User Request: ${userPrompt}`;
 
     if (this.mcpManager) {
       // Ensure correct types for arguments
-      return this.mcpManager.executeTool(
-        toolName,
-        args,
-        request.context
-      );
+      return this.mcpManager.executeTool(toolName, args, request.context);
     } else {
       logger.warn(`Tool execution requested but no MCP manager available: ${toolName}`);
       return {
@@ -675,7 +691,8 @@ User Request: ${userPrompt}`;
       [key: string]: unknown;
     }
 
-    const payloadTyped: PayloadWithOptions = typeof payload === 'object' && payload !== null ? payload as PayloadWithOptions : {};
+    const payloadTyped: PayloadWithOptions =
+      typeof payload === 'object' && payload !== null ? (payload as PayloadWithOptions) : {};
 
     const prompt =
       payloadTyped.prompt ??
@@ -685,11 +702,18 @@ User Request: ${userPrompt}`;
         : '');
 
     // Map messages to the correct type if present
-    let messages: { role: "user" | "assistant" | "tool"; content: string; tool_calls?: Record<string, unknown>[]; tool_call_id?: string }[] | undefined = undefined;
+    let messages:
+      | {
+          role: 'user' | 'assistant' | 'tool';
+          content: string;
+          tool_calls?: Record<string, unknown>[];
+          tool_call_id?: string;
+        }[]
+      | undefined = undefined;
     if (Array.isArray(payloadTyped.messages)) {
-      messages = payloadTyped.messages.map((msg) => ({
-        role: "user",
-        content: msg.content ?? "",
+      messages = payloadTyped.messages.map(msg => ({
+        role: 'user',
+        content: msg.content ?? '',
       }));
     }
 
@@ -708,7 +732,9 @@ User Request: ${userPrompt}`;
     return this.processModelRequest(modelRequest);
   }
 
-  private async handleAnalysisRequest(request: Readonly<WorkflowRequest>): Promise<Record<string, unknown>> {
+  private async handleAnalysisRequest(
+    request: Readonly<WorkflowRequest>
+  ): Promise<Record<string, unknown>> {
     const { payload } = request;
     const filePath = (payload as { filePath?: string }).filePath ?? '';
     if (!filePath) {
@@ -789,7 +815,9 @@ User Request: ${userPrompt}`;
             fileContent = readRes.data;
           } else {
             // If read tool failed, fallback to local fs
-            logger.debug('MCP read tool failed or returned non-string, falling back to fs.readFile');
+            logger.debug(
+              'MCP read tool failed or returned non-string, falling back to fs.readFile'
+            );
             fileContent = undefined;
           }
         } catch (err) {
@@ -847,12 +875,10 @@ User Request: ${userPrompt}`;
         modelResponse = await this.processModelRequest(modelRequest);
 
         // If the model produced tool calls (e.g., to run linters or tests), route them
-        if (this.toolExecutionRouter) {
-          try {
-            modelResponse = await this.processToolCalls(modelResponse, request, modelRequest);
-          } catch (err) {
-            logger.warn('Processing tool calls during analysis failed:', err);
-          }
+        try {
+          modelResponse = await this.processToolCalls(modelResponse, request, modelRequest);
+        } catch (err) {
+          logger.warn('Processing tool calls during analysis failed:', err);
         }
 
         // Try to parse model text into JSON result if the model returned plain text
@@ -897,16 +923,24 @@ User Request: ${userPrompt}`;
       const lines = (fileContent ?? '').split(/\r?\n/);
       const longLines = lines
         .map((l, i) => ({ line: i + 1, length: l.length }))
-        .filter((x) => x.length > 200)
+        .filter(x => x.length > 200)
         .slice(0, 10);
 
       const todoMatches = lines
         .map((l, i) => ({ line: i + 1, text: l }))
-        .filter((x) => /TODO|FIXME|BUG|HACK/i.test(x.text));
+        .filter(x => /TODO|FIXME|BUG|HACK/i.test(x.text));
 
       const issues = [
-        ...longLines.map((l) => ({ severity: 'low', line: l.line, message: `Long line (${l.length} chars)` })),
-        ...todoMatches.map((t) => ({ severity: 'medium', line: t.line, message: `Contains TODO/FIXME: ${t.text.trim()}` })),
+        ...longLines.map(l => ({
+          severity: 'low',
+          line: l.line,
+          message: `Long line (${l.length} chars)`,
+        })),
+        ...todoMatches.map(t => ({
+          severity: 'medium',
+          line: t.line,
+          message: `Contains TODO/FIXME: ${t.text.trim()}`,
+        })),
       ];
 
       const localAnalysis = {
@@ -935,8 +969,16 @@ User Request: ${userPrompt}`;
       this.eventBus.emit('workflow:analysis_completed', { id: request.id, path: resolvedPath });
       return result;
     } catch (err: unknown) {
-      logger.error('Analysis request failed for', typeof resolvedPath !== 'undefined' ? resolvedPath : '', err);
-      this.eventBus.emit('workflow:analysis_failed', { id: request?.id, path: typeof resolvedPath !== 'undefined' ? resolvedPath : '', error: err });
+      logger.error(
+        'Analysis request failed for',
+        typeof resolvedPath !== 'undefined' ? resolvedPath : '',
+        err
+      );
+      this.eventBus.emit('workflow:analysis_failed', {
+        id: request?.id,
+        path: typeof resolvedPath !== 'undefined' ? resolvedPath : '',
+        error: err,
+      });
       throw err;
     }
   }

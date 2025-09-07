@@ -5,14 +5,13 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { ChildProcess, exec } from 'child_process';
-import { promisify } from 'util';
+import { ChildProcess, spawn } from 'child_process';
 import * as path from 'path';
 import { logger } from '../infrastructure/logging/logger.js';
 import { ToolExecutionArgs } from '../infrastructure/types/tool-execution-types.js';
 import { ToolCallResponse } from './smithery-mcp-server.js';
 
-const execAsync = promisify(exec);
+// Secure command execution using spawn instead of exec to prevent shell injection
 
 interface TerminalConfig {
   workingDirectory?: string;
@@ -29,6 +28,7 @@ interface TerminalResult {
   exitCode: number;
   duration: number;
   command: string;
+  error?: string;
 }
 
 export class TerminalMCPServer {
@@ -276,60 +276,87 @@ export class TerminalMCPServer {
     timeout?: number
   ): Promise<TerminalResult> {
     const startTime = Date.now();
-    const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
-
-    if (!this.isCommandAllowed(fullCommand)) {
+    
+    // Security: Check command against allow-list before parsing arguments
+    if (!this.isCommandAllowed(command)) {
       throw new Error(`Command not allowed: ${command}`);
     }
 
-    const execOptions = {
-      cwd: workingDirectory || this.config.workingDirectory,
-      timeout: timeout || this.config.timeout,
-      maxBuffer: this.config.maxOutputSize,
-      env: { ...process.env, ...this.config.environment },
-    };
-
-    try {
-      const { stdout, stderr } = await execAsync(fullCommand, execOptions);
-      return {
-        stdout,
-        stderr,
-        exitCode: 0,
-        duration: Date.now() - startTime,
-        command: fullCommand,
-      };
-    } catch (error) {
+    // Security: Use spawn instead of exec to prevent shell injection
+    // Arguments are passed as separate array elements, not concatenated into shell command
+    return new Promise((resolve) => {
       let stdout = '';
       let stderr = '';
-      let exitCode = 1;
+      let timedOut = false;
 
-      if (typeof error === 'object' && error !== null) {
-        if ('stdout' in error && typeof (error as { stdout?: unknown }).stdout === 'string') {
-          const { stdout: errStdout } = error as { stdout: string };
-          stdout = errStdout;
-        }
-        if ('stderr' in error && typeof (error as { stderr?: unknown }).stderr === 'string') {
-          const { stderr: errStderr } = error as { stderr: string };
-          stderr = errStderr;
-        } else if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
-          const { message } = error as { message: string };
-          stderr = message;
-        }
-        if ('code' in error && typeof (error as { code?: unknown }).code === 'number') {
-          exitCode = (error as { code: number }).code;
-        }
-      } else if (typeof error === 'string') {
-        stderr = error;
+      const child = spawn(command, [...args], {
+        cwd: workingDirectory || this.config.workingDirectory,
+        env: { ...process.env, ...this.config.environment },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      // Set up timeout
+      const timeoutMs = timeout || this.config.timeout;
+      const timeoutHandle = setTimeout(() => {
+        timedOut = true;
+        child.kill('SIGTERM');
+        setTimeout(() => {
+          if (!child.killed) {
+            child.kill('SIGKILL');
+          }
+        }, 5000);
+      }, timeoutMs);
+
+      // Collect stdout
+      if (child.stdout) {
+        child.stdout.on('data', (data) => {
+          stdout += data?.toString() || '';
+          if (stdout.length > (this.config.maxOutputSize || 1024 * 1024)) {
+            child.kill('SIGTERM');
+          }
+        });
       }
 
-      return {
-        stdout,
-        stderr,
-        exitCode,
-        duration: Date.now() - startTime,
-        command: fullCommand,
-      };
-    }
+      // Collect stderr
+      if (child.stderr) {
+        child.stderr.on('data', (data) => {
+          stderr += data?.toString() || '';
+          if (stderr.length > (this.config.maxOutputSize || 1024 * 1024)) {
+            child.kill('SIGTERM');
+          }
+        });
+      }
+
+      // Handle completion
+      child.on('close', (code, signal) => {
+        clearTimeout(timeoutHandle);
+        const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+        
+        resolve({
+          stdout,
+          stderr,
+          exitCode: code ?? (signal ? 128 : 1),
+          duration: Date.now() - startTime,
+          command: fullCommand,
+          error: timedOut ? 'Command timed out' : (signal ? `Killed by signal: ${signal}` : undefined),
+        });
+      });
+
+      // Handle spawn errors
+      child.on('error', (error) => {
+        clearTimeout(timeoutHandle);
+        const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+        
+        resolve({
+          stdout,
+          stderr,
+          exitCode: 1,
+          duration: Date.now() - startTime,
+          command: fullCommand,
+          error: `Failed to start command: ${error.message}`,
+        });
+      });
+    });
   }
 
   public async runCommand(

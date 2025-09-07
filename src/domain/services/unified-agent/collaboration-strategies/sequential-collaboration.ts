@@ -1,8 +1,8 @@
 import {
-  IAgent,
-  CollaborativeTask,
   CollaborativeResponse,
+  CollaborativeTask,
   ExecutionResult,
+  IAgent,
 } from '../agent-types.js';
 
 export async function sequentialCollaboration(

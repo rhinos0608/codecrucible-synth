@@ -1,6 +1,11 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { validateBranchName } from './git-security';
+// Simple branch name validation (alphanumeric, dashes, underscores, slashes, no spaces)
+function validateBranchName(name: string): void {
+  if (!/^[\w\-/]+$/.test(name)) {
+    throw new Error(`Invalid branch name: ${name}`);
+  }
+}
 
 // Escape a string for safe use as a shell argument (single-quoted)
 function escapeShellArg(arg: string): string {

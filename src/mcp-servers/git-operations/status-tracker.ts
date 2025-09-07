@@ -23,8 +23,7 @@ export class StatusTracker {
         untracked.push(line.slice(3));
       } else {
         // line is at least 3 chars: XY filename
-        const indexStatus = line[0];
-        const workTreeStatus = line[1];
+        const [indexStatus, workTreeStatus] = line;
         const filename = line.slice(3);
         if (indexStatus !== ' ' && indexStatus !== '?') {
           staged.push(filename);

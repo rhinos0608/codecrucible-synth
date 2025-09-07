@@ -7,15 +7,15 @@ export interface ToolDependencies {
 export class DependencyResolver {
   private dependencies: ToolDependencies = {};
 
-  register(toolId: string, deps: string[] = []): void {
-    this.dependencies[toolId] = deps;
+  public register(toolId: string, deps: readonly string[] = []): void {
+    this.dependencies[toolId] = [...deps];
   }
 
-  resolveOrder(toolIds: string[]): string[] {
+  public resolveOrder(toolIds: readonly string[]): string[] {
     const visited = new Set<string>();
     const order: string[] = [];
 
-    const visit = (id: string, stack: string[]) => {
+    const visit = (id: string, stack: readonly string[]): void => {
       if (stack.includes(id)) {
         const cyclePath = [...stack, id].join(' -> ');
         throw new Error(`Circular dependency detected: ${cyclePath}`);
@@ -23,16 +23,15 @@ export class DependencyResolver {
       if (visited.has(id)) {
         return;
       }
-      stack.push(id);
-      for (const dep of this.dependencies[id] || []) {
-        visit(dep, stack);
+      const newStack = [...stack, id];
+      for (const dep of this.dependencies[id]) {
+        visit(dep, newStack);
       }
-      stack.pop();
       visited.add(id);
       order.push(id);
     };
 
-    toolIds.forEach(id => visit(id, []));
+    toolIds.forEach((id) => { visit(id, []); });
     logger.debug('Resolved dependency order', { order });
     return order;
   }

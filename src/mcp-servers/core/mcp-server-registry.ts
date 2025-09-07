@@ -15,7 +15,7 @@ export interface MCPServerDefinition {
   name: string;
   description: string;
   type: 'filesystem' | 'git' | 'terminal' | 'package' | 'smithery' | 'external';
-  config: any;
+  config: Record<string, unknown>;
   enabled: boolean;
   priority: number; // 1-10, higher = higher priority
   lazyLoad: boolean; // If true, only initialize when needed
@@ -24,7 +24,7 @@ export interface MCPServerDefinition {
 
 export interface ServerRegistration {
   definition: MCPServerDefinition;
-  instance?: any; // Lazy-loaded server instance
+  instance?: unknown; // Lazy-loaded server instance
   status: 'uninitialized' | 'initializing' | 'ready' | 'error' | 'disabled';
   lastError?: Error;
   initializationTime?: number;
@@ -35,29 +35,28 @@ export interface ServerRegistration {
  * Lightweight server registry with dependency injection support
  */
 export class MCPServerRegistry extends EventEmitter {
-  private registrations: Map<string, ServerRegistration> = new Map();
-  private initializationQueue: Set<string> = new Set();
-  private dependencyGraph: Map<string, Set<string>> = new Map(); // serverId -> dependents
+  private readonly registrations: Map<string, ServerRegistration> = new Map();
+  private readonly initializationQueue: Set<string> = new Set();
+  private readonly dependencyGraph: Map<string, Set<string>> = new Map(); // serverId -> dependents
 
   // Memory management
-  private maxConcurrentInit = 3; // Limit concurrent initializations
+  private readonly maxConcurrentInit = 3; // Limit concurrent initializations
   private currentInitializations = 0;
-  private _initialized = false;
 
-  constructor() {
+  public constructor() {
     super();
 
     // Configure event emitter for memory efficiency
     this.setMaxListeners(50); // Reasonable limit
 
     // Clean up listeners on process exit
-    process.on('beforeExit', () => this.cleanup());
+    process.on('beforeExit', () => { this.cleanup(); });
   }
 
   /**
    * Register a server definition (no initialization)
    */
-  register(definition: MCPServerDefinition): void {
+  public register(definition: Readonly<MCPServerDefinition>): void {
     if (this.registrations.has(definition.id)) {
       logger.warn(`Server ${definition.id} already registered, updating definition`);
     }
@@ -79,7 +78,7 @@ export class MCPServerRegistry extends EventEmitter {
   /**
    * Get server instance with lazy initialization
    */
-  async getServer(serverId: string): Promise<any> {
+  public async getServer(serverId: string): Promise<unknown> {
     const registration = this.registrations.get(serverId);
     if (!registration) {
       throw new Error(`Server ${serverId} not registered`);
@@ -121,7 +120,10 @@ export class MCPServerRegistry extends EventEmitter {
    * Initialize server with dependency resolution and memory tracking
    */
   private async initializeServer(serverId: string): Promise<void> {
-    const registration = this.registrations.get(serverId)!;
+    const registration = this.registrations.get(serverId);
+    if (!registration) {
+      throw new Error(`Server ${serverId} not registered`);
+    }
 
     // Check if already in initialization queue
     if (this.initializationQueue.has(serverId)) {
@@ -182,7 +184,7 @@ export class MCPServerRegistry extends EventEmitter {
   /**
    * Create server instance based on type (factory pattern)
    */
-  private async createServerInstance(definition: MCPServerDefinition): Promise<any> {
+  private async createServerInstance(definition: MCPServerDefinition): Promise<unknown> {
     // Dynamic imports to prevent eager loading
     switch (definition.type) {
       case 'filesystem': {
@@ -207,7 +209,12 @@ export class MCPServerRegistry extends EventEmitter {
 
       case 'smithery': {
         const { SmitheryMCPServer } = await import('../smithery-mcp-server.js');
-        return new SmitheryMCPServer(definition.config);
+        // Validate config for SmitheryMCPConfig
+        const config = definition.config as Partial<import('../smithery-mcp-server.js').SmitheryMCPConfig>;
+        if (typeof config.apiKey !== 'string') {
+          throw new Error(`SmitheryMCPServer requires a valid 'apiKey' in config`);
+        }
+        return new SmitheryMCPServer(config as import('../smithery-mcp-server.js').SmitheryMCPConfig);
       }
 
       default:
@@ -216,17 +223,20 @@ export class MCPServerRegistry extends EventEmitter {
   }
 
   /**
-   * Initialize all dependencies for a server
+   * Initialize dependencies for a server before initializing the server itself
    */
   private async initializeDependencies(serverId: string): Promise<void> {
-    const registration = this.registrations.get(serverId)!;
+    const registration = this.registrations.get(serverId);
+    if (!registration) {
+      throw new Error(`Server ${serverId} not registered`);
+    }
 
     for (const depId of registration.definition.dependencies) {
-      if (!this.registrations.has(depId)) {
+      const depRegistration = this.registrations.get(depId);
+      if (!depRegistration) {
         throw new Error(`Dependency ${depId} not registered for server ${serverId}`);
       }
 
-      const depRegistration = this.registrations.get(depId)!;
       if (depRegistration.status === 'uninitialized') {
         await this.initializeServer(depId);
       } else if (depRegistration.status === 'initializing') {
@@ -289,14 +299,17 @@ export class MCPServerRegistry extends EventEmitter {
       if (!this.dependencyGraph.has(depId)) {
         this.dependencyGraph.set(depId, new Set());
       }
-      this.dependencyGraph.get(depId)!.add(definition.id);
+      const dependents = this.dependencyGraph.get(depId);
+      if (dependents) {
+        dependents.add(definition.id);
+      }
     }
   }
 
   /**
    * Get registration status for monitoring
    */
-  getRegistrationStatus(): {
+  public getRegistrationStatus(): {
     total: number;
     ready: number;
     initializing: number;
@@ -327,6 +340,9 @@ export class MCPServerRegistry extends EventEmitter {
         case 'disabled':
           stats.disabled++;
           break;
+        default:
+          // Handles 'uninitialized' and any unexpected status
+          break;
       }
 
       if (reg.memoryUsage) {
@@ -340,14 +356,14 @@ export class MCPServerRegistry extends EventEmitter {
   /**
    * Get list of registered server IDs
    */
-  getRegisteredServerIds(): string[] {
+  public getRegisteredServerIds(): string[] {
     return Array.from(this.registrations.keys());
   }
 
   /**
    * Check if server is available (registered and not disabled)
    */
-  isServerAvailable(serverId: string): boolean {
+  public isServerAvailable(serverId: string): boolean {
     const registration = this.registrations.get(serverId);
     return registration ? registration.status !== 'disabled' : false;
   }
@@ -355,7 +371,7 @@ export class MCPServerRegistry extends EventEmitter {
   /**
    * Disable a server (prevents initialization)
    */
-  disableServer(serverId: string): void {
+  public disableServer(serverId: string): void {
     const registration = this.registrations.get(serverId);
     if (registration) {
       registration.status = 'disabled';
@@ -367,7 +383,7 @@ export class MCPServerRegistry extends EventEmitter {
   /**
    * Enable a disabled server
    */
-  enableServer(serverId: string): void {
+  public enableServer(serverId: string): void {
     const registration = this.registrations.get(serverId);
     if (registration && registration.status === 'disabled') {
       registration.status = 'uninitialized';
@@ -401,7 +417,7 @@ export class MCPServerRegistry extends EventEmitter {
     const sizeIndex = Math.min(Math.max(i, 0), sizes.length - 1);
     const value = bytes / Math.pow(k, sizeIndex);
 
-    return parseFloat(value.toFixed(2)) + ' ' + sizes[sizeIndex];
+    return `${parseFloat(value.toFixed(2))} ${sizes[sizeIndex]}`;
   }
 }
 

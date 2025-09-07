@@ -37,7 +37,7 @@ export class RoutingDecisionEngine {
   public constructor(
     private readonly modelCoordinator: ModelSelectionCoordinator,
     private readonly voiceHandler: VoiceIntegrationHandler,
-    private readonly hybridRouter: HybridLLMRouter
+    private readonly hybridRouter: Readonly<HybridLLMRouter>
   ) {}
 
   public async makeDecision(
@@ -51,7 +51,11 @@ export class RoutingDecisionEngine {
     let routingStrategy: 'single-model' | 'hybrid' | 'multi-voice' | 'load-balanced';
 
     if (context.preferences?.enableHybridRouting) {
-      hybridRouting = await this.hybridRouter.routeTask(context.metrics ?? {});
+      hybridRouting = await this.hybridRouter.routeTask(
+        context.request.type?.toString() || 'general',
+        context.request.content || '',
+        context.metrics
+      );
       routingStrategy = 'hybrid';
     } else if (context.preferences?.enableLoadBalancing) {
       routingStrategy = 'load-balanced';

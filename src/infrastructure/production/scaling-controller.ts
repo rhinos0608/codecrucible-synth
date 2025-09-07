@@ -27,18 +27,17 @@ const DEFAULT_THRESHOLDS: ScalingThresholds = {
 export class ScalingController {
   private history: ResourceSnapshot[] = [];
   private readonly window: number;
-  private readonly cpuScaleUpThreshold: number;
-  private readonly cpuScaleDownThreshold: number;
-  private readonly queueScaleUpThreshold: number;
+  private readonly thresholds: ScalingThresholds;
 
   constructor(config: ScalingConfig = {}) {
     this.window = config.window ?? 60; // keep last 60 seconds
-    this.cpuScaleUpThreshold = config.cpuScaleUpThreshold ?? 80;
-    this.cpuScaleDownThreshold = config.cpuScaleDownThreshold ?? 20;
-    this.queueScaleUpThreshold = config.queueScaleUpThreshold ?? 0;
+    this.thresholds = {
+      cpuScaleUp: config.cpuScaleUpThreshold ?? DEFAULT_THRESHOLDS.cpuScaleUp,
+      cpuScaleDown: config.cpuScaleDownThreshold ?? DEFAULT_THRESHOLDS.cpuScaleDown,
+      queueScaleUp: config.queueScaleUpThreshold ?? DEFAULT_THRESHOLDS.queueScaleUp,
+      queueScaleDown: DEFAULT_THRESHOLDS.queueScaleDown,
+    };
   }
-
-  constructor(private thresholds: ScalingThresholds = DEFAULT_THRESHOLDS) {}
 
   record(snapshot: ResourceSnapshot): void {
     this.history.push(snapshot);
@@ -63,19 +62,17 @@ export class ScalingController {
       this.history.reduce((sum, s) => sum + s.concurrency.queuedOperations, 0) /
       this.history.length;
 
-
-    if (cpuAvg > this.cpuScaleUpThreshold || queueAvg > this.queueScaleUpThreshold) {
-      return 'scale_up';
-    }
-    if (cpuAvg < this.cpuScaleDownThreshold && queueAvg === 0) {
-
+    // Scale up if CPU or queue thresholds exceeded
     if (cpuAvg > this.thresholds.cpuScaleUp || queueAvg > this.thresholds.queueScaleUp) {
       return 'scale_up';
     }
-    if (cpuAvg < this.thresholds.cpuScaleDown && queueAvg <= this.thresholds.queueScaleDown) {
 
+    // Scale down if CPU and queue are below thresholds
+    if (cpuAvg < this.thresholds.cpuScaleDown && queueAvg <= this.thresholds.queueScaleDown) {
       return 'scale_down';
     }
+
+    // Otherwise remain stable
     return 'stable';
   }
 }

@@ -31,6 +31,6 @@ export * from './security-integration.js';
 export * from './backup-coordinator.js';
 export * from './metrics-collector.js';
 export * from './rollback-manager.js';
-export * from './production-integration-manager.js';
+export { ProductionIntegrationManager } from './production-integration-manager.js';
 
 

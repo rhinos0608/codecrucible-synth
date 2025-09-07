@@ -30,22 +30,22 @@ interface UrlReadResponse {
 }
 
 interface MCPGlobal {
-  mcp__exa__web_search_exa?: (params: {
+  mcp__exa__web_search_exa?: (params: Readonly<{
     query: string;
     numResults?: number;
-  }) => Promise<SearchResponse>;
-  mcp__ref_tools_ref_tools_mcp__ref_search_documentation?: (params: {
+  }>) => Promise<SearchResponse>;
+  mcp__ref_tools_ref_tools_mcp__ref_search_documentation?: (params: Readonly<{
     query: string;
-  }) => Promise<SearchResponse>;
-  mcp__ref_tools_ref_tools_mcp__ref_read_url?: (params: {
+  }>) => Promise<SearchResponse>;
+  mcp__ref_tools_ref_tools_mcp__ref_read_url?: (params: Readonly<{
     url: string;
-  }) => Promise<UrlReadResponse>;
+  }>) => Promise<UrlReadResponse>;
 }
 
 declare const global: typeof globalThis & MCPGlobal;
 
 export class GoogleWebSearchTool extends BaseTool {
-  constructor(private _agentContext: { workingDirectory: string }) {
+  public constructor() {
     super({
       name: 'googleWebSearch',
       description: 'Search the web using Google search capabilities.',
@@ -56,16 +56,13 @@ export class GoogleWebSearchTool extends BaseTool {
     });
   }
 
-  public async execute(params: { query: string }): Promise<SearchResponse> {
+  public async execute(params: Readonly<{ query: string }>): Promise<SearchResponse> {
     try {
       logger.info(`🔍 Google Web Search: ${params.query}`);
 
       // Try to use MCP Exa search if available
       try {
-        if (
-          typeof global.mcp__exa__web_search_exa !== 'undefined' &&
-          global.mcp__exa__web_search_exa
-        ) {
+        if (typeof global.mcp__exa__web_search_exa !== 'undefined') {
           return await global.mcp__exa__web_search_exa({ query: params.query });
         }
       } catch (e) {
@@ -100,7 +97,7 @@ export class GoogleWebSearchTool extends BaseTool {
 }
 
 export class RefDocumentationTool extends BaseTool {
-  constructor(private _agentContext: { workingDirectory: string }) {
+  public constructor() {
     super({
       name: 'refDocumentationSearch',
       description: 'Search programming documentation and API references using Ref-Search.',
@@ -111,7 +108,7 @@ export class RefDocumentationTool extends BaseTool {
     });
   }
 
-  public async execute(params: { query: string }): Promise<SearchResponse> {
+  public async execute(params: Readonly<{ query: string }>): Promise<SearchResponse> {
     try {
       logger.info(`📚 Ref Documentation Search: ${params.query}`);
 
@@ -230,7 +227,7 @@ export class RefReadUrlTool extends BaseTool {
 }
 
 export class ExaWebSearchTool extends BaseTool {
-  constructor(private _agentContext: { workingDirectory: string }) {
+  public constructor() {
     super({
       name: 'exaWebSearch',
       description: 'Perform advanced web search using Exa AI.',
@@ -242,16 +239,13 @@ export class ExaWebSearchTool extends BaseTool {
     });
   }
 
-  public async execute(params: { query: string; numResults?: number }): Promise<SearchResponse> {
+  public async execute(params: Readonly<{ query: string; numResults?: number }>): Promise<SearchResponse> {
     try {
       logger.info(`🔍 Exa Web Search: ${params.query}`);
 
       // Try to use MCP Exa search if available
       try {
-        if (
-          typeof global.mcp__exa__web_search_exa !== 'undefined' &&
-          global.mcp__exa__web_search_exa
-        ) {
+        if (typeof global.mcp__exa__web_search_exa !== 'undefined') {
           return await global.mcp__exa__web_search_exa({
             query: params.query,
             numResults: params.numResults,

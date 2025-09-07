@@ -26,10 +26,13 @@ export class ModelSelectionCoordinator {
     const modelSelection = await this.modelService.selectOptimalModel(context.request, {
       prioritize,
     });
-    const providerSelection = this.providerStrategy.selectProvider(
-      modelSelection.primaryModel,
-      context.request
-    );
+    const providerSelection = this.providerStrategy.selectProvider({
+      taskType: context.request.type?.toString(),
+      complexity: context.priority,
+      requiresTools: context.preferences?.learningEnabled,
+      prioritizeSpeed: context.preferences?.enableLoadBalancing,
+      model: modelSelection.primaryModel?.name?.value,
+    });
     return { modelSelection, providerSelection };
   }
 }

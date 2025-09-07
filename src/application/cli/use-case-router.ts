@@ -156,10 +156,15 @@ export class UseCaseRouter {
     // AI-driven tool selection: Let the model decide between MCP tools and codebase analysis
     // const codebaseAnalysis: CodebaseAnalysisResult | null = null;
 
+    // Ensure processedInput is a string for downstream processing
+    const stringInput = typeof processedInput === 'string' 
+      ? processedInput 
+      : JSON.stringify(processedInput);
+
     // Enhance input with project context if available
-    let contextEnhancedInput = processedInput;
-    if (projectConfig && projectConfig.isLoaded && typeof processedInput === 'string') {
-      contextEnhancedInput = this.enhanceInputWithProjectContext(processedInput, projectConfig);
+    let contextEnhancedInput = stringInput;
+    if (projectConfig && projectConfig.isLoaded) {
+      contextEnhancedInput = this.enhanceInputWithProjectContext(stringInput, projectConfig);
     }
 
     // Further enhance with codebase analysis if available
@@ -338,7 +343,9 @@ export class UseCaseRouter {
     }
 
     // Check if this is a code generation request using ORIGINAL user input, not enhanced context
-    const originalInput = request.input;
+    const originalInput = typeof request.input === 'string' 
+      ? request.input 
+      : JSON.stringify(request.input);
     if (this.isCodeGenerationRequest(originalInput)) {
       const generationRequest: GenerationRequest = {
         prompt: enhancedInput as string,

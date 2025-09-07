@@ -1,19 +1,19 @@
 import { z } from 'zod';
 
-export interface ToolDefinition {
+export interface ToolDefinition<T extends z.ZodRawShape = z.ZodRawShape> {
   name: string;
   description: string;
-  parameters: z.ZodObject<any>;
+  parameters: z.ZodObject<T>;
   category: string;
   examples?: string[];
 }
 
-export abstract class BaseTool {
-  definition: ToolDefinition;
+export abstract class BaseTool<T extends z.ZodRawShape> {
+  public readonly definition: ToolDefinition<T>;
 
-  constructor(definition: ToolDefinition) {
+  public constructor(definition: Readonly<ToolDefinition<T>>) {
     this.definition = definition;
   }
 
-  abstract execute(args: any): Promise<any>;
+  public abstract execute(args: Readonly<z.infer<z.ZodObject<T>>>): Promise<unknown>;
 }

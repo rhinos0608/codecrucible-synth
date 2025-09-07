@@ -6,11 +6,12 @@ export interface IAgent {
   role: AgentRole;
   status: AgentStatus;
   capabilities: AgentCapability[];
-  initialize(): Promise<void>;
-  process(request: AgentRequest): Promise<AgentResponse>;
-  collaborate(agents: IAgent[], task: CollaborativeTask): Promise<CollaborativeResponse>;
-  learn(feedback: AgentFeedback): Promise<void>;
-  shutdown(): Promise<void>;
+  expertiseDomains: string[];
+  initialize: () => Promise<void>;
+  process: (request: Readonly<AgentRequest>) => Promise<AgentResponse>;
+  collaborate: (agents: ReadonlyArray<IAgent>, task: Readonly<CollaborativeTask>) => Promise<CollaborativeResponse>;
+  learn: (feedback: Readonly<AgentFeedback>) => Promise<void>;
+  shutdown: () => Promise<void>;
 }
 
 export interface AgentRole {
@@ -105,7 +106,7 @@ export interface AgentRequest {
   preferences?: AgentPreferences;
   priority: 'low' | 'medium' | 'high' | 'critical';
   timeout?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AgentConstraints {
@@ -214,13 +215,16 @@ export interface AgentTask {
   id: string;
   description: string;
   input: string;
+  expertiseDomains: string[];
 }
 
 export interface AgentResponse {
   taskId: string;
   output: string;
   success: boolean;
-  metadata?: Record<string, any>;
+  error?: string;
+  duration: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ExecutionResult {

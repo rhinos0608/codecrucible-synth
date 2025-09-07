@@ -20,21 +20,14 @@ export class OllamaAdapter implements ProviderAdapter {
     const cfg = (this.provider as any).config;
 
     try {
-      const providerResponse = await this.provider.request({
-        ...req,
+      // Extract prompt from messages
+      const prompt = req.messages?.map(msg => `${msg.role}: ${msg.content}`).join('\n') || '';
+      
+      const providerResponse = await this.provider.generateCode(prompt, {
         model: req.model || cfg.defaultModel,
-        messages: req.messages?.map(msg => ({
-          role: msg.role,
-          content: msg.content,
-          tool_calls: msg.tool_calls?.map(tc => ({
-            id: (tc as any).id,
-            type: 'function' as const,
-            function: {
-              name: (tc as any).function?.name || '',
-              arguments: (tc as any).function?.arguments || '{}',
-            },
-          })),
-        })),
+        onStreamingToken: req.stream ? (token: any) => {
+          // Handle streaming if needed
+        } : undefined,
       }) as any;  // Provider response type varies
 
       let content = '';

@@ -8,7 +8,7 @@ import {
   ErrorSeverity,
   ServiceResponse,
 } from '../../error-handling/structured-error-system.js';
-import type { ExecutionOptions, ExecutionResult, BackendConfig } from '../execution-types.js';
+import type { BackendConfig, ExecutionOptions, ExecutionResult } from '../execution-types.js';
 import { ExecutionBackend } from '../base-execution-backend.js';
 
 const execAsync = promisify(exec);

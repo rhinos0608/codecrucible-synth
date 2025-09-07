@@ -5,17 +5,17 @@ import { IAgent } from './agent-types.js';
  * Maintains a registry of available agents and supports dynamic loading.
  */
 export class AgentRegistry {
-  private agents: Map<string, IAgent> = new Map();
+  private readonly agents: Map<string, IAgent> = new Map();
 
-  registerAgent(agent: IAgent): void {
+  public registerAgent(agent: Readonly<IAgent>): void {
     this.agents.set(agent.id, agent);
   }
 
-  getAgent(id: string): IAgent | undefined {
+  public getAgent(id: string): IAgent | undefined {
     return this.agents.get(id);
   }
 
-  listAgents(): IAgent[] {
+  public listAgents(): IAgent[] {
     return Array.from(this.agents.values());
   }
 }

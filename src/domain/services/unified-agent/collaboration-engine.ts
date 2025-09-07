@@ -1,4 +1,4 @@
-import { IAgent, CollaborativeTask, CollaborativeResponse } from './agent-types.js';
+import { CollaborativeResponse, CollaborativeTask, IAgent } from './agent-types.js';
 import { sequentialCollaboration } from './collaboration-strategies/sequential-collaboration.js';
 import { parallelCollaboration } from './collaboration-strategies/parallel-collaboration.js';
 import { hierarchicalCollaboration } from './collaboration-strategies/hierarchical-collaboration.js';
@@ -8,23 +8,24 @@ type StrategyName = 'sequential' | 'parallel' | 'hierarchical' | 'consensus';
 
 type StrategyHandler = (
   agents: IAgent[],
-  task: CollaborativeTask
+  task: Readonly<CollaborativeTask>
 ) => Promise<CollaborativeResponse>;
 
 export class CollaborationEngine {
-  private strategies: Record<StrategyName, StrategyHandler> = {
+  private readonly strategies: Record<StrategyName, StrategyHandler> = {
     sequential: sequentialCollaboration,
     parallel: parallelCollaboration,
     hierarchical: hierarchicalCollaboration,
     consensus: consensusCollaboration,
   };
 
-  async collaborate(
+  public async collaborate(
     strategy: StrategyName,
-    agents: IAgent[],
-    task: CollaborativeTask
+    agents: readonly IAgent[],
+    task: Readonly<CollaborativeTask>
   ): Promise<CollaborativeResponse> {
     const handler = this.strategies[strategy];
-    return handler(agents, task);
+    const mutableAgents: IAgent[] = [...agents];
+    return handler(mutableAgents, task);
   }
 }

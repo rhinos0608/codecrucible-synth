@@ -1,5 +1,7 @@
 import { EventEmitter } from 'events';
-import { createLogger } from '../../infrastructure/logging/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
+import { ModelParameters } from '../../domain/entities/model.js';
+import { ModelName, ProviderType } from '../../domain/value-objects/voice-values.js';
 import {
   IIntelligentRoutingCoordinator,
   RoutingContext,
@@ -21,13 +23,16 @@ import {
   IVoiceOrchestrationService,
   SynthesisMode,
 } from '../../domain/services/voice-orchestration-service.js';
-import { IProviderSelectionStrategy } from '../../providers/provider-selection-strategy.js';
+import { 
+  IProviderSelectionStrategy,
+  ProviderType as ProviderStrategyType,
+} from '../../providers/provider-selection-strategy.js';
 import { HybridLLMRouter } from '../../providers/hybrid/hybrid-llm-router.js';
 import { PerformanceMonitor } from '../../utils/performance.js';
 import { Model } from '../../domain/entities/model.js';
 import { Voice } from '../../domain/entities/voice.js';
 
-const logger = createLogger('IntelligentRoutingCoordinator');
+// Logger already imported as singleton
 
 export class IntelligentRoutingCoordinator
   extends EventEmitter
@@ -78,21 +83,25 @@ export class IntelligentRoutingCoordinator
       return decision;
     } catch (error) {
       logger.error('Routing decision failed, returning failsafe decision', error);
+      // Create a proper fallback Model instance
+      const fallbackParams: ModelParameters = {
+        maxTokens: 4096,
+        contextWindow: 4096,
+        isMultimodal: false,
+        estimatedLatency: 1000,
+        qualityRating: 0.5,
+      };
+      
+      const fallbackModel = new Model(
+        ModelName.create('fallback-model'),
+        ProviderType.create('lm-studio'),
+        ['text-generation'],
+        fallbackParams
+      );
+
       const failsafeDecision: IntelligentRoutingDecision = Object.freeze({
         modelSelection: {
-          primaryModel: {
-            name: { value: 'fallback-model' },
-            providerType: 'lm-studio',
-            // Add other required Model properties with failsafe defaults
-            // If Model is an interface, add all required fields here
-            // If Model is a class, instantiate it if possible
-            // The following are common Model fields; adjust as needed
-            id: 'fallback-model',
-            version: '1.0.0',
-            description: 'Failsafe fallback model',
-            isActive: true,
-            // Add more fields if Model requires them
-          },
+          primaryModel: fallbackModel,
           fallbackModels: [],
           selectionReason: 'Failsafe model selection',
           routingStrategy: RoutingStrategy.SHARED,
@@ -112,7 +121,7 @@ export class IntelligentRoutingCoordinator
           reasoning: 'Failsafe voice selection',
         },
         providerSelection: {
-          provider: 'lm-studio',
+          provider: 'lm-studio' as ProviderStrategyType,
           reason: 'Failsafe provider',
           confidence: 0,
           fallbackChain: [],
@@ -125,7 +134,7 @@ export class IntelligentRoutingCoordinator
         estimatedQuality: 0,
         fallbackChain: [
           {
-            type: 'model',
+            type: 'model' as const,
             option: 'fallback-model',
             reason: 'Default failsafe model',
           },

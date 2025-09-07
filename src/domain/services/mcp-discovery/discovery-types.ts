@@ -77,6 +77,7 @@ export enum CostTier {
 }
 
 export interface ServerDiscoveryQuery {
+  type?: string;
   requiredCapabilities: CapabilityType[];
   optionalCapabilities?: CapabilityType[];
   maxLatency?: number;

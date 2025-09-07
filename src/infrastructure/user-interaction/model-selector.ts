@@ -29,7 +29,7 @@ export class ModelSelector {
   private models: ModelInfo[] = [];
   private selectedIndex: number = 0;
 
-  constructor() {
+  public constructor() {
     // Hide cursor and enable raw mode for better UX
     process.stdout.write('\x1B[?25l');
   }
@@ -37,7 +37,7 @@ export class ModelSelector {
   /**
    * Discover available models from all providers
    */
-  async discoverModels(): Promise<ModelInfo[]> {
+  public async discoverModels(): Promise<ModelInfo[]> {
     const discoveredModels: ModelInfo[] = [];
 
     // Discover Ollama models
@@ -85,13 +85,21 @@ export class ModelSelector {
    * Discover models from Ollama
    */
   private async discoverOllamaModels(): Promise<ModelInfo[]> {
+    interface OllamaModel {
+      name: string;
+      size: number;
+      details?: {
+        parameter_size?: string;
+      };
+    }
+
     const response = await fetch('http://localhost:11434/api/tags');
     if (!response.ok) {
       throw new Error('Ollama not available');
     }
 
-    const data = (await response.json()) as { models: any[] };
-    return data.models.map(model => ({
+    const data = (await response.json()) as { models: OllamaModel[] };
+    return data.models.map((model: OllamaModel) => ({
       id: model.name,
       name: `${model.name} (${this.formatSize(model.size)})`,
       provider: 'ollama' as const,
@@ -113,7 +121,7 @@ export class ModelSelector {
   /**
    * Present interactive model selection menu
    */
-  async selectModel(): Promise<ModelSelectionResult> {
+  public async selectModel(): Promise<ModelSelectionResult> {
     console.log('\n🤖 Select AI Model for CodeCrucible Synth');
     console.log('═'.repeat(50));
 
@@ -129,7 +137,7 @@ export class ModelSelector {
     }
 
     // Show interactive selection
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _reject) => {
       const rl = createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -142,22 +150,22 @@ export class ModelSelector {
 
       this.renderModelList();
 
-      const handleKeypress = (data: Buffer) => {
+      const handleKeypress = (data: Readonly<Buffer>): void => {
         const key = data.toString();
 
         switch (key) {
-          case '\u001b[A': // Up arrow
+          case '\u001b[A': { // Up arrow
             this.selectedIndex = Math.max(0, this.selectedIndex - 1);
             this.renderModelList();
             break;
-
-          case '\u001b[B': // Down arrow
+          }
+          case '\u001b[B': { // Down arrow
             this.selectedIndex = Math.min(this.models.length - 1, this.selectedIndex + 1);
             this.renderModelList();
             break;
-
+          }
           case '\r': // Enter
-          case '\n':
+          case '\n': {
             const selectedModel = this.models[this.selectedIndex];
             this.cleanup();
             rl.close();
@@ -170,19 +178,25 @@ export class ModelSelector {
               provider: selectedModel.provider,
             });
             return;
-
-          case '\u0003': // Ctrl+C
+          }
+          case '\u0003': { // Ctrl+C
             this.cleanup();
             rl.close();
             console.log('\n\n👋 Goodbye!');
             process.exit(0);
-
+            break;
+          }
           case 'q':
-          case 'Q':
+          case 'Q': {
             this.cleanup();
             rl.close();
             console.log('\n\n👋 Goodbye!');
             process.exit(0);
+            break;
+          }
+          default:
+            // Do nothing for other keys
+            break;
         }
       };
 
@@ -254,7 +268,7 @@ export class ModelSelector {
   /**
    * Get models for programmatic access
    */
-  getDiscoveredModels(): ModelInfo[] {
+  public getDiscoveredModels(): ModelInfo[] {
     return this.models;
   }
 }
@@ -266,5 +280,5 @@ export class ModelSelector {
 export async function quickSelectModel(): Promise<ModelSelectionResult> {
   // Use the new smart selection logic
   const { smartQuickSelectModel } = await import('./smart-model-selector.js');
-  return await smartQuickSelectModel();
+  return smartQuickSelectModel();
 }

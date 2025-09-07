@@ -1,17 +1,17 @@
 import {
-  IAgent,
-  CollaborativeTask,
   CollaborativeResponse,
+  CollaborativeTask,
   ExecutionResult,
+  IAgent,
 } from '../agent-types.js';
 
 export async function parallelCollaboration(
-  agents: IAgent[],
-  task: CollaborativeTask
+  agents: readonly IAgent[],
+  task: Readonly<CollaborativeTask>
 ): Promise<CollaborativeResponse> {
   const contributions = new Map<string, ExecutionResult>();
   const results = await Promise.all(
-    agents.map(agent =>
+    agents.map(async (agent: Readonly<IAgent>) =>
       agent.process({
         id: task.id,
         type: 'collaborate',

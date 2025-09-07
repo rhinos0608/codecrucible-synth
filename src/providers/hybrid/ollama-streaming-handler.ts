@@ -14,8 +14,10 @@ export async function handleStreaming(
   let metadata: OllamaStreamingMetadata = {};
   let toolCalls: OllamaToolCall[] = [];
 
-  while (true) {
-    const { value, done } = await reader.read();
+  let done = false;
+  while (!done) {
+    const { value, done: readDone } = await reader.read();
+    done = readDone;
     if (done) break;
     const chunk = decoder.decode(value, { stream: true });
     const lines = chunk.split('\n').filter(Boolean);

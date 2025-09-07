@@ -6,8 +6,8 @@
  */
 
 import {
-  IUserInteraction,
   DisplayOptions,
+  IUserInteraction,
   PromptOptions,
 } from '../../domain/interfaces/user-interaction.js';
 import chalk from 'chalk';
@@ -18,18 +18,18 @@ export class CLIUserInteraction implements IUserInteraction {
   private currentSpinner: Ora | null = null;
   private _isVerbose: boolean;
 
-  constructor(options: { verbose?: boolean } = {}) {
+  public constructor(options: Readonly<{ verbose?: boolean }> = {}) {
     this._isVerbose = options.verbose ?? false;
   }
 
-  async display(message: string, options: DisplayOptions = {}): Promise<void> {
+  public async display(message: string, options: Readonly<DisplayOptions> = {}): Promise<void> {
     // Stop any current spinner
     if (this.currentSpinner) {
       this.currentSpinner.stop();
       this.currentSpinner = null;
     }
 
-    const prefix = options.prefix || '';
+    const prefix = options.prefix ?? '';
     const formattedMessage = this.formatMessage(message, options.type, prefix);
 
     if (options.stream) {
@@ -37,7 +37,7 @@ export class CLIUserInteraction implements IUserInteraction {
       process.stdout.write(formattedMessage);
 
       // Ensure the output is flushed and finalized properly
-      if (options.final || message.trim().length === 0 || message.endsWith('\n')) {
+      if ((options.final ?? false) || message.trim().length === 0 || message.endsWith('\n')) {
         process.stdout.write('\n');
       }
 
@@ -55,19 +55,19 @@ export class CLIUserInteraction implements IUserInteraction {
     }
   }
 
-  async warn(message: string): Promise<void> {
+  public async warn(message: string): Promise<void> {
     await this.display(message, { type: 'warn' });
   }
 
-  async error(message: string): Promise<void> {
+  public async error(message: string): Promise<void> {
     await this.display(message, { type: 'error' });
   }
 
-  async success(message: string): Promise<void> {
+  public async success(message: string): Promise<void> {
     await this.display(message, { type: 'success' });
   }
 
-  async progress(message: string, progress?: number): Promise<void> {
+  public async progress(message: string, progress?: number): Promise<void> {
     if (progress !== undefined) {
       // Show progress with percentage
       const progressBar = this.createProgressBar(progress);
@@ -82,14 +82,17 @@ export class CLIUserInteraction implements IUserInteraction {
     }
   }
 
-  async prompt(question: string, options: PromptOptions = {}): Promise<string> {
+  public async prompt(
+    question: string,
+    options: Readonly<PromptOptions> = {}
+  ): Promise<string> {
     // Stop any current spinner
     if (this.currentSpinner) {
       this.currentSpinner.stop();
       this.currentSpinner = null;
     }
 
-    const inquirerOptions: any = {
+    const inquirerOptions: inquirer.InputQuestion = {
       type: 'input',
       name: 'answer',
       message: question,
@@ -102,29 +105,26 @@ export class CLIUserInteraction implements IUserInteraction {
           return 'This field is required';
         }
 
-        if (options.validation) {
-          const result = options.validation(input);
-          if (result === true) return true;
-          if (typeof result === 'string') return result;
-          return 'Invalid input';
-        }
-
-        return true;
+        const result = options.validation!(input);
+        if (result === true) return true;
+        if (typeof result === 'string') return result;
+        return 'Invalid input';
       };
     }
 
     const answers = await inquirer.prompt([inquirerOptions]);
+    const answers = await inquirer.prompt<{ answer: string }>([inquirerOptions]);
     return answers.answer;
   }
 
-  async confirm(question: string): Promise<boolean> {
+  public async confirm(question: string): Promise<boolean> {
     // Stop any current spinner
     if (this.currentSpinner) {
       this.currentSpinner.stop();
       this.currentSpinner = null;
     }
 
-    const answers = await inquirer.prompt([
+    const answers = await inquirer.prompt<{ confirmed: boolean }>([
       {
         type: 'confirm',
         name: 'confirmed',
@@ -136,14 +136,14 @@ export class CLIUserInteraction implements IUserInteraction {
     return answers.confirmed;
   }
 
-  async select(question: string, choices: readonly string[]): Promise<string> {
+  public async select(question: string, choices: readonly string[]): Promise<string> {
     // Stop any current spinner
     if (this.currentSpinner) {
       this.currentSpinner.stop();
       this.currentSpinner = null;
     }
 
-    const answers = await inquirer.prompt([
+    const answers = await inquirer.prompt<{ selected: string }>([
       {
         type: 'list',
         name: 'selected',

@@ -1,4 +1,4 @@
-import type { ExecutionOptions, ExecutionResult, BackendConfig } from '../execution-types.js';
+import type { BackendConfig, ExecutionOptions, ExecutionResult } from '../execution-types.js';
 import { E2BBackend } from './e2b-backend.js';
 import type { ServiceResponse } from '../../error-handling/structured-error-system.js';
 

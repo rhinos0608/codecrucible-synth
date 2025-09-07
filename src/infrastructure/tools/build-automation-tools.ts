@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
-import { join, isAbsolute } from 'path';
+import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -23,8 +23,13 @@ const BuildProjectSchema = z.object({
   timeout: z.number().default(300000).describe('Build timeout in milliseconds'),
 });
 
+export interface PackageJson {
+  scripts?: Record<string, string>;
+  [key: string]: unknown;
+}
+
 export class BuildAutomatorTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  public constructor(private readonly agentContext: Readonly<{ workingDirectory: string }>) {
     super({
       name: 'buildProject',
       description: 'Builds the project using various build tools and configurations',
@@ -33,17 +38,17 @@ export class BuildAutomatorTool extends BaseTool {
     });
   }
 
-  async execute(args: z.infer<typeof BuildProjectSchema>): Promise<string> {
+  public async execute(args: Readonly<z.infer<typeof BuildProjectSchema>>): Promise<string> {
     try {
       const { buildTool, buildScript, environment, watch, optimize, sourceMaps, timeout } = args;
 
       // Check if package.json exists to understand the project structure
       const packageJsonPath = join(this.agentContext.workingDirectory, 'package.json');
-      let packageJson: any = {};
+      let packageJson: PackageJson = {};
 
       try {
         const packageContent = await fs.readFile(packageJsonPath, 'utf-8');
-        packageJson = JSON.parse(packageContent);
+        packageJson = JSON.parse(packageContent) as PackageJson;
       } catch {
         // No package.json found, will use basic commands
       }
@@ -99,14 +104,29 @@ export class BuildAutomatorTool extends BaseTool {
       }
 
       return result;
-    } catch (error: any) {
-      const duration = error.signal === 'SIGTERM' ? 'timed out' : 'failed';
+    } catch (error) {
+      let duration = 'failed';
+      if (typeof error === 'object' && error !== null && 'signal' in error && (error as { signal?: unknown }).signal === 'SIGTERM') {
+        duration = 'timed out';
+      }
+
+      const message =
+        typeof error === 'object' && error !== null && 'message' in error
+          ? String((error as { message?: unknown }).message)
+          : String(error);
+
+      const stdout =
+        typeof error === 'object' && error !== null && 'stdout' in error && (error as { stdout?: unknown }).stdout
+          ? `STDOUT:\n${String((error as { stdout?: unknown }).stdout)}\n`
+          : '';
+
+      const stderr =
+        typeof error === 'object' && error !== null && 'stderr' in error && (error as { stderr?: unknown }).stderr
+          ? `STDERR:\n${String((error as { stderr?: unknown }).stderr)}\n`
+          : '';
 
       return (
-        `❌ Build ${duration}:\n` +
-        `Error: ${error.message}\n` +
-        `${error.stdout ? `STDOUT:\n${error.stdout}\n` : ''}` +
-        `${error.stderr ? `STDERR:\n${error.stderr}\n` : ''}`
+        `❌ Build ${duration}:\nError: ${message}\n${stdout}${stderr}`
       );
     }
   }
@@ -114,7 +134,7 @@ export class BuildAutomatorTool extends BaseTool {
   private buildCommand(
     buildTool: string,
     buildScript: string | undefined,
-    packageJson: any,
+    packageJson: PackageJson,
     environment: string,
     watch: boolean,
     optimize: boolean,
@@ -126,18 +146,20 @@ export class BuildAutomatorTool extends BaseTool {
     }
 
     // Check package.json scripts
-    const scripts = packageJson.scripts || {};
+    const scripts = packageJson && typeof packageJson === 'object' && 'scripts' in packageJson && packageJson.scripts && typeof packageJson.scripts === 'object'
+      ? packageJson.scripts
+      : {};
 
     switch (buildTool) {
       case 'npm': {
-        if (scripts.build) return `npm run build${watch ? ':watch' : ''}`;
-        if (scripts.compile) return 'npm run compile';
+        if ('build' in scripts) return `npm run build${watch ? ':watch' : ''}`;
+        if ('compile' in scripts) return 'npm run compile';
         return 'npm run build'; // Will fail if no build script
       }
 
       case 'yarn': {
-        if (scripts.build) return `yarn build${watch ? ':watch' : ''}`;
-        if (scripts.compile) return 'yarn compile';
+        if ('build' in scripts) return `yarn build${watch ? ':watch' : ''}`;
+        if ('compile' in scripts) return 'yarn compile';
         return 'yarn build';
       }
 
@@ -269,7 +291,7 @@ const PackageManagerSchema = z.object({
 });
 
 export class PackageManagerTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  public constructor(private readonly agentContext: Readonly<{ workingDirectory: string }>) {
     super({
       name: 'managePackages',
       description: 'Manages project dependencies and packages',
@@ -278,7 +300,7 @@ export class PackageManagerTool extends BaseTool {
     });
   }
 
-  async execute(args: z.infer<typeof PackageManagerSchema>): Promise<string> {
+  public async execute(args: Readonly<z.infer<typeof PackageManagerSchema>>): Promise<string> {
     try {
       const { action, packages, packageManager, flags, force, timeout } = args;
 
@@ -315,21 +337,37 @@ export class PackageManagerTool extends BaseTool {
       }
 
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      let stdout = '';
+      let stderr = '';
+      if (typeof error === 'object' && error !== null) {
+        if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
+          message = String((error as { message?: unknown }).message);
+        }
+        if ('stdout' in error && typeof (error as { stdout?: unknown }).stdout === 'string') {
+          stdout = `STDOUT:\n${String((error as { stdout?: unknown }).stdout)}\n`;
+        }
+        if ('stderr' in error && typeof (error as { stderr?: unknown }).stderr === 'string') {
+          stderr = `STDERR:\n${String((error as { stderr?: unknown }).stderr)}\n`;
+        }
+      } else if (typeof error === 'string') {
+        message = error;
+      }
       return (
         `❌ Package ${args.action} failed:\n` +
-        `Error: ${error.message}\n` +
-        `${error.stdout ? `STDOUT:\n${error.stdout}\n` : ''}` +
-        `${error.stderr ? `STDERR:\n${error.stderr}\n` : ''}`
+        `Error: ${message}\n` +
+        `${stdout}` +
+        `${stderr}`
       );
     }
   }
 
   private buildPackageCommand(
     action: string,
-    packages: string[] | undefined,
+    packages: ReadonlyArray<string> | undefined,
     packageManager: string,
-    flags: string[] | undefined,
+    flags: ReadonlyArray<string> | undefined,
     force: boolean
   ): string {
     let command = packageManager;
@@ -345,7 +383,7 @@ export class PackageManagerTool extends BaseTool {
           command += packages && packages.length > 0 ? ` update ${packages.join(' ')}` : ' update';
           break;
         case 'remove':
-          command += ` uninstall ${packages?.join(' ') || ''}`;
+          command += ` uninstall ${packages?.join(' ') ?? ''}`;
           break;
         case 'list':
           command += ' list';
@@ -364,8 +402,8 @@ export class PackageManagerTool extends BaseTool {
         case 'publish':
           command += ' publish';
           break;
-      }
-    } else if (packageManager === 'yarn') {
+        default:
+          // No action, or unknown action
       switch (action) {
         case 'install':
           command += packages && packages.length > 0 ? ` add ${packages.join(' ')}` : ' install';
@@ -375,7 +413,7 @@ export class PackageManagerTool extends BaseTool {
             packages && packages.length > 0 ? ` upgrade ${packages.join(' ')}` : ' upgrade';
           break;
         case 'remove':
-          command += ` remove ${packages?.join(' ') || ''}`;
+          command += ` remove ${packages?.join(' ') ?? ''}`;
           break;
         case 'list':
           command += ' list';
@@ -391,6 +429,12 @@ export class PackageManagerTool extends BaseTool {
           if (force) command += ' -y';
           break;
         case 'publish':
+          command += ' publish';
+          break;
+        default:
+          // No action, or unknown action
+          break;
+      }
           command += ' publish';
           break;
       }
@@ -409,10 +453,10 @@ export class PackageManagerTool extends BaseTool {
       const packageJsonPath = join(this.agentContext.workingDirectory, 'package.json');
       const lockfilePath = join(this.agentContext.workingDirectory, 'package-lock.json');
 
-      const [packageJson, lockfileExists] = await Promise.all([
+      const [packageJsonRaw, lockfileExists] = await Promise.all([
         fs
           .readFile(packageJsonPath, 'utf-8')
-          .then(JSON.parse)
+          .then((data) => JSON.parse(data) as unknown)
           .catch((): null => null),
         fs
           .access(lockfilePath)
@@ -420,13 +464,19 @@ export class PackageManagerTool extends BaseTool {
           .catch(() => false),
       ]);
 
-      if (!packageJson) return null;
+      if (!packageJsonRaw || typeof packageJsonRaw !== 'object' || Array.isArray(packageJsonRaw)) return null;
+
+      const packageJson = packageJsonRaw as { dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
 
       let analysis = '';
 
       // Count dependencies
-      const deps = Object.keys(packageJson.dependencies || {}).length;
-      const devDeps = Object.keys(packageJson.devDependencies || {}).length;
+      const deps = packageJson.dependencies && typeof packageJson.dependencies === 'object'
+        ? Object.keys(packageJson.dependencies).length
+        : 0;
+      const devDeps = packageJson.devDependencies && typeof packageJson.devDependencies === 'object'
+        ? Object.keys(packageJson.devDependencies).length
+        : 0;
 
       analysis += `Dependencies: ${deps} production, ${devDeps} development\n`;
 
@@ -467,7 +517,7 @@ const DeploySchema = z.object({
 });
 
 export class DeploymentTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
+  public constructor(private readonly agentContext: Readonly<{ workingDirectory: string }>) {
     super({
       name: 'deployProject',
       description: 'Deploys the project to various hosting platforms',
@@ -476,7 +526,7 @@ export class DeploymentTool extends BaseTool {
     });
   }
 
-  async execute(args: z.infer<typeof DeploySchema>): Promise<string> {
+  public async execute(args: Readonly<z.infer<typeof DeploySchema>>): Promise<string> {
     try {
       const {
         deploymentTarget,
@@ -493,13 +543,17 @@ export class DeploymentTool extends BaseTool {
       if (buildBeforeDeploy) {
         result += '📦 Building project...\n';
         try {
-          const { stdout } = await execAsync('npm run build', {
+          await execAsync('npm run build', {
             cwd: this.agentContext.workingDirectory,
             timeout: 300000,
           });
           result += `Build completed successfully\n\n`;
-        } catch (buildError: any) {
-          return `❌ Build failed before deployment:\n${buildError.message}`;
+        } catch (buildError) {
+          const message =
+            typeof buildError === 'object' && buildError !== null && 'message' in buildError
+              ? String((buildError as { message?: unknown }).message)
+              : String(buildError);
+          return `❌ Build failed before deployment:\n${message}`;
         }
       }
 
@@ -507,7 +561,6 @@ export class DeploymentTool extends BaseTool {
       const deployCommand = this.buildDeploymentCommand(
         deploymentTarget,
         environment,
-        environmentVariables,
         deploymentConfig,
         dryRun
       );
@@ -541,12 +594,26 @@ export class DeploymentTool extends BaseTool {
       result += `✅ Deployment to ${deploymentTarget} completed successfully!`;
 
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      let stdout = '';
+      let stderr = '';
+      if (typeof error === 'object' && error !== null) {
+        if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
+          message = String((error as { message?: unknown }).message);
+        }
+        if ('stdout' in error && typeof (error as { stdout?: unknown }).stdout === 'string') {
+          stdout = `STDOUT:\n${String((error as { stdout?: unknown }).stdout)}\n`;
+        }
+        if ('stderr' in error && typeof (error as { stderr?: unknown }).stderr === 'string') {
+          stderr = `STDERR:\n${String((error as { stderr?: unknown }).stderr)}\n`;
+        }
+      }
       return (
         `❌ Deployment failed:\n` +
-        `Error: ${error.message}\n` +
-        `${error.stdout ? `STDOUT:\n${error.stdout}\n` : ''}` +
-        `${error.stderr ? `STDERR:\n${error.stderr}\n` : ''}`
+        `Error: ${message}\n` +
+        `${stdout}` +
+        `${stderr}`
       );
     }
   }
@@ -554,7 +621,7 @@ export class DeploymentTool extends BaseTool {
   private buildDeploymentCommand(
     target: string,
     environment: string,
-    envVars?: Record<string, string>,
+    // envVars?: Readonly<Record<string, string>>, // Removed unused parameter
     configPath?: string,
     dryRun?: boolean
   ): string {
@@ -587,7 +654,7 @@ export class DeploymentTool extends BaseTool {
       docker: ['Dockerfile', 'package.json'],
     };
 
-    const files = requiredFiles[target as keyof typeof requiredFiles] || [];
+    const files = requiredFiles[target as keyof typeof requiredFiles];
 
     for (const file of files) {
       try {

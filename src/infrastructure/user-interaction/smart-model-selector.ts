@@ -6,7 +6,7 @@
  */
 
 import { logger } from '../logging/unified-logger.js';
-import { ModelSelector, ModelSelectionResult, ModelInfo } from './model-selector.js';
+import { ModelInfo, ModelSelectionResult, ModelSelector } from './model-selector.js';
 import { modelCapabilityService } from '../discovery/model-capability-service.js';
 
 export interface SmartSelectionOptions {
@@ -29,7 +29,7 @@ export class SmartModelSelector {
   /**
    * Select the best model based on user preferences and capabilities
    */
-  async selectModel(options: SmartSelectionOptions = {}): Promise<ModelSelectionResult> {
+  public async selectModel(options: SmartSelectionOptions = {}): Promise<ModelSelectionResult> {
     // Get options from environment variables or parameters
     const {
       preferredModel = process.env.MODEL_PREFERRED,
@@ -39,26 +39,26 @@ export class SmartModelSelector {
     } = options;
 
     logger.info('🤖 Smart model selection started', {
-      preferredModel: preferredModel || 'none',
+      preferredModel: preferredModel ?? 'none',
       requireFunctionCalling,
       fallbackToBest,
-      preferredProvider: provider || 'any',
+      preferredProvider: provider ?? 'any',
     });
 
     // Discover available models
     const models = await this.selector.discoverModels();
-    const availableModels = models.filter(m => m.available);
+    const availableModels = (models as readonly ModelInfo[]).filter(m => m.available);
 
     if (availableModels.length === 0) {
       throw new Error('No AI models available');
     }
 
     logger.info(
-      `📋 Found ${availableModels.length} available models across ${[...new Set(availableModels.map(m => m.provider))].length} providers`
+      `📋 Found ${availableModels.length} available models across ${[...new Set((availableModels as readonly ModelInfo[]).map(m => m.provider))].length} providers`
     );
 
     // Step 1: Try user's preferred model
-    if (preferredModel && preferredModel.trim()) {
+    if (preferredModel?.trim()) {
       const result = await this.tryPreferredModel(
         availableModels,
         preferredModel,
@@ -79,11 +79,11 @@ export class SmartModelSelector {
 
     // Step 3: Dynamic selection based on capabilities
     if (fallbackToBest) {
-      return await this.selectBestAvailable(availableModels, requireFunctionCalling);
+      return this.selectBestAvailable(availableModels, requireFunctionCalling);
     }
 
     // Step 4: Simple fallback
-    const fallbackModel = availableModels[0];
+    const [fallbackModel] = availableModels;
     logger.info(`⚠️ Using simple fallback: ${fallbackModel.name} (${fallbackModel.provider})`);
 
     return {
@@ -183,17 +183,17 @@ export class SmartModelSelector {
    * Select the best available model based on capability scoring
    */
   private async selectBestAvailable(
-    availableModels: ModelInfo[],
+    availableModels: readonly ModelInfo[],
     requireFunctionCalling: boolean
   ): Promise<ModelSelectionResult> {
-    return await this.selectBestFromModels(availableModels, requireFunctionCalling);
+    return this.selectBestFromModels(availableModels, requireFunctionCalling);
   }
 
   /**
    * Score models and select the best one
    */
   private async selectBestFromModels(
-    models: ModelInfo[],
+    models: readonly ModelInfo[],
     requireFunctionCalling: boolean
   ): Promise<ModelSelectionResult> {
     logger.info(`🎯 Scoring ${models.length} models for selection...`);
@@ -305,7 +305,7 @@ export class SmartModelSelector {
     // Sort by score (highest first)
     scoredModels.sort((a, b) => b.score - a.score);
 
-    const bestModel = scoredModels[0];
+    const [bestModel] = scoredModels;
 
     logger.info(`✅ Selected best model: ${bestModel.model.name}`, {
       score: bestModel.score,
@@ -336,10 +336,10 @@ export class SmartModelSelector {
  * Quick selection function that uses smart selection logic
  */
 export async function smartQuickSelectModel(
-  options: SmartSelectionOptions = {}
+  options: Readonly<SmartSelectionOptions> = {}
 ): Promise<ModelSelectionResult> {
   const selector = new SmartModelSelector();
-  return await selector.selectModel(options);
+  return selector.selectModel(options);
 }
 
 // Export the smart selector as singleton

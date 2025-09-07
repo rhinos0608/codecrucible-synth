@@ -1,9 +1,9 @@
 import { logger } from '../../infrastructure/logging/logger.js';
 import {
-  LLMProvider,
   LLMCapabilities,
-  LLMStatus,
+  LLMProvider,
   LLMResponse,
+  LLMStatus,
 } from '../../domain/interfaces/llm-interfaces.js';
 import { OllamaConfig, OllamaRequest, parseEnvInt } from './ollama-config.js';
 import { OllamaHttpClient } from './ollama-http-client.js';
@@ -18,10 +18,10 @@ export class OllamaProvider implements LLMProvider {
   private readonly config: OllamaConfig;
   private readonly http: OllamaHttpClient;
 
-  private currentLoad = 0;
+  private readonly currentLoad = 0;
   private lastError?: string;
 
-  public constructor(config: OllamaConfig) {
+  public constructor(config: Readonly<OllamaConfig>) {
     this.config = config;
     this.endpoint = config.endpoint;
     this.http = new OllamaHttpClient(this.endpoint);
@@ -31,7 +31,7 @@ export class OllamaProvider implements LLMProvider {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(
-        () => controller.abort(),
+        () => { controller.abort(); },
         parseEnvInt('OLLAMA_HEALTH_CHECK_TIMEOUT', 5000, 1000, 30000)
       );
       await this.http.get('/api/tags', controller.signal);
@@ -45,37 +45,68 @@ export class OllamaProvider implements LLMProvider {
 
   public async generateCode(
     prompt: string,
-    options: Record<string, unknown> = {}
+    options: Readonly<Record<string, unknown>> = {}
   ): Promise<LLMResponse> {
-    const model = (options.model as string) ?? this.config.defaultModel;
-    const messages = [
-      { role: 'system', content: generateContextualSystemPrompt() },
+    const model = (options.model as string) || this.config.defaultModel;
+
+    // Provide required arguments for generateContextualSystemPrompt
+    const availableTools: readonly string[] = Array.isArray(options.availableTools)
+      ? (options.availableTools as readonly string[])
+      : [];
+    const userContext: string | undefined = typeof options.userContext === 'string'
+      ? options.userContext
+      : undefined;
+
+    const messages: import('./ollama-config.js').OllamaMessage[] = [
+      { role: 'system', content: generateContextualSystemPrompt(availableTools, userContext) },
       { role: 'user', content: prompt },
     ];
+
+    const onStreamingToken = typeof options.onStreamingToken === 'function'
+      ? options.onStreamingToken as (token: string, metadata?: unknown) => void
+      : undefined;
 
     const request: OllamaRequest = {
       model,
       messages,
-      stream: typeof (options as any).onStreamingToken === 'function',
+      stream: !!onStreamingToken,
     };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.config.timeout);
+    const timeout = setTimeout(() => { controller.abort(); }, this.config.timeout);
 
     try {
       const response = await this.http.post('/api/chat', request, controller.signal);
       let text = '';
-      let metadata = {} as Record<string, unknown>;
-      let toolCalls = [] as Array<{ id?: string; function: { name: string; arguments: string } }>;
+      let metadata: Record<string, unknown> = {};
+      let toolCalls: Array<{ id?: string; function: { name: string; arguments: string } }> = [];
 
-      if (request.stream) {
-        const result = await handleStreaming(response, (options as any).onStreamingToken as any);
-        text = result.text;
-        metadata = result.metadata as Record<string, unknown>;
-        toolCalls = extractToolCalls(result.toolCalls) as any;
+      if (request.stream && onStreamingToken) {
+        const { text: streamedText, metadata: streamedMetadata, toolCalls: streamedToolCalls } =
+          await handleStreaming(response, onStreamingToken);
+        text = streamedText;
+        metadata = streamedMetadata as Record<string, unknown>;
+        toolCalls = extractToolCalls(streamedToolCalls);
+        // Map to required type
+        toolCalls = toolCalls.map(tc => ({
+          id: tc.id,
+          function: {
+            name: tc.function.name,
+            arguments: tc.function.arguments,
+          },
+        }));
       } else {
         const json = await parseResponse(response);
         text = json.message?.content ?? json.response ?? '';
+        toolCalls = extractToolCalls(json.message?.tool_calls);
+        // Map to required type
+        toolCalls = toolCalls.map(tc => ({
+          id: tc.id,
+          function: {
+            name: tc.function.name,
+            arguments: tc.function.arguments,
+          },
+        }));
         metadata = {
           model: json.model,
           totalDuration: json.total_duration,
@@ -83,7 +114,6 @@ export class OllamaProvider implements LLMProvider {
           evalCount: json.eval_count,
           context: json.context,
         };
-        toolCalls = extractToolCalls(json.message?.tool_calls);
       }
 
       return {
@@ -92,7 +122,12 @@ export class OllamaProvider implements LLMProvider {
         responseTime: 0,
         model,
         provider: this.name,
-        toolCalls: toolCalls as any,
+        toolCalls: toolCalls.map(tc => ({
+          id: tc.id ?? '',
+          type: 'function',
+          name: tc.function.name,
+          arguments: tc.function.arguments,
+        })),
         metadata,
       };
     } catch (err) {

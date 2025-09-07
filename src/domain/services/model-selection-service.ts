@@ -17,26 +17,26 @@ import { ProviderType } from '../value-objects/voice-values.js';
  * Model Selection Service Interface
  */
 export interface IModelSelectionService {
-  selectOptimalModel(
-    request: ProcessingRequest,
-    preferences?: ModelSelectionPreferences
-  ): Promise<ModelSelection>;
+  selectOptimalModel: (
+    request: Readonly<ProcessingRequest>,
+    preferences?: Readonly<ModelSelectionPreferences>
+  ) => Promise<ModelSelection>;
 
-  selectHybridModels(
-    request: ProcessingRequest,
-    preferences?: HybridSelectionPreferences
-  ): Promise<HybridModelSelection>;
+  selectHybridModels: (
+    request: Readonly<ProcessingRequest>,
+    preferences?: Readonly<HybridSelectionPreferences>
+  ) => Promise<HybridModelSelection>;
 
-  selectLoadBalancedModels(
-    requests: ProcessingRequest[],
-    preferences?: LoadBalancingPreferences
-  ): Promise<LoadBalancingPlan>;
+  selectLoadBalancedModels: (
+    requests: ReadonlyArray<Readonly<ProcessingRequest>>,
+    preferences?: Readonly<LoadBalancingPreferences>
+  ) => Promise<LoadBalancingPlan>;
 
-  handleModelFailure(
-    failedModel: Model,
-    request: ProcessingRequest,
-    originalSelection: ModelSelection
-  ): Promise<FailoverResult>;
+  handleModelFailure: (
+    failedModel: Readonly<Model>,
+    request: Readonly<ProcessingRequest>,
+    originalSelection: Readonly<ModelSelection>
+  ) => Promise<FailoverResult>;
 }
 
 /**
@@ -51,8 +51,8 @@ export class ModelSelectionService implements IModelSelectionService {
    * Business rule: Balance capabilities, performance, and availability
    */
   async selectOptimalModel(
-    request: ProcessingRequest,
-    preferences?: ModelSelectionPreferences
+    request: Readonly<ProcessingRequest>,
+    preferences?: Readonly<ModelSelectionPreferences>
   ): Promise<ModelSelection> {
     const availableModels = await this.modelRepository.findAvailableModels();
 
@@ -110,8 +110,8 @@ export class ModelSelectionService implements IModelSelectionService {
    * Business rule: Combine fast and high-quality models for optimal results
    */
   async selectHybridModels(
-    request: ProcessingRequest,
-    preferences?: HybridSelectionPreferences
+    request: Readonly<ProcessingRequest>,
+    preferences?: Readonly<HybridSelectionPreferences>
   ): Promise<HybridModelSelection> {
     const availableModels = await this.modelRepository.findAvailableModels();
 
@@ -158,8 +158,8 @@ export class ModelSelectionService implements IModelSelectionService {
    * Business rule: Distribute load across available models
    */
   async selectLoadBalancedModels(
-    requests: ProcessingRequest[],
-    preferences?: LoadBalancingPreferences
+    requests: ReadonlyArray<Readonly<ProcessingRequest>>,
+    preferences?: Readonly<LoadBalancingPreferences>
   ): Promise<LoadBalancingPlan> {
     const availableModels = await this.modelRepository.findAvailableModels();
 
@@ -205,9 +205,9 @@ export class ModelSelectionService implements IModelSelectionService {
    * Business rule: Seamlessly switch to backup models on failure
    */
   async handleModelFailure(
-    failedModel: Model,
-    request: ProcessingRequest,
-    originalSelection: ModelSelection
+    failedModel: Readonly<Model>,
+    request: Readonly<ProcessingRequest>,
+    originalSelection: Readonly<ModelSelection>
   ): Promise<FailoverResult> {
     // Mark model as unhealthy
     const updatedModel = failedModel.recordHealthCheckFailure();
@@ -251,8 +251,8 @@ export class ModelSelectionService implements IModelSelectionService {
 
   private filterModelsByConstraints(
     models: Model[],
-    request: ProcessingRequest,
-    preferences?: ModelSelectionPreferences
+    request: Readonly<ProcessingRequest>,
+    preferences?: Readonly<ModelSelectionPreferences>
   ): Model[] {
     return models.filter(model => {
       // Check required capabilities
@@ -284,7 +284,7 @@ export class ModelSelectionService implements IModelSelectionService {
 
   private calculateModelScore(
     model: Model,
-    request: ProcessingRequest,
+    request: Readonly<ProcessingRequest>,
     complexity: number
   ): number {
     // Base suitability score (40%)
@@ -308,7 +308,7 @@ export class ModelSelectionService implements IModelSelectionService {
     );
   }
 
-  private calculatePerformanceScore(model: Model, request: ProcessingRequest): number {
+  private calculatePerformanceScore(model: Model, request: Readonly<ProcessingRequest>): number {
     const maxAcceptableLatency = request.constraints.maxResponseTime || 30000;
     const latencyScore = Math.max(0, 1 - model.parameters.estimatedLatency / maxAcceptableLatency);
 
@@ -329,7 +329,7 @@ export class ModelSelectionService implements IModelSelectionService {
     return Math.max(0, baseScore - errorPenalty);
   }
 
-  private calculateContextScore(model: Model, request: ProcessingRequest): number {
+  private calculateContextScore(model: Model, request: Readonly<ProcessingRequest>): number {
     // Score based on how well the model matches the request context
     let score = 0.5; // Base score
 
@@ -351,7 +351,7 @@ export class ModelSelectionService implements IModelSelectionService {
 
   private async selectOptimalFromCandidates(
     candidates: Model[],
-    request: ProcessingRequest,
+    request: Readonly<ProcessingRequest>,
     criteria: { prioritize: 'speed' | 'quality' }
   ): Promise<{ model: Model; score: number } | null> {
     if (candidates.length === 0) return null;
@@ -377,7 +377,7 @@ export class ModelSelectionService implements IModelSelectionService {
     return scoredModels[0];
   }
 
-  private determineRoutingStrategy(request: ProcessingRequest, model: Model): RoutingStrategy {
+  private determineRoutingStrategy(request: Readonly<ProcessingRequest>, model: Model): RoutingStrategy {
     const complexity = request.calculateComplexity();
 
     if (complexity > 0.8) {
@@ -392,7 +392,7 @@ export class ModelSelectionService implements IModelSelectionService {
   private generateSelectionReason(
     primaryModel: Model,
     fallbackModels: Model[],
-    request: ProcessingRequest,
+    request: Readonly<ProcessingRequest>,
     score: number
   ): string {
     const reasons = [
@@ -410,7 +410,7 @@ export class ModelSelectionService implements IModelSelectionService {
     return reasons.join('\n');
   }
 
-  private estimateProcessingCost(model: Model, request: ProcessingRequest): number {
+  private estimateProcessingCost(model: Model, request: Readonly<ProcessingRequest>): number {
     // Simple cost estimation based on model size and request complexity
     const baseCost = 0.01; // Base cost per request
     const complexityMultiplier = 1 + request.calculateComplexity();
@@ -419,7 +419,7 @@ export class ModelSelectionService implements IModelSelectionService {
     return baseCost * complexityMultiplier * modelSizeMultiplier;
   }
 
-  private estimateProcessingLatency(model: Model, request: ProcessingRequest): number {
+  private estimateProcessingLatency(model: Model, request: Readonly<ProcessingRequest>): number {
     const baseLatency = model.parameters.estimatedLatency;
     const complexityMultiplier = 1 + request.calculateComplexity() * 0.5;
 
@@ -429,7 +429,7 @@ export class ModelSelectionService implements IModelSelectionService {
   private determineHybridStrategy(
     fastModel: Model | null,
     qualityModel: Model | null,
-    request: ProcessingRequest
+    request: Readonly<ProcessingRequest>
   ): HybridProcessingStrategy {
     if (!fastModel && !qualityModel) {
       return HybridProcessingStrategy.SINGLE_MODEL;
@@ -466,8 +466,8 @@ export class ModelSelectionService implements IModelSelectionService {
     return Math.max(0, Math.min(1, qualityDifference));
   }
 
-  private groupRequestsByComplexity(requests: ProcessingRequest[]): RequestGroup[] {
-    const groups: Map<string, ProcessingRequest[]> = new Map();
+  private groupRequestsByComplexity(requests: ReadonlyArray<Readonly<ProcessingRequest>>): RequestGroup[] {
+    const groups: Map<string, Readonly<ProcessingRequest>[]> = new Map();
 
     requests.forEach(request => {
       const complexity = request.calculateComplexity();
@@ -592,7 +592,7 @@ export interface LoadBalancingPlan {
 }
 
 export interface RequestModelAssignment {
-  request: ProcessingRequest;
+  request: Readonly<ProcessingRequest>;
   assignedModel: Model;
   estimatedStartTime: Date;
   estimatedDuration: number;
@@ -607,7 +607,7 @@ export interface FailoverResult {
 
 export interface RequestGroup {
   complexity: string;
-  requests: ProcessingRequest[];
+  requests: Readonly<ProcessingRequest>[];
 }
 
 export enum RoutingStrategy {

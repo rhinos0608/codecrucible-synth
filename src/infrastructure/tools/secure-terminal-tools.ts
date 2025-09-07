@@ -27,9 +27,9 @@ import { logger } from '../logging/logger.js';
  * All commands are executed in isolated E2B sandboxes with no access to the host system.
  */
 export class SecureTerminalExecuteTool extends BaseTool {
-  private secureExecutionManager: SecureExecutionManager;
+  private readonly secureExecutionManager: SecureExecutionManager;
 
-  constructor(private _agentContext: { workingDirectory: string }) {
+  public constructor(private readonly _agentContext: Readonly<{ workingDirectory: string }>) {
     const parameters = z.object({
       command: z.string().describe('Command to execute in secure sandbox'),
       language: z
@@ -53,26 +53,43 @@ export class SecureTerminalExecuteTool extends BaseTool {
     this.secureExecutionManager = new SecureExecutionManager();
   }
 
-  async execute(args: z.infer<typeof this.definition.parameters>): Promise<any> {
+  public async execute(
+    args: Readonly<z.infer<typeof this.definition.parameters>>
+  ): Promise<{
+    success: boolean;
+    command: string;
+    exitCode: number;
+    stdout: string;
+    stderr: string;
+    executionTime: number;
+    backend: string;
+    sessionId: string;
+    securityWarnings?: string[];
+    workingDirectory: string;
+    sandboxed: true;
+    message: string;
+    error?: string;
+  }> {
     const startTime = Date.now();
 
     try {
       // Initialize secure execution manager if needed
-      if (!this.secureExecutionManager['isInitialized']) {
+      if (!this.secureExecutionManager.getStats().isInitialized) {
         await this.secureExecutionManager.initialize();
       }
 
+      const commandStr = typeof args.command === 'string' ? args.command : '';
       logger.info(
-        `🔒 Executing secure command: ${args.command.substring(0, 50)}${args.command.length > 50 ? '...' : ''}`
+        `🔒 Executing secure command: ${commandStr.substring(0, 50)}${commandStr.length > 50 ? '...' : ''}`
       );
 
       // Execute securely via E2B sandbox
       const result = await this.secureExecutionManager.executeSecurely({
-        command: args.command,
-        language: args.language === 'bash' || args.language === 'shell' ? 'bash' : args.language,
-        workingDirectory: args.workingDirectory || '/tmp',
-        timeout: Math.min(args.timeout || 30000, 30000), // Max 30 seconds
-        sessionId: args.sessionId,
+        command: commandStr,
+        language: args.language === 'bash' || args.language === 'shell' ? 'bash' : (args.language as 'bash' | 'python'),
+        workingDirectory: typeof args.workingDirectory === 'string' ? args.workingDirectory : '/tmp',
+        timeout: Math.min(typeof args.timeout === 'number' ? args.timeout : 30000, 30000), // Max 30 seconds
+        sessionId: typeof args.sessionId === 'string' ? args.sessionId : undefined,
       });
 
       // Log security warnings if any
@@ -82,15 +99,15 @@ export class SecureTerminalExecuteTool extends BaseTool {
 
       return {
         success: result.success,
-        command: args.command,
+        command: args.command as string,
         exitCode: result.exitCode,
-        stdout: result.stdout || '',
-        stderr: result.stderr || '',
+        stdout: result.stdout ?? '',
+        stderr: result.stderr ?? '',
         executionTime: result.executionTime,
         backend: result.backend,
         sessionId: result.sessionId,
         securityWarnings: result.securityWarnings,
-        workingDirectory: args.workingDirectory || '/tmp',
+        workingDirectory: args.workingDirectory as string,
         sandboxed: true, // Always true for this secure implementation
         message: result.success
           ? 'Command executed successfully in secure sandbox'
@@ -102,14 +119,16 @@ export class SecureTerminalExecuteTool extends BaseTool {
 
       return {
         success: false,
-        command: args.command,
+        command: args.command as string,
         exitCode: 1,
         stdout: '',
         stderr: `Secure execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         executionTime,
         backend: 'error',
-        sessionId: args.sessionId || 'unknown',
+        sessionId: (args.sessionId as string) ?? 'unknown',
         sandboxed: true,
+        workingDirectory: '/tmp',
+        message: 'Secure execution failed',
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
@@ -122,10 +141,48 @@ export class SecureTerminalExecuteTool extends BaseTool {
  * Provides safe process management within E2B sandboxes only.
  * No access to host system processes.
  */
-export class SecureProcessManagementTool extends BaseTool {
-  private secureExecutionManager: SecureExecutionManager;
+interface ProcessManagementResult {
+  success: boolean;
+  error?: string;
+  message?: string;
+  processes?: string;
+  sandboxed?: boolean;
+  sessionId?: string;
+  sandboxStats?: Record<string, unknown>;
+  securityConfig?: {
+    enforceE2BOnly: boolean;
+    auditLog: boolean;
+    maxExecutionTime: number;
+  };
+  isInitialized?: boolean;
+}
 
-  constructor(private _agentContext: { workingDirectory: string }) {
+interface _ListProcessesResult {
+  success: boolean;
+  processes?: string;
+  sandboxed?: boolean;
+  message?: string;
+  sessionId?: string;
+  error?: string;
+}
+
+interface _SandboxStatusResult {
+  success: boolean;
+  sandboxStats?: Record<string, unknown>;
+  securityConfig?: {
+    enforceE2BOnly: boolean;
+    auditLog: boolean;
+    maxExecutionTime: number;
+  };
+  isInitialized?: boolean;
+  message?: string;
+  error?: string;
+}
+
+export class SecureProcessManagementTool extends BaseTool {
+  private readonly secureExecutionManager: SecureExecutionManager;
+
+  public constructor() {
     const parameters = z.object({
       action: z
         .enum(['list', 'status'])
@@ -143,19 +200,21 @@ export class SecureProcessManagementTool extends BaseTool {
     this.secureExecutionManager = new SecureExecutionManager();
   }
 
-  async execute(args: z.infer<typeof this.definition.parameters>): Promise<any> {
+  public async execute(args: Readonly<z.infer<typeof this.definition.parameters>>): Promise<ProcessManagementResult> {
     try {
       // Initialize secure execution manager if needed
-      if (!this.secureExecutionManager['isInitialized']) {
+      if (!this.secureExecutionManager.getStats().isInitialized) {
         await this.secureExecutionManager.initialize();
       }
 
       switch (args.action) {
         case 'list':
-          return await this.listSandboxProcesses(args.sessionId);
+          return await this.listSandboxProcesses(
+            typeof args.sessionId === 'string' ? args.sessionId : undefined
+          );
 
         case 'status':
-          return await this.getSandboxStatus(args.sessionId);
+          return this.getSandboxStatus();
 
         default:
           return {
@@ -173,18 +232,18 @@ export class SecureProcessManagementTool extends BaseTool {
     }
   }
 
-  private async listSandboxProcesses(sessionId?: string): Promise<any> {
+  private async listSandboxProcesses(sessionId?: string): Promise<_ListProcessesResult> {
     try {
       const result = await this.secureExecutionManager.executeSecurely({
         command: 'ps aux',
         language: 'bash',
-        sessionId: sessionId || 'temp_ps',
+        sessionId: sessionId ?? 'temp_ps',
         timeout: 10000,
       });
 
       return {
         success: result.success,
-        processes: result.stdout || '',
+        processes: result.stdout ?? '',
         sandboxed: true,
         message: 'Process list from secure sandbox environment',
         sessionId: result.sessionId,
@@ -197,13 +256,13 @@ export class SecureProcessManagementTool extends BaseTool {
     }
   }
 
-  private async getSandboxStatus(sessionId?: string): Promise<any> {
+  private getSandboxStatus(): _SandboxStatusResult {
     try {
       const stats = this.secureExecutionManager.getStats();
 
       return {
         success: true,
-        sandboxStats: stats.e2bService,
+        sandboxStats: stats.e2bService as Record<string, unknown>,
         securityConfig: {
           enforceE2BOnly: stats.config.enforceE2BOnly,
           auditLog: stats.config.auditLog,
@@ -228,9 +287,9 @@ export class SecureProcessManagementTool extends BaseTool {
  * No access to host environment variables or system information.
  */
 export class SecureShellEnvironmentTool extends BaseTool {
-  private secureExecutionManager: SecureExecutionManager;
+  private readonly secureExecutionManager: SecureExecutionManager;
 
-  constructor(private _agentContext: { workingDirectory: string }) {
+  public constructor(private readonly _agentContext: Readonly<{ workingDirectory: string }>) {
     const parameters = z.object({
       action: z.enum(['pwd', 'whoami', 'which', 'env']).describe('Environment query action'),
       command: z.string().optional().describe('Command to locate with which'),
@@ -247,10 +306,20 @@ export class SecureShellEnvironmentTool extends BaseTool {
     this.secureExecutionManager = new SecureExecutionManager();
   }
 
-  async execute(args: z.infer<typeof this.definition.parameters>): Promise<any> {
+  public async execute(
+    args: Readonly<z.infer<typeof this.definition.parameters>>
+  ): Promise<{
+    success: boolean;
+    action: 'pwd' | 'whoami' | 'which' | 'env';
+    output: string;
+    error: string;
+    sandboxed: boolean;
+    message: string;
+    sessionId: string;
+  } | { success: false; error: string }> {
     try {
       // Initialize secure execution manager if needed
-      if (!this.secureExecutionManager['isInitialized']) {
+      if (!this.secureExecutionManager.getStats().isInitialized) {
         await this.secureExecutionManager.initialize();
       }
 
@@ -277,24 +346,24 @@ export class SecureShellEnvironmentTool extends BaseTool {
           break;
 
         default:
-          return { success: false, error: `Unknown action: ${args.action}` };
+          return { success: false, error: `Unknown action: ${String(args.action)}` };
       }
 
       const result = await this.secureExecutionManager.executeSecurely({
         command,
         language: 'bash',
-        sessionId: args.sessionId || 'temp_env',
+        sessionId: typeof args.sessionId === 'string' ? args.sessionId : 'temp_env',
         timeout: 10000,
       });
 
       return {
         success: result.success,
-        action: args.action,
-        output: result.stdout || '',
-        error: result.stderr,
+        action: args.action as 'pwd' | 'whoami' | 'which' | 'env',
+        output: result.stdout ?? '',
+        error: result.stderr ?? '',
         sandboxed: true,
         message: `Environment query executed in secure sandbox`,
-        sessionId: result.sessionId,
+        sessionId: result.sessionId ?? '',
       };
     } catch (error) {
       logger.error('❌ Secure environment query failed:', error);
@@ -313,7 +382,7 @@ export class SecureShellEnvironmentTool extends BaseTool {
  * any remaining references to unsafe execution.
  */
 export class TerminalExecuteTool extends BaseTool {
-  constructor(agentContext: any) {
+  public constructor(_agentContext: unknown) {
     const parameters = z.object({
       command: z.string(),
     });
@@ -330,7 +399,14 @@ export class TerminalExecuteTool extends BaseTool {
     );
   }
 
-  async execute(args: any): Promise<any> {
+  public async execute(_args: unknown): Promise<{
+    success: false;
+    error: string;
+    exitCode: number;
+    blocked: true;
+    recommendation: string;
+    securityReason: string;
+  }> {
     logger.error(`🚨 SECURITY BLOCK: Attempt to use unsafe TerminalExecuteTool blocked`);
     logger.info('✅ Use SecureTerminalExecuteTool for safe command execution');
 

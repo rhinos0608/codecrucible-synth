@@ -14,7 +14,7 @@ type ProcessManagerResult =
   | { error: string }
   | { success: boolean; sessionId?: string | null; command?: string; pid?: number; initialOutput?: string; isRunning?: boolean; interactive?: boolean; message?: string }
   | { sessionId: string; command: string; isRunning: boolean; output: string; totalLines: number; lastActivity: string; uptime: number }
-  | { totalSessions: number; runningSessions: number; sessions: any[] }
+  | { totalSessions: number; runningSessions: number; sessions: ProcessSessionSummary[] }
   | { sessionId: string; command: string; pid: number; isRunning: boolean; startTime: string; lastActivity: string; uptime: number; outputLines: number; recentOutput: string; isInteractive: boolean }
   | { success: boolean; sessionId: string; input: string; output: string; newLines: number; totalLines: number };
 
@@ -25,6 +25,16 @@ interface ProcessSession {
   startTime: number;
   lastActivity: number;
   outputBuffer: string[];
+  isInteractive: boolean;
+}
+
+interface ProcessSessionSummary {
+  id: string;
+  command: string;
+  isRunning: boolean;
+  pid: number;
+  uptime: number;
+  lastActivity: string;
   isInteractive: boolean;
 }
 
@@ -74,7 +84,7 @@ export class AdvancedProcessTool extends BaseTool {
           return await this.interactWithProcess(args);
 
         case 'read':
-          return await this.readProcessOutput(args);
+          return this.readProcessOutput(args);
 
         case 'list':
           return this.listSessions();
@@ -86,7 +96,7 @@ export class AdvancedProcessTool extends BaseTool {
           return this.getProcessStatus(args);
 
         default:
-          return { error: `Unknown action: ${args.action}` };
+          return { error: `Unknown action: ${String(args.action)}` };
       }
     } catch (error) {
       return {
@@ -95,10 +105,18 @@ export class AdvancedProcessTool extends BaseTool {
     }
   }
 
-  private async startProcess(args: any): Promise<any> {
+  private async startProcess(args: Readonly<ProcessManagerArgs>): Promise<ProcessManagerResult> {
     try {
-      const sessionId = `session_${++this.sessionCounter}_${Date.now()}`;
-      const cwd = args.workingDirectory || this.agentContext.workingDirectory;
+      // Ensure command is provided and is a string
+      if (!args.command || typeof args.command !== 'string') {
+        return {
+          error: 'Command is required and must be a string.',
+          success: false,
+        };
+      }
+
+      // Use agentContext.workingDirectory only, as args.workingDirectory may not exist
+      const cwd: string = this.agentContext.workingDirectory;
 
       // SECURITY: Validate command before execution
       const validation = validateCommand(args.command);
@@ -107,10 +125,9 @@ export class AdvancedProcessTool extends BaseTool {
         logger.error(`🚨 Reason: ${validation.reason}`);
         return {
           success: false,
-          sessionId: null,
+          sessionId: '',
           error: `SECURITY BLOCKED: ${validation.reason}`,
           output: '',
-          stderr: `Command blocked for security: ${validation.reason}`,
         };
       }
 
@@ -120,45 +137,45 @@ export class AdvancedProcessTool extends BaseTool {
       logger.info(`✅ SECURITY: Executing validated command: ${command}`);
       const childProcess = spawn(command, cmdArgs, {
         cwd,
-        env: { ...process.env, ...args.environment },
+        env: { ...process.env, ...(args.environment ?? {}) },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
       const session: ProcessSession = {
-        id: sessionId,
+        id: `session_${++this.sessionCounter}_${Date.now()}`,
         process: childProcess,
         command: args.command,
         startTime: Date.now(),
         lastActivity: Date.now(),
         outputBuffer: [],
-        isInteractive: args.interactive,
+        isInteractive: !!args.interactive,
       };
 
       // Set up output handlers
       this.setupOutputHandlers(session);
 
       // Store session
-      this.sessions.set(sessionId, session);
+      this.sessions.set(session.id, session);
 
       // Handle process exit
-      childProcess.on('exit', code => {
+      childProcess.on('exit', (code: number | null) => {
         session.outputBuffer.push(`Process exited with code: ${code}`);
         if (!args.interactive) {
-          this.sessions.delete(sessionId);
+          this.sessions.delete(session.id);
         }
       });
 
       // Wait for initial output or process to be ready
-      await this.waitForProcessReady(session, args.timeout);
+      await this.waitForProcessReady(session, args.timeout ?? 30000);
 
       return {
         success: true,
-        sessionId,
+        sessionId: session.id,
         command: args.command,
         pid: childProcess.pid,
         initialOutput: session.outputBuffer.slice(0, 10).join('\n'),
         isRunning: !childProcess.killed,
-        interactive: args.interactive,
+        interactive: !!args.interactive,
       };
     } catch (error) {
       return {
@@ -171,11 +188,12 @@ export class AdvancedProcessTool extends BaseTool {
   private setupOutputHandlers(session: ProcessSession): void {
     const maxBufferSize = 1000; // Keep last 1000 lines
 
-    session.process.stdout?.on('data', data => {
-      const lines = data
-        .toString()
+    session.process.stdout?.on('data', (data: unknown) => {
+      const str = typeof data === 'string' ? data : Buffer.isBuffer(data) ? data.toString() : '';
+      const lines: string[] = str
         .split('\n')
-        .filter((line: string) => line.trim());
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
       session.outputBuffer.push(...lines);
       session.lastActivity = Date.now();
 
@@ -185,12 +203,13 @@ export class AdvancedProcessTool extends BaseTool {
       }
     });
 
-    session.process.stderr?.on('data', data => {
-      const lines = data
-        .toString()
+    session.process.stderr?.on('data', (data: unknown) => {
+      const str = typeof data === 'string' ? data : Buffer.isBuffer(data) ? data.toString() : '';
+      const lines: string[] = str
         .split('\n')
-        .filter((line: string) => line.trim());
-      const errorLines = lines.map((line: string) => `[ERROR] ${line}`);
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+      const errorLines: string[] = lines.map(line => `[ERROR] ${line}`);
       session.outputBuffer.push(...errorLines);
       session.lastActivity = Date.now();
 
@@ -199,7 +218,7 @@ export class AdvancedProcessTool extends BaseTool {
       }
     });
 
-    session.process.on('error', error => {
+    session.process.on('error', (error: Error) => {
       session.outputBuffer.push(`[PROCESS ERROR] ${error.message}`);
       session.lastActivity = Date.now();
     });
@@ -235,8 +254,11 @@ export class AdvancedProcessTool extends BaseTool {
     });
   }
 
-  public async interactWithProcess(args: any): Promise<any> {
-    const session = this.sessions.get(args.sessionId!);
+  public async interactWithProcess(args: Readonly<ProcessManagerArgs>): Promise<ProcessManagerResult> {
+    if (!args.sessionId) {
+      return { error: 'Session ID is required.' };
+    }
+    const session = this.sessions.get(args.sessionId);
 
     if (!session) {
       return { error: `Session not found: ${args.sessionId}` };
@@ -310,34 +332,46 @@ export class AdvancedProcessTool extends BaseTool {
     });
   }
 
-  public async readProcessOutput(args: any): Promise<any> {
-    const session = this.sessions.get(args.sessionId!);
-
-    if (!session) {
-      return { error: `Session not found: ${args.sessionId}` };
+  public readProcessOutput(args: Readonly<ProcessManagerArgs>): ProcessManagerResult {
+    const { sessionId } = args;
+    if (!sessionId) {
+      return { error: 'Session ID is required.' };
     }
 
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return { error: `Session not found: ${sessionId}` };
+    }
+
+    const outputLines = session.outputBuffer.length;
+    const recentOutput = session.outputBuffer.slice(-50).join('\n');
+
     return {
-      sessionId: args.sessionId,
+      sessionId: session.id,
       command: session.command,
+      pid: session.process.pid ?? -1,
       isRunning: !session.process.killed,
-      output: session.outputBuffer.join('\n'),
-      totalLines: session.outputBuffer.length,
+      startTime: new Date(session.startTime).toISOString(),
       lastActivity: new Date(session.lastActivity).toISOString(),
       uptime: Date.now() - session.startTime,
+      outputLines,
+      recentOutput,
+      isInteractive: session.isInteractive,
     };
   }
 
-  public listSessions(): any {
-    const sessions = Array.from(this.sessions.values()).map(session => ({
-      id: session.id,
-      command: session.command,
-      isRunning: !session.process.killed,
-      pid: session.process.pid,
-      uptime: Date.now() - session.startTime,
-      lastActivity: new Date(session.lastActivity).toISOString(),
-      isInteractive: session.isInteractive,
-    }));
+  public listSessions(): ProcessManagerResult {
+    const sessions: ProcessSessionSummary[] = Array.from(this.sessions.values()).map(
+      (session: ProcessSession) => ({
+        id: session.id,
+        command: session.command,
+        isRunning: !session.process.killed,
+        pid: session.process.pid ?? -1,
+        uptime: Date.now() - session.startTime,
+        lastActivity: new Date(session.lastActivity).toISOString(),
+        isInteractive: session.isInteractive,
+      })
+    );
 
     return {
       totalSessions: sessions.length,
@@ -346,8 +380,12 @@ export class AdvancedProcessTool extends BaseTool {
     };
   }
 
-  public killProcess(args: any): any {
-    const session = this.sessions.get(args.sessionId!);
+  public killProcess(args: Readonly<ProcessManagerArgs>): ProcessManagerResult {
+    const { sessionId } = args;
+    if (!sessionId) {
+      return { error: 'Session ID is required.' };
+    }
+    const session = this.sessions.get(sessionId);
 
     if (!session) {
       return { error: `Session not found: ${args.sessionId}` };
@@ -366,7 +404,9 @@ export class AdvancedProcessTool extends BaseTool {
       }
 
       // Remove from sessions
-      this.sessions.delete(args.sessionId!);
+      if (args.sessionId) {
+        this.sessions.delete(args.sessionId);
+      }
 
       return {
         success: true,
@@ -379,17 +419,21 @@ export class AdvancedProcessTool extends BaseTool {
       };
     }
   }
-  public getProcessStatus(args: any): any {
-    const session = this.sessions.get(args.sessionId!);
+  public getProcessStatus(args: Readonly<ProcessManagerArgs>): ProcessManagerResult {
+    const sessionId = args.sessionId ?? '';
+    if (!sessionId) {
+      return { error: 'Session ID is required.' };
+    }
+    const session = this.sessions.get(sessionId);
 
     if (!session) {
-      return { error: `Session not found: ${args.sessionId}` };
+      return { error: `Session not found: ${sessionId}` };
     }
 
     return {
-      sessionId: args.sessionId,
+      sessionId,
       command: session.command,
-      pid: session.process.pid,
+      pid: session.process.pid ?? -1,
       isRunning: !session.process.killed,
       startTime: new Date(session.startTime).toISOString(),
       lastActivity: new Date(session.lastActivity).toISOString(),
@@ -404,15 +448,32 @@ export class AdvancedProcessTool extends BaseTool {
 /**
  * Memory Code Execution Tool (like in Desktop Commander)
  */
+
+// Define a type for code execution results
+export interface CodeExecutionResult {
+  success: boolean;
+  language: string;
+  code: string;
+  output?: string;
+  stderr?: string;
+  executionTime?: number;
+  error?: string;
+  exitCode?: number;
+}
+
+const codeExecutionParameters = z.object({
+  language: z.enum(['python', 'javascript', 'nodejs', 'bash', 'powershell']),
+  code: z.string().describe('Code to execute'),
+  timeout: z.number().optional().default(30000).describe('Timeout in milliseconds'),
+  captureOutput: z.boolean().optional().default(true).describe('Capture and return output'),
+  environment: z.record(z.string()).optional().describe('Environment variables'),
+});
+
+export type CodeExecutionArgs = z.infer<typeof codeExecutionParameters>;
+
 export class CodeExecutionTool extends BaseTool {
-  constructor(private agentContext: { workingDirectory: string }) {
-    const parameters = z.object({
-      language: z.enum(['python', 'javascript', 'nodejs', 'bash', 'powershell']),
-      code: z.string().describe('Code to execute'),
-      timeout: z.number().optional().default(30000).describe('Timeout in milliseconds'),
-      captureOutput: z.boolean().optional().default(true).describe('Capture and return output'),
-      environment: z.record(z.string()).optional().describe('Environment variables'),
-    });
+  public constructor(private readonly agentContext: Readonly<{ workingDirectory: string }>) {
+    const parameters = codeExecutionParameters;
 
     super({
       name: 'executeCode',
@@ -422,7 +483,7 @@ export class CodeExecutionTool extends BaseTool {
     });
   }
 
-  async execute(args: z.infer<typeof this.definition.parameters>): Promise<any> {
+  public async execute(args: Readonly<CodeExecutionArgs>): Promise<CodeExecutionResult | { error: string }> {
     try {
       switch (args.language) {
         case 'python':
@@ -442,18 +503,17 @@ export class CodeExecutionTool extends BaseTool {
           return { error: `Unsupported language: ${args.language}` };
       }
     } catch (error) {
-      return {
-        error: `Code execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      };
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 
-  private async executePython(args: any): Promise<any> {
+  private async executePython(args: Readonly<CodeExecutionArgs>): Promise<CodeExecutionResult> {
     try {
-      const result = await execAsync(`python -c "${args.code.replace(/"/g, '\\"')}"`, {
+      const escaped = args.code.replace(/"/g, '\\"');
+      const result = await execAsync(`python -c "${escaped}"`, {
         cwd: this.agentContext.workingDirectory,
         timeout: args.timeout,
-        env: { ...process.env, ...args.environment },
+        env: { ...process.env, ...(args.environment ?? {}) },
       });
 
       return {
@@ -464,25 +524,27 @@ export class CodeExecutionTool extends BaseTool {
         stderr: result.stderr,
         executionTime: Date.now(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string; stdout?: string; stderr?: string; code?: number };
       return {
         success: false,
         language: 'python',
         code: args.code,
-        error: error.message,
-        output: error.stdout || '',
-        stderr: error.stderr || '',
-        exitCode: error.code,
+        error: err.message ?? String(error),
+        output: err.stdout ?? '',
+        stderr: err.stderr ?? '',
+        exitCode: err.code,
       };
     }
   }
 
-  private async executeNodeJS(args: any): Promise<any> {
+  private async executeNodeJS(args: Readonly<CodeExecutionArgs>): Promise<CodeExecutionResult> {
     try {
-      const result = await execAsync(`node -e "${args.code.replace(/"/g, '\\"')}"`, {
+      const escaped = args.code.replace(/"/g, '\\"');
+      const result = await execAsync(`node -e "${escaped}"`, {
         cwd: this.agentContext.workingDirectory,
         timeout: args.timeout,
-        env: { ...process.env, ...args.environment },
+        env: { ...process.env, ...(args.environment ?? {}) },
       });
 
       return {
@@ -493,25 +555,26 @@ export class CodeExecutionTool extends BaseTool {
         stderr: result.stderr,
         executionTime: Date.now(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string; stdout?: string; stderr?: string; code?: number };
       return {
         success: false,
         language: 'nodejs',
         code: args.code,
-        error: error.message,
-        output: error.stdout || '',
-        stderr: error.stderr || '',
-        exitCode: error.code,
+        error: err.message ?? String(error),
+        output: err.stdout ?? '',
+        stderr: err.stderr ?? '',
+        exitCode: err.code,
       };
     }
   }
 
-  private async executeBash(args: any): Promise<any> {
+  private async executeBash(args: Readonly<CodeExecutionArgs>): Promise<CodeExecutionResult> {
     try {
       const result = await execAsync(args.code, {
         cwd: this.agentContext.workingDirectory,
         timeout: args.timeout,
-        env: { ...process.env, ...args.environment },
+        env: { ...process.env, ...(args.environment ?? {}) },
         shell: '/bin/bash',
       });
 
@@ -523,25 +586,27 @@ export class CodeExecutionTool extends BaseTool {
         stderr: result.stderr,
         executionTime: Date.now(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string; stdout?: string; stderr?: string; code?: number };
       return {
         success: false,
         language: 'bash',
         code: args.code,
-        error: error.message,
-        output: error.stdout || '',
-        stderr: error.stderr || '',
-        exitCode: error.code,
+        error: err.message ?? String(error),
+        output: err.stdout ?? '',
+        stderr: err.stderr ?? '',
+        exitCode: err.code,
       };
     }
   }
 
-  private async executePowerShell(args: any): Promise<any> {
+  private async executePowerShell(args: Readonly<CodeExecutionArgs>): Promise<CodeExecutionResult> {
     try {
-      const result = await execAsync(`powershell -Command "${args.code.replace(/"/g, '\\"')}"`, {
+      const escaped = args.code.replace(/"/g, '\\"');
+      const result = await execAsync(`powershell -Command "${escaped}"`, {
         cwd: this.agentContext.workingDirectory,
         timeout: args.timeout,
-        env: { ...process.env, ...args.environment },
+        env: { ...process.env, ...(args.environment ?? {}) },
       });
 
       return {
@@ -552,15 +617,16 @@ export class CodeExecutionTool extends BaseTool {
         stderr: result.stderr,
         executionTime: Date.now(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string; stdout?: string; stderr?: string; code?: number };
       return {
         success: false,
         language: 'powershell',
         code: args.code,
-        error: error.message,
-        output: error.stdout || '',
-        stderr: error.stderr || '',
-        exitCode: error.code,
+        error: err.message ?? String(error),
+        output: err.stdout ?? '',
+        stderr: err.stderr ?? '',
+        exitCode: err.code,
       };
     }
   }

@@ -32,6 +32,7 @@ export interface IAgent {
   role: AgentRole;
   status: AgentStatus;
   capabilities: AgentCapability[];
+  expertiseDomains: string[];
 
   initialize(): Promise<void>;
   process(request: AgentRequest): Promise<AgentResponse>;
@@ -244,6 +245,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
   public readonly role: AgentRole;
   public status: AgentStatus = 'idle';
   public capabilities: AgentCapability[] = [];
+  public expertiseDomains: string[] = [];
 
   protected config: UnifiedConfiguration;
   protected eventBus: IEventBus;
@@ -634,6 +636,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
 export class ExplorerAgent extends BaseAgent {
   async initialize(): Promise<void> {
     this.status = 'initializing';
+    this.expertiseDomains = ['code-discovery', 'innovation-research', 'technology-exploration', 'pattern-recognition'];
 
     // Register exploration capabilities
     this.registerCapability({
@@ -710,6 +713,7 @@ export class ExplorerAgent extends BaseAgent {
 export class SecurityAgent extends BaseAgent {
   async initialize(): Promise<void> {
     this.status = 'initializing';
+    this.expertiseDomains = ['security-analysis', 'vulnerability-assessment', 'threat-detection', 'code-security'];
 
     this.registerCapability({
       name: 'vulnerability-analysis',
@@ -792,6 +796,7 @@ export class SecurityAgent extends BaseAgent {
 export class ArchitectAgent extends BaseAgent {
   async initialize(): Promise<void> {
     this.status = 'initializing';
+    this.expertiseDomains = ['system-design', 'architecture-patterns', 'scalability', 'technical-planning'];
 
     this.registerCapability({
       name: 'system-design',
@@ -1104,6 +1109,7 @@ export class AgentFactory {
 class GenericAgent extends BaseAgent {
   async initialize(): Promise<void> {
     this.status = 'initializing';
+    this.expertiseDomains = ['general-purpose', 'task-execution', 'basic-analysis'];
 
     // Add basic capabilities based on role
     this.registerCapability({

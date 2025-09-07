@@ -1,16 +1,19 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
-import { join, relative, isAbsolute } from 'path';
+import { isAbsolute, join, relative } from 'path';
 // Cache for import results to prevent circular dependency issues
-const importCache = new Map<string, any>();
+const importCache = new Map<string, unknown>();
 
 // Function to dynamically import eslint with enhanced error handling
-async function tryImportESLint(): Promise<any> {
+async function tryImportESLint(): Promise<unknown> {
   const cacheKey = 'eslint';
 
   if (importCache.has(cacheKey)) {
     const cached = importCache.get(cacheKey);
-    return cached === 'loading' ? null : cached;
+    if (cached === 'loading') {
+      return null;
+    }
+    return cached;
   }
 
   try {
@@ -20,11 +23,11 @@ async function tryImportESLint(): Promise<any> {
     const eslintModule = await import('eslint');
 
     // Validate that ESLint was imported correctly
-    if (!eslintModule?.ESLint) {
+    if (!('ESLint' in eslintModule)) {
       throw new Error('ESLint module imported but ESLint class not found');
     }
 
-    const ESLint = eslintModule.ESLint;
+    const { ESLint } = eslintModule;
 
     // Cache the successful result
     importCache.set(cacheKey, ESLint);
@@ -53,12 +56,12 @@ async function tryImportESLint(): Promise<any> {
 }
 
 // Function to dynamically import typescript with enhanced error handling
-async function tryImportTypeScript(): Promise<any> {
+async function tryImportTypeScript(): Promise<typeof import('typescript') | null> {
   const cacheKey = 'typescript';
 
   if (importCache.has(cacheKey)) {
     const cached = importCache.get(cacheKey);
-    return cached === 'loading' ? null : cached;
+    return cached === 'loading' ? null : cached as typeof import('typescript') | null;
   }
 
   try {
@@ -68,7 +71,7 @@ async function tryImportTypeScript(): Promise<any> {
     const tsModule = await import('typescript');
 
     // Validate that TypeScript was imported correctly
-    if (!tsModule?.createProgram) {
+    if (!tsModule.createProgram) {
       throw new Error('TypeScript module imported but createProgram function not found');
     }
 
@@ -105,10 +108,10 @@ const LintCodeSchema = z.object({
 });
 
 export class LintCodeTool extends BaseTool {
-  private eslint: any;
+  private eslint: unknown;
   private eslintAvailable: boolean;
 
-  constructor(private agentContext: { workingDirectory: string }) {
+  public constructor(private readonly agentContext: { readonly workingDirectory: string }) {
     super({
       name: 'lintCode',
       description: 'Lints a code file and returns the linting errors.',
@@ -120,25 +123,44 @@ export class LintCodeTool extends BaseTool {
     this.eslint = null;
 
     // Initialize eslint asynchronously
-    this.initializeESLint();
+    void this.initializeESLint();
   }
 
   private async initializeESLint(): Promise<void> {
     const ESLint = await tryImportESLint();
-    if (ESLint) {
+    if (ESLint && typeof ESLint === 'function') {
       this.eslintAvailable = true;
-      this.eslint = new ESLint({ cwd: this.agentContext.workingDirectory });
+      // TypeScript cannot know the type of ESLint here, so we use 'unknown'
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      this.eslint = new (ESLint as new (options: { cwd: string }) => unknown)({ cwd: this.agentContext.workingDirectory });
     }
   }
 
-  async execute(args: z.infer<typeof LintCodeSchema>): Promise<any[]> {
+  public async execute(args: Readonly<z.infer<typeof LintCodeSchema>>): Promise<
+    Array<{
+      filePath: string;
+      messages: Array<{
+        ruleId: string | null;
+        severity: number;
+        message: string;
+        line: number;
+        column: number;
+      }>;
+      errorCount: number;
+      warningCount: number;
+      fixableErrorCount: number;
+      fixableWarningCount: number;
+      source: string;
+      usedDeprecatedRules: unknown[];
+    }>
+  > {
     // Log the received arguments for debugging
     console.log('LintCodeTool received args:', JSON.stringify(args, null, 2));
 
-    if (!args?.path || args.path.trim() === '') {
+    if (!args.path || args.path.trim() === '') {
       return [
         {
-          filePath: args?.path || 'undefined',
+          filePath: args.path || 'undefined',
           messages: [
             {
               ruleId: null,
@@ -214,7 +236,29 @@ export class LintCodeTool extends BaseTool {
     }
 
     try {
-      return await this.eslint.lintFiles([fullPath]);
+      // eslint is of type unknown, so we need to assert its type
+      interface ESLintType {
+        lintFiles: (files: readonly string[]) => Promise<
+          Array<{
+            filePath: string;
+            messages: Array<{
+              ruleId: string | null;
+              severity: number;
+              message: string;
+              line: number;
+              column: number;
+            }>;
+            errorCount: number;
+            warningCount: number;
+            fixableErrorCount: number;
+            fixableWarningCount: number;
+            source: string;
+            usedDeprecatedRules: unknown[];
+          }>
+        >;
+      }
+      const eslintInstance = this.eslint as ESLintType;
+      return await eslintInstance.lintFiles([fullPath]);
     } catch (error) {
       return [
         {
@@ -270,10 +314,10 @@ const GetAstSchema = z.object({
 });
 
 export class GetAstTool extends BaseTool {
-  private ts: any;
+  private ts: typeof import('typescript') | null;
   private tsAvailable: boolean;
 
-  constructor(private agentContext: { workingDirectory: string }) {
+  public constructor(private readonly agentContext: Readonly<{ workingDirectory: string }>) {
     super({
       name: 'getAst',
       description: 'Gets the Abstract Syntax Tree (AST) of a TypeScript file.',
@@ -285,7 +329,7 @@ export class GetAstTool extends BaseTool {
     this.ts = null;
 
     // Initialize typescript asynchronously
-    this.initializeTypeScript();
+    void this.initializeTypeScript();
   }
 
   private async initializeTypeScript(): Promise<void> {
@@ -296,14 +340,24 @@ export class GetAstTool extends BaseTool {
     }
   }
 
-  async execute(args: z.infer<typeof GetAstSchema>): Promise<any> {
+  public async execute(args: Readonly<z.infer<typeof GetAstSchema>>): Promise<{
+    error?: string;
+    fileName: string;
+    kind: string;
+    text: string;
+    statements: Array<{ kind: string; start: number; end: number }>;
+    childCount: number;
+    fullStart: number;
+    start: number;
+    end: number;
+  }> {
     // Log the received arguments for debugging
     console.log('GetAstTool received args:', JSON.stringify(args, null, 2));
 
-    if (!args?.path || args.path.trim() === '') {
+    if (!args.path || args.path.trim() === '') {
       return {
         error: `Path parameter is required for getAst tool. Received args: ${JSON.stringify(args)}`,
-        fileName: args?.path || 'undefined',
+        fileName: args.path || 'undefined',
         kind: 'InvalidInput',
         text: 'Invalid or missing path parameter',
         statements: [],
@@ -350,6 +404,19 @@ export class GetAstTool extends BaseTool {
     }
 
     try {
+      if (!this.ts) {
+        return {
+          error: `TypeScript API is not available.`,
+          fileName: args.path,
+          kind: 'NotAvailable',
+          text: 'TypeScript compiler not available',
+          statements: [],
+          childCount: 0,
+          fullStart: 0,
+          start: 0,
+          end: 0,
+        };
+      }
       const program = this.ts.createProgram([fullPath], { allowJs: true });
       const sourceFile = program.getSourceFile(fullPath);
       if (!sourceFile) {
@@ -367,21 +434,37 @@ export class GetAstTool extends BaseTool {
       }
 
       // Convert AST to serializable format
+      if (!sourceFile || !this.ts) {
+        return {
+          error: `TypeScript could not parse source file or TypeScript API not available.`,
+          fileName: args.path,
+          kind: 'ParseError',
+          text: 'Unable to parse file as TypeScript/JavaScript',
+          statements: [],
+          childCount: 0,
+          fullStart: 0,
+          start: 0,
+          end: 0,
+        };
+      }
+
       const astSummary = {
         fileName: sourceFile.fileName,
         kind: this.ts.SyntaxKind[sourceFile.kind],
         text: sourceFile.text.slice(0, 500) + (sourceFile.text.length > 500 ? '...' : ''),
-        statements: sourceFile.statements
-          .map((stmt: any) => ({
-            kind: this.ts.SyntaxKind[stmt.kind],
-            start: stmt.getStart(),
-            end: stmt.getEnd(),
-          }))
-          .slice(0, 10), // Limit to first 10 statements
-        childCount: sourceFile.getChildCount(),
-        fullStart: sourceFile.getFullStart(),
-        start: sourceFile.getStart(),
-        end: sourceFile.getEnd(),
+        statements: Array.isArray(sourceFile.statements) && this.ts
+          ? sourceFile.statements
+              .map((stmt: import('typescript').Node) => ({
+                kind: this.ts ? this.ts.SyntaxKind[stmt.kind] : 'Unknown',
+                start: typeof stmt.getStart === 'function' ? stmt.getStart() : 0,
+                end: typeof stmt.getEnd === 'function' ? stmt.getEnd() : 0,
+              }))
+              .slice(0, 10)
+          : [],
+        childCount: typeof sourceFile.getChildCount === 'function' ? sourceFile.getChildCount() : 0,
+        fullStart: typeof sourceFile.getFullStart === 'function' ? sourceFile.getFullStart() : 0,
+        start: typeof sourceFile.getStart === 'function' ? sourceFile.getStart() : 0,
+        end: typeof sourceFile.getEnd === 'function' ? sourceFile.getEnd() : 0,
       };
 
       return astSummary;

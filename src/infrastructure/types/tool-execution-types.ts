@@ -30,7 +30,8 @@ export interface ToolExecutionArgs {
   includeHidden?: boolean;
 
   // Generic extensibility for tool-specific args
-  [key: string]: any;
+  // Allow additional tool-specific arguments; use 'unknown' to avoid 'any' and require runtime checks before use
+  [key: string]: unknown;
 }
 
 export interface ToolExecutionContext {
@@ -54,10 +55,10 @@ export interface ToolExecutionContext {
   executionMode?: 'sync' | 'async' | 'stream';
 
   // Generic extensibility
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
-export interface ToolExecutionResult<T = any> {
+export interface ToolExecutionResult<T = unknown> {
   success: boolean;
   data?: T;
   output?: {
@@ -68,7 +69,7 @@ export interface ToolExecutionResult<T = any> {
   error?: {
     code: string;
     message: string;
-    details?: Record<string, any>;
+    details?: Record<string, unknown>;
     stack?: string;
   };
   metadata?: {
@@ -135,12 +136,15 @@ export interface ToolDefinition {
         type: string;
         description?: string;
         required?: boolean;
-        default?: any;
+        default?: unknown;
       }
     >;
     required?: string[];
   };
-  handler: (args: ToolExecutionArgs, context: ToolExecutionContext) => Promise<ToolExecutionResult>;
+  handler: (
+    args: Readonly<ToolExecutionArgs>,
+    context: Readonly<ToolExecutionContext>
+  ) => Promise<ToolExecutionResult>;
 }
 
 // Tool execution statistics
@@ -182,22 +186,22 @@ export type SearchToolArgs = Pick<
 >;
 
 // Type guards for runtime type checking
-export function isFileOperationResult(result: ToolExecutionResult): result is FileOperationResult {
+export function isFileOperationResult(result: Readonly<ToolExecutionResult>): result is FileOperationResult {
   return result.success && typeof result.data === 'string';
 }
 
 export function isDirectoryListingResult(
-  result: ToolExecutionResult
+  result: Readonly<ToolExecutionResult>
 ): result is DirectoryListingResult {
   return result.success && Array.isArray(result.data);
 }
 
 export function isCommandExecutionResult(
-  result: ToolExecutionResult
+  result: Readonly<ToolExecutionResult>
 ): result is CommandExecutionResult {
-  return result.success && typeof result.data === 'string' && 'exitCode' in (result.metadata || {});
+  return result.success && typeof result.data === 'string' && 'exitCode' in (result.metadata ?? {});
 }
 
-export function isGitOperationResult(result: ToolExecutionResult): result is GitOperationResult {
-  return result.success && typeof result.data === 'string' && 'commit' in (result.metadata || {});
+export function isGitOperationResult(result: Readonly<ToolExecutionResult>): result is GitOperationResult {
+  return result.success && typeof result.data === 'string' && 'commit' in (result.metadata ?? {});
 }

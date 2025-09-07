@@ -83,34 +83,42 @@ export class CLIOrchestrator implements ICLIOrchestrator {
       }
 
       const resilientResult = await resilientWrapper.executeWithRecovery(
-
-        async () => useCaseRouter.executeOperation(request),
-
         async () => {
-          // Adapt session format to match UseCaseRouter expectations
-          const adaptedSession = request.session ? {
-            id: request.session.id,
-            workingDirectory: request.session.workingDirectory || process.cwd(),
-            context: request.session.context || {
-              sessionId: request.session.id,
+          try {
+            // Primary operation - convert request to match UseCaseRouter interface
+            const adaptedRequest = {
+              ...request,
+              input: (typeof request.input === 'string' || (typeof request.input === 'object' && request.input !== null)) 
+                ? request.input 
+                : String(request.input || ''),
+            };
+            return useCaseRouter.executeOperation(adaptedRequest);
+          } catch (error) {
+            // Fallback operation - adapt session format and try again
+            const adaptedSession = request.session ? {
+              id: request.session.id,
               workingDirectory: request.session.workingDirectory || process.cwd(),
-              permissions: ['read', 'write'],
-              securityLevel: 'medium' as const,
-            },
-          } : undefined;
+              context: request.session.context || {
+                sessionId: request.session.id,
+                workingDirectory: request.session.workingDirectory || process.cwd(),
+                permissions: ['read', 'write'],
+                securityLevel: 'medium' as const,
+              },
+            } : undefined;
 
-          const routerRequest = {
-            ...request,
-            input: typeof request.input === 'string' ? request.input : '',
-            session: adaptedSession,
-          };
-          return useCaseRouter.executeOperation(routerRequest);
+            const routerRequest = {
+              ...request,
+              input: typeof request.input === 'string' ? request.input : '',
+              session: adaptedSession,
+            };
+            return useCaseRouter.executeOperation(routerRequest);
+          }
         },
-
         {
           name: `CLI-${request.type}`,
           component: 'UnifiedCLICoordinator',
           critical: request.type === 'execute',
+          timeout: options.timeoutMs,
         },
         {
           enableGracefulDegradation: options.enableGracefulDegradation,

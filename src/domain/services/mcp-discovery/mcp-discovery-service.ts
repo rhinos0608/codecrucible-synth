@@ -61,4 +61,16 @@ export class MCPDiscoveryService {
       alternatives: servers.filter(s => s !== selected),
     };
   }
+
+  // Aliases for adapter compatibility
+  async discoverServers(query: ServerDiscoveryQuery): Promise<MCPServerProfile[]> {
+    return this.discover(query);
+  }
+
+  async selectServers(
+    servers: MCPServerProfile[], 
+    query: ServerDiscoveryQuery
+  ): Promise<ServerSelectionResult> {
+    return this.select(query);
+  }
 }

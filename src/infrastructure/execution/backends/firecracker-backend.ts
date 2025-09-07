@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { writeFile, unlink } from 'fs/promises';
+import { unlink, writeFile } from 'fs/promises';
 import { logger } from '../../logging/logger.js';
 import {
   ErrorCategory,
@@ -10,7 +10,7 @@ import {
   ErrorSeverity,
   ServiceResponse,
 } from '../../error-handling/structured-error-system.js';
-import type { ExecutionOptions, ExecutionResult, BackendConfig } from '../execution-types.js';
+import type { BackendConfig, ExecutionOptions, ExecutionResult } from '../execution-types.js';
 import { ExecutionBackend } from '../base-execution-backend.js';
 
 const execAsync = promisify(exec);
@@ -174,11 +174,12 @@ export class FirecrackerBackend extends ExecutionBackend {
       let message = 'Execution failed';
       let code = 1;
       if (typeof error === 'object' && error !== null) {
-        if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
-          message = (error as { message: string }).message;
+        const { message: errMsg, code: errCode } = error as { message?: unknown; code?: unknown };
+        if (typeof errMsg === 'string') {
+          message = errMsg;
         }
-        if ('code' in error && typeof (error as { code?: unknown }).code === 'number') {
-          code = (error as { code: number }).code;
+        if (typeof errCode === 'number') {
+          code = errCode;
         }
       }
       return {

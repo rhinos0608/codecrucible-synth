@@ -10,7 +10,7 @@ export class VoiceIntegrationHandler {
   public async selectVoices(context: RoutingContext): Promise<VoiceSelection> {
     return this.voiceService.selectVoicesForRequest(context.request, {
       preferredVoices: context.preferences?.preferredVoices,
-      enableMultiVoice: context.preferences?.enableMultiVoice,
+      maxVoices: context.preferences?.maxVoices,
     });
   }
 }

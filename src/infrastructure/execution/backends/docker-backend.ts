@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto';
 import { resolve } from 'path';
-import { exec, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { logger } from '../../logging/logger.js';
 import {
@@ -10,7 +10,7 @@ import {
   ErrorSeverity,
   ServiceResponse,
 } from '../../error-handling/structured-error-system.js';
-import type { ExecutionOptions, ExecutionResult, BackendConfig } from '../execution-types.js';
+import type { BackendConfig, ExecutionOptions, ExecutionResult } from '../execution-types.js';
 import { ExecutionBackend } from '../base-execution-backend.js';
 
 const execFileAsync = promisify(execFile);
@@ -189,7 +189,7 @@ export class DockerBackend extends ExecutionBackend {
       this.releaseExecutionSlot();
       this.activeContainers.delete(containerId);
       try {
-        await execAsync(`docker rm -f ${containerId} 2>/dev/null`);
+        await execFileAsync('docker', ['rm', '-f', containerId]);
       } catch {
         // ignore
       }
@@ -200,7 +200,7 @@ export class DockerBackend extends ExecutionBackend {
     logger.info('Cleaning up Docker backend');
     for (const containerId of this.activeContainers) {
       try {
-        await execAsync(`docker rm -f ${containerId}`);
+        await execFileAsync('docker', ['rm', '-f', containerId]);
       } catch (error) {
         logger.warn(`Failed to remove container ${containerId}:`, error);
       }

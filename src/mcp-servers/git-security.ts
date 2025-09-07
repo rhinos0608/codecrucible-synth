@@ -3,7 +3,12 @@ export function validateBranchName(name: string): boolean {
 }
 
 export function ensureSafeArg(arg: string): void {
-  if (arg.includes('..') || arg.includes('--')) {
+  // Block path traversal, double-dash, and dangerous shell metacharacters
+  if (
+    arg.includes('..') ||
+    arg.includes('--') ||
+    /[;|&`$><]/.test(arg)
+  ) {
     throw new Error('Unsafe git argument');
   }
 }

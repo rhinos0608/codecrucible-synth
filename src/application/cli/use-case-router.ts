@@ -30,7 +30,7 @@ import {
 export interface CLIOperationRequest {
   id: string;
   type: 'prompt' | 'analyze' | 'execute' | 'navigate' | 'suggest';
-  input: unknown;
+  input: string | object;
   options?: UseCaseRouterOptions;
   session?: {
     id: string;

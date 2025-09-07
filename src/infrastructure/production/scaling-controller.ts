@@ -1,11 +1,28 @@
 import { ResourceSnapshot } from './resource-types.js';
 
+
 export interface ScalingConfig {
   window?: number;
   cpuScaleUpThreshold?: number;
   cpuScaleDownThreshold?: number;
   queueScaleUpThreshold?: number;
 }
+
+
+export interface ScalingThresholds {
+  cpuScaleUp: number;
+  cpuScaleDown: number;
+  queueScaleUp: number;
+  queueScaleDown: number;
+}
+
+const DEFAULT_THRESHOLDS: ScalingThresholds = {
+  cpuScaleUp: 80,
+  cpuScaleDown: 20,
+  queueScaleUp: 0,
+  queueScaleDown: 0,
+};
+
 
 export class ScalingController {
   private history: ResourceSnapshot[] = [];
@@ -20,6 +37,8 @@ export class ScalingController {
     this.cpuScaleDownThreshold = config.cpuScaleDownThreshold ?? 20;
     this.queueScaleUpThreshold = config.queueScaleUpThreshold ?? 0;
   }
+
+  constructor(private thresholds: ScalingThresholds = DEFAULT_THRESHOLDS) {}
 
   record(snapshot: ResourceSnapshot): void {
     this.history.push(snapshot);
@@ -37,10 +56,17 @@ export class ScalingController {
       this.history.reduce((sum, s) => sum + s.concurrency.queuedOperations, 0) /
       this.history.length;
 
+
     if (cpuAvg > this.cpuScaleUpThreshold || queueAvg > this.queueScaleUpThreshold) {
       return 'scale_up';
     }
     if (cpuAvg < this.cpuScaleDownThreshold && queueAvg === 0) {
+
+    if (cpuAvg > this.thresholds.cpuScaleUp || queueAvg > this.thresholds.queueScaleUp) {
+      return 'scale_up';
+    }
+    if (cpuAvg < this.thresholds.cpuScaleDown && queueAvg <= this.thresholds.queueScaleDown) {
+
       return 'scale_down';
     }
     return 'stable';

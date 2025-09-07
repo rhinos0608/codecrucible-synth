@@ -211,6 +211,12 @@ export class ProductionResourceEnforcer extends EventEmitter {
           }
         };
         this.on('operation-start', onStart);
+        try {
+          // The Promise will resolve when onStart is called.
+        } finally {
+          // Ensure cleanup if the Promise is rejected or interrupted.
+          this.off('operation-start', onStart);
+        }
         const timeoutMs = ctx.timeout > 0 ? ctx.timeout : (this.limits?.concurrency?.operationTimeout ?? 60000);
         const timeoutHandle = setTimeout(() => {
           this.off('operation-start', onStart);

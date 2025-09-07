@@ -224,6 +224,25 @@ export class ProductionResourceEnforcer extends EventEmitter {
     }
   }
 
+  /**
+   * Triggers an emergency cleanup of all active and queued operations.
+   *
+   * This method should be called in critical situations where the system is in an unrecoverable state,
+   * such as severe resource violations, persistent instability, or when normal operation cannot continue safely.
+   *
+   * The cleanup process involves:
+   * - Clearing all active operations.
+   * - Emptying the operation queue.
+   * - Resetting the count of rejected operations.
+   * - Updating concurrency statistics.
+   * - Emitting an 'emergency-cleanup' event with the provided reason.
+   *
+   * Potential side effects:
+   * - Abrupt termination of all in-progress and queued operations, which may result in loss of work or inconsistent state.
+   * - Listeners to the 'emergency-cleanup' event should handle any necessary recovery or alerting.
+   *
+   * @param reason - A descriptive reason for triggering the emergency cleanup.
+   */
   async triggerEmergencyCleanup(reason: string): Promise<void> {
     this.activeOperations.clear();
     this.operationQueue = [];

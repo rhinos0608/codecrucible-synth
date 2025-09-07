@@ -28,7 +28,7 @@ function buildFallbackChain(
   }
   if (voices.supportingVoices && voices.supportingVoices.length > 0) {
     const voice = voices.supportingVoices[0];
-    chain.push({ type: 'voice', option: voice.id ?? voice.name, reason: 'Supporting voice' });
+    chain.push({ type: 'voice', option: voice.id ?? voice.name ?? 'unknown', reason: 'Supporting voice' });
   }
   return chain;
 }

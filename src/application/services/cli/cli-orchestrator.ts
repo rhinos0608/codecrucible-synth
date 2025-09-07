@@ -83,13 +83,7 @@ export class CLIOrchestrator implements ICLIOrchestrator {
       }
 
       const resilientResult = await resilientWrapper.executeWithRecovery(
-        async () => {
-          const routerRequest = {
-            ...request,
-            input: typeof request.input === 'string' ? request.input : '',
-          };
-          return useCaseRouter.executeOperation(routerRequest);
-        },
+        async () => useCaseRouter.executeOperation(request),
         {
           name: `CLI-${request.type}`,
           component: 'UnifiedCLICoordinator',

@@ -4,8 +4,8 @@ import { logger } from '../logging/logger.js';
 import type { ProductionHardeningConfig, ProductionStats } from './hardening-types.js';
 import { SecurityEnforcer } from './security-enforcer.js';
 
-function deepMerge<T extends Record<string, any>>(base: T, override: Partial<T>): T {
-  const result: Record<string, any> = { ...base };
+function deepMerge<T extends Record<string, unknown>>(base: T, override: Partial<T>): T {
+  const result: Record<string, unknown> = { ...base };
   for (const key of Object.keys(override)) {
     const baseVal = base[key as keyof T];
     const overrideVal = override[key as keyof Partial<T>];
@@ -76,7 +76,6 @@ export class ProductionHardeningSystem extends EventEmitter {
     config: Partial<ProductionHardeningConfig> = {}
   ): ProductionHardeningSystem {
     if (!this.instance) {
-
       this.instance = new ProductionHardeningSystem(deepMerge(defaultConfig, config));
 
       const merged: ProductionHardeningConfig = {
@@ -96,7 +95,6 @@ export class ProductionHardeningSystem extends EventEmitter {
         },
       };
       this.instance = new ProductionHardeningSystem(merged);
-
     }
     return this.instance;
   }
@@ -137,7 +135,6 @@ export class ProductionHardeningSystem extends EventEmitter {
     this.stats.successRate = (this.successfulOperations / n) * 100;
 
     this.stats.successRate = (this.stats.successRate * (n - 1) + 100) / n;
-
   }
 
   private recordFailure(duration: number): void {

@@ -1,3 +1,16 @@
+
+import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
+import type { RuntimeContext } from '../runtime/runtime-context.js';
+import { EventCoordinator } from './event-coordinator.js';
+import { ExecutionMonitor } from './execution-monitor.js';
+import { ErrorRecovery } from './error-recovery.js';
+import { WorkflowEngine } from './workflow-engine.js';
+import { TaskScheduler } from './task-scheduler.js';
+import { ResourceAllocator } from './resource-allocator.js';
+import { StateManager } from './state-manager.js';
+import { DependencyResolver, type DependencyHandler } from './dependency-resolver.js';
+import type { OrchestrationRequest, OrchestrationResponse } from './orchestration-types.js';
+
 /**
  * Unified Orchestration Service - Application Layer
  *
@@ -83,79 +96,21 @@ export interface OrchestrationResponse {
 }
 
 /**
- * Central orchestration service that coordinates all system components.
- * This is the main application service that handles high-level requests
- * and routes them to appropriate domain services.
+ * Slim orchestrator that composes workflow modules and exposes high-level
+ * orchestration APIs.
  */
-export class UnifiedOrchestrationService extends EventEmitter {
-  private config!: UnifiedConfiguration;
-  private readonly eventBus: IEventBus;
-  private readonly userInteraction: IUserInteraction;
+export class UnifiedOrchestrationService {
   private readonly logger = createLogger('UnifiedOrchestrationService');
-  private readonly runtimeContext?: RuntimeContext;
-
-  // Domain services
-  private readonly configManager: UnifiedConfigurationManager;
-  private agentSystem!: UnifiedAgentSystem;
-  private serverSystem!: UnifiedServerSystem;
-  private securityValidator!: UnifiedSecurityValidator;
-  private performanceSystem!: UnifiedPerformanceSystem;
-  private pluginManager?: PluginManager;
-  private commandBus?: CommandBus;
-  private commandRegistry?: CommandRegistry;
-
-  private initialized = false;
-  private readonly activeRequests = new Map<string, OrchestrationRequest>();
-  private readonly cleanupHandlers: Array<() => Promise<void> | void> = [];
-
-  public registerCleanup(handler: () => Promise<void> | void): void {
-    this.cleanupHandlers.push(handler);
-  }
 
   public constructor(
-    configManager: UnifiedConfigurationManager,
-    eventBus: IEventBus,
-    userInteraction: IUserInteraction,
-    runtimeContext?: RuntimeContext
-  ) {
-    super();
-
-    this.configManager = configManager;
-    this.eventBus = eventBus;
-    this.userInteraction = userInteraction;
-    this.runtimeContext = runtimeContext;
-    this.logger.info('UnifiedOrchestrationService initialized with dependency injection');
-
-    this.setupEventHandlers();
-  }
-
-  /**
-   * Get singleton instance
-   * @deprecated Use createUnifiedOrchestrationServiceWithContext instead
-   */
-  public static async getInstance(options?: {
-    configManager?: UnifiedConfigurationManager;
-    eventBus?: IEventBus;
-    userInteraction?: IUserInteraction;
-  }): Promise<UnifiedOrchestrationService> {
-    // Create dependencies if not provided
-    const configManager = options?.configManager || (await getUnifiedConfigurationManager());
-
-    // Import dependencies to avoid circular imports
-    const { EventBus } = await import('../../infrastructure/messaging/event-bus.js');
-    const { CLIUserInteraction } = await import(
-      '../../infrastructure/user-interaction/cli-user-interaction.js'
-    );
-
-    const eventBus = options?.eventBus ?? new EventBus();
-    const userInteraction = options?.userInteraction ?? new CLIUserInteraction();
-
-    const service = new UnifiedOrchestrationService(configManager, eventBus, userInteraction);
-    await service.initialize();
-    return service;
-  }
+    private readonly engine: WorkflowEngine,
+    private readonly dependencies: DependencyResolver
+  ) {}
 
   public async initialize(): Promise<void> {
+
+    this.logger.info('UnifiedOrchestrationService initialized');
+
     if (this.initialized) {
       return;
     }
@@ -662,38 +617,16 @@ export class UnifiedOrchestrationService extends EventEmitter {
         performanceSystem: this.performanceSystem.getSystemMetrics(),
       },
     };
+
   }
 
   public async shutdown(): Promise<void> {
-    this.logger.info('Shutting down Unified Orchestration Service...');
-
-    try {
-      // Cancel active requests
-      for (const [id, request] of this.activeRequests.entries()) {
-        this.logger.warn(`Cancelling active request: ${id}`);
-        this.emit('request-cancelled', request);
-      }
-      this.activeRequests.clear();
-
-      // Cleanup handlers
-      for (const handler of this.cleanupHandlers) {
-        try {
-          await handler();
-        } catch (err) {
-          this.logger.error('Error in cleanup handler during shutdown:', err);
-        }
-      }
-
-      this.initialized = false;
-      this.emit('shutdown');
-      this.removeAllListeners();
-
-      this.logger.info('Unified Orchestration Service shut down successfully');
-    } catch (error) {
-      this.logger.error('Error during orchestration service shutdown:', error);
-      throw error;
-    }
+    this.logger.info('UnifiedOrchestrationService shutting down');
   }
+
+
+  public async processRequest(request: OrchestrationRequest): Promise<OrchestrationResponse> {
+    return this.engine.execute(request);
 
   // === Missing Interface Methods ===
 
@@ -817,29 +750,49 @@ export class UnifiedOrchestrationService extends EventEmitter {
         timestamp: Date.now(),
       };
     }
+
   }
 
-  // === Helper Methods for Interface Implementation ===
-
-  private getBasicPerformanceStats(): {
-    enabled: boolean;
-    message: string;
-    basicStats: {
-      memoryUsage: NodeJS.MemoryUsage;
-      uptime: number;
-      timestamp: number;
-    };
-  } {
-    return {
-      enabled: false,
-      message: 'Performance system not available',
-      basicStats: {
-        memoryUsage: process.memoryUsage(),
-        uptime: process.uptime(),
-        timestamp: Date.now(),
-      },
-    };
+  public registerPlugin(name: string, handler: DependencyHandler): void {
+    this.dependencies.register(name, handler);
   }
+
+
+  public async executePluginCommand(name: string, ...args: unknown[]): Promise<unknown> {
+    const handler = this.dependencies.resolve(name);
+    if (!handler) {
+      throw new Error(`Plugin command not found: ${name}`);
+    }
+    return handler(...args);
+  }
+}
+
+/**
+ * Factory to create a unified orchestration service from runtime context.
+ */
+export function createUnifiedOrchestrationServiceWithContext(
+  _context: RuntimeContext
+): UnifiedOrchestrationService {
+  const events = new EventCoordinator();
+  const scheduler = new TaskScheduler();
+  const resources = new ResourceAllocator();
+  const state = new StateManager();
+  const monitor = new ExecutionMonitor(events);
+  const recovery = new ErrorRecovery(events);
+  const dependencies = new DependencyResolver();
+  const engine = new WorkflowEngine({
+    scheduler,
+    resources,
+    state,
+    events,
+    monitor,
+    recovery,
+  });
+
+  return new UnifiedOrchestrationService(engine, dependencies);
+}
+
+export type { OrchestrationRequest, OrchestrationResponse } from './orchestration-types.js';
 
   private totalRequestsProcessed = 0;
   private requestMetrics: Array<{ timestamp: number; responseTime: number; success: boolean }> = [];
@@ -1332,3 +1285,4 @@ export function createUnifiedOrchestrationServiceWithContext(
     runtimeContext as RuntimeContext
   );
 }
+

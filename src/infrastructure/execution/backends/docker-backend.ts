@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto';
 import { resolve } from 'path';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { logger } from '../../logging/logger.js';
 import {
@@ -13,7 +13,7 @@ import {
 import type { ExecutionOptions, ExecutionResult, BackendConfig } from '../execution-types.js';
 import { ExecutionBackend } from '../base-execution-backend.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class DockerBackend extends ExecutionBackend {
   private readonly containerPrefix = 'codecrucible';
@@ -101,10 +101,14 @@ export class DockerBackend extends ExecutionBackend {
       logger.debug(`Executing in Docker: ${command}`, { containerId });
       this.activeContainers.add(containerId);
 
-      const result = await execAsync(`docker ${dockerArgs.join(' ')}`, {
-        timeout: options.timeout ?? 30000,
-        maxBuffer: options.maxOutputSize ?? 1024 * 1024 * 10,
-      });
+      const result = await execFileAsync(
+        "docker",
+        dockerArgs,
+        {
+          timeout: options.timeout ?? 30000,
+          maxBuffer: options.maxOutputSize ?? 1024 * 1024 * 10,
+        }
+      );
 
       const duration = Date.now() - startTime;
 

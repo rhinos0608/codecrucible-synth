@@ -1,12 +1,15 @@
-import { Agent } from 'undici';
+import { Agent, fetch } from 'undici';
 
 export class OllamaHttpClient {
   private readonly baseUrl: string;
   private readonly agent: Agent;
 
-  public constructor(baseUrl: string) {
+  public constructor(baseUrl: string, maxConnections = 10) {
     this.baseUrl = baseUrl;
-    this.agent = new Agent({ keepAliveTimeout: 60_000, connections: 100 });
+    this.agent = new Agent({
+      keepAliveTimeout: 60_000,
+      connections: maxConnections,
+    });
   }
 
   public async get<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -32,6 +35,6 @@ export class OllamaHttpClient {
       },
       signal,
     });
-    return response;
+    return response as unknown as Response;
   }
 }

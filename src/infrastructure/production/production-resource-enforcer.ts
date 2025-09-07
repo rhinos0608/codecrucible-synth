@@ -131,10 +131,12 @@ export class ProductionResourceEnforcer extends EventEmitter {
       ctx.state = 'running';
       ctx.startTime = Date.now();
       this.activeOperations.set(ctx.operationId, ctx);
+      this.emit('operation-start', ctx.operationId);
     } else if (this.operationQueue.length < this.limits.concurrency.maxQueueSize) {
       ctx.state = 'pending';
       this.operationQueue.push(ctx);
     } else {
+      ctx.state = 'rejected';
       this.rejectedOperations += 1;
       const violation = this.quota.enforce(
         ResourceType.CONCURRENCY,
@@ -151,6 +153,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
     this.updateConcurrencyStats();
   }
 
+  /** Complete an operation and promote the next queued operation if available. */
   completeOperation(id: string): void {
     this.activeOperations.delete(id);
     if (this.operationQueue.length > 0) {
@@ -192,6 +195,19 @@ export class ProductionResourceEnforcer extends EventEmitter {
     return this.violations;
   }
 
+  /**
+   * Executes a function while enforcing resource constraints.
+   *
+   * The operation is registered and may be queued if concurrency limits are reached.
+   * Execution begins only when the operation is promoted to running. If the operation
+   * is rejected due to resource limits, an error is thrown and the callback is not executed.
+   *
+   * @param operationId Unique identifier for the operation.
+   * @param fn Callback to execute once resources are granted.
+   * @param options Optional execution parameters including resource requirements,
+   * priority, and timeout.
+   * @throws Error if the operation is rejected by the resource enforcer.
+   */
   async executeWithEnforcement<T>(
     operationId: string,
     fn: () => Promise<T> | T,
@@ -212,6 +228,36 @@ export class ProductionResourceEnforcer extends EventEmitter {
     };
 
     this.registerOperation(ctx);
+
+    if (ctx.state === 'rejected') {
+      throw new Error(`Operation ${operationId} rejected due to resource limits`);
+    }
+
+    if (ctx.state === 'pending') {
+      await new Promise<void>((resolve, reject) => {
+        const onStart = (id: string): void => {
+          if (id === operationId) {
+            clearTimeout(timeoutHandle);
+            this.off('operation-start', onStart);
+            resolve();
+          }
+        };
+        this.on('operation-start', onStart);
+        try {
+          // The Promise will resolve when onStart is called.
+        } finally {
+          // Ensure cleanup if the Promise is rejected or interrupted.
+          this.off('operation-start', onStart);
+        }
+        const timeoutMs = ctx.timeout > 0 ? ctx.timeout : (this.limits?.concurrency?.operationTimeout ?? 60000);
+        const timeoutHandle = setTimeout(() => {
+          this.off('operation-start', onStart);
+          ctx.state = 'failed';
+          reject(new Error(`Operation ${operationId} timed out waiting for start event`));
+        }, timeoutMs);
+      });
+    }
+
     try {
       const result = await fn();
       ctx.state = 'completed';

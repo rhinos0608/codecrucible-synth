@@ -223,7 +223,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
       resourceRequirements?: OperationResourceContext['resourceRequirements'];
       priority?: number;
       timeout?: number;
-      metadata?: any;
+      metadata?: Record<string, unknown>;
     } = {}
   ): Promise<T> {
     const opCtx: OperationResourceContext = {

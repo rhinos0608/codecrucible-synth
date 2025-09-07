@@ -228,11 +228,6 @@ export class UnifiedOrchestrationService {
           this.registerPlugin(name, handler);
 
 
-          this.registerPlugin(
-            name,
-            async (...args: unknown[]): Promise<unknown> => handler(...args)
-          );
-
           this.eventBus.emit('plugin:command_registered', { name });
         },
       });

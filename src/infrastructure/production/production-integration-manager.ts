@@ -17,11 +17,8 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../logging/logger.js';
-import {
-  ProductionHardeningSystem,
-  ProductionStats,
-  ProductionAlert,
-} from './production-hardening-system.js';
+import { ProductionHardeningSystem } from './production-hardening-system.js';
+import { ProductionStats } from './hardening-types.js';
 import {
   ProductionSecurityAuditLogger,
   SecurityEventType,
@@ -100,7 +97,7 @@ export interface IntegratedSystemHealth {
     active: number;
     critical: number;
     warnings: number;
-    lastAlert?: ProductionAlert;
+    lastAlert?: string;
   };
 
   recommendations: SystemRecommendation[];
@@ -1137,8 +1134,6 @@ export class ProductionIntegrationManager extends EventEmitter {
     if (this.config.components.hardeningSystem && this.hardeningSystem) {
       const hardeningAlerts = this.hardeningSystem.getActiveAlerts();
       alerts.active += hardeningAlerts.length;
-      alerts.critical += hardeningAlerts.filter(a => a.level === 'critical').length;
-      alerts.warnings += hardeningAlerts.filter(a => a.level === 'warning').length;
     }
 
     return alerts;

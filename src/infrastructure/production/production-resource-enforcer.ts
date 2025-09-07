@@ -66,7 +66,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
       this.rejectedOperations += 1;
       const violation = this.quota.enforce(
         ResourceType.CONCURRENCY,
-        this.activeOperations.size + this.operationQueue.length,
+        this.operationQueue.length,
         'queued',
         ctx.operationId
       );

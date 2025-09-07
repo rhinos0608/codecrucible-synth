@@ -15,6 +15,78 @@ import { HealthChecker } from './health-checker.js';
 import { AlertManager } from './alert-manager.js';
 import { CapacityPlanner } from './capacity-planner.js';
 
+const DEFAULT_LIMITS: ResourceLimits = {
+  memory: {
+
+    hardLimit: 1024,
+    softLimit: 768,
+    emergencyLimit: 900,
+    gcThreshold: 0.8,
+    leakDetectionEnabled: true,
+    maxAllocationSize: 256,
+  },
+  cpu: {
+    maxUsagePercent: 90,
+    throttleThreshold: 80,
+    measurementWindow: 1000,
+
+    hardLimit: 1_024 * 1_024 * 1_024,
+    softLimit: 768 * 1_024 * 1_024,
+    emergencyLimit: 1_280 * 1_024 * 1_024,
+    gcThreshold: 0.85,
+    leakDetectionEnabled: true,
+    maxAllocationSize: 100 * 1_024 * 1_024,
+  },
+  cpu: {
+    maxUsagePercent: 90,
+    throttleThreshold: 75,
+    measurementWindow: 1_000,
+
+    throttleDelay: 100,
+    maxConcurrentCpuOps: 4,
+  },
+  concurrency: {
+    maxConcurrentOperations: 10,
+
+    operationTimeout: 60000,
+
+    maxQueueSize: 50,
+    operationTimeout: 30_000,
+
+    priorityLevels: 3,
+    fairnessEnabled: true,
+    starvationPrevention: true,
+  },
+  network: {
+    maxConnections: 100,
+
+    maxBandwidthMbps: 1000,
+    connectionTimeout: 30000,
+    idleTimeout: 60000,
+    maxConcurrentRequests: 100,
+  },
+  filesystem: {
+    maxOpenFiles: 100,
+    maxDiskUsageMB: 1024,
+    tempFileQuotaMB: 100,
+    maxFileSize: 50,
+    ioThrottleThreshold: 80,
+
+    maxBandwidthMbps: 1_000,
+    connectionTimeout: 30_000,
+    idleTimeout: 30_000,
+    maxConcurrentRequests: 50,
+  },
+  filesystem: {
+    maxOpenFiles: 1_000,
+    maxDiskUsageMB: 10_000,
+    tempFileQuotaMB: 1_000,
+    maxFileSize: 1_000,
+    ioThrottleThreshold: 1_000,
+
+  },
+};
+
 /**
  * ProductionResourceEnforcer
  *
@@ -39,9 +111,9 @@ export class ProductionResourceEnforcer extends EventEmitter {
   private operationQueue: OperationResourceContext[] = [];
   private rejectedOperations = 0;
 
-  constructor(private limits: ResourceLimits) {
+  constructor(private limits: ResourceLimits = DEFAULT_LIMITS) {
     super();
-    this.quota = new QuotaEnforcer(limits);
+    this.quota = new QuotaEnforcer(this.limits);
     this.monitor.on('snapshot', snap => this.handleSnapshot(snap));
   }
 
@@ -49,7 +121,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
     this.monitor.start();
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     this.monitor.stop();
   }
 
@@ -120,6 +192,77 @@ export class ProductionResourceEnforcer extends EventEmitter {
     return this.violations;
   }
 
+  async executeWithEnforcement<T>(
+    operationId: string,
+    fn: () => Promise<T> | T,
+    options: {
+      resourceRequirements?: OperationResourceContext['resourceRequirements'];
+      priority?: number;
+      timeout?: number;
+    } = {}
+  ): Promise<T> {
+    const ctx: OperationResourceContext = {
+      operationId,
+      resourceRequirements: options.resourceRequirements || {},
+      priority: options.priority ?? 0,
+      startTime: Date.now(),
+      timeout: options.timeout ?? 0,
+      resourcesAllocated: new Map(),
+      state: 'pending',
+    };
+
+    this.registerOperation(ctx);
+    try {
+      const result = await fn();
+      ctx.state = 'completed';
+      return result;
+    } catch (error) {
+      ctx.state = 'failed';
+      throw error;
+    } finally {
+      this.completeOperation(operationId);
+    }
+  }
+
+  /**
+   * Triggers an emergency cleanup of all active and queued operations.
+   *
+   * This method should be called in critical situations where the system is in an unrecoverable state,
+   * such as severe resource violations, persistent instability, or when normal operation cannot continue safely.
+   *
+   * The cleanup process involves:
+   * - Clearing all active operations.
+   * - Emptying the operation queue.
+   * - Resetting the count of rejected operations.
+   * - Updating concurrency statistics.
+   * - Emitting an 'emergency-cleanup' event with the provided reason.
+   *
+   * Potential side effects:
+   * - Abrupt termination of all in-progress and queued operations, which may result in loss of work or inconsistent state.
+   * - Listeners to the 'emergency-cleanup' event should handle any necessary recovery or alerting.
+   *
+   * @param reason - A descriptive reason for triggering the emergency cleanup.
+   */
+  async triggerEmergencyCleanup(reason: string): Promise<void> {
+    this.activeOperations.clear();
+    this.operationQueue = [];
+    this.rejectedOperations = 0;
+    this.updateConcurrencyStats();
+    this.emit('emergency-cleanup', reason);
+  }
+
+  getEnforcementStats(): {
+    activeOperations: number;
+    queuedOperations: number;
+    rejectedOperations: number;
+  } {
+    return {
+      activeOperations: this.activeOperations.size,
+      queuedOperations: this.operationQueue.length,
+      rejectedOperations: this.rejectedOperations,
+    };
+  }
+
   private handleSnapshot(snapshot: ResourceSnapshot): void {
     this.history.push(snapshot);
     if (this.history.length > 100) {
@@ -167,11 +310,66 @@ export class ProductionResourceEnforcer extends EventEmitter {
     this.violations.push(v);
     this.alerts.notify('error', `Resource violation: ${v.resourceType} (${v.violationType})`, v);
     this.emit('violation', v);
+    this.emit('resource-violation', v);
   }
 
   private updateConcurrencyStats(): void {
     const active = this.activeOperations.size;
     const queued = this.operationQueue.length;
     this.monitor.updateConcurrency(active, queued, this.rejectedOperations, 0);
+  }
+
+  async executeWithEnforcement<T>(
+    operationId: string,
+    operation: () => Promise<T>,
+    ctx: Partial<OperationResourceContext> & {
+      resourceRequirements?: OperationResourceContext['resourceRequirements'];
+      priority?: number;
+      timeout?: number;
+      metadata?: Record<string, unknown>;
+    } = {}
+  ): Promise<T> {
+    const opCtx: OperationResourceContext = {
+      operationId,
+      resourceRequirements: ctx.resourceRequirements || {},
+      priority: ctx.priority ?? 0,
+      startTime: Date.now(),
+      timeout: ctx.timeout ?? 0,
+      resourcesAllocated: new Map(),
+      state: 'pending',
+    };
+    this.registerOperation(opCtx);
+    try {
+      const result = await operation();
+      opCtx.state = 'completed';
+      return result;
+    } catch (err) {
+      opCtx.state = 'failed';
+      throw err;
+    } finally {
+      this.completeOperation(operationId);
+    }
+  }
+
+  async triggerEmergencyCleanup(reason: string): Promise<void> {
+    this.emit('emergency-cleanup', reason);
+  }
+
+  async shutdown(): Promise<void> {
+    await this.stop();
+  }
+
+  getEnforcementStats(): {
+    activeOperations: number;
+    queuedOperations: number;
+    rejectedOperations: number;
+    violations: number;
+  } {
+    return {
+      activeOperations: this.activeOperations.size,
+      queuedOperations: this.operationQueue.length,
+      rejectedOperations: this.rejectedOperations,
+      violations: this.violations.length,
+    };
   }
 }

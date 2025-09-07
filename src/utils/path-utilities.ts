@@ -8,6 +8,7 @@
 
 import * as path from 'path';
 import { promises as fs } from 'fs';
+import * as fsSync from 'fs';
 import { logger } from '../infrastructure/logging/unified-logger.js';
 
 export interface PathValidationResult {
@@ -35,9 +36,9 @@ export interface PathNormalizationOptions {
  */
 export class PathUtilities {
   private static readonly DANGEROUS_PATTERNS = [
-    /\.\.[\/\\]/g, // Parent directory traversal
+    /\.\.[/\\]/g, // Parent directory traversal
     /[<>:"|?*]/g, // Windows forbidden characters
-    /[\x00-\x1f]/g, // Control characters
+    /[\x00-\x1F]/g, // Control characters (hexadecimal range)
     /\.{3,}/g, // Multiple consecutive dots
   ];
 
@@ -69,7 +70,7 @@ export class PathUtilities {
   /**
    * Intelligently normalize AI-generated paths without over-sanitization
    */
-  static normalizeAIPath(filePath: string, options: PathNormalizationOptions = {}): string {
+  public static normalizeAIPath(filePath: Readonly<string>, options: PathNormalizationOptions = {}): string {
     if (!filePath || typeof filePath !== 'string') {
       return filePath || '.';
     }
@@ -78,7 +79,6 @@ export class PathUtilities {
       allowAbsolute = true,
       allowRelative = true,
       basePath = process.cwd(),
-      maxDepth = 10,
     } = options;
 
     let normalized = filePath.trim();
@@ -108,10 +108,11 @@ export class PathUtilities {
       if (!normalized.startsWith('./') && !normalized.startsWith('../') && normalized !== '.') {
         // If it's just a filename, make it explicitly relative
         if (!normalized.includes('/') && !normalized.includes('\\')) {
-          return './' + normalized;
+          return `./${normalized}`;
         }
-      }
 
+        return path.normalize(normalized);
+      }
       return path.normalize(normalized);
     }
 
@@ -122,7 +123,7 @@ export class PathUtilities {
   /**
    * Normalize path separators to Unix style for consistency
    */
-  static normalizePathSeparators(filePath: string): string {
+  public static normalizePathSeparators(filePath: string): string {
     // Convert Windows backslashes to forward slashes
     return filePath.replace(/\\/g, '/');
   }
@@ -130,7 +131,7 @@ export class PathUtilities {
   /**
    * Resolve paths safely with traversal protection
    */
-  static resolveSafePath(filePath: string, basePath: string = process.cwd()): string {
+  public static resolveSafePath(filePath: string, basePath: string = process.cwd()): string {
     const normalized = this.normalizeAIPath(filePath);
     const resolved = path.resolve(basePath, normalized);
 
@@ -147,9 +148,9 @@ export class PathUtilities {
   /**
    * Comprehensive path validation with detailed feedback
    */
-  static async validatePath(
+  public static async validatePath(
     filePath: string,
-    options: PathNormalizationOptions = {}
+    options: Readonly<PathNormalizationOptions> = {}
   ): Promise<PathValidationResult> {
     const result: PathValidationResult = {
       isValid: true,
@@ -216,17 +217,17 @@ export class PathUtilities {
   /**
    * Check if a path attempts directory traversal
    */
-  static hasPathTraversal(filePath: string): boolean {
+  public static hasPathTraversal(filePath: string): boolean {
     const normalized = path.normalize(filePath);
     return (
-      normalized.includes('..') || normalized.startsWith('../') || /[\/\\]\.\./.test(normalized)
+      normalized.includes('..') || normalized.startsWith('../') || /[\/\\]..\./.test(normalized)
     );
   }
 
   /**
    * Get relative path between two paths safely
    */
-  static getRelativePath(from: string, to: string): string {
+  public static getRelativePath(from: string, to: string): string {
     try {
       const normalizedFrom = this.normalizeAIPath(from);
       const normalizedTo = this.normalizeAIPath(to);
@@ -240,7 +241,7 @@ export class PathUtilities {
   /**
    * Sanitize filename for cross-platform compatibility
    */
-  static sanitizeFilename(filename: string): string {
+  public static sanitizeFilename(filename: string): string {
     if (!filename || typeof filename !== 'string') {
       return 'unnamed';
     }
@@ -248,7 +249,7 @@ export class PathUtilities {
     // Remove/replace dangerous characters
     let sanitized = filename
       .replace(/[<>:"|?*]/g, '_') // Windows forbidden chars
-      .replace(/[\x00-\x1f\x7f]/g, '') // Control characters
+      .replace(/[\u0000-\u001f\u007f]/g, '') // Control characters
       .replace(/[\/\\]/g, '_') // Path separators
       .replace(/\.+$/, '') // Trailing dots
       .replace(/\s+$/, '') // Trailing spaces
@@ -258,7 +259,7 @@ export class PathUtilities {
     if (process.platform === 'win32') {
       const baseName = sanitized.split('.')[0].toUpperCase();
       if (this.WINDOWS_RESERVED_NAMES.has(baseName)) {
-        sanitized = '_' + sanitized;
+        sanitized = `_${sanitized}`;
       }
     }
 
@@ -280,7 +281,7 @@ export class PathUtilities {
   /**
    * Check if path is within allowed directory boundaries
    */
-  static isWithinBoundaries(filePath: string, allowedPaths: string[]): boolean {
+  public static isWithinBoundaries(filePath: string, allowedPaths: ReadonlyArray<string>): boolean {
     try {
       const normalizedPath = path.resolve(this.normalizeAIPath(filePath));
 
@@ -324,7 +325,7 @@ export class PathUtilities {
   /**
    * Extract directory from path safely
    */
-  static getDirname(filePath: string): string {
+  public static getDirname(filePath: string): string {
     try {
       const normalized = this.normalizeAIPath(filePath);
       return path.dirname(normalized);
@@ -337,7 +338,7 @@ export class PathUtilities {
   /**
    * Join paths safely with normalization
    */
-  static joinPaths(...pathSegments: string[]): string {
+  public static joinPaths(...pathSegments: ReadonlyArray<string>): string {
     try {
       const normalizedSegments = pathSegments
         .filter(segment => segment && typeof segment === 'string')
@@ -353,7 +354,7 @@ export class PathUtilities {
   /**
    * Resolve directory path with case-insensitive fallback for common directories
    */
-  static resolveCaseInsensitivePath(basePath: string, targetDir: string): string | null {
+  public static resolveCaseInsensitivePath(basePath: string, targetDir: string): string | null {
     try {
       // First try exact match
       const exactPath = path.join(basePath, targetDir);
@@ -389,24 +390,49 @@ export class PathUtilities {
    */
   private static pathExists(filePath: string): boolean {
     try {
-      const fs = require('fs');
-      return fs.existsSync(filePath);
+      return fsSync.existsSync(filePath);
     } catch {
       return false;
     }
   }
 }
 
-// Export convenient functions for common operations
-export const {
-  normalizeAIPath,
-  normalizePathSeparators,
-  resolveSafePath,
-  validatePath,
-  hasPathTraversal,
-  getRelativePath,
-  sanitizeFilename,
-  isWithinBoundaries,
-  getDirname,
-  joinPaths,
-} = PathUtilities;
+// Export convenient functions for common operations as arrow functions to avoid unbound method issues
+export const normalizeAIPath = (
+  filePath: string,
+  options?: PathNormalizationOptions
+): string =>
+  PathUtilities.normalizeAIPath(filePath, options);
+
+export const normalizePathSeparators = (filePath: string): string =>
+  PathUtilities.normalizePathSeparators(filePath);
+
+export const resolveSafePath = (filePath: string, basePath?: string): string =>
+  PathUtilities.resolveSafePath(filePath, basePath);
+
+export const validatePath = async (
+  filePath: string,
+  options?: Readonly<PathNormalizationOptions>
+): Promise<PathValidationResult> =>
+  PathUtilities.validatePath(filePath, options);
+
+export const hasPathTraversal = (filePath: string): boolean =>
+  PathUtilities.hasPathTraversal(filePath);
+
+export const getRelativePath = (from: string, to: string): string =>
+  PathUtilities.getRelativePath(from, to);
+
+export const sanitizeFilename = (filename: string): string =>
+  PathUtilities.sanitizeFilename(filename);
+
+export const isWithinBoundaries = (
+  filePath: string,
+  allowedPaths: readonly string[]
+): boolean =>
+  PathUtilities.isWithinBoundaries(filePath, allowedPaths);
+
+export const getDirname = (filePath: string): string =>
+  PathUtilities.getDirname(filePath);
+
+export const joinPaths = (...pathSegments: readonly string[]): string =>
+  PathUtilities.joinPaths(...pathSegments);

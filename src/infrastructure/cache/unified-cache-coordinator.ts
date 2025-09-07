@@ -882,7 +882,20 @@ export class UnifiedCacheCoordinator extends EventEmitter {
       },
       delete: async (key: string) => this.unifiedCache.delete(key),
       clear: async () => this.unifiedCache.clear(),
-      getStats: async () => this.unifiedCache.getStats(),
+      getStats: async (): Promise<CacheMetrics> => {
+        const stats = await this.unifiedCache.getStats();
+        // Transform extended stats to CacheMetrics interface
+        return {
+          hits: typeof stats.hits === 'number' ? stats.hits : 0,
+          misses: typeof stats.misses === 'number' ? stats.misses : 0,
+          sets: typeof stats.sets === 'number' ? stats.sets : 0,
+          deletes: typeof stats.deletes === 'number' ? stats.deletes : 0,
+          evictions: typeof stats.evictions === 'number' ? stats.evictions : 0,
+          size: typeof stats.size === 'number' ? stats.size : 0,
+          hitRate: typeof stats.hitRate === 'number' ? stats.hitRate : 0,
+          memoryUsage: typeof stats.memoryUsage === 'number' ? stats.memoryUsage : 0,
+        };
+      },
       cleanup: async () => {
         const unifiedCacheWithCleanup = this.unifiedCache as UnifiedCacheSystem & {
           cleanup?: () => Promise<void>;

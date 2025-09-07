@@ -6,12 +6,12 @@
  */
 
 import { performance } from 'perf_hooks';
-import { writeFileSync, existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { dirname } from 'path';
 import {
-  IGenerateCodeUseCase,
   GenerationRequest,
   GenerationResponse,
+  IGenerateCodeUseCase,
 } from '../../domain/interfaces/use-cases.js';
 import {
   IWorkflowOrchestrator,
@@ -20,9 +20,9 @@ import {
 import { logger } from '../../infrastructure/logging/logger.js';
 
 export class GenerateCodeUseCase implements IGenerateCodeUseCase {
-  constructor(private orchestrator: IWorkflowOrchestrator) {}
+  public constructor(private readonly orchestrator: IWorkflowOrchestrator) {}
 
-  async execute(request: GenerationRequest): Promise<GenerationResponse> {
+  public async execute(request: Readonly<GenerationRequest>): Promise<GenerationResponse> {
     const startTime = performance.now();
 
     try {
@@ -82,7 +82,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
       // Save files if not dry run and files were intended to be saved
       if (!request.options?.dryRun && smartFiles.length > 0) {
         logger.info('Saving AI-generated files', { fileCount: smartFiles.length });
-        await this.saveGeneratedFiles(smartFiles);
+        this.saveGeneratedFiles(smartFiles);
       } else if (inlineFiles.length > 0 || smartFiles.length === 0) {
         logger.debug('Content displayed inline, no files saved', { mode: 'inline' });
       } else {
@@ -214,8 +214,8 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
   }
 
   private parseGenerationResult(
-    result: any,
-    request: GenerationRequest
+    result: unknown,
+    _request: Readonly<GenerationRequest>
   ): GenerationResponse['generated']['files'] {
     const files: GenerationResponse['generated']['files'] = [];
 
@@ -224,14 +224,19 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
       resultText = result;
     } else if (result && typeof result === 'object') {
       // Properly handle object responses by extracting meaningful content
-      if (result.content) {
-        resultText = result.content;
-      } else if (result.text) {
-        resultText = result.text;
-      } else if (result.response) {
-        resultText = result.response;
-      } else if (result.message?.content) {
-        resultText = result.message.content;
+      const obj = result as Record<string, unknown>;
+      if (typeof obj.content === 'string') {
+        resultText = obj.content;
+      } else if (typeof obj.text === 'string') {
+        resultText = obj.text;
+      } else if (typeof obj.response === 'string') {
+        resultText = obj.response;
+      } else if (
+        obj.message &&
+        typeof obj.message === 'object' &&
+        typeof (obj.message as { content?: unknown }).content === 'string'
+      ) {
+        resultText = (obj.message as { content: string }).content;
       } else {
         // If no standard content field found, try to stringify but log for debugging
         logger.error('Unexpected result format in generate-code-use-case', { result });
@@ -260,10 +265,10 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
       logger.debug('AI chose FILE format for output', { extractionMode: 'explicit_paths' });
       let match;
       while ((match = fileCodeRegex.exec(resultText)) !== null) {
-        const filePath = match[1]?.trim();
-        const content = match[2]?.trim();
+        const filePath = match[1].trim();
+        const content = match[2].trim();
 
-        logger.debug('Found generated file', { filePath, contentLength: content?.length });
+        logger.debug('Found generated file', { filePath, contentLength: content.length });
 
         if (content && filePath) {
           const fileType = this.determineFileType(filePath, content);
@@ -280,11 +285,11 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
       let match;
       while ((match = inlineCodeRegex.exec(resultText)) !== null) {
         const language = match[1] || 'typescript';
-        const content = match[2]?.trim();
+        const content = match[2].trim();
 
         logger.debug('Found inline code block', {
           language,
-          contentLength: content?.length,
+          contentLength: content.length,
         });
 
         if (content) {
@@ -318,7 +323,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
 
   private determineFileType(
     filePath: string,
-    content: string
+    _content: string
   ): GenerationResponse['generated']['files'][0]['type'] {
     const fileName = filePath.toLowerCase();
 
@@ -347,7 +352,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
     return 'source';
   }
 
-  private async saveGeneratedFiles(files: GenerationResponse['generated']['files']): Promise<void> {
+  private saveGeneratedFiles(files: Readonly<GenerationResponse['generated']['files']>): void {
     logger.debug('Starting file save operation', { fileCount: files.length });
 
     for (const file of files) {
@@ -403,12 +408,12 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
     // Handle file creation case
     let summary = `Generated ${files.length} file(s) based on: "${request.prompt}"\n\n`;
 
-    const filesByType = files.reduce(
+    const filesByType = files.reduce<Record<string, number>>(
       (acc, file) => {
         acc[file.type] = (acc[file.type] || 0) + 1;
         return acc;
       },
-      {} as Record<string, number>
+      {}
     );
 
     if (files.length > 0) {
@@ -436,11 +441,11 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
     return summary;
   }
 
-  private buildChangesSummary(files: GenerationResponse['generated']['files']): string[] {
+  private buildChangesSummary(files: Readonly<GenerationResponse['generated']['files']>): string[] {
     return files.map(file => `Created ${file.path} (${file.type})`);
   }
 
-  private estimateTokens(files: GenerationResponse['generated']['files']): number {
+  private estimateTokens(files: Readonly<GenerationResponse['generated']['files']>): number {
     // Rough estimation: ~4 characters per token
     return files.reduce((total, file) => total + Math.ceil(file.content.length / 4), 0);
   }

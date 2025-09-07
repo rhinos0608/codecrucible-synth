@@ -116,7 +116,9 @@ switch (platform) {
         nativeBinding = require('@codecrucible/rust-executor-darwin-universal');
       }
       break;
-    } catch {}
+    } catch (e) {
+      loadError = e;
+    }
     switch (arch) {
       case 'x64':
         localFileExisted = existsSync(

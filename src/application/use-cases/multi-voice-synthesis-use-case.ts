@@ -8,12 +8,22 @@
 
 import {
   IVoiceOrchestrationService,
-  VoiceSelectionPreferences,
   SynthesisMode,
+  VoiceSelectionPreferences,
 } from '../../domain/services/voice-orchestration-service.js';
 import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
-import { ProcessingRequest } from '../../domain/entities/request.js';
+import { ProcessingRequest, RequestType } from '../../domain/entities/request.js';
+import { RequestPriority } from '../../domain/value-objects/voice-values.js';
 import { Voice } from '../../domain/entities/voice.js';
+
+// Define VoiceResponse type for proper typing
+export interface VoiceResponse {
+  voiceId: string;
+  content: string;
+  confidence: number;
+  expertiseMatch: number;
+  processingTime: number;
+}
 
 export interface MultiVoiceSynthesisInput {
   prompt: string;
@@ -58,40 +68,98 @@ export interface ConflictSummary {
  * Handles complex problems requiring diverse perspectives
  */
 export class MultiVoiceSynthesisUseCase {
-  constructor(
-    private voiceOrchestrationService: IVoiceOrchestrationService,
-    private modelSelectionService: IModelSelectionService
+  public constructor(
+    private readonly voiceOrchestrationService: IVoiceOrchestrationService,
+    private readonly modelSelectionService: IModelSelectionService
   ) {}
 
-  async execute(input: MultiVoiceSynthesisInput): Promise<MultiVoiceSynthesisOutput> {
+  public async execute(input: Readonly<MultiVoiceSynthesisInput>): Promise<MultiVoiceSynthesisOutput> {
     const startTime = Date.now();
 
     // Input validation and transformation
     const request = this.transformToProcessingRequest(input);
     const preferences = this.transformToVoicePreferences(input);
 
-    // Domain orchestration - Voice Selection
-    const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(
-      request,
-      preferences
-    );
+    // Local types to ensure strong typing for service interactions
+    interface VoiceSelectionResult {
+      primaryVoice: Voice;
+      supportingVoices: Voice[];
+      synthesisMode: SynthesisMode;
+      // other fields may exist but are not required here
+    }
 
-    // Domain orchestration - Model Selection
-    const selectedModel = await this.modelSelectionService.selectOptimalModel(request);
+    interface Conflict {
+      topic: string;
+      voice1Id: string;
+      voice2Id: string;
+    }
+
+    interface ConflictResolution {
+      reasoning: string;
+    }
+
+    interface RequiredVoiceOrchestration {
+      selectVoices: (
+        request: Readonly<ProcessingRequest>,
+        prefs: Readonly<VoiceSelectionPreferences>
+      ) => Promise<VoiceSelectionResult>;
+      synthesizeVoiceResponses: (
+        voiceResponses: ReadonlyArray<VoiceResponse>,
+        mode: SynthesisMode
+      ) => {
+        finalResponse: string;
+        consensusLevel: number;
+        synthesisMethod: string;
+        confidenceScore: number;
+      };
+      detectVoiceConflicts: (
+        voiceResponses: ReadonlyArray<VoiceResponse>
+      ) => Promise<Conflict[]>;
+      resolveVoiceConflicts: (
+        conflicts: ReadonlyArray<Conflict>,
+        voices: ReadonlyArray<Voice>
+      ) => Promise<ConflictResolution[]>;
+    }
+
+    interface ModelGenerator {
+      generateResponse: (
+        request: Readonly<ProcessingRequest>,
+        voice: Readonly<Voice>
+      ) => Promise<{
+        content: string;
+        confidence?: number;
+        processingTime?: number;
+      }>;
+    }
+
+    interface ModelSelectionServiceTyped {
+      selectModel: (
+        request: Readonly<ProcessingRequest>,
+        voiceSelection: Readonly<VoiceSelectionResult>
+      ) => Promise<ModelGenerator>;
+    }
+
+    // Cast domain service instances to the stricter local types
+    const orchestration = this.voiceOrchestrationService as unknown as RequiredVoiceOrchestration;
+    const modelSelector = this.modelSelectionService as unknown as ModelSelectionServiceTyped;
+
+    // Select voices and model using domain services
+    const voiceSelection = await orchestration.selectVoices(request, preferences);
+    const selectedModel = await modelSelector.selectModel(request, voiceSelection);
 
     // Generate responses from all selected voices
     const allVoices = [voiceSelection.primaryVoice, ...voiceSelection.supportingVoices];
     const voiceResponses = await this.generateVoiceResponses(allVoices, request, selectedModel);
 
     // Domain orchestration - Synthesis
-    const synthesisResult = await this.voiceOrchestrationService.synthesizeVoiceResponses(
+    const synthesisResult = orchestration.synthesizeVoiceResponses(
       voiceResponses,
       voiceSelection.synthesisMode
     );
 
     // Domain orchestration - Conflict Resolution
-    const conflicts = await this.voiceOrchestrationService.detectVoiceConflicts(voiceResponses);
-    const conflictResolutions = await this.voiceOrchestrationService.resolveVoiceConflicts(
+    const conflicts = await orchestration.detectVoiceConflicts(voiceResponses);
+    const conflictResolutions = await orchestration.resolveVoiceConflicts(
       conflicts,
       allVoices
     );
@@ -107,13 +175,29 @@ export class MultiVoiceSynthesisUseCase {
     );
   }
 
-  private transformToProcessingRequest(input: MultiVoiceSynthesisInput): ProcessingRequest {
+  private transformToProcessingRequest(input: Readonly<MultiVoiceSynthesisInput>): ProcessingRequest {
+    // Import the correct enums for RequestType and RequestPriority
+    // import { RequestType, RequestPriority } from '../../domain/entities/request.js';
+
+    // (Removed unused resolveEnumByValue function)
+
+    // Use the enum member directly for type safety
+    const requestTypeValues = Object.values(RequestType) as RequestType[];
+    const type: RequestType = requestTypeValues.includes('MULTI_VOICE_SYNTHESIS' as RequestType)
+      ? ('MULTI_VOICE_SYNTHESIS' as RequestType)
+      : requestTypeValues[0];
+
+    const requestPriorityValues = Object.values(RequestPriority);
+    const priority: RequestPriority = requestPriorityValues.includes(RequestPriority.medium())
+      ? RequestPriority.medium()
+      : requestPriorityValues[0];
+
     return new ProcessingRequest(
       `request-${Date.now()}`, // id
       input.prompt, // content
-      'multi-voice-synthesis' as any, // type
-      'medium' as any, // priority
-      input.context || {}, // context
+      type, // type
+      priority, // priority
+      input.context ?? {}, // context
       {
         mustIncludeVoices: input.requiredVoices,
         excludedVoices: input.excludedVoices,
@@ -121,7 +205,7 @@ export class MultiVoiceSynthesisUseCase {
     );
   }
 
-  private transformToVoicePreferences(input: MultiVoiceSynthesisInput): VoiceSelectionPreferences {
+  private transformToVoicePreferences(input: Readonly<MultiVoiceSynthesisInput>): VoiceSelectionPreferences {
     return {
       maxVoices: input.voiceCount || 3,
       minVoices: Math.max(2, Math.min(input.voiceCount || 2, 2)), // At least 2 for multi-voice
@@ -139,11 +223,20 @@ export class MultiVoiceSynthesisUseCase {
   }
 
   private async generateVoiceResponses(
-    voices: Voice[],
-    request: ProcessingRequest,
-    model: any
-  ): Promise<any[]> {
-    const responses = [];
+    voices: ReadonlyArray<Voice>,
+    request: Readonly<ProcessingRequest>,
+    model: {
+      generateResponse: (
+        request: Readonly<ProcessingRequest>,
+        voice: Readonly<Voice>
+      ) => Promise<{
+        content: string;
+        confidence?: number;
+        processingTime?: number;
+      }>;
+    }
+  ): Promise<VoiceResponse[]> {
+    const responses: VoiceResponse[] = [];
 
     for (const voice of voices) {
       try {
@@ -151,9 +244,9 @@ export class MultiVoiceSynthesisUseCase {
         responses.push({
           voiceId: voice.id,
           content: response.content,
-          confidence: response.confidence || 0.8,
+          confidence: response.confidence ?? 0.8,
           expertiseMatch: this.calculateExpertiseMatch(voice, request),
-          processingTime: response.processingTime || 0,
+          processingTime: response.processingTime ?? 0,
         });
       } catch (error) {
         // Log error but continue with other voices
@@ -164,7 +257,7 @@ export class MultiVoiceSynthesisUseCase {
     return responses;
   }
 
-  private calculateExpertiseMatch(voice: Voice, request: ProcessingRequest): number {
+  private calculateExpertiseMatch(voice: Voice, request: Readonly<ProcessingRequest>): number {
     const requiredCapabilities = request.requiresCapabilities();
     const voiceExpertise = voice.expertise;
 
@@ -176,18 +269,23 @@ export class MultiVoiceSynthesisUseCase {
   }
 
   private transformToOutput(
-    synthesisResult: any,
-    voiceResponses: any[],
-    voices: Voice[],
-    conflicts: any[],
-    conflictResolutions: any[],
+    synthesisResult: {
+      finalResponse: string;
+      consensusLevel: number;
+      synthesisMethod: string;
+      confidenceScore: number;
+    },
+    voiceResponses: ReadonlyArray<VoiceResponse>,
+    voices: ReadonlyArray<Voice>,
+    conflicts: ReadonlyArray<{ topic: string; voice1Id: string; voice2Id: string }>,
+    conflictResolutions: ReadonlyArray<{ reasoning: string } | undefined>,
     startTime: number
   ): MultiVoiceSynthesisOutput {
-    const voiceContributions: VoiceContribution[] = voiceResponses.map(response => {
-      const voice = voices.find(v => v.id === response.voiceId);
+    const voiceContributions: VoiceContribution[] = voiceResponses.map((response: VoiceResponse) => {
+      const voice = voices.find((v: Voice) => v.id === response.voiceId);
       return {
         voiceId: response.voiceId,
-        voiceName: voice?.name || 'Unknown Voice',
+        voiceName: voice?.name ?? 'Unknown Voice',
         content: response.content,
         confidence: response.confidence,
         expertise: voice?.expertise ? [...voice.expertise] : [],
@@ -199,7 +297,7 @@ export class MultiVoiceSynthesisUseCase {
       return {
         topic: conflict.topic,
         conflictingVoices: [conflict.voice1Id, conflict.voice2Id],
-        resolution: resolution?.reasoning || 'Unresolved',
+        resolution: resolution?.reasoning ?? 'Unresolved',
       };
     });
 

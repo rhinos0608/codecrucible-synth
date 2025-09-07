@@ -146,23 +146,33 @@ export class E2BTerminalTool {
           action: 'start',
           command: fullCommand,
           interactive: true,
-          workingDirectory: command.workingDirectory || session.workingDirectory,
           environment: { ...session.environment, ...command.environment },
           timeout: command.timeout || 30000,
         });
 
+        // Handle ProcessManagerResult union type with type guard
+        if ('error' in processResult) {
+          return {
+            success: false,
+            stdout: '',
+            stderr: processResult.error,
+            exitCode: 1,
+            executionTime: Date.now() - startTime,
+          };
+        }
+
         // Store process session ID for later interaction
-        if (processResult.success && processResult.sessionId) {
+        if ('success' in processResult && processResult.success && processResult.sessionId) {
           session.processSessionId = processResult.sessionId;
         }
 
         return {
-          success: processResult.success,
-          stdout: processResult.output || '',
-          stderr: processResult.error || '',
-          exitCode: processResult.exitCode || 0,
+          success: 'success' in processResult ? processResult.success : true,
+          stdout: ('initialOutput' in processResult ? processResult.initialOutput : '') || '',
+          stderr: '',
+          exitCode: 0,
           executionTime: Date.now() - startTime,
-          sessionId: processResult.sessionId,
+          sessionId: 'sessionId' in processResult ? (processResult.sessionId || undefined) : undefined,
         };
       }
 
@@ -339,15 +349,27 @@ export class E2BTerminalTool {
         sessionId: session.processSessionId,
         input,
         timeout: 30000,
+        interactive: true, // Required property
       });
 
       session.lastActivity = Date.now();
 
+      // Handle ProcessManagerResult union type with type guard
+      if ('error' in result) {
+        return {
+          success: false,
+          stdout: '',
+          stderr: result.error,
+          exitCode: 1,
+          executionTime: Date.now() - startTime,
+        };
+      }
+
       return {
-        success: result.success,
-        stdout: result.output || '',
-        stderr: result.error || '',
-        exitCode: result.exitCode || 0,
+        success: 'success' in result ? result.success : true,
+        stdout: ('output' in result ? result.output : '') || '',
+        stderr: '',
+        exitCode: 0,
         executionTime: Date.now() - startTime,
         sessionId,
       };
@@ -375,6 +397,8 @@ export class E2BTerminalTool {
         await this.processManager.execute({
           action: 'kill',
           sessionId: session.processSessionId,
+          timeout: 5000,
+          interactive: false,
         });
       }
 
@@ -401,6 +425,8 @@ export class E2BTerminalTool {
         processStatus = await this.processManager.execute({
           action: 'status',
           sessionId: session.processSessionId,
+          timeout: 5000,
+          interactive: false,
         });
       } catch (error) {
         this.logger.warn(`Failed to get process status for session ${sessionId}:`, error);

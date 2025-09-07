@@ -1,14 +1,14 @@
 import { ModelRequest } from '../../domain/interfaces/model-client.js';
 
 export interface RequestProcessor {
-  process(request: ModelRequest): ModelRequest;
+  process: (request: Readonly<ModelRequest>) => ModelRequest;
 }
 
 export class BasicRequestProcessor implements RequestProcessor {
-  process(request: ModelRequest): ModelRequest {
+  public process(request: Readonly<ModelRequest>): ModelRequest {
     if (
       !request.prompt &&
-      (!Array.isArray((request as any).messages) || (request as any).messages.length === 0)
+      (!Array.isArray(request.messages) || request.messages.length === 0)
     ) {
       throw new Error('ModelRequest requires a prompt or messages');
     }

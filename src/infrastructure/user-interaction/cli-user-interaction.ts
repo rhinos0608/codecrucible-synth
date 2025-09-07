@@ -136,7 +136,7 @@ export class CLIUserInteraction implements IUserInteraction {
     return answers.confirmed;
   }
 
-  async select(question: string, choices: string[]): Promise<string> {
+  async select(question: string, choices: readonly string[]): Promise<string> {
     // Stop any current spinner
     if (this.currentSpinner) {
       this.currentSpinner.stop();
@@ -148,7 +148,7 @@ export class CLIUserInteraction implements IUserInteraction {
         type: 'list',
         name: 'selected',
         message: question,
-        choices,
+        choices: [...choices], // Create a mutable copy for inquirer
       },
     ]);
 

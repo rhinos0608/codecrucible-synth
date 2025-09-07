@@ -6,9 +6,9 @@ export class PluginManager {
   private readonly plugins = new Map<string, IPlugin>();
   private initialized = false;
 
-  constructor(private readonly context: PluginContext = {}) {}
+  public constructor(private readonly context: Readonly<PluginContext> = {}) {}
 
-  register(plugin: IPlugin): void {
+  public register(plugin: Readonly<IPlugin>): void {
     const key = `${plugin.meta.name}@${plugin.meta.version}`;
     if (this.plugins.has(key)) {
       this.logger.warn(`Plugin already registered: ${key}`);
@@ -18,7 +18,7 @@ export class PluginManager {
     this.logger.info(`Registered plugin: ${key}`);
   }
 
-  async initializeAll(): Promise<void> {
+  public async initializeAll(): Promise<void> {
     if (this.initialized) return;
     for (const plugin of this.plugins.values()) {
       try {
@@ -31,7 +31,7 @@ export class PluginManager {
     this.initialized = true;
   }
 
-  async startAll(): Promise<void> {
+  public async startAll(): Promise<void> {
     for (const plugin of this.plugins.values()) {
       try {
         if (plugin.start) await plugin.start();
@@ -42,7 +42,7 @@ export class PluginManager {
     }
   }
 
-  async stopAll(): Promise<void> {
+  public async stopAll(): Promise<void> {
     for (const plugin of this.plugins.values()) {
       try {
         if (plugin.stop) await plugin.stop();
@@ -54,7 +54,7 @@ export class PluginManager {
   }
 
   // Simple loader for pre-imported modules/factories to avoid direct FS coupling here
-  async loadFromFactories(factories: Array<() => Promise<IPlugin> | IPlugin>): Promise<void> {
+  public async loadFromFactories(factories: ReadonlyArray<() => Promise<IPlugin> | IPlugin>): Promise<void> {
     for (const factory of factories) {
       const plugin = await Promise.resolve(factory());
       this.register(plugin);

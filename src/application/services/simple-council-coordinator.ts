@@ -9,10 +9,11 @@
 
 import {
   IVoiceOrchestrationService,
+  SynthesisMode,
   VoiceResponse,
 } from '../../domain/services/voice-orchestration-service.js';
 import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
-import { ProcessingRequest } from '../../domain/entities/request.js';
+import { ProcessingRequest, RequestType } from '../../domain/entities/request.js';
 
 export interface CouncilRequest {
   prompt: string;
@@ -42,16 +43,16 @@ export interface VoiceContribution {
  * Clean orchestration without unnecessary complexity
  */
 export class SimpleCouncilCoordinator {
-  constructor(
-    private voiceOrchestrationService: IVoiceOrchestrationService,
-    private modelSelectionService: IModelSelectionService
+  public constructor(
+    private readonly voiceOrchestrationService: Readonly<IVoiceOrchestrationService>,
+    private readonly modelSelectionService: Readonly<IModelSelectionService>
   ) {}
 
   /**
    * Coordinate multiple voices for a decision
    * Clean single responsibility implementation
    */
-  async coordinateCouncil(request: CouncilRequest): Promise<CouncilResponse> {
+  public async coordinateCouncil(request: Readonly<CouncilRequest>): Promise<CouncilResponse> {
     const startTime = Date.now();
 
     // Input transformation
@@ -62,11 +63,19 @@ export class SimpleCouncilCoordinator {
       this.modelSelectionService.selectOptimalModel(processingRequest)
     );
 
+    // Ensure selectedModel has the expected generateResponse method
+    const model = {
+      generateResponse: selectedModel.generateResponse?.bind(selectedModel) as unknown as (
+        request: Readonly<ProcessingRequest>,
+        options: Readonly<{ id: string }>
+      ) => Promise<{ content: string; confidence?: number; processingTime?: number }>
+    };
+
     // Generate responses from all voices
     const voiceResponses = await this.generateVoiceResponses(
       request.voiceIds,
       processingRequest,
-      selectedModel
+      model
     );
 
     // Synthesize responses using domain service
@@ -85,19 +94,35 @@ export class SimpleCouncilCoordinator {
    * Get voice recommendations without synthesis
    * For cases where individual perspectives are needed
    */
-  async getVoiceRecommendations(request: CouncilRequest): Promise<VoiceContribution[]> {
+  public async getVoiceRecommendations(request: Readonly<CouncilRequest>): Promise<VoiceContribution[]> {
     const processingRequest = this.transformToProcessingRequest(request);
     const selectedModel = await Promise.resolve(
       this.modelSelectionService.selectOptimalModel(processingRequest)
     );
 
+    // Ensure selectedModel has the expected generateResponse method
+    const model = {
+      generateResponse: (selectedModel.generateResponse?.bind(selectedModel) ??
+        (async (
+          _request: Readonly<ProcessingRequest>,
+          _options: Readonly<{ readonly id: string }>
+        ): Promise<{ content: string; confidence?: number; processingTime?: number }> => Promise.resolve({
+          content: '',
+          confidence: 0,
+          processingTime: 0,
+        }))) as (
+        request: Readonly<ProcessingRequest>,
+        options: Readonly<{ readonly id: string }>
+      ) => Promise<{ content: string; confidence?: number; processingTime?: number }>
+    };
+
     const voiceResponses = await this.generateVoiceResponses(
       request.voiceIds,
       processingRequest,
-      selectedModel
+      model
     );
 
-    return voiceResponses.map(response => ({
+    return voiceResponses.map((response: Readonly<VoiceResponse>) => ({
       voiceId: response.voiceId,
       content: response.content,
       confidence: response.confidence,
@@ -105,12 +130,12 @@ export class SimpleCouncilCoordinator {
     }));
   }
 
-  private transformToProcessingRequest(request: CouncilRequest): ProcessingRequest {
+  private transformToProcessingRequest(request: Readonly<CouncilRequest>): ProcessingRequest {
     return ProcessingRequest.create(
       request.prompt,
-      'council-decision' as any,
+      'COUNCIL_DECISION' as RequestType,
       'medium',
-      request.context || {},
+      request.context ?? {},
       {
         mustIncludeVoices: request.voiceIds,
       }
@@ -118,9 +143,9 @@ export class SimpleCouncilCoordinator {
   }
 
   private async generateVoiceResponses(
-    voiceIds: string[],
-    request: ProcessingRequest,
-    model: any
+    voiceIds: readonly string[],
+    request: Readonly<ProcessingRequest>,
+    model: { generateResponse: (request: ProcessingRequest, options: { id: string }) => Promise<{ content: string; confidence?: number; processingTime?: number }> }
   ): Promise<VoiceResponse[]> {
     const responses: VoiceResponse[] = [];
 
@@ -128,7 +153,7 @@ export class SimpleCouncilCoordinator {
       try {
         const voiceRequest = ProcessingRequest.create(
           request.prompt,
-          request.type as any,
+          request.type,
           'medium',
           request.context,
           {
@@ -137,16 +162,14 @@ export class SimpleCouncilCoordinator {
           }
         );
 
-        const response = await Promise.resolve(
-          model.generateResponse(voiceRequest, { id: voiceId })
-        );
+        const response = await model.generateResponse(voiceRequest, { id: voiceId });
 
         responses.push({
           voiceId,
           content: response.content,
-          confidence: response.confidence || 0.8,
+          confidence: typeof response.confidence === 'number' ? response.confidence : 0.8,
           expertiseMatch: 1.0, // Simplified - could calculate based on voice/request match
-          processingTime: response.processingTime || 0,
+          processingTime: typeof response.processingTime === 'number' ? response.processingTime : 0,
         });
       } catch (error) {
         console.warn(`Voice ${voiceId} failed to generate response:`, error);
@@ -161,24 +184,27 @@ export class SimpleCouncilCoordinator {
         });
       }
     }
-
     return responses;
   }
 
-  private mapSynthesisMode(mode: string): any {
-    const modeMap: Record<string, string> = {
-      collaborative: 'COLLABORATIVE',
-      competitive: 'COMPETITIVE',
-      consensus: 'CONSENSUS',
-      weighted: 'WEIGHTED',
+  private mapSynthesisMode(mode: string): SynthesisMode {
+    const modeMap: Record<string, SynthesisMode> = {
+      collaborative: SynthesisMode.COLLABORATIVE,
+      competitive: SynthesisMode.COMPETITIVE,
+      consensus: SynthesisMode.CONSENSUS,
+      weighted: SynthesisMode.WEIGHTED,
     };
 
-    return modeMap[mode] || 'COLLABORATIVE';
+    return modeMap[mode] ?? SynthesisMode.COLLABORATIVE;
   }
 
   private transformToCouncilResponse(
-    synthesisResult: any,
-    voiceResponses: VoiceResponse[],
+    synthesisResult: Readonly<{
+      finalResponse: string;
+      consensusLevel: number;
+      synthesisMethod: string;
+    }>,
+    voiceResponses: ReadonlyArray<VoiceResponse>,
     startTime: number
   ): CouncilResponse {
     const voiceContributions: VoiceContribution[] = voiceResponses.map(response => ({
@@ -201,13 +227,13 @@ export class SimpleCouncilCoordinator {
    * Check if voices have conflicts in their recommendations
    * Simplified conflict detection
    */
-  async detectConflicts(voiceResponses: VoiceResponse[]): Promise<boolean> {
+  public async detectConflicts(voiceResponses: ReadonlyArray<VoiceResponse>): Promise<boolean> {
     if (voiceResponses.length < 2) {
       return false;
     }
 
     const conflicts = await Promise.resolve(
-      this.voiceOrchestrationService.detectVoiceConflicts(voiceResponses)
+      this.voiceOrchestrationService.detectVoiceConflicts([...voiceResponses])
     );
     return conflicts.length > 0;
   }
@@ -216,14 +242,14 @@ export class SimpleCouncilCoordinator {
    * Get consensus level between voices
    * Simple consensus calculation
    */
-  calculateConsensus(voiceResponses: VoiceResponse[]): number {
+  public calculateConsensus(voiceResponses: ReadonlyArray<VoiceResponse>): number {
     if (voiceResponses.length <= 1) {
       return 1.0;
     }
 
     // Calculate average confidence as a simple consensus metric
     const avgConfidence =
-      voiceResponses.reduce((sum, response) => sum + response.confidence, 0) /
+      voiceResponses.reduce((sum: number, response: Readonly<VoiceResponse>) => sum + response.confidence, 0) /
       voiceResponses.length;
 
     // Adjust for number of voices (more voices = potentially less consensus)

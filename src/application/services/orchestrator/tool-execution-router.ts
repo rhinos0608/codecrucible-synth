@@ -9,25 +9,25 @@ import { getGlobalEnhancedToolIntegration } from '../../../infrastructure/tools/
  * Routes tool execution requests and handles follow-up model synthesis.
  */
 export class ToolExecutionRouter {
-  constructor(private mcpManager: IMcpManager) {}
+  public constructor(private readonly mcpManager: IMcpManager) {}
 
-  async handleToolCalls(
-    response: ModelResponse,
-    request: WorkflowRequest,
-    modelRequest: ModelRequest,
-    processModelRequest: (req: ModelRequest) => Promise<ModelResponse>
+  public async handleToolCalls(
+    response: Readonly<ModelResponse>,
+    request: Readonly<WorkflowRequest>,
+    modelRequest: Readonly<ModelRequest>,
+    processModelRequest: (req: Readonly<ModelRequest>) => Promise<ModelResponse>
   ): Promise<ModelResponse> {
     if (!response.toolCalls || response.toolCalls.length === 0) {
       return response;
     }
 
     logger.info(`🔧 AI model made ${response.toolCalls.length} tool calls`);
-    const toolResults: Array<{ id: string; result: any; error?: string }> = [];
+    const toolResults: Array<{ id: string; result: unknown; error?: string }> = [];
 
     for (const toolCall of response.toolCalls) {
-      let parsedArgs;
+      let parsedArgs: Record<string, unknown>;
       try {
-        parsedArgs = JSON.parse(toolCall.function.arguments);
+        parsedArgs = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
       } catch (parseError) {
         logger.error(
           `❌ Failed to parse arguments for tool call ${toolCall.function.name}: ${getErrorMessage(parseError)}. Arguments: ${toolCall.function.arguments}`
@@ -40,7 +40,7 @@ export class ToolExecutionRouter {
         continue;
       }
       try {
-        let toolResult;
+        let toolResult: unknown;
 
         // Try to use EnhancedToolIntegration for caching and performance benefits
         const enhancedIntegration = getGlobalEnhancedToolIntegration();
@@ -121,6 +121,6 @@ export class ToolExecutionRouter {
     logger.info(
       `🔄 Sending ${toolResults.length} tool results back to AI model for synthesis (STRUCTURED)`
     );
-    return await processModelRequest(followUpRequest);
+    return processModelRequest(followUpRequest);
   }
 }

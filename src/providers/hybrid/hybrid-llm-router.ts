@@ -49,14 +49,14 @@ export interface HybridConfig {
 }
 
 export class HybridLLMRouter extends EventEmitter {
-  private config: HybridConfig;
-  private taskHistory: Map<string, RoutingDecision & { actualPerformance: any }> = new Map();
+  private readonly config: HybridConfig;
+  private readonly taskHistory: Map<string, RoutingDecision & { actualPerformance: { success: boolean; responseTime: number; qualityScore?: number; errorType?: string; taskType: string } }> = new Map();
   private currentLoads: { lmStudio: number; ollama: number } = { lmStudio: 0, ollama: 0 };
 
   // PERFORMANCE OPTIMIZATIONS: Caching and metrics
-  private routingDecisionCache: Map<string, { decision: RoutingDecision; timestamp: number }> =
+  private readonly routingDecisionCache: Map<string, { decision: RoutingDecision; timestamp: number }> =
     new Map();
-  private performanceMetrics: Map<string, number[]> = new Map();
+  private readonly performanceMetrics: Map<string, number[]> = new Map();
   private readonly CACHE_TTL = 300000; // 5 minutes
   private readonly MAX_CACHE_SIZE = 1000;
 
@@ -67,7 +67,7 @@ export class HybridLLMRouter extends EventEmitter {
     totalRequests: 0,
   };
 
-  constructor(config: HybridConfig) {
+  public constructor(config: Readonly<HybridConfig>) {
     super();
     this.config = config;
     this.setMaxListeners(20); // Prevent memory leak warnings
@@ -77,10 +77,10 @@ export class HybridLLMRouter extends EventEmitter {
    * Determine which LLM should handle a task based on complexity and current load
    * PERFORMANCE OPTIMIZED: Includes caching and intelligent fallback
    */
-  async routeTask(
-    taskType: string,
-    prompt: string,
-    metrics?: TaskComplexityMetrics
+  public async routeTask(
+    taskType: Readonly<string>,
+    prompt: Readonly<string>,
+    metrics?: Readonly<TaskComplexityMetrics>
   ): Promise<RoutingDecision> {
     try {
       // PERFORMANCE FIX: Check cache first
@@ -113,10 +113,10 @@ export class HybridLLMRouter extends EventEmitter {
         timestamp: Date.now(),
       });
 
-      return loadAdjustedDecision;
+      return await Promise.resolve(loadAdjustedDecision);
     } catch (error) {
       logger.error('Error in task routing:', error);
-      return this.getFailsafeDecision();
+      return Promise.resolve(this.getFailsafeDecision());
     }
   }
 
@@ -126,7 +126,7 @@ export class HybridLLMRouter extends EventEmitter {
   private analyzeTaskComplexity(
     taskType: string,
     prompt: string,
-    metrics?: TaskComplexityMetrics
+    metrics?: Readonly<TaskComplexityMetrics>
   ): number {
     let complexityScore = 0;
 
@@ -292,7 +292,7 @@ export class HybridLLMRouter extends EventEmitter {
   /**
    * Apply contextual adjustments based on historical patterns and system state
    */
-  private applyContextualAdjustments(baseScore: number, taskType: string, prompt: string): number {
+  private applyContextualAdjustments(baseScore: number, taskType: string, _prompt: string): number {
     let adjustedScore = baseScore;
 
     // Time-of-day adjustments (complex tasks might be better suited for specific times)
@@ -562,15 +562,15 @@ export class HybridLLMRouter extends EventEmitter {
   /**
    * Record task performance for learning
    */
-  recordPerformance(
+  public recordPerformance(
     taskId: string,
-    performance: {
+    performance: Readonly<{
       success: boolean;
       responseTime: number;
       qualityScore?: number;
       errorType?: string;
       taskType: string;
-    }
+    }>
   ): void {
     const decision = this.taskHistory.get(taskId);
     if (decision) {
@@ -590,7 +590,7 @@ export class HybridLLMRouter extends EventEmitter {
   /**
    * Update current load tracking
    */
-  updateLoad(llm: 'lm-studio' | 'ollama', delta: number): void {
+  public updateLoad(llm: 'lm-studio' | 'ollama', delta: number): void {
     if (llm === 'lm-studio') {
       this.currentLoads.lmStudio = Math.max(0, this.currentLoads.lmStudio + delta);
     } else {
@@ -633,7 +633,9 @@ export class HybridLLMRouter extends EventEmitter {
   /**
    * Calculate aggregate metrics for a set of history entries
    */
-  private calculateAggregateMetrics(history: any[]) {
+  private calculateAggregateMetrics(
+    history: Array<RoutingDecision & { actualPerformance: { success: boolean; responseTime: number; qualityScore?: number; errorType?: string; taskType: string } }>
+  ) {
     if (history.length === 0) {
       return { successRate: 0, avgResponseTime: 0, sampleSize: 0 };
     }
@@ -714,19 +716,21 @@ export class HybridLLMRouter extends EventEmitter {
   /**
    * PERFORMANCE FIX: Track performance metrics for learning
    */
-  trackPerformance(provider: string, responseTime: number, success: boolean): void {
+  public trackPerformance(provider: string, responseTime: number, success: boolean): void {
     const key = `${provider}_${success ? 'success' : 'failure'}`;
 
     if (!this.performanceMetrics.has(key)) {
       this.performanceMetrics.set(key, []);
     }
 
-    const metrics = this.performanceMetrics.get(key)!;
-    metrics.push(responseTime);
+    const metrics = this.performanceMetrics.get(key);
+    if (metrics) {
+      metrics.push(responseTime);
 
-    // Keep only last 100 measurements
-    if (metrics.length > 100) {
-      metrics.shift();
+      // Keep only last 100 measurements
+      if (metrics.length > 100) {
+        metrics.shift();
+      }
     }
 
     logger.debug(`Performance tracked: ${key} - ${responseTime}ms`);
@@ -735,9 +739,9 @@ export class HybridLLMRouter extends EventEmitter {
   /**
    * Get performance statistics for a provider
    */
-  getPerformanceStats(provider: string): { avgResponseTime: number; successRate: number } {
-    const successMetrics = this.performanceMetrics.get(`${provider}_success`) || [];
-    const failureMetrics = this.performanceMetrics.get(`${provider}_failure`) || [];
+  public getPerformanceStats(provider: string): { avgResponseTime: number; successRate: number } {
+    const successMetrics = this.performanceMetrics.get(`${provider}_success`) ?? [];
+    const failureMetrics = this.performanceMetrics.get(`${provider}_failure`) ?? [];
 
     const totalRequests = successMetrics.length + failureMetrics.length;
     const successRate = totalRequests > 0 ? successMetrics.length / totalRequests : 0;
@@ -752,7 +756,7 @@ export class HybridLLMRouter extends EventEmitter {
   /**
    * Clear performance cache and reset statistics (for memory management)
    */
-  clearCache(): void {
+  public clearCache(): void {
     this.routingDecisionCache.clear();
     this.performanceMetrics.clear();
     this.cacheStats = { hits: 0, misses: 0, totalRequests: 0 };
@@ -762,11 +766,11 @@ export class HybridLLMRouter extends EventEmitter {
   /**
    * Get current cache status with accurate hit rate
    */
-  getCacheStatus(): {
+  public getCacheStatus(): {
     size: number;
     maxSize: number;
     hitRate: number;
-    stats: any;
+    stats: { hits: number; misses: number; totalRequests: number };
   } {
     const hitRate =
       this.cacheStats.totalRequests > 0 ? this.cacheStats.hits / this.cacheStats.totalRequests : 0;
@@ -782,7 +786,7 @@ export class HybridLLMRouter extends EventEmitter {
   /**
    * Destroy router and cleanup resources
    */
-  destroy(): void {
+  public destroy(): void {
     this.removeAllListeners();
     this.taskHistory.clear();
     this.routingDecisionCache.clear();

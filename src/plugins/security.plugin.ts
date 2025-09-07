@@ -9,9 +9,9 @@ export default function createSecurityPlugin(): IPlugin {
       lifecycle: 'both',
       tags: ['security'],
     },
-    async initialize(ctx: PluginContext) {
+    initialize(ctx: Readonly<PluginContext>): void {
       if (ctx.registerCommand) {
-        ctx.registerCommand('security:audit', async () => ({ success: true, issues: [] as any[] }));
+        ctx.registerCommand('security:audit', () => ({ success: true, issues: [] as [] }));
       }
     },
   };

@@ -12,8 +12,9 @@ import { selectVoices } from './voice-selector.js';
 import { CouncilMode, CouncilOrchestrator } from './council-orchestrator.js';
 import {
   VoiceOutput,
-  synthesizePerspectives,
   formatSynthesisResult,
+  synthesizePerspectives,
+  type SynthesisResult,
 } from './perspective-synthesizer.js';
 import { CouncilDecisionEngine } from './collaboration/council-decision-engine.js';
 import { VOICE_GROUPS } from './voice-constants.js';
@@ -32,12 +33,12 @@ export interface VoiceCoordinatorResult {
  */
 export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
   private voices: Map<string, VoiceDefinition> = new Map();
-  private logger: ILogger;
+  private readonly logger: ILogger;
   private council: CouncilOrchestrator;
 
   public constructor(
-    private readonly _modelClient?: IModelClient,
-    logger?: ILogger
+    private readonly _modelClient?: Readonly<IModelClient>,
+    logger?: Readonly<ILogger>
   ) {
     this.logger = logger ?? createLogger('VoiceSystem');
     this.council = new CouncilOrchestrator(new CouncilDecisionEngine(this));
@@ -86,37 +87,40 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
   }
 
   // Interface implementation
-  getAvailableVoices(): string[] {
+  public getAvailableVoices(): string[] {
     return Array.from(this.voices.keys());
   }
 
-  getDefaultVoices(): string[] {
+  public getDefaultVoices(): string[] {
     // Return default voice group for typical operations
     return VOICE_GROUPS.DEFAULT.filter(voice => this.voices.has(voice));
   }
 
-  getVoice(id: string): VoiceDefinition | undefined {
+  public getVoice(id: string): VoiceDefinition | undefined {
     return this.voices.get(id);
   }
 
   // Living Spiral Phase: Council + Synthesis
-  async processPrompt(
+  public async processPrompt(
     prompt: string,
-    options?: { requiredVoices?: string[]; councilMode?: CouncilMode }
+    options?: Readonly<{ requiredVoices?: readonly string[]; councilMode?: CouncilMode }>
   ): Promise<VoiceCoordinatorResult> {
-    const selected = selectVoices(this.voices, options?.requiredVoices, this.logger);
+    const selected = selectVoices(this.voices, options?.requiredVoices ? [...options.requiredVoices] : undefined, this.logger);
 
     // Parallel processing - all voices get perspectives concurrently
     this.logger.debug(`Processing ${selected.length} voices in parallel for synthesis`);
 
-    const perspectivePromises = selected.map(voice =>
+    const perspectivePromises = selected.map(async (voice: Readonly<typeof selected[number]>) =>
       this.getVoicePerspective(voice.id, prompt)
-        .then(perspective => ({ voiceId: voice.id, content: perspective.position }))
-        .catch(error => {
+        .then((perspective: Readonly<{ position: string }>) => ({ voiceId: voice.id, content: perspective.position }))
+        .catch((error: unknown) => {
           this.logger.warn(`Voice ${voice.id} failed during parallel processing:`, error);
+          const errorMsg = (typeof error === 'object' && error !== null && 'message' in error)
+            ? (error as { message?: string }).message
+            : String(error);
           return {
             voiceId: voice.id,
-            content: `${voice.name || voice.id} perspective unavailable due to error: ${error.message || String(error)}`,
+            content: `${voice.name || voice.id} perspective unavailable due to error: ${errorMsg}`,
           };
         })
     );
@@ -129,26 +133,26 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
       content: p.content,
     }));
 
-    const structuredSynthesis = synthesizePerspectives(voiceOutputs);
-    const finalDecision = formatSynthesisResult(structuredSynthesis);
+    const structuredSynthesis: SynthesisResult = synthesizePerspectives(voiceOutputs);
+    const finalDecision: string = formatSynthesisResult(structuredSynthesis);
 
     this.logger.info('Voices synthesized', {
-      voices: selected.map(v => v.id).join(', '),
-      consensusLevel: structuredSynthesis.consensusLevel,
-      totalVoices: structuredSynthesis.totalVoices,
+      voices: selected.map((v: Readonly<typeof selected[number]>) => v.id).join(', '),
+      consensusLevel: typeof structuredSynthesis.consensusLevel === 'number' ? structuredSynthesis.consensusLevel : 0,
+      totalVoices: typeof structuredSynthesis.totalVoices === 'number' ? structuredSynthesis.totalVoices : 0,
     });
 
     // Living Spiral Phase: Rebirth (deliver result) & Reflection (logging above)
     return {
       finalDecision,
-      voicesUsed: selected.map(v => v.id),
-      consensus: structuredSynthesis.consensusLevel,
+      voicesUsed: selected.map((v: Readonly<typeof selected[number]>) => v.id),
+      consensus: typeof structuredSynthesis.consensusLevel === 'number' ? structuredSynthesis.consensusLevel : 0,
       structuredSynthesis,
     };
   }
 
   public async generateMultiVoiceSolutions(
-    voices: string[],
+    voices: readonly string[],
     prompt: string,
     options?: { files?: string[] }
   ): Promise<
@@ -159,7 +163,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
       files: string[];
     }>
   > {
-    const result = await this.processPrompt(prompt, { requiredVoices: voices });
+    const result = await this.processPrompt(prompt, { requiredVoices: [...voices] });
     // Convert single result to array format expected by callers
     return [
       {
@@ -238,12 +242,12 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
 
       return {
         voiceId,
-        position: parsedResponse.position || `${voice.name} perspective on the given topic`,
-        confidence: parsedResponse.confidence || 0.7,
-        reasoning: parsedResponse.reasoning || 'Generated through AI analysis',
-        supportingEvidence: parsedResponse.supportingEvidence || [],
-        concerns: parsedResponse.concerns || [],
-        alternatives: parsedResponse.alternatives || [],
+        position: parsedResponse.position ?? `${voice.name} perspective on the given topic`,
+        confidence: parsedResponse.confidence ?? 0.7,
+        reasoning: parsedResponse.reasoning ?? 'Generated through AI analysis',
+        supportingEvidence: parsedResponse.supportingEvidence ?? [],
+        concerns: parsedResponse.concerns ?? [],
+        alternatives: parsedResponse.alternatives ?? [],
       };
     } catch (error) {
       this.logger.error(`Failed to generate perspective for ${voiceId}:`, error);
@@ -254,7 +258,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
         position: `${voice.name} perspective: ${this.generateStaticPerspective(voice, prompt)}`,
         confidence: 0.4,
         reasoning: `Fallback response due to error: ${error instanceof Error ? error.message : String(error)}`,
-        supportingEvidence: [voice.name + ' archetype expertise'],
+        supportingEvidence: [`${voice.name} archetype expertise`],
         concerns: ['Unable to generate full AI-powered perspective'],
         alternatives: [],
       };
@@ -315,7 +319,7 @@ Respond as ${voice.name} would, focusing on your specialized domain and perspect
 
   private parseVoicePerspectiveResponse(
     response: string,
-    voice: VoiceDefinition
+    _voice: Readonly<VoiceDefinition>
   ): {
     position?: string;
     confidence?: number;
@@ -324,7 +328,14 @@ Respond as ${voice.name} would, focusing on your specialized domain and perspect
     concerns?: string[];
     alternatives?: string[];
   } {
-    const result: any = {};
+    const result: {
+      position?: string;
+      confidence?: number;
+      reasoning?: string;
+      supportingEvidence?: string[];
+      concerns?: string[];
+      alternatives?: string[];
+    } = {};
 
     try {
       // Parse structured response format
@@ -385,24 +396,22 @@ Respond as ${voice.name} would, focusing on your specialized domain and perspect
     return this.council;
   }
 
-  public setLivingSpiralCoordinator(_coordinator: CouncilOrchestrator): void {
+  public setLivingSpiralCoordinator(_coordinator: Readonly<CouncilOrchestrator>): void {
     // Update the council with the provided spiral coordinator
-    this.council = _coordinator;
+    this.council = _coordinator as CouncilOrchestrator;
   }
 
   public async synthesizeMultipleVoices(
     request: string,
-    context: { requiredVoices?: string[]; councilMode?: CouncilMode } = {}
+    context: Readonly<{ requiredVoices?: string[]; councilMode?: CouncilMode }> = {}
   ): Promise<VoiceCoordinatorResult> {
     // Map context to the expected type for processPrompt
     const options: { requiredVoices?: string[]; councilMode?: CouncilMode } = {};
-    if (context && typeof context === 'object') {
-      if (Array.isArray(context.requiredVoices)) {
-        options.requiredVoices = context.requiredVoices;
-      }
-      if (typeof context.councilMode === 'string' || typeof context.councilMode === 'number') {
-        options.councilMode = context.councilMode;
-      }
+    if (Array.isArray(context.requiredVoices)) {
+      options.requiredVoices = context.requiredVoices;
+    }
+    if (typeof context.councilMode === 'string' || typeof context.councilMode === 'number') {
+      options.councilMode = context.councilMode;
     }
     return this.processPrompt(request, options);
   }

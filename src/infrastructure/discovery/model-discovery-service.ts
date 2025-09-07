@@ -7,7 +7,7 @@
  */
 
 import { logger } from '../logging/unified-logger.js';
-import { ProviderType } from '../execution/request-execution-manager.js';
+import { ProviderType } from '../../domain/types/unified-types.js';
 
 export interface ModelInfo {
   name: string;
@@ -48,7 +48,7 @@ export class ModelDiscoveryService {
       includeUnavailable = false,
       timeout = 10000,
       cache = true,
-      providers = ['ollama', 'lm-studio', 'claude', 'huggingface'],
+      providers = ['ollama', 'lm-studio', 'anthropic', 'huggingface'],
     } = options;
 
     const allModels: ModelInfo[] = [];
@@ -354,10 +354,10 @@ export class ModelDiscoveryService {
           lastChecked: new Date(),
         },
       ],
-      claude: [
+      anthropic: [
         {
           name: 'claude-3-sonnet-20240229',
-          provider: 'claude',
+          provider: 'anthropic',
           capabilities: ['chat', 'tool-calling'],
           isAvailable: false,
           lastChecked: new Date(),
@@ -372,7 +372,24 @@ export class ModelDiscoveryService {
           lastChecked: new Date(),
         },
       ],
-      auto: [], // Auto provider doesn't have specific models
+      openai: [
+        {
+          name: 'gpt-4',
+          provider: 'openai',
+          capabilities: ['chat', 'tool-calling', 'code-generation'],
+          isAvailable: false,
+          lastChecked: new Date(),
+        },
+      ],
+      google: [
+        {
+          name: 'gemini-pro',
+          provider: 'google',
+          capabilities: ['chat', 'code-generation'],
+          isAvailable: false,
+          lastChecked: new Date(),
+        },
+      ],
     };
 
     return fallbacks[provider] || [];

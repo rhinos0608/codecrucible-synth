@@ -1,12 +1,12 @@
 import {
-  ProviderAdapter,
-  OllamaAdapter,
-  LMStudioAdapter,
   ClaudeAdapter,
   HuggingFaceAdapter,
+  LMStudioAdapter,
+  OllamaAdapter,
+  ProviderAdapter,
 } from './provider-adapters/index.js';
 
-export type ProviderConfig = {
+export interface ProviderConfig {
   type: 'ollama' | 'lm-studio' | 'claude' | 'huggingface';
   endpoint: string;
   models?: string[];
@@ -16,14 +16,14 @@ export type ProviderConfig = {
   priority?: number;
   timeout?: number;
   apiKey?: string; // Required for claude and huggingface
-};
+}
 
 export function createAdaptersFromProviders(
   providers: Readonly<ProviderConfig[]>
 ): ProviderAdapter[] {
   const adapters: ProviderAdapter[] = [];
   for (const p of providers) {
-    const defaultModel = p.defaultModel || (p.models && p.models[0]) || '';
+    const defaultModel = p.defaultModel || p.models?.[0] || '';
 
     if (p.type === 'ollama') {
       // Ollama can work without a default model - it uses the model from each request

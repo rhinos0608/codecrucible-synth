@@ -220,7 +220,12 @@ export class LMStudioProvider implements LLMProvider {
    * Make a request with full OpenAI-compatible API support including tools
    * This is the preferred method for tool-enabled requests
    */
-  async request(requestOptions: LMStudioRequest): Promise<LLMResponse> {
+  async request(requestOptions: unknown): Promise<unknown> {
+    // Type guard to ensure request is LMStudioRequest
+    if (!requestOptions || typeof requestOptions !== 'object') {
+      throw new Error('Invalid request: expected an object');
+    }
+    const typedRequest = requestOptions as LMStudioRequest;
     const startTime = Date.now();
     this.currentLoad++;
     this.requestCount++;
@@ -228,17 +233,17 @@ export class LMStudioProvider implements LLMProvider {
     try {
       // Build messages from either messages array or prompt
       let messages: LMStudioMessage[];
-      if (requestOptions.messages && Array.isArray(requestOptions.messages)) {
-        messages = requestOptions.messages;
-      } else if (requestOptions.prompt) {
+      if (typedRequest.messages && Array.isArray(typedRequest.messages)) {
+        messages = typedRequest.messages;
+      } else if (typedRequest.prompt) {
         messages = [
           {
             role: 'system' as const,
-            content: this.getSystemPrompt(requestOptions.taskType || 'default'),
+            content: this.getSystemPrompt(typedRequest.taskType || 'default'),
           },
           {
             role: 'user' as const,
-            content: requestOptions.prompt,
+            content: typedRequest.prompt,
           },
         ];
       } else {
@@ -246,29 +251,29 @@ export class LMStudioProvider implements LLMProvider {
       }
 
       const payload: LMStudioPayload = {
-        model: requestOptions.model || this.config.defaultModel,
+        model: typedRequest.model || this.config.defaultModel,
         messages: messages,
         temperature:
-          requestOptions.temperature ?? this.getTemperature(requestOptions.taskType || 'default'),
+          typedRequest.temperature ?? this.getTemperature(typedRequest.taskType || 'default'),
         max_tokens:
-          requestOptions.maxTokens ?? this.getMaxTokens(requestOptions.taskType || 'default'),
+          typedRequest.maxTokens ?? this.getMaxTokens(typedRequest.taskType || 'default'),
         stream: false,
       };
 
       // FIXED: Add tools to payload if provided
       if (
-        requestOptions.tools &&
-        Array.isArray(requestOptions.tools) &&
-        requestOptions.tools.length > 0
+        typedRequest.tools &&
+        Array.isArray(typedRequest.tools) &&
+        typedRequest.tools.length > 0
       ) {
-        payload.tools = requestOptions.tools;
-        payload.tool_choice = requestOptions.tool_choice || 'auto';
+        payload.tools = typedRequest.tools;
+        payload.tool_choice = typedRequest.tool_choice || 'auto';
       }
 
       const controller = new AbortController();
       const timeout = setTimeout(
         () => controller.abort(),
-        requestOptions.timeout || this.config.timeout || 60000
+        typedRequest.timeout || this.config.timeout || 60000
       );
 
       try {
@@ -311,7 +316,7 @@ export class LMStudioProvider implements LLMProvider {
         const confidence = this.calculateConfidence(
           choice.message?.content || '',
           responseTime,
-          requestOptions.taskType
+          typedRequest.taskType
         );
 
         return {

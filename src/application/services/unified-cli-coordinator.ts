@@ -11,7 +11,6 @@ import { performance } from 'perf_hooks';
 import { randomUUID } from 'crypto';
 import {
   IWorkflowOrchestrator,
-  WorkflowContext,
 } from '../../domain/interfaces/workflow-orchestrator.js';
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
@@ -19,8 +18,7 @@ import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { EnterpriseSecurityFramework } from '../../infrastructure/security/enterprise-security-framework.js';
 
 // Import all modular components
-import { SessionManager, CLISession, CLISessionMetrics } from '../cli/session-manager.js';
-import { NaturalLanguageProcessor } from '../cli/natural-language-processor.js';
+import { CLISession, SessionManager } from '../cli/session-manager.js';
 import { WorkflowDisplayManager } from '../cli/workflow-display-manager.js';
 import { MetricsCollector } from '../cli/metrics-collector.js';
 import { UseCaseRouter } from '../cli/use-case-router.js';
@@ -36,13 +34,6 @@ import { setupResilienceEvents } from './cli/resilience-manager.js';
 export type { CLISession, CLISessionMetrics } from '../cli/session-manager.js';
 
 // Define interfaces for backward compatibility
-interface IntelligentCommand {
-  command: string;
-  description: string;
-  examples: string[];
-  contextRelevance: number;
-  suggestedArgs: string[];
-}
 
 interface QuickContextInfo {
   available: boolean;
@@ -69,7 +60,7 @@ export interface UnifiedCLIOptions extends ResilientOptions {
 export interface CLIOperationRequest {
   id: string;
   type: 'prompt' | 'analyze' | 'execute' | 'navigate' | 'suggest';
-  input: string | any;
+  input: unknown;
   options?: UnifiedCLIOptions;
   session?: CLISession;
 }
@@ -77,11 +68,11 @@ export interface CLIOperationRequest {
 export interface CLIOperationResponse {
   id: string;
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: string;
   enhancements?: {
     contextAdded?: boolean;
-    suggestions?: any[];
+    suggestions?: unknown[];
     performanceOptimized?: boolean;
     errorsRecovered?: number;
   };
@@ -95,26 +86,72 @@ export interface CLIOperationResponse {
 /**
  * Unified CLI Coordinator - fully modularized implementation
  */
+interface SystemHealth {
+  isHealthy: boolean;
+  healthScore: number;
+  errorStats?: {
+    recentErrors: number;
+  };
+  [key: string]: unknown;
+}
+
+interface SessionStats {
+  activeSessions: number;
+  totalCommandsExecuted: number;
+  totalErrorsRecovered: number;
+  totalProcessingTime: number;
+}
+
+interface MetricsSummary {
+  totalOperations: number;
+}
+
+interface SystemMetrics {
+  coordinator: {
+    activeSessions: number;
+    operationCount: number;
+    globalMetrics: {
+      commandsExecuted: number;
+      contextEnhancements: number;
+      errorsRecovered: number;
+      totalProcessingTime: number;
+    };
+  };
+  systemHealth: SystemHealth;
+  contextIntelligence: {
+    operations: number;
+    accuracy: number;
+  };
+  performanceOptimization: {
+    operations: number;
+    performance: number;
+  };
+  capabilities: {
+    contextIntelligence?: boolean;
+    performanceOptimization?: boolean;
+    errorResilience?: boolean;
+  };
+}
+
 export class UnifiedCLICoordinator extends EventEmitter {
   private orchestrator!: IWorkflowOrchestrator;
   private userInteraction!: IUserInteraction;
   private eventBus!: IEventBus;
 
   // Security Framework
-  private securityFramework: EnterpriseSecurityFramework;
+  private readonly securityFramework: EnterpriseSecurityFramework;
 
   // Modular Components
-  private sessionManager: SessionManager;
-  private naturalLanguageProcessor: NaturalLanguageProcessor;
-  private workflowDisplayManager: WorkflowDisplayManager;
-  private metricsCollector: MetricsCollector;
-  private useCaseRouter: UseCaseRouter;
-  private resilientWrapper: ResilientCLIWrapper;
+  private readonly sessionManager: SessionManager;
+  private readonly workflowDisplayManager: WorkflowDisplayManager;
+  private readonly metricsCollector: MetricsCollector;
+  private readonly useCaseRouter: UseCaseRouter;
+  private readonly resilientWrapper: ResilientCLIWrapper;
 
-  private defaultOptions: UnifiedCLIOptions;
+  private readonly defaultOptions: UnifiedCLIOptions;
   private isInitialized = false;
 
-  constructor(options: Partial<UnifiedCLIOptions> = {}) {
+  public constructor(readonly options: Readonly<Partial<UnifiedCLIOptions>> = {}) {
     super();
 
     // Initialize Security Framework
@@ -122,21 +159,15 @@ export class UnifiedCLICoordinator extends EventEmitter {
 
     // Initialize Modular Components
     this.sessionManager = new SessionManager({
-      sessionTimeout: options.sessionTimeout || 300000,
-      maxConcurrentSessions: options.maxConcurrentOperations || 10,
-    });
-
-    this.naturalLanguageProcessor = new NaturalLanguageProcessor({
-      enableDeepAnalysis: options.enableContextIntelligence !== false,
-      confidenceThreshold: 0.7,
-      complexityAnalysis: true,
+      sessionTimeout: options.sessionTimeout ?? 300000,
+      maxConcurrentSessions: options.maxConcurrentOperations ?? 10,
     });
 
     this.workflowDisplayManager = new WorkflowDisplayManager({
       enableRealTimeUpdates: true,
       enableStreamingDisplay: true,
       showProgressBars: true,
-      verboseLogging: options.enableContextIntelligence || false,
+      verboseLogging: options.enableContextIntelligence ?? false,
     });
 
     this.metricsCollector = new MetricsCollector({
@@ -168,10 +199,10 @@ export class UnifiedCLICoordinator extends EventEmitter {
   /**
    * Initialize the unified CLI coordinator
    */
-  async initialize(dependencies: {
-    orchestrator: IWorkflowOrchestrator;
-    userInteraction: IUserInteraction;
-    eventBus: IEventBus;
+  public async initialize(dependencies: {
+    readonly orchestrator: IWorkflowOrchestrator;
+    readonly userInteraction: IUserInteraction;
+    readonly eventBus: IEventBus;
   }): Promise<void> {
     try {
       this.orchestrator = dependencies.orchestrator;
@@ -180,7 +211,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
 
       // Initialize modular components
       this.sessionManager.initialize(this.eventBus);
-      await this.useCaseRouter.initialize(this.orchestrator);
+      this.useCaseRouter.initialize(this.orchestrator);
 
       // Initialize resilience policies
       setupResilienceEvents(this.resilientWrapper, this);
@@ -201,7 +232,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
   /**
    * Process a CLI operation using modular components
    */
-  async processOperation(request: CLIOperationRequest): Promise<CLIOperationResponse> {
+  public async processOperation(request: Readonly<CLIOperationRequest>): Promise<CLIOperationResponse> {
     if (!this.isInitialized) {
       throw new Error('CLI Coordinator not initialized. Call initialize() first.');
     }
@@ -258,6 +289,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
           // Convert CLISession to required format for UseCaseRouter
           const routerRequest = {
             ...request,
+            input: typeof request.input === 'string' ? request.input : '',
             session: request.session
               ? {
                   id: request.session.id,
@@ -272,7 +304,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
               : undefined,
           };
 
-          return await this.useCaseRouter.executeOperation(routerRequest);
+          return this.useCaseRouter.executeOperation(routerRequest);
         },
         {
           name: `CLI-${request.type}`,
@@ -355,7 +387,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
   /**
    * Create a new CLI session - delegates to SessionManager
    */
-  async createSession(workingDirectory: string = process.cwd()): Promise<CLISession> {
+  public async createSession(workingDirectory: string = process.cwd()): Promise<CLISession> {
     const session = await this.sessionManager.createSession(workingDirectory);
 
     // Ensure session has all required properties
@@ -365,7 +397,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
     if (!session.context) {
       session.context = {
         sessionId: session.id,
-        workingDirectory: workingDirectory,
+        workingDirectory,
         permissions: ['read', 'write', 'execute'],
         securityLevel: 'medium',
       };
@@ -385,70 +417,27 @@ export class UnifiedCLICoordinator extends EventEmitter {
   /**
    * Get session by ID - delegates to SessionManager
    */
-  getSession(sessionId: string): CLISession | null {
-    return this.sessionManager.getSession(sessionId) || null;
+  public getSession(sessionId: string): CLISession | null {
+    return this.sessionManager.getSession(sessionId) ?? null;
   }
 
   /**
    * Close a session - delegates to SessionManager
    */
-  async closeSession(sessionId: string): Promise<void> {
+  public closeSession(sessionId: string): void {
     this.sessionManager.endSession(sessionId);
-  }
-
-  /**
-   * Get intelligent command suggestions
-   */
-  async getIntelligentCommands(context?: string): Promise<IntelligentCommand[]> {
-    // Return basic commands - this could be enhanced with actual intelligence
-    return [
-      {
-        command: 'analyze',
-        description: 'Analyze code or files',
-        examples: ['analyze src/', 'analyze main.ts'],
-        contextRelevance: 0.8,
-        suggestedArgs: [],
-      },
-      {
-        command: 'generate',
-        description: 'Generate code',
-        examples: ['generate component UserProfile'],
-        contextRelevance: 0.7,
-        suggestedArgs: [],
-      },
-      {
-        command: 'help',
-        description: 'Show help information',
-        examples: ['help'],
-        contextRelevance: 0.6,
-        suggestedArgs: [],
-      },
-    ];
-  }
-
-  /**
-   * Get quick context status
-   */
-  async getQuickContextStatus(): Promise<QuickContextInfo> {
-    return {
-      available: true,
-      basic: {
-        type: 'TypeScript',
-        language: 'TypeScript',
-      },
-      fullLoaded: false,
-      loading: false,
-      confidence: 0.8,
-    };
   }
 
   /**
    * Get system metrics using modular components
    */
-  getSystemMetrics(): any {
-    const systemHealth = this.resilientWrapper.getSystemHealth();
-    const sessionStats = this.sessionManager.getSessionStats();
-    const metricsSummary = this.metricsCollector.getMetricsSummary();
+  public getSystemMetrics(): SystemMetrics {
+    const rawSystemHealth = this.resilientWrapper.getSystemHealth();
+    const sessionStats: SessionStats = this.sessionManager.getSessionStats();
+    const metricsSummary: MetricsSummary = this.metricsCollector.getMetricsSummary();
+
+    // Transform raw system health to expected format
+    const systemHealth: SystemHealth = this.transformSystemHealth(rawSystemHealth);
 
     return {
       coordinator: {
@@ -473,10 +462,74 @@ export class UnifiedCLICoordinator extends EventEmitter {
   }
 
   /**
+   * Transform raw system health data to expected SystemHealth format
+   */
+  private transformSystemHealth(rawHealth: any): SystemHealth {
+    // Handle different possible formats of system health data
+    if (rawHealth && typeof rawHealth === 'object') {
+      const isHealthy = rawHealth.status === 'healthy' || 
+                       rawHealth.isHealthy === true ||
+                       (rawHealth.errorRate !== undefined && rawHealth.errorRate < 0.1);
+      
+      let healthScore: number;
+      if (typeof rawHealth.healthScore === 'number') {
+        healthScore = Math.max(0, Math.min(1, rawHealth.healthScore));
+      } else if (rawHealth.status === 'healthy') {
+        healthScore = 0.9;
+      } else if (rawHealth.status === 'degraded') {
+        healthScore = 0.6;
+      } else if (rawHealth.status === 'critical') {
+        healthScore = 0.3;
+      } else if (typeof rawHealth.recoveryRate === 'number' && typeof rawHealth.errorRate === 'number') {
+        // Calculate health score based on error and recovery rates
+        healthScore = Math.max(0.1, Math.min(1.0, (rawHealth.recoveryRate * 0.7) + ((1 - rawHealth.errorRate) * 0.3)));
+      } else {
+        healthScore = isHealthy ? 0.8 : 0.4;
+      }
+
+      return {
+        isHealthy,
+        healthScore,
+        errorStats: {
+          recentErrors: rawHealth.errorStats?.recentErrors ?? rawHealth.totalErrors ?? 0,
+        },
+        ...rawHealth, // Include any additional properties
+      };
+    }
+
+    // Fallback if no valid health data
+    return {
+      isHealthy: true,
+      healthScore: 0.8,
+      errorStats: {
+        recentErrors: 0,
+      },
+    };
+  }
+
+  /**
+   * Get quick context status
+   */
+  public getQuickContextStatus(): QuickContextInfo {
+    return {
+      available: true,
+      basic: {
+        type: 'TypeScript',
+        language: 'TypeScript',
+      },
+      fullLoaded: false,
+      loading: false,
+      confidence: 0.8,
+    };
+  }
+
+  // Duplicate getSystemMetrics method removed to resolve duplicate implementation error.
+
+  /**
    * Calculate overall system health
    */
   private calculateSystemHealth(): number {
-    const systemHealth = this.resilientWrapper.getSystemHealth();
+    const systemHealth = this.resilientWrapper.getSystemHealth() as SystemHealth;
     const metricsHealth = this.metricsCollector.isSystemHealthy();
 
     let health = 1.0;
@@ -492,15 +545,47 @@ export class UnifiedCLICoordinator extends EventEmitter {
   }
 
   /**
+   * Get intelligent command suggestions based on context
+   */
+  public async getIntelligentCommands(context?: string): Promise<ReadonlyArray<{
+    command: string;
+    description: string;
+    examples: ReadonlyArray<string>;
+    contextRelevance: number;
+  }>> {
+    // Basic implementation - could be enhanced with AI-powered suggestions
+    return [
+      {
+        command: 'analyze',
+        description: 'Analyze code files for patterns and insights',
+        examples: ['analyze src/', 'analyze --type=dependencies'],
+        contextRelevance: context ? 0.8 : 0.5,
+      },
+      {
+        command: 'generate', 
+        description: 'Generate code based on specifications',
+        examples: ['generate component MyComponent', 'generate test MyModule'],
+        contextRelevance: context ? 0.7 : 0.4,
+      },
+      {
+        command: 'status',
+        description: 'Show current system and project status',
+        examples: ['status', 'status --verbose'],
+        contextRelevance: 0.9,
+      },
+    ];
+  }
+
+  /**
    * Shutdown and cleanup all resources
    */
-  async shutdown(): Promise<void> {
+  public shutdown(): void {
     logger.info('Shutting down UnifiedCLICoordinator');
 
     // Shutdown all modular components
-    await this.sessionManager.shutdown();
-    await this.workflowDisplayManager.shutdown();
-    await this.metricsCollector.shutdown();
+    this.sessionManager.shutdown();
+    this.workflowDisplayManager.shutdown();
+    this.metricsCollector.shutdown();
     this.resilientWrapper.shutdown();
 
     // Remove all listeners

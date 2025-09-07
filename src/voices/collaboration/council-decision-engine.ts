@@ -90,17 +90,13 @@ export class CouncilDecisionEngine extends EventEmitter {
       // Collect perspectives from all voices in parallel with timeout
       this.logger.debug(`Collecting perspectives from ${voices.length} voices in parallel`);
 
-      const perspectivePromises = voices.map(voiceId =>
+      const perspectivePromises = voices.map(async (voiceId: Readonly<string>) =>
         Promise.race([
           this.voiceSystem
-            .getVoicePerspective(voiceId, prompt)
-            .then(perspective => perspective as VoicePerspective),
-          new Promise<null>((_, reject) =>
-            setTimeout(
-              () => reject(new Error(`Voice ${voiceId} timed out`)),
-              config.timeoutMs / voices.length
-            )
-          ),
+            .getVoicePerspective(voiceId, prompt),
+          new Promise<null>((_, reject) => {
+            setTimeout(() => { reject(new Error(`Voice ${voiceId} timed out`)); }, config.timeoutMs / voices.length);
+          }),
         ]).catch(error => {
           this.logger.warn(`Failed to get perspective from voice ${voiceId}:`, error);
           return null; // Return null for failed perspectives, filter out later
@@ -108,7 +104,7 @@ export class CouncilDecisionEngine extends EventEmitter {
       );
 
       const perspectiveResults = await Promise.all(perspectivePromises);
-      const perspectives = perspectiveResults.filter(p => p !== null) as VoicePerspective[];
+      const perspectives = perspectiveResults.filter((p): p is VoicePerspective => p !== null);
 
       // Apply consensus threshold from configuration
       const consensusLevel = this.calculateConsensus(perspectives);
@@ -148,22 +144,22 @@ export class CouncilDecisionEngine extends EventEmitter {
   }
 
   private synthesizeDecisionWithConfig(
-    perspectives: VoicePerspective[],
-    config: CouncilConfig
+    perspectives: ReadonlyArray<VoicePerspective>,
+    config: Readonly<CouncilConfig>
   ): string {
     switch (config.mode) {
       case CouncilMode.COLLABORATIVE:
         return this.synthesizeCollaboratively(perspectives);
       case CouncilMode.DEBATE:
-        return this.synthesizeFromDebate(perspectives);
+        return this.synthesizeFromDebate([...perspectives]);
       case CouncilMode.CONSENSUS:
-        return this.synthesizeWithConsensus(perspectives, config.consensusThreshold);
+        return this.synthesizeWithConsensus([...perspectives], config.consensusThreshold);
       default:
-        return this.synthesizeDecision(perspectives); // Fallback to simple synthesis
+        return this.synthesizeDecision([...perspectives]); // Fallback to simple synthesis
     }
   }
 
-  private synthesizeCollaboratively(perspectives: VoicePerspective[]): string {
+  private synthesizeCollaboratively(perspectives: ReadonlyArray<VoicePerspective>): string {
     // Combine perspectives in a collaborative manner - enhance with better synthesis logic
     const positions = perspectives.map(p => p.position);
     const reasoning = perspectives.map(p => p.reasoning).filter(r => r.trim().length > 0);
@@ -193,7 +189,8 @@ export class CouncilDecisionEngine extends EventEmitter {
     const consensusViews = perspectives.filter(p => p.confidence >= threshold);
 
     if (consensusViews.length === 0) {
-      const fallback = perspectives.sort((a, b) => b.confidence - a.confidence)[0];
+      const [fallback] = perspectives
+        .sort((a: Readonly<VoicePerspective>, b: Readonly<VoicePerspective>) => b.confidence - a.confidence);
       return `No consensus reached (threshold: ${threshold}). Highest confidence perspective from ${fallback?.voiceId || 'unknown'}: ${fallback?.position || 'No perspectives available'}`;
     }
 

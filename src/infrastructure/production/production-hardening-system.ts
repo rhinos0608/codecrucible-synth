@@ -16,17 +16,14 @@
 
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
-import { promises as fs } from 'fs';
-import * as path from 'path';
 import { logger } from '../logging/logger.js';
 import {
-  TimeoutManager,
   TimeoutLevel,
+  TimeoutManager,
   TimeoutStrategy,
 } from '../error-handling/timeout-manager.js';
 import { CircuitBreakerManager } from '../error-handling/circuit-breaker-system.js';
 import { ObservabilitySystem } from '../observability/observability-system.js';
-import { globalRateLimitManager } from '../networking/rate-limiting-system.js';
 
 // Production Hardening Configuration
 export interface ProductionHardeningConfig {
@@ -160,7 +157,7 @@ export interface ProductionAlert {
   level: 'info' | 'warning' | 'error' | 'critical';
   category: 'resource' | 'security' | 'performance' | 'reliability' | 'system';
   message: string;
-  details: any;
+  details: unknown;
   action?: string;
   resolved?: boolean;
   resolvedAt?: number;
@@ -175,31 +172,30 @@ export interface ProductionAlert {
 export class ProductionHardeningSystem extends EventEmitter {
   private static instance: ProductionHardeningSystem | null = null;
 
-  private config: ProductionHardeningConfig;
-  private stats: ProductionStats;
+  private readonly config: ProductionHardeningConfig;
+  private readonly stats: ProductionStats;
   private alerts: ProductionAlert[] = [];
   private isRunning: boolean = false;
-  private startTime: number;
+  private readonly startTime: number;
 
   // Core Components
-  private timeoutManager: TimeoutManager;
-  private circuitBreakerManager: CircuitBreakerManager;
-  private observabilitySystem: ObservabilitySystem;
-  private resourceMonitor: ResourceMonitor;
-  private securityHardener: SecurityHardener;
-  private errorRecoverySystem: ErrorRecoverySystem;
-  private performanceProtector: PerformanceProtector;
-  private shutdownHandler: GracefulShutdownHandler;
+  private readonly timeoutManager: TimeoutManager;
+  private readonly circuitBreakerManager: CircuitBreakerManager;
+  private readonly observabilitySystem: ObservabilitySystem;
+  private readonly resourceMonitor: ResourceMonitor;
+  private readonly securityHardener: SecurityHardener;
+  private readonly errorRecoverySystem: ErrorRecoverySystem;
+  private readonly performanceProtector: PerformanceProtector;
+  private readonly shutdownHandler: GracefulShutdownHandler;
 
   // Monitoring Intervals
   private monitoringIntervals: NodeJS.Timeout[] = [];
 
   // Operational State
-  private operationQueue: OperationRequest[] = [];
-  private activeOperations = new Map<string, OperationContext>();
+  private readonly activeOperations = new Map<string, OperationContext>();
   private performanceHistory: PerformanceMetric[] = [];
 
-  private constructor(config?: Partial<ProductionHardeningConfig>) {
+  private constructor(config?: Readonly<Partial<ProductionHardeningConfig>>) {
     super();
 
     this.config = this.createDefaultConfig(config);
@@ -209,7 +205,7 @@ export class ProductionHardeningSystem extends EventEmitter {
     // Initialize core components
     this.timeoutManager = TimeoutManager.getInstance();
     this.circuitBreakerManager = CircuitBreakerManager.getInstance();
-    this.observabilitySystem = new ObservabilitySystem(this.createObservabilityConfig());
+    this.observabilitySystem = new ObservabilitySystem(this.createObservabilityConfig() as import('../observability/observability-system.js').ObservabilityConfig);
     this.resourceMonitor = new ResourceMonitor(this.config.resourceLimits, this);
     this.securityHardener = new SecurityHardener(this.config.security, this);
     this.errorRecoverySystem = new ErrorRecoverySystem(this.config.errorRecovery, this);
@@ -225,7 +221,7 @@ export class ProductionHardeningSystem extends EventEmitter {
     });
   }
 
-  static getInstance(config?: Partial<ProductionHardeningConfig>): ProductionHardeningSystem {
+  public static getInstance(config?: Readonly<Partial<ProductionHardeningConfig>>): ProductionHardeningSystem {
     if (!ProductionHardeningSystem.instance) {
       ProductionHardeningSystem.instance = new ProductionHardeningSystem(config);
     }
@@ -235,7 +231,7 @@ export class ProductionHardeningSystem extends EventEmitter {
   /**
    * Initialize the production hardening system
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     if (this.isRunning) {
       logger.warn('Production hardening system already running');
       return;
@@ -271,10 +267,10 @@ export class ProductionHardeningSystem extends EventEmitter {
   /**
    * Execute operation with comprehensive production hardening
    */
-  async executeWithHardening<T>(
+  public async executeWithHardening<T>(
     operationId: string,
     operation: () => Promise<T>,
-    options: {
+    options: Readonly<{
       timeout?: number;
       priority?: 'low' | 'medium' | 'high' | 'critical';
       retries?: number;
@@ -283,16 +279,16 @@ export class ProductionHardeningSystem extends EventEmitter {
         memory?: number;
         cpu?: number;
       };
-      metadata?: any;
-    } = {}
+      metadata?: Record<string, unknown>;
+    }> = {}
   ): Promise<T> {
     const startTime = performance.now();
     const context: OperationContext = {
       id: operationId,
       startTime,
-      priority: options.priority || 'medium',
-      metadata: options.metadata || {},
-      resourceRequirements: options.resourceRequirements || {},
+      priority: options.priority ?? 'medium',
+      metadata: options.metadata ?? {},
+      resourceRequirements: options.resourceRequirements ?? {},
       status: 'starting',
     };
 
@@ -340,15 +336,15 @@ export class ProductionHardeningSystem extends EventEmitter {
   /**
    * Get comprehensive production statistics
    */
-  getProductionStats(): ProductionStats {
-    const currentStats = { ...this.stats };
+  public getProductionStats(): ProductionStats {
+    const currentStats: ProductionStats = { ...this.stats };
 
     // Update real-time metrics
     currentStats.uptime = Date.now() - this.startTime;
-    currentStats.resourceUsage = this.resourceMonitor.getCurrentUsage();
-    currentStats.security = this.securityHardener.getSecurityStats();
-    currentStats.reliability = this.getReliabilityStats();
-    currentStats.performance = this.performanceProtector.getPerformanceStats();
+    currentStats.resourceUsage = this.resourceMonitor.getCurrentUsage() as ProductionStats['resourceUsage'];
+    currentStats.security = this.securityHardener.getSecurityStats() as ProductionStats['security'];
+    currentStats.reliability = this.getReliabilityStats() as ProductionStats['reliability'];
+    currentStats.performance = this.performanceProtector.getPerformanceStats() as ProductionStats['performance'];
 
     return currentStats;
   }
@@ -356,16 +352,16 @@ export class ProductionHardeningSystem extends EventEmitter {
   /**
    * Get active production alerts
    */
-  getActiveAlerts(): ProductionAlert[] {
-    return this.alerts.filter(alert => !alert.resolved);
+  public getActiveAlerts(): ProductionAlert[] {
+    return this.alerts.filter((alert: Readonly<ProductionAlert>) => !alert.resolved);
   }
 
   /**
    * Create production health report
    */
-  async getHealthReport(): Promise<ProductionHealthReport> {
+  public async getHealthReport(): Promise<ProductionHealthReport> {
     const stats = this.getProductionStats();
-    const systemHealth = await this.observabilitySystem.checkHealth();
+    const systemHealth = await this.observabilitySystem.getSystemHealth();
     const resourceHealth = this.resourceMonitor.getHealthStatus();
     const securityHealth = this.securityHardener.getSecurityHealth();
 
@@ -383,10 +379,10 @@ export class ProductionHardeningSystem extends EventEmitter {
 
       components: {
         system: systemHealth,
-        resources: resourceHealth,
-        security: securityHealth,
-        performance: this.performanceProtector.getHealthStatus(),
-        reliability: this.getReliabilityHealth(),
+        resources: resourceHealth as { status: string; score: number },
+        security: securityHealth as { score: number },
+        performance: this.performanceProtector.getHealthStatus() as { status: string; score: number },
+        reliability: this.getReliabilityHealth() as { status: string; errorRate: number; stats: any },
       },
 
       metrics: stats,
@@ -398,7 +394,7 @@ export class ProductionHardeningSystem extends EventEmitter {
   /**
    * Trigger emergency measures for critical situations
    */
-  async triggerEmergencyMode(reason: string): Promise<void> {
+  public async triggerEmergencyMode(reason: string): Promise<void> {
     logger.error(`🚨 EMERGENCY MODE TRIGGERED: ${reason}`);
 
     const alert: ProductionAlert = {
@@ -433,7 +429,7 @@ export class ProductionHardeningSystem extends EventEmitter {
   /**
    * Graceful shutdown of the production hardening system
    */
-  async shutdown(): Promise<void> {
+  public async shutdown(): Promise<void> {
     if (!this.isRunning) return;
 
     logger.info('🛑 Shutting down Production Hardening System...');
@@ -480,16 +476,18 @@ export class ProductionHardeningSystem extends EventEmitter {
     if (options.circuitBreaker) {
       const circuitBreaker = this.circuitBreakerManager.getCircuitBreaker(
         `operation_${context.id}`,
-        () => timeoutPromise,
         {
-          name: context.id,
           failureThreshold: 5,
           recoveryTimeout: 30000,
           timeout: options.timeout || this.config.timeouts.operation,
-          maxRetries: options.retries || this.config.errorRecovery.maxRetries,
-          backoffMultiplier: this.config.errorRecovery.retryBackoffMultiplier,
-          maxBackoffTime: this.config.errorRecovery.maxBackoffTime,
-          fallbackEnabled: this.config.errorRecovery.fallbackModeEnabled,
+          successThreshold: 3,
+          operationTimeout: options.timeout || this.config.timeouts.operation,
+          onStateChange: (state, breaker) => {
+            logger.info(`Circuit breaker ${breaker} state changed to ${state}`);
+          },
+          onFailure: (error, breaker) => {
+            logger.warn(`Circuit breaker ${breaker} failure:`, error.message);
+          },
         }
       );
 

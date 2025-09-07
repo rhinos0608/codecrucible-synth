@@ -9,9 +9,9 @@ export default function createVoicePlugin(): IPlugin {
       lifecycle: 'both',
       tags: ['voice'],
     },
-    async initialize(ctx: PluginContext) {
+    initialize(ctx: Readonly<PluginContext>): void {
       if (ctx.registerCommand) {
-        ctx.registerCommand('voice:list-voices', async () => ({ voices: [] as any[] }));
+        ctx.registerCommand('voice:list-voices', () => ({ voices: [] as string[] }));
       }
     },
   };

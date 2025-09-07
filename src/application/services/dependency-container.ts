@@ -7,12 +7,12 @@
 
 import { IWorkflowOrchestrator } from '../../domain/interfaces/workflow-orchestrator.js';
 import {
-  IAnalyzeFileUseCase,
-  IGenerateCodeUseCase,
-  IAnalyzeDirectoryUseCase,
+  AnalyzeDirectoryUseCase,
   AnalyzeFileUseCase,
   GenerateCodeUseCase,
-  AnalyzeDirectoryUseCase,
+  IAnalyzeDirectoryUseCase,
+  IAnalyzeFileUseCase,
+  IGenerateCodeUseCase,
 } from '../use-cases/index.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 
@@ -29,7 +29,7 @@ export class DependencyContainer {
   /**
    * Initialize the container with required dependencies
    */
-  initialize(orchestrator: IWorkflowOrchestrator): void {
+  public initialize(orchestrator: Readonly<IWorkflowOrchestrator>): void {
     this._orchestrator = orchestrator;
     this._useCases = this.createUseCases();
     logger.info('Dependency container initialized');
@@ -38,7 +38,7 @@ export class DependencyContainer {
   /**
    * Get the workflow orchestrator
    */
-  get orchestrator(): IWorkflowOrchestrator {
+  public get orchestrator(): IWorkflowOrchestrator {
     if (!this._orchestrator) {
       throw new Error('Dependency container not initialized. Call initialize() first.');
     }
@@ -48,7 +48,7 @@ export class DependencyContainer {
   /**
    * Get all use cases
    */
-  get useCases(): UseCaseDependencies {
+  public get useCases(): UseCaseDependencies {
     if (!this._useCases) {
       throw new Error('Dependency container not initialized. Call initialize() first.');
     }
@@ -58,21 +58,21 @@ export class DependencyContainer {
   /**
    * Get analyze file use case
    */
-  get analyzeFileUseCase(): IAnalyzeFileUseCase {
+  public get analyzeFileUseCase(): IAnalyzeFileUseCase {
     return this.useCases.analyzeFileUseCase;
   }
 
   /**
    * Get generate code use case
    */
-  get generateCodeUseCase(): IGenerateCodeUseCase {
+  public get generateCodeUseCase(): IGenerateCodeUseCase {
     return this.useCases.generateCodeUseCase;
   }
 
   /**
    * Get analyze directory use case
    */
-  get analyzeDirectoryUseCase(): IAnalyzeDirectoryUseCase {
+  public get analyzeDirectoryUseCase(): IAnalyzeDirectoryUseCase {
     return this.useCases.analyzeDirectoryUseCase;
   }
 
@@ -94,14 +94,14 @@ export class DependencyContainer {
   /**
    * Check if container is initialized
    */
-  get isInitialized(): boolean {
+  public get isInitialized(): boolean {
     return !!(this._orchestrator && this._useCases);
   }
 
   /**
    * Clear all dependencies (for cleanup)
    */
-  cleanup(): void {
+  public cleanup(): void {
     this._orchestrator = undefined;
     this._useCases = undefined;
     logger.info('Dependency container cleaned up');
@@ -109,7 +109,7 @@ export class DependencyContainer {
 }
 
 // Singleton instance
-let containerInstance: DependencyContainer;
+let containerInstance: DependencyContainer | undefined;
 
 /**
  * Get the global dependency container instance
@@ -125,7 +125,7 @@ export function getDependencyContainer(): DependencyContainer {
  * Initialize the global dependency container
  */
 export function initializeDependencyContainer(
-  orchestrator: IWorkflowOrchestrator
+  orchestrator: Readonly<IWorkflowOrchestrator>
 ): DependencyContainer {
   const container = getDependencyContainer();
   container.initialize(orchestrator);

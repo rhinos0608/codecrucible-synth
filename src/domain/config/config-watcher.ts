@@ -1,29 +1,28 @@
-import { watch, FSWatcher } from 'fs';
+import { FSWatcher, watch } from 'fs';
 
 export class ConfigWatcher {
   private watcher?: FSWatcher;
 
-  constructor(
-    private filePath: string,
-    private onChange: () => Promise<void>
+  public constructor(
+    private readonly filePath: string,
+    private readonly onChange: () => Promise<void>
   ) {}
 
-  start(): void {
+  public start(): void {
     if (this.watcher) return;
 
-    this.watcher = watch(this.filePath, async eventType => {
+    this.watcher = watch(this.filePath, eventType => {
       if (eventType === 'change') {
-        try {
-          await this.onChange();
-        } catch (error) {
-          console.error('Error in ConfigWatcher onChange callback:', error);
-        }
+        this.onChange()
+          .catch(error => {
+            console.error('Error in ConfigWatcher onChange callback:', error);
+          });
       }
     });
   }
 
-  stop(): void {
-    this.watcher?.close();
-    this.watcher = undefined;
+    public stop(): void {
+      this.watcher?.close();
+      this.watcher = undefined;
+    }
   }
-}

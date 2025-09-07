@@ -9,7 +9,7 @@ export class ToolOrchestrator {
   }
 
   async executeWorkflow(
-    steps: WorkflowStep[],
+    steps: ReadonlyArray<Readonly<WorkflowStep<Readonly<Record<string, unknown>>>>>,
     context: ToolExecutionContext
   ): Promise<WorkflowResult> {
     return this.engine.run(steps, context);

@@ -582,7 +582,7 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
   /**
    * Check if convergence has been achieved
    */
-  async checkConvergence(results: any[]): Promise<boolean> {
+  async checkConvergence(results: ReadonlyArray<unknown>): Promise<boolean> {
     if (results.length === 0) return false;
 
     const qualities = results.map((r: any) => r.quality || 0);

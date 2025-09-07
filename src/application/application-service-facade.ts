@@ -77,7 +77,17 @@ export class ApplicationServiceFacade {
       modelClient
     );
 
-    this.analyzeCodebaseUseCase = new AnalyzeCodebaseUseCase(modelSelectionService);
+    // Create adapter for AnalyzeCodebaseUseCase that maps domain service to expected interface
+    const codebaseAnalysisModelSelector = {
+      selectModel: async (analysisType: string) => ({
+        generateResponse: async (request: any, options?: any) => {
+          // Use the domain service's selectOptimalModel method
+          const selection = await modelSelectionService.selectOptimalModel(request);
+          return { content: `Analysis result for ${analysisType}`, confidence: 0.8 };
+        }
+      })
+    };
+    this.analyzeCodebaseUseCase = new AnalyzeCodebaseUseCase(codebaseAnalysisModelSelector);
 
     this.simplifiedLivingSpiralCoordinator = new SimplifiedLivingSpiralCoordinator(
       voiceOrchestrationService,

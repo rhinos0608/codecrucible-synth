@@ -50,34 +50,25 @@ export interface SelectionResult {
 }
 
 export interface IProviderSelectionStrategy {
-  selectProvider(context: SelectionContext): SelectionResult;
-  createFallbackChain(primaryProvider: ProviderType, context: SelectionContext): ProviderType[];
-  validateProviderForContext(provider: ProviderType, context: SelectionContext): boolean;
+  selectProvider: (context: Readonly<SelectionContext>) => SelectionResult;
+  createFallbackChain: (primaryProvider: ProviderType, context: Readonly<SelectionContext>) => ProviderType[];
+  validateProviderForContext: (provider: ProviderType, context: Readonly<SelectionContext>) => boolean;
 }
 
 export class ProviderSelectionStrategy extends EventEmitter implements IProviderSelectionStrategy {
-  private readonly config: ProviderSelectionConfig;
-  private readonly performanceMonitor: PerformanceMonitor;
-  private readonly registry: ProviderRegistry;
-  private readonly capabilityDiscovery: IProviderCapabilityDiscovery;
-
-  constructor(
-    config: ProviderSelectionConfig,
-    performanceMonitor: PerformanceMonitor,
-    registry: ProviderRegistry,
-    capabilityDiscovery: IProviderCapabilityDiscovery
+  public constructor(
+    public readonly config: ProviderSelectionConfig,
+    public readonly performanceMonitor: PerformanceMonitor,
+    public readonly registry: ProviderRegistry,
+    public readonly capabilityDiscovery: IProviderCapabilityDiscovery
   ) {
     super();
-    this.config = config;
-    this.performanceMonitor = performanceMonitor;
-    this.registry = registry;
-    this.capabilityDiscovery = capabilityDiscovery;
   }
 
   /**
    * Select optimal provider based on context and strategy
    */
-  selectProvider(context: SelectionContext): SelectionResult {
+  public selectProvider(context: Readonly<SelectionContext>): SelectionResult {
     logger.debug('Selecting provider with context:', context);
 
     let selectedProvider: ProviderType;
@@ -117,17 +108,20 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
           confidence = 0.8;
           break;
 
-        case 'adaptive':
-          const adaptiveResult = this.selectAdaptiveProvider(context);
-          selectedProvider = adaptiveResult.provider;
-          reason = adaptiveResult.reason;
-          confidence = adaptiveResult.confidence;
+        case 'adaptive': {
+          const { provider, reason: adaptiveReason, confidence: adaptiveConfidence } = this.selectAdaptiveProvider(context);
+          selectedProvider = provider;
+          reason = adaptiveReason;
+          confidence = adaptiveConfidence;
           break;
+        }
 
-        default:
-          selectedProvider = this.registry.getFallbackChain()[0];
+        default: {
+          const [firstProvider] = this.registry.getFallbackChain();
+          selectedProvider = firstProvider;
           reason = 'Default fallback provider';
           confidence = 0.6;
+        }
       }
     }
 
@@ -264,7 +258,7 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
   /**
    * Get current selection metrics
    */
-  getSelectionMetrics(): unknown {
+  public getSelectionMetrics(): unknown {
     return {
       strategy: this.config.selectionStrategy,
       fallbackChain: this.registry.getFallbackChain(),
@@ -275,7 +269,7 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
   /**
    * Update selection strategy
    */
-  updateStrategy(strategy: ProviderSelectionConfig['selectionStrategy']): void {
+  public updateStrategy(strategy: ProviderSelectionConfig['selectionStrategy']): void {
     logger.info(`Updating provider selection strategy to: ${strategy}`);
     this.config.selectionStrategy = strategy;
     this.emit('strategyUpdated', { strategy });
@@ -284,9 +278,9 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
   /**
    * Update fallback chain
    */
-  updateFallbackChain(fallbackChain: ProviderType[]): void {
+  public updateFallbackChain(fallbackChain: readonly ProviderType[]): void {
     logger.info(`Updating fallback chain to: ${fallbackChain.join(' -> ')}`);
-    this.registry.setFallbackChain(fallbackChain);
+    this.registry.setFallbackChain(fallbackChain as ProviderType[]);
     this.emit('fallbackChainUpdated', { fallbackChain });
   }
 }

@@ -239,8 +239,8 @@ export async function createTestOrchestrationService(config: ServiceFactoryConfi
  * Migration helper: Create service with RuntimeContext for existing code
  */
 export async function migrateToRuntimeContext(
-  existingService: UnifiedOrchestrationService,
-  config: ServiceFactoryConfig = {}
+  existingService: Readonly<UnifiedOrchestrationService>,
+  config: Readonly<ServiceFactoryConfig> = {}
 ): Promise<{
   newService: UnifiedOrchestrationService;
   factory: ServiceFactory;

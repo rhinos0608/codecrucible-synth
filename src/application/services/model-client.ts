@@ -1,20 +1,20 @@
 import { EventEmitter } from 'events';
 import {
   IModelClient,
+  ModelInfo,
   ModelRequest,
   ModelResponse,
   StreamToken,
-  ModelInfo,
 } from '../../domain/interfaces/model-client.js';
 import { ProviderAdapter } from './provider-adapters/index.js';
-import { RequestProcessor, BasicRequestProcessor } from './request-processor.js';
-import { ResponseHandler, BasicResponseHandler } from './response-handler.js';
+import { BasicRequestProcessor, RequestProcessor } from './request-processor.js';
+import { BasicResponseHandler, ResponseHandler } from './response-handler.js';
 import { IStreamingManager, StreamingManager } from './streaming-manager.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { logger as defaultLogger } from '../../infrastructure/logging/unified-logger.js';
 import {
-  enterpriseErrorHandler,
   EnterpriseErrorHandler,
+  enterpriseErrorHandler,
 } from '../../infrastructure/error-handling/enterprise-error-handler.js';
 import {
   ErrorCategory,
@@ -24,7 +24,7 @@ import {
 export interface ModelClientOptions {
   adapters: ProviderAdapter[];
   defaultProvider?: string;
-  providers?: any[];
+  providers?: ProviderAdapter[];
   fallbackStrategy?: string;
   executionMode?: string;
   fallbackChain?: string[];
@@ -56,15 +56,15 @@ export interface ModelClientOptions {
 }
 
 export class ModelClient extends EventEmitter implements IModelClient {
-  private adapters: Map<string, ProviderAdapter>;
-  private requestProcessor: RequestProcessor;
-  private responseHandler: ResponseHandler;
-  private streamingManager: IStreamingManager;
-  private logger: ILogger;
+  private readonly adapters: Map<string, ProviderAdapter>;
+  private readonly requestProcessor: RequestProcessor;
+  private readonly responseHandler: ResponseHandler;
+  private readonly streamingManager: IStreamingManager;
+  private readonly logger: ILogger;
 
-  constructor(options: ModelClientOptions) {
+  public constructor(options: Readonly<ModelClientOptions>) {
     super();
-    this.adapters = new Map(options.adapters.map(a => [a.name, a]));
+    this.adapters = new Map((options.adapters as readonly ProviderAdapter[]).map(a => [a.name, a]));
     this.requestProcessor = options.requestProcessor ?? new BasicRequestProcessor();
     this.responseHandler = options.responseHandler ?? new BasicResponseHandler();
     this.streamingManager = options.streamingManager ?? new StreamingManager();
@@ -96,7 +96,7 @@ export class ModelClient extends EventEmitter implements IModelClient {
             context: { configuredProviders: 0, systemPhase: 'initialization' },
           }
         );
-        throw error;
+        throw new Error(error.message);
       }
       this.logger.debug(`🔧 Using fallback adapter: ${first.name}`);
       return first;
@@ -104,7 +104,12 @@ export class ModelClient extends EventEmitter implements IModelClient {
 
     // If specific provider requested, fail fast if not found
     if (this.adapters.has(name)) {
-      return this.adapters.get(name)!;
+      const adapter = this.adapters.get(name);
+      if (adapter) {
+        return adapter;
+      } else {
+        throw new Error(`Provider adapter '${name}' is undefined.`);
+      }
     }
 
     // Fail fast instead of silent fallback
@@ -123,10 +128,10 @@ export class ModelClient extends EventEmitter implements IModelClient {
         },
       }
     );
-    throw error;
+    throw new Error(error.message);
   }
 
-  async request(request: ModelRequest): Promise<ModelResponse> {
+  public async request(request: Readonly<ModelRequest>): Promise<ModelResponse> {
     try {
       const processed = this.requestProcessor.process(request);
       const adapter = this.getAdapter(processed.provider);
@@ -139,20 +144,21 @@ export class ModelClient extends EventEmitter implements IModelClient {
         resource: 'ai_provider',
         context: {
           modelName: request.model,
-          promptLength: request.prompt?.length || 0,
+          promptLength: request.prompt.length || 0,
           provider: 'unknown',
         },
       });
 
       // Always throw the structured error to prevent undefined returns
-      throw structuredError;
+      throw new Error(structuredError.message);
     }
   }
 
-  async generate(prompt: string, options: any = {}): Promise<string> {
+  public async generate(prompt: string, options: Partial<ModelRequest> = {}): Promise<string> {
     try {
-      const response = await this.request({ prompt, ...options });
-      return response?.content || '';
+      const requestObj: Readonly<ModelRequest> = { prompt, ...options };
+      const response = await this.request(requestObj);
+      return response.content || '';
     } catch (err) {
       // Use enterprise error handler for generation failures
       const structuredError = await enterpriseErrorHandler.handleEnterpriseError(err as Error, {
@@ -172,24 +178,27 @@ export class ModelClient extends EventEmitter implements IModelClient {
         retryable: structuredError.retryable,
       });
 
-      throw structuredError;
+      throw new Error(structuredError.message);
     }
   }
 
-  async *stream(request: ModelRequest): AsyncIterableIterator<StreamToken> {
+  public async *stream(request: Readonly<ModelRequest>): AsyncIterableIterator<StreamToken> {
     const processed = this.requestProcessor.process(request);
     const adapter = this.getAdapter(processed.provider);
-    for await (const token of this.streamingManager.stream(adapter, processed)) {
+    for await (const tokenRaw of this.streamingManager.stream(adapter, processed)) {
+      const token: StreamToken = tokenRaw as StreamToken;
       yield {
         ...token,
-        isComplete: token.isComplete ?? false,
-        index: token.index ?? 0,
-        timestamp: token.timestamp ?? Date.now(),
+        // Safely assign isComplete if it exists, otherwise default to false
+        isComplete: typeof token.isComplete === 'boolean' ? token.isComplete : false,
+        // index and timestamp are assumed to exist on StreamToken, so no need for nullish coalescing
+        index: token.index,
+        timestamp: token.timestamp,
       };
     }
   }
 
-  async getAvailableModels(): Promise<ModelInfo[]> {
+  public async getAvailableModels(): Promise<ModelInfo[]> {
     const models: ModelInfo[] = [];
     for (const adapter of this.adapters.values()) {
       const list = adapter.getModels ? await adapter.getModels() : [];
@@ -200,33 +209,35 @@ export class ModelClient extends EventEmitter implements IModelClient {
     return models;
   }
 
-  async isHealthy(): Promise<boolean> {
-    return true;
+  public async isHealthy(): Promise<boolean> {
+    return Promise.resolve(true);
   }
 
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     this.logger.info('ModelClient initialized');
+    await Promise.resolve();
   }
 
-  async shutdown(): Promise<void> {
+  public async shutdown(): Promise<void> {
     this.logger.info('ModelClient shutdown');
+    await Promise.resolve();
   }
 
-  async destroy(): Promise<void> {
+  public async destroy(): Promise<void> {
     await this.shutdown();
   }
 
   // Core interfaces compatibility methods
-  async processRequest(request: ModelRequest, context?: any): Promise<ModelResponse> {
+  public async processRequest(request: Readonly<ModelRequest>, _context?: Readonly<unknown>): Promise<ModelResponse> {
     return this.request(request);
   }
 
-  async streamRequest(
-    request: ModelRequest,
-    onToken: (token: StreamToken) => void,
-    context?: any
+  public async streamRequest(
+    request: Readonly<ModelRequest>,
+    onToken: (token: Readonly<StreamToken>) => void,
+    _context?: unknown
   ): Promise<ModelResponse> {
-    const tokens: StreamToken[] = [];
+    const tokens: Readonly<StreamToken>[] = [];
 
     // CRITICAL FIX: We need to get the full response including tool calls
     // First, make a non-streaming request to get the complete response with tool calls
@@ -253,27 +264,27 @@ export class ModelClient extends EventEmitter implements IModelClient {
     }
 
     // Return the full response (including tool calls) but with any streamed content updates
-    const streamedContent = tokens.map(t => t.content).join('');
+    const streamedContent = tokens.map((t: Readonly<StreamToken>) => t.content).join('');
     return {
       ...fullResponse, // Preserve tool calls, usage, etc.
       content: streamedContent || fullResponse.content, // Use streamed content if available
     };
   }
 
-  async generateText(prompt: string, options?: Record<string, unknown>): Promise<string> {
+  public async generateText(prompt: Readonly<string>, options?: Readonly<Record<string, unknown>>): Promise<string> {
     return this.generate(prompt, options);
   }
 
-  async synthesize(request: ModelRequest): Promise<ModelResponse> {
+  public async synthesize(request: Readonly<ModelRequest>): Promise<ModelResponse> {
     return this.request(request);
   }
 
-  async healthCheck(): Promise<Record<string, boolean>> {
+  public async healthCheck(): Promise<Readonly<Record<string, boolean>>> {
     const isHealthy = await this.isHealthy();
     return { healthy: isHealthy };
   }
 
-  getProviders(): Map<string, unknown> {
+  public getProviders(): Map<string, unknown> {
     return new Map(Array.from(this.adapters.entries()));
   }
 }

@@ -4,22 +4,22 @@
  */
 
 import { EventEmitter } from 'events';
-import crypto from 'crypto';
+// Removed unused crypto import
 import { logger } from '../logging/logger.js';
 
 export interface RateLimitConfig {
   algorithm: 'sliding-window' | 'fixed-window' | 'token-bucket';
   windowMs: number;
   maxRequests: number;
-  keyGenerator?: (req: any) => string;
+  keyGenerator?: (req: Readonly<{ ip?: string }>) => string;
   skipSuccessfulRequests?: boolean;
   skipFailedRequests?: boolean;
-  skipIf?: (req: any) => boolean;
+  skipIf?: (req: Readonly<{ ip?: string }>) => boolean;
   message?: string;
   standardHeaders?: boolean;
   legacyHeaders?: boolean;
   store?: RateLimitStore;
-  onLimitReached?: (req: any, res: any) => void;
+  onLimitReached?: (req: Readonly<{ ip?: string }>, res: { status: (code: number) => void }) => void;
 }
 
 export interface RateLimitInfo {
@@ -31,10 +31,10 @@ export interface RateLimitInfo {
 }
 
 export interface RateLimitStore {
-  get(key: string): Promise<RateLimitInfo | null>;
-  set(key: string, info: RateLimitInfo, ttl: number): Promise<void>;
-  increment(key: string): Promise<RateLimitInfo>;
-  reset(key: string): Promise<void>;
+  get: (key: Readonly<string>) => Promise<RateLimitInfo | null>;
+  set: (key: Readonly<string>, info: RateLimitInfo, ttl: number) => Promise<void>;
+  increment: (key: Readonly<string>) => Promise<RateLimitInfo>;
+  reset: (key: Readonly<string>) => Promise<void>;
 }
 
 export interface TokenBucketConfig {
@@ -52,30 +52,32 @@ export interface SlidingWindowConfig {
  * In-memory rate limit store (for development)
  */
 class MemoryStore implements RateLimitStore {
-  private store = new Map<string, { info: RateLimitInfo; expiry: number }>();
-  private cleanupInterval!: NodeJS.Timeout;
+  private readonly store = new Map<string, { info: RateLimitInfo; expiry: number }>();
+  private readonly cleanupInterval!: NodeJS.Timeout;
 
-  constructor() {
+  public constructor() {
     // Clean up expired entries every minute
-    this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
+    this.cleanupInterval = setInterval(() => {
+      this.cleanup();
+    }, 60000);
   }
 
-  async get(key: string): Promise<RateLimitInfo | null> {
+  public async get(key: Readonly<string>): Promise<RateLimitInfo | null> {
     const entry = this.store.get(key);
     if (!entry || entry.expiry < Date.now()) {
-      return null;
+      return Promise.resolve(null);
     }
-    return entry.info;
+    return Promise.resolve(entry.info);
   }
 
-  async set(key: string, info: RateLimitInfo, ttl: number): Promise<void> {
+  public async set(key: Readonly<string>, info: RateLimitInfo, ttl: number): Promise<void> {
     this.store.set(key, {
       info,
       expiry: Date.now() + ttl,
     });
   }
 
-  async increment(key: string): Promise<RateLimitInfo> {
+  public async increment(key: string): Promise<RateLimitInfo> {
     const existing = await this.get(key);
     if (existing) {
       existing.totalHits++;
@@ -96,8 +98,9 @@ class MemoryStore implements RateLimitStore {
     return newInfo;
   }
 
-  async reset(key: string): Promise<void> {
+  public async reset(key: string): Promise<void> {
     this.store.delete(key);
+    return Promise.resolve();
   }
 
   private cleanup(): void {
@@ -109,7 +112,7 @@ class MemoryStore implements RateLimitStore {
     }
   }
 
-  stop(): void {
+  public stop(): void {
     this.store.clear();
   }
 }
@@ -120,9 +123,9 @@ class MemoryStore implements RateLimitStore {
 class TokenBucket {
   private tokens: number;
   private lastRefill: number;
-  private config: TokenBucketConfig;
+  private readonly config: TokenBucketConfig;
 
-  constructor(config: TokenBucketConfig) {
+  public constructor(config: Readonly<TokenBucketConfig>) {
     this.config = config;
     this.tokens = config.capacity;
     this.lastRefill = Date.now();
@@ -131,7 +134,7 @@ class TokenBucket {
   /**
    * Try to consume tokens
    */
-  consume(tokens: number = 1): boolean {
+  public consume(tokens: number = 1): boolean {
     this.refill();
 
     if (this.tokens >= tokens) {
@@ -145,7 +148,7 @@ class TokenBucket {
   /**
    * Get available tokens
    */
-  getAvailableTokens(): number {
+  public getAvailableTokens(): number {
     this.refill();
     return this.tokens;
   }
@@ -170,22 +173,22 @@ class TokenBucket {
  * Sliding window rate limiter
  */
 class SlidingWindow {
-  private windows = new Map<string, number[]>();
-  private config: SlidingWindowConfig;
+  private readonly windows = new Map<string, number[]>();
+  private readonly config: SlidingWindowConfig;
 
-  constructor(config: SlidingWindowConfig) {
+  public constructor(config: Readonly<SlidingWindowConfig>) {
     this.config = config;
   }
 
   /**
    * Check if request is allowed
    */
-  isAllowed(key: string, limit: number): boolean {
+  public isAllowed(key: string, limit: number): boolean {
     const now = Date.now();
     const windowStart = now - this.config.windowSize;
 
     // Get or create window for this key
-    let timestamps = this.windows.get(key) || [];
+    let timestamps = this.windows.get(key) ?? [];
 
     // Remove old timestamps
     timestamps = timestamps.filter(timestamp => timestamp > windowStart);
@@ -203,10 +206,10 @@ class SlidingWindow {
   /**
    * Get current count for key
    */
-  getCurrentCount(key: string): number {
+  public getCurrentCount(key: string): number {
     const now = Date.now();
     const windowStart = now - this.config.windowSize;
-    const timestamps = this.windows.get(key) || [];
+    const timestamps = this.windows.get(key) ?? [];
 
     return timestamps.filter(timestamp => timestamp > windowStart).length;
   }
@@ -214,7 +217,7 @@ class SlidingWindow {
   /**
    * Clean up old entries
    */
-  cleanup(): void {
+  public cleanup(): void {
     const now = Date.now();
     const cutoff = now - this.config.windowSize;
 
@@ -234,17 +237,17 @@ class SlidingWindow {
  * Main rate limiter class
  */
 export class RateLimiter extends EventEmitter {
-  private config: RateLimitConfig;
-  private store: RateLimitStore;
-  private tokenBuckets = new Map<string, TokenBucket>();
-  private slidingWindows = new Map<string, SlidingWindow>();
-  private cleanupInterval?: NodeJS.Timeout;
+  private readonly config: RateLimitConfig;
+  private readonly store: RateLimitStore;
+  private readonly tokenBuckets = new Map<string, TokenBucket>();
+  private readonly slidingWindows = new Map<string, SlidingWindow>();
+  private readonly cleanupInterval?: NodeJS.Timeout;
 
-  constructor(config: RateLimitConfig) {
+  public constructor(config: Readonly<RateLimitConfig>) {
     super();
 
     this.config = {
-      keyGenerator: this.defaultKeyGenerator,
+      keyGenerator: (req: Readonly<{ ip?: string }>): string => RateLimiter.defaultKeyGenerator(req),
       skipSuccessfulRequests: false,
       skipFailedRequests: false,
       message: 'Too many requests, please try again later',
@@ -253,93 +256,78 @@ export class RateLimiter extends EventEmitter {
       ...config,
     };
 
-    this.store = config.store || new MemoryStore();
+    this.store = config.store ?? new MemoryStore();
 
     // Start cleanup for sliding windows
     if (this.config.algorithm === 'sliding-window') {
-      this.cleanupInterval = setInterval(() => this.cleanupSlidingWindows(), 60000);
+      this.cleanupInterval = setInterval(() => {
+        this.cleanupSlidingWindows();
+      }, 60000);
     }
   }
-
   /**
-   * Create Express middleware
+   * Express middleware for rate limiting
    */
-  middleware() {
-    return async (req: any, res: any, next: any) => {
+  public middleware(): (
+    req: Readonly<{ ip?: string; get: (header: string) => string | undefined; path: string; method: string }>,
+    res: Readonly<{ setHeader: (name: string, value: string | number) => void; status: (code: number) => { json: (body: object) => void } }>,
+    next: () => void
+  ) => Promise<void> {
+    return async (req, res, next) => {
+      const key = this.config.keyGenerator ? this.config.keyGenerator(req) : `rate_limit:${req.ip ?? 'unknown'}`;
       try {
-        const key = this.config.keyGenerator!(req);
-        const allowed = await this.checkLimit(key, req);
+        const allowedResult = await this.checkLimit(key, req);
 
-        if (!allowed.allowed) {
-          // Set rate limit headers
-          if (this.config.standardHeaders) {
-            res.setHeader('X-RateLimit-Limit', this.config.maxRequests);
-            res.setHeader('X-RateLimit-Remaining', allowed.info.remainingHits);
-            res.setHeader('X-RateLimit-Reset', Math.ceil(allowed.info.resetTime.getTime() / 1000));
-          }
+        if (!allowedResult.allowed) {
+          res.setHeader('X-RateLimit-Limit', this.config.maxRequests);
+          res.setHeader('X-RateLimit-Remaining', allowedResult.info.remainingHits);
+          res.setHeader('X-RateLimit-Reset', Math.ceil(allowedResult.info.resetTime.getTime() / 1000) || 0);
 
           if (this.config.legacyHeaders) {
             res.setHeader('X-Rate-Limit-Limit', this.config.maxRequests);
-            res.setHeader('X-Rate-Limit-Remaining', allowed.info.remainingHits);
-            res.setHeader('X-Rate-Limit-Reset', Math.ceil(allowed.info.resetTime.getTime() / 1000));
+            res.setHeader('X-Rate-Limit-Remaining', allowedResult.info.remainingHits);
+            res.setHeader('X-Rate-Limit-Reset', Math.ceil(allowedResult.info.resetTime.getTime() / 1000) || 0);
           }
 
-          // Call custom handler if provided
-          if (this.config.onLimitReached) {
-            this.config.onLimitReached(req, res);
-            return;
-          }
-
-          // Emit event
-          this.emit('limit-reached', {
-            key,
-            ip: req.ip,
-            info: allowed.info,
-          });
-
-          // Log rate limit hit
-          logger.warn('Rate limit exceeded', {
-            key,
-            ip: req.ip,
-            userAgent: req.get('User-Agent'),
-            path: req.path,
-            method: req.method,
-            limit: this.config.maxRequests,
-            window: this.config.windowMs,
-          });
-
-          return res.status(429).json({
-            error: this.config.message,
-            retryAfter: Math.ceil(allowed.info.msBeforeNext / 1000),
-            limit: this.config.maxRequests,
-            remaining: allowed.info.remainingHits,
-            resetTime: allowed.info.resetTime.toISOString(),
-          });
+        if (this.config.onLimitReached) {
+          this.config.onLimitReached(req, res);
+          return;
         }
 
-        // Set success headers
-        if (this.config.standardHeaders) {
-          res.setHeader('X-RateLimit-Limit', this.config.maxRequests);
-          res.setHeader('X-RateLimit-Remaining', allowed.info.remainingHits);
-          res.setHeader('X-RateLimit-Reset', Math.ceil(allowed.info.resetTime.getTime() / 1000));
-        }
+        this.emit('limit-reached', { key, ip: req.ip, info: allowedResult.info });
 
-        // Track the request for potential cleanup
-        req.rateLimitInfo = allowed.info;
+        logger.warn('Rate limit exceeded', {
+          key,
+          ip: req.ip,
+          userAgent: req.get('User-Agent'),
+          path: req.path,
+          method: req.method,
+          limit: this.config.maxRequests,
+          window: this.config.windowMs,
+        });
 
-        next();
-      } catch (error) {
-        logger.error('Rate limiter error', error as Error);
-        // Fail open - allow request if rate limiter fails
-        next();
+        res.status(429).json({
+          error: this.config.message,
+          retryAfter: Math.ceil(allowedResult.info.msBeforeNext / 1000),
+          limit: this.config.maxRequests,
+          remaining: allowedResult.info.remainingHits,
+          resetTime: allowedResult.info.resetTime.toISOString(),
+        });
+        return;
       }
-    };
-  }
+
+      next();
+    } catch (error) {
+      logger.error('Rate limiter error', error as Error);
+      next();
+    }
+  };
+}
 
   /**
-   * Check if request is within rate limit
+   * Check if a request is allowed under the current rate limit.
    */
-  async checkLimit(key: string, req?: any): Promise<{ allowed: boolean; info: RateLimitInfo }> {
+  public async checkLimit(key: string, req?: { ip?: string }): Promise<{ allowed: boolean; info: RateLimitInfo }> {
     // Check skip conditions
     if (req && this.config.skipIf && this.config.skipIf(req)) {
       return {
@@ -368,9 +356,8 @@ export class RateLimiter extends EventEmitter {
   /**
    * Check token bucket rate limit
    */
-  private async checkTokenBucket(key: string): Promise<{ allowed: boolean; info: RateLimitInfo }> {
-    let bucket = this.tokenBuckets.get(key);
-
+  public checkTokenBucket(key: string): { allowed: boolean; info: RateLimitInfo } {
+    let bucket = this.tokenBuckets.get(key) ?? null;
     if (!bucket) {
       bucket = new TokenBucket({
         capacity: this.config.maxRequests,
@@ -397,9 +384,9 @@ export class RateLimiter extends EventEmitter {
   /**
    * Check sliding window rate limit
    */
-  private async checkSlidingWindow(
+  private checkSlidingWindow(
     key: string
-  ): Promise<{ allowed: boolean; info: RateLimitInfo }> {
+  ): { allowed: boolean; info: RateLimitInfo } {
     let window = this.slidingWindows.get(key);
 
     if (!window) {
@@ -410,6 +397,7 @@ export class RateLimiter extends EventEmitter {
       this.slidingWindows.set(key, window);
     }
 
+    // window is guaranteed to be defined here
     const allowed = window.isAllowed(key, this.config.maxRequests);
     const currentCount = window.getCurrentCount(key);
 
@@ -462,14 +450,22 @@ export class RateLimiter extends EventEmitter {
   /**
    * Default key generator (IP-based)
    */
-  private defaultKeyGenerator(req: any): string {
-    return `rate_limit:${req.ip || 'unknown'}`;
+  private static defaultKeyGenerator(req: { ip?: string }): string {
+    return `rate_limit:${req.ip ?? 'unknown'}`;
+  }
+
+  /**
+   * Cleanup sliding windows (removes old entries)
+   */
+  private cleanupSlidingWindows(): void {
+    for (const window of this.slidingWindows.values()) {
+      window.cleanup();
+    }
   }
 
   /**
    * Get rate limit status for a key
-   */
-  async getStatus(key: string): Promise<RateLimitInfo | null> {
+  public async getStatus(key: string): Promise<RateLimitInfo | null> {
     switch (this.config.algorithm) {
       case 'token-bucket': {
         const bucket = this.tokenBuckets.get(key);
@@ -500,14 +496,14 @@ export class RateLimiter extends EventEmitter {
 
       case 'fixed-window':
       default:
-        return await this.store.get(key);
+        return this.store.get(key);
     }
+  }
   }
 
   /**
    * Reset rate limit for a key
-   */
-  async reset(key: string): Promise<void> {
+  public async reset(key: string): Promise<void> {
     switch (this.config.algorithm) {
       case 'token-bucket':
         this.tokenBuckets.delete(key);
@@ -525,94 +521,88 @@ export class RateLimiter extends EventEmitter {
 
     this.emit('rate-limit-reset', { key });
     logger.info('Rate limit reset', { key });
+    logger.info('Rate limit reset', { key });
   }
 
   /**
-   * Create key generator for specific field
+   * Supported key generator fields
    */
-  static createKeyGenerator(field: 'ip' | 'userId' | 'sessionId' | string): (req: any) => string {
-    return (req: any) => {
-      switch (field) {
-        case 'ip':
-          return `rate_limit:ip:${req.ip || 'unknown'}`;
-        case 'userId':
-          return `rate_limit:user:${req.user?.userId || 'anonymous'}`;
-        case 'sessionId':
-          return `rate_limit:session:${req.sessionId || 'no-session'}`;
-        default:
-          return `rate_limit:${field}:${req[field] || 'unknown'}`;
-      }
-    };
   }
 
-  /**
-   * Create different rate limiters for different endpoints
-   */
-  static createTieredLimiters(): Record<string, RateLimiter> {
-    return {
-      // Strict limits for auth endpoints
-      auth: new RateLimiter({
-        algorithm: 'fixed-window',
-        windowMs: 15 * 60 * 1000, // 15 minutes
-        maxRequests: 5,
-        keyGenerator: RateLimiter.createKeyGenerator('ip'),
-        message: 'Too many authentication attempts',
-      }),
+  // --- Type and function declarations moved outside the class ---
 
-      // Moderate limits for API endpoints
-      api: new RateLimiter({
-        algorithm: 'sliding-window',
-        windowMs: 60 * 1000, // 1 minute
-        maxRequests: 100,
-        keyGenerator: RateLimiter.createKeyGenerator('userId'),
-        message: 'API rate limit exceeded',
-      }),
+/**
+ * Supported key generator fields
+ */
+export type KeyGeneratorField = 'ip' | 'userId' | 'sessionId';
 
-      // Generous limits for general requests
-      general: new RateLimiter({
-        algorithm: 'token-bucket',
-        windowMs: 60 * 1000, // 1 minute
-        maxRequests: 1000,
-        keyGenerator: RateLimiter.createKeyGenerator('ip'),
-        message: 'Rate limit exceeded',
-      }),
+/**
+ * Minimal request type for key generator
+ */
+export interface KeyGenRequest {
+  ip?: string;
+  user?: { userId?: string };
+  sessionId?: string;
+  [key: string]: unknown;
+}
 
-      // Very strict for admin operations
-      admin: new RateLimiter({
-        algorithm: 'fixed-window',
-        windowMs: 60 * 60 * 1000, // 1 hour
-        maxRequests: 10,
-        keyGenerator: RateLimiter.createKeyGenerator('userId'),
-        message: 'Admin operation rate limit exceeded',
-      }),
-    };
-  }
-
-  /**
-   * Clean up sliding windows
-   */
-  private cleanupSlidingWindows(): void {
-    for (const window of this.slidingWindows.values()) {
-      window.cleanup();
+/**
+ * Create key generator for specific field
+ */
+export function createKeyGenerator(field: KeyGeneratorField | (string & {})): (req: KeyGenRequest) => string {
+  return (req: KeyGenRequest) => {
+    switch (field) {
+      case 'ip':
+        return `rate_limit:ip:${req.ip ?? 'unknown'}`;
+      case 'userId':
+        return `rate_limit:user:${req.user && typeof req.user === 'object' && 'userId' in req.user ? (req.user.userId ?? 'anonymous') : 'anonymous'}`;
+      case 'sessionId':
+        return `rate_limit:session:${req.sessionId ?? 'no-session'}`;
+      default:
+        return `rate_limit:${field}:${req[field] ?? 'unknown'}`;
     }
-  }
+  };
+}
 
-  /**
-   * Stop rate limiter and clean up resources
-   */
-  stop(): void {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = undefined;
-    }
+/**
+ * Create different rate limiters for different endpoints
+ */
+export function createTieredLimiters(): Record<string, RateLimiter> {
+  return {
+    // Strict limits for auth endpoints
+    auth: new RateLimiter({
+      algorithm: 'fixed-window',
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      maxRequests: 5,
+      keyGenerator: createKeyGenerator('ip'),
+      message: 'Too many authentication attempts',
+    }),
 
-    this.tokenBuckets.clear();
-    this.slidingWindows.clear();
+    // Moderate limits for API endpoints
+    api: new RateLimiter({
+      algorithm: 'sliding-window',
+      windowMs: 60 * 1000, // 1 minute
+      maxRequests: 100,
+      keyGenerator: createKeyGenerator('userId'),
+      message: 'API rate limit exceeded',
+    }),
 
-    if (this.store instanceof MemoryStore) {
-      this.store.stop();
-    }
+    // Generous limits for general requests
+    general: new RateLimiter({
+      algorithm: 'token-bucket',
+      windowMs: 60 * 1000, // 1 minute
+      maxRequests: 1000,
+      keyGenerator: createKeyGenerator('ip'),
+      message: 'Rate limit exceeded',
+    }),
 
-    logger.info('Rate limiter stopped');
-  }
+    // Very strict for admin operations
+    admin: new RateLimiter({
+      algorithm: 'fixed-window',
+      windowMs: 60 * 60 * 1000, // 1 hour
+      maxRequests: 10,
+      keyGenerator: createKeyGenerator('userId'),
+      message: 'Admin operation rate limit exceeded',
+    }),
+  };
 }

@@ -7,9 +7,9 @@ import { VoiceDefinition } from './archetype-definitions.js';
  * Now warns about missing requested voices for better debugging.
  */
 export function selectVoices(
-  available: Map<string, VoiceDefinition>,
-  required?: string[],
-  logger?: { warn: (message: string, meta?: any) => void }
+  available: ReadonlyMap<string, VoiceDefinition>,
+  required?: readonly string[],
+  logger?: { warn: (message: string, meta?: unknown) => void }
 ): VoiceDefinition[] {
   const ids = required && required.length > 0 ? required : Array.from(available.keys());
   const selected: VoiceDefinition[] = [];

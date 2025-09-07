@@ -273,6 +273,10 @@ export function initializeGlobalToolIntegration(mcpManager: MCPServerManager): v
   globalToolIntegration = new ToolIntegration(mcpManager);
 }
 
+export function getGlobalToolIntegration(): ToolIntegration | null {
+  return globalToolIntegration;
+}
+
 export function setGlobalToolIntegrationRustBackend(backend: RustExecutionBackend): void {
   if (globalToolIntegration) {
     try {

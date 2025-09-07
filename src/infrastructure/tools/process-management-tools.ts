@@ -399,6 +399,8 @@ export class AdvancedProcessTool extends BaseTool {
       isInteractive: session.isInteractive,
     };
   }
+}
+
 /**
  * Memory Code Execution Tool (like in Desktop Commander)
  */

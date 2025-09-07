@@ -3,7 +3,11 @@ import {
   ModelInfo,
   modelDiscoveryService,
 } from '../../infrastructure/discovery/model-discovery-service.js';
-import { unifiedResultFormatter } from '../../infrastructure/formatting/unified-result-formatter.js';
+import { 
+  unifiedResultFormatter,
+  FormattingOptions 
+} from '../../infrastructure/formatting/unified-result-formatter.js';
+import { ProviderType } from '../../domain/types/unified-types.js';
 
 /**
  * Centralized output formatting using UnifiedResultFormatter
@@ -41,14 +45,14 @@ export function formatOutput(result: unknown): string {
   }
 
   // Use centralized result formatter for consistent output
-  const formatted = unifiedResultFormatter.formatResult(result, {
+  const formatted = unifiedResultFormatter.formatResult(result as Readonly<unknown>, {
     includeMetadata: false,
     preferMarkdown: false,
     highlightErrors: true,
     format: 'text',
     maxLength: 50000,
     maxDepth: 10,
-  });
+  } as Readonly<FormattingOptions>);
 
   // CRITICAL FIX: Add fallback for empty/null results to prevent blank responses
   if (!formatted.content || formatted.content.trim().length === 0) {
@@ -102,7 +106,7 @@ export class OutputFormatter {
         includeUnavailable: true,
         timeout: 8000,
         cache: true,
-        providers: ['ollama', 'lm-studio', 'claude', 'huggingface'],
+        providers: ['ollama', 'lm-studio', 'anthropic', 'huggingface'] as ProviderType[],
       });
 
       if (models.length === 0) {

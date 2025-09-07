@@ -2,18 +2,18 @@
  * Timeout utilities for non-blocking CLI operations
  */
 
-export interface TimeoutOptions {
-  timeoutMs: number;
-  operation: string;
-  defaultValue?: any;
+export interface TimeoutOptions<T = unknown> {
+  readonly timeoutMs: number;
+  readonly operation: string;
+  readonly defaultValue?: T;
 }
 
 /**
  * Wraps a promise with a timeout to prevent CLI hanging
  */
 export async function withTimeout<T>(
-  promise: Promise<T>,
-  options: TimeoutOptions
+  promise: Readonly<Promise<T>>,
+  options: Readonly<TimeoutOptions<T>>
 ): Promise<{ success: boolean; result?: T; error?: string; timedOut?: boolean }> {
   const { timeoutMs, operation, defaultValue } = options;
 
@@ -22,9 +22,8 @@ export async function withTimeout<T>(
       const timeoutId = setTimeout(() => {
         reject(new Error(`${operation} timed out after ${timeoutMs}ms`));
       }, timeoutMs);
-
       // Clear timeout if the main promise resolves first
-      promise.finally(() => clearTimeout(timeoutId));
+      void promise.finally(() => { clearTimeout(timeoutId); });
     });
 
     const result = await Promise.race([promise, timeoutPromise]);
@@ -49,12 +48,12 @@ export async function withTimeout<T>(
 /**
  * Creates a timeout wrapper with default CLI settings
  */
-export function createCliTimeout<T>(
+export async function createCliTimeout<T>(
   promise: Promise<T>,
   operation: string,
   timeoutMs: number = 5000,
   defaultValue?: T
-) {
+): Promise<{ success: boolean; result?: T; error?: string; timedOut?: boolean }> {
   return withTimeout(promise, {
     timeoutMs,
     operation,
@@ -65,6 +64,10 @@ export function createCliTimeout<T>(
 /**
  * Specific timeout wrapper for MCP operations
  */
-export function withMcpTimeout<T>(promise: Promise<T>, operation: string, defaultValue?: T) {
+export async function withMcpTimeout<T>(
+  promise: Promise<T>,
+  operation: string,
+  defaultValue?: T
+): Promise<{ success: boolean; result?: T; error?: string; timedOut?: boolean }> {
   return createCliTimeout(promise, `MCP ${operation}`, 3000, defaultValue);
 }

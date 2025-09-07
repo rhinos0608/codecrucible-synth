@@ -63,7 +63,7 @@ export interface StreamChunk {
   // Legacy compatibility
   content?: string;
   finished?: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface StreamWarning {
@@ -86,7 +86,7 @@ export interface StreamBlock {
   startTime: number;
   endTime?: number;
   content: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // StreamToken now imported from domain types for consistency
@@ -127,44 +127,47 @@ export interface StreamSession {
 
 export interface IStreamingManager {
   // Core streaming operations
-  startStream(
-    content: string,
-    onToken: (token: StreamToken) => void,
-    config?: StreamConfig
-  ): Promise<string>;
+  startStream: (
+    content: Readonly<string>,
+    onToken: (token: import('../../domain/types/unified-types.js').StreamToken) => void,
+    config?: Readonly<StreamConfig>
+  ) => Promise<string>;
 
   // Enhanced: Modern streaming with AI SDK v5.0 patterns
-  startModernStream(
-    content: string,
-    onChunk: (chunk: StreamChunk) => void,
-    config?: StreamConfig
-  ): Promise<string>;
+  startModernStream: (
+    content: Readonly<string>,
+    onChunk: (chunk: Readonly<StreamChunk>) => void,
+    config?: Readonly<StreamConfig>
+  ) => Promise<string>;
 
   // Enhanced: Tool streaming support
-  streamToolExecution(
-    toolName: string,
-    args: unknown,
-    onChunk: (chunk: StreamChunk) => void
-  ): Promise<unknown>;
+  streamToolExecution: (
+    toolName: Readonly<string>,
+    args: Readonly<unknown>,
+    onChunk: (chunk: Readonly<StreamChunk>) => void
+  ) => Promise<unknown>;
 
   // Session management
-  createSession(sessionId?: string): StreamSession;
-  getSession(sessionId: string): StreamSession | undefined;
-  destroySession(sessionId: string): void;
+  createSession: (sessionId?: Readonly<string>) => StreamSession;
+  getSession: (sessionId: Readonly<string>) => StreamSession | undefined;
+  destroySession: (sessionId: Readonly<string>) => void;
 
   // Metrics and monitoring
-  getStreamMetrics(sessionId: string): StreamMetrics | undefined;
-  getAllMetrics(): Map<string, StreamMetrics>;
+  getStreamMetrics: (sessionId: Readonly<string>) => StreamMetrics | undefined;
+  getAllMetrics: () => Map<string, StreamMetrics>;
 
   // Configuration
-  updateConfig(config: Partial<StreamConfig>): void;
-  getConfig(): StreamConfig;
+  updateConfig: (config: Readonly<Partial<StreamConfig>>) => void;
+  getConfig: () => StreamConfig;
 
   // Cleanup
-  cleanup(): Promise<void>;
+  cleanup: () => Promise<void>;
 
   // Adapter-based streaming
-  stream(adapter: ProviderAdapter, request: ModelRequest): AsyncIterable<StreamToken>;
+  stream: (
+    adapter: Readonly<ProviderAdapter>,
+    request: Readonly<ModelRequest>
+  ) => AsyncIterable<import('../../domain/types/unified-types.js').StreamToken>;
 }
 
 /**
@@ -173,9 +176,9 @@ export interface IStreamingManager {
  */
 export class StreamingManager extends EventEmitter implements IStreamingManager {
   private config: StreamConfig;
-  private sessions: Map<string, StreamSession> = new Map();
-  private activeStreams: Set<string> = new Set();
-  private defaultConfig: StreamConfig = {
+  private readonly sessions: Map<string, StreamSession> = new Map();
+  private readonly activeStreams: Set<string> = new Set();
+  private readonly defaultConfig: StreamConfig = {
     chunkSize: 50,
     bufferSize: 1024,
     enableBackpressure: true,
@@ -190,7 +193,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     enableLifecycleEvents: true,
   };
 
-  constructor(config: Partial<StreamConfig> = {}) {
+  public constructor(config: Readonly<Partial<StreamConfig>> = {}) {
     super();
     this.config = { ...this.defaultConfig, ...config };
     this.setupEventHandlers();
@@ -205,15 +208,15 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     });
 
     // Enhanced: Modern streaming events
-    this.on('stream-start', (chunk: StreamChunk) => {
+    this.on('stream-start', (chunk: Readonly<StreamChunk>) => {
       logger.debug('Modern stream started', { id: chunk.id });
     });
 
-    this.on('text-block-start', (chunk: StreamChunk) => {
+    this.on('text-block-start', (chunk: Readonly<StreamChunk>) => {
       logger.debug('Text block started', { id: chunk.id });
     });
 
-    this.on('tool-call', (chunk: StreamChunk) => {
+    this.on('tool-call', (chunk: Readonly<StreamChunk>) => {
       logger.debug('Tool call received', { toolName: chunk.toolName, id: chunk.toolCallId });
     });
 
@@ -229,10 +232,10 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   /**
    * Enhanced: Start modern streaming with AI SDK v5.0 lifecycle patterns
    */
-  async startModernStream(
+  public async startModernStream(
     content: string,
-    onChunk: (chunk: StreamChunk) => void,
-    config?: StreamConfig
+    onChunk: (chunk: Readonly<StreamChunk>) => void,
+    config?: Readonly<StreamConfig>
   ): Promise<string> {
     const sessionConfig = { ...this.config, ...config };
     const sessionId = this.generateSessionId();
@@ -275,10 +278,10 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       session.activeBlocks.set(textBlockId, textBlock);
 
       // Stream content as deltas
-      const tokens = this.tokenizeContent(content, sessionConfig.chunkSize || 50);
+      const tokens = this.tokenizeContent(content, sessionConfig.chunkSize ?? 50);
       let streamedContent = '';
 
-      for (let i = 0; i < tokens.length; i++) {
+      for (const token of tokens) {
         if (!this.activeStreams.has(sessionId)) {
           throw new Error(`Stream session ${sessionId} was terminated`);
         }
@@ -286,16 +289,16 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
         const deltaChunk: StreamChunk = {
           type: 'text-delta',
           id: textBlockId,
-          delta: tokens[i],
+          delta: token,
           timestamp: Date.now(),
         };
 
-        textBlock.content.push(tokens[i]);
+        textBlock.content.push(token);
         session.chunks.push(deltaChunk);
         onChunk(deltaChunk);
         this.emit('text-delta', deltaChunk);
 
-        streamedContent += tokens[i];
+        streamedContent += token;
         await new Promise(resolve => setTimeout(resolve, 10));
       }
 
@@ -368,10 +371,10 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   /**
    * Enhanced: Stream tool execution with proper lifecycle
    */
-  async streamToolExecution(
+  public async streamToolExecution(
     toolName: string,
     args: unknown,
-    onChunk: (chunk: StreamChunk) => void
+    onChunk: (chunk: Readonly<StreamChunk>) => void
   ): Promise<unknown> {
     const toolCallId = this.generateBlockId();
 
@@ -418,7 +421,10 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   /**
    * Adapter-based streaming compatible with ModelClient
    */
-  async *stream(adapter: ProviderAdapter, request: ModelRequest): AsyncIterable<StreamToken> {
+  public async *stream(
+    adapter: Readonly<ProviderAdapter>,
+    request: Readonly<ModelRequest>
+  ): AsyncIterable<import('../../domain/types/unified-types.js').StreamToken> {
     // CRITICAL FIX: Skip native streaming for tool-enabled requests
     // Many providers (like Ollama) have separate endpoints for simple prompts vs tool-enabled chat
     const hasTools = request.tools && Array.isArray(request.tools) && request.tools.length > 0;
@@ -444,8 +450,17 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     }
 
     const result = await adapter.request(request);
-    const tokens: StreamToken[] = [];
-    await this.startStream(result.content ?? '', token => tokens.push(token));
+    const tokens: import('../../domain/types/unified-types.js').StreamToken[] = [];
+    await this.startStream(result.content, (token: Readonly<StreamToken>) => {
+      // Convert core StreamToken to unified StreamToken format
+      const unifiedToken: import('../../domain/types/unified-types.js').StreamToken = {
+        content: token.content,
+        timestamp: token.timestamp ?? Date.now(),
+        index: token.index ?? 0, // Provide default value for required field
+        metadata: token.metadata
+      };
+      tokens.push(unifiedToken);
+    });
     for (const token of tokens) {
       yield token;
     }
@@ -455,10 +470,10 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
    * Start streaming content with token-by-token delivery
    * Core streaming method with comprehensive error handling
    */
-  async startStream(
-    content: string,
-    onToken: (token: StreamToken) => void,
-    config?: StreamConfig
+  public async startStream(
+    content: Readonly<string>,
+    onToken: (token: Readonly<import('../../domain/types/unified-types.js').StreamToken>) => void,
+    config?: Readonly<StreamConfig>
   ): Promise<string> {
     const sessionConfig = { ...this.config, ...config };
     const sessionId = this.generateSessionId();
@@ -475,7 +490,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       });
 
       // Stream content token by token
-      const tokens = this.tokenizeContent(content, sessionConfig.chunkSize || 50);
+      const tokens = this.tokenizeContent(content, sessionConfig.chunkSize ?? 50);
       let streamedContent = '';
 
       for (let i = 0; i < tokens.length; i++) {
@@ -484,11 +499,10 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
           throw new Error(`Stream session ${sessionId} was terminated`);
         }
 
-        const token: StreamToken = {
+        const token: import('../../domain/types/unified-types.js').StreamToken = {
           content: tokens[i],
           timestamp: Date.now(),
           index: i,
-          isComplete: i === tokens.length - 1,
           metadata: {
             sessionId,
             progress: (i + 1) / tokens.length,
@@ -543,8 +557,8 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   /**
    * Create a new streaming session
    */
-  createSession(sessionId?: string): StreamSession {
-    const id = sessionId || this.generateSessionId();
+  public createSession(sessionId?: string): StreamSession {
+    const id = sessionId ?? this.generateSessionId();
 
     if (this.sessions.has(id)) {
       throw new Error(`Session ${id} already exists`);
@@ -576,14 +590,14 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   /**
    * Get existing session
    */
-  getSession(sessionId: string): StreamSession | undefined {
+  public getSession(sessionId: string): StreamSession | undefined {
     return this.sessions.get(sessionId);
   }
 
   /**
    * Destroy a streaming session and cleanup resources
    */
-  destroySession(sessionId: string): void {
+  public destroySession(sessionId: string): void {
     const session = this.sessions.get(sessionId);
     if (session) {
       session.isActive = false;
@@ -596,14 +610,14 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   /**
    * Get metrics for a specific session
    */
-  getStreamMetrics(sessionId: string): StreamMetrics | undefined {
+  public getStreamMetrics(sessionId: string): StreamMetrics | undefined {
     return this.sessions.get(sessionId)?.metrics;
   }
 
   /**
    * Get all session metrics
    */
-  getAllMetrics(): Map<string, StreamMetrics> {
+  public getAllMetrics(): Map<string, StreamMetrics> {
     const metrics = new Map<string, StreamMetrics>();
     for (const [id, session] of this.sessions.entries()) {
       metrics.set(id, session.metrics);
@@ -614,7 +628,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   /**
    * Update streaming configuration
    */
-  updateConfig(config: Partial<StreamConfig>): void {
+  public updateConfig(config: Readonly<Partial<StreamConfig>>): void {
     this.config = { ...this.config, ...config };
     logger.info('Streaming configuration updated', { config: this.config });
   }
@@ -622,14 +636,14 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   /**
    * Get current configuration
    */
-  getConfig(): StreamConfig {
+  public getConfig(): StreamConfig {
     return { ...this.config };
   }
 
   /**
    * Cleanup all sessions and resources with AbortController integration
    */
-  async cleanup(): Promise<void> {
+  public async cleanup(): Promise<void> {
     logger.info('Cleaning up streaming manager', {
       activeSessions: this.sessions.size,
       activeStreams: this.activeStreams.size,
@@ -644,7 +658,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     });
 
     // Cleanup promise
-    const cleanupPromise = (async () => {
+    const cleanupPromise: Promise<void> = (async (): Promise<void> => {
       // Stop all active streams gracefully
       const cleanupPromises: Promise<void>[] = [];
 
@@ -713,11 +727,14 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   /**
    * Private: Update metrics for a streaming session
    */
-  private updateStreamMetrics(sessionId: string, token: StreamToken): void {
+  private updateStreamMetrics(
+    sessionId: string,
+    _token: Readonly<import('../../domain/types/unified-types.js').StreamToken>
+  ): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    const metrics = session.metrics;
+    const { metrics } = session;
     metrics.tokensStreamed++;
     metrics.streamDuration = Date.now() - session.startTime;
 

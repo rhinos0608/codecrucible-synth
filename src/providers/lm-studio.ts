@@ -32,7 +32,10 @@ export interface ChatMessage {
   };
 }
 
-type LMChatMessageInput = { role: 'system' | 'user' | 'assistant'; content: string };
+interface LMChatMessageInput {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
 
 export interface LLMTool {
   type: string;
@@ -181,9 +184,9 @@ export class LMStudioProvider {
     }
   }
 
-  async generateTextStreaming(
+  public async generateTextStreaming(
     prompt: string,
-    options: LLMOptions = {}
+    options: Readonly<LLMOptions> = {}
   ): Promise<AsyncIterable<string>> {
     try {
       logger.debug('LMStudioProvider generateTextStreaming called', {
@@ -202,19 +205,19 @@ export class LMStudioProvider {
 
       // Use official LM Studio client streaming
       const stream = model.complete(prompt, {
-        temperature: options.temperature || 0.7,
-        maxTokens: options.maxTokens || 1000,
+        temperature: options.temperature ?? 0.7,
+        maxTokens: options.maxTokens ?? 1000,
         stream: true,
         ...options,
       });
 
-      return (async function* () {
+      return (async function* (): AsyncGenerator<string> {
         for await (const chunk of stream) {
           if (chunk.content) {
             yield chunk.content;
           }
         }
-      })();
+      }());
     } catch (error) {
       logger.error('LMStudioProvider generateTextStreaming failed', {
         error: getErrorMessage(error),
@@ -224,7 +227,10 @@ export class LMStudioProvider {
     }
   }
 
-  async chat(messages: ChatMessage[], options: LLMOptions = {}): Promise<string> {
+  public async chat(
+    messages: ReadonlyArray<Readonly<ChatMessage>>,
+    options: Readonly<LLMOptions> = {}
+  ): Promise<string> {
     try {
       logger.debug('LMStudioProvider chat called', {
         messageCount: messages.length,
@@ -242,13 +248,13 @@ export class LMStudioProvider {
 
       // Filter/convert to roles supported by LM Studio ('system' | 'user' | 'assistant')
       const lmMessages: LMChatMessageInput[] = messages
-        .filter(m => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
-        .map(m => ({ role: m.role as LMChatMessageInput['role'], content: m.content }));
+        .filter((m: Readonly<ChatMessage>) => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
+        .map((m: Readonly<ChatMessage>) => ({ role: m.role as LMChatMessageInput['role'], content: m.content }));
 
       // Use respond with sanitized messages
       const response = await model.respond(lmMessages, {
-        temperature: options.temperature || 0.7,
-        maxTokens: options.maxTokens || 1000,
+        temperature: options.temperature ?? 0.7,
+        maxTokens: options.maxTokens ?? 1000,
         ...options,
       });
 
@@ -268,10 +274,10 @@ export class LMStudioProvider {
   }
 
   // Advanced LM Studio feature - agentic workflows
-  async act(
+  public async act(
     task: string,
-    tools: LLMTool[] = [],
-    options: LLMOptions = {}
+    tools: ReadonlyArray<Readonly<LLMTool>> = [],
+    options: Readonly<LLMOptions> = {}
   ): Promise<AgenticResponse> {
     try {
       logger.debug('LMStudioProvider act called', {
@@ -295,13 +301,13 @@ export class LMStudioProvider {
         model as unknown as {
           act: (
             task: string,
-            tools: unknown[],
-            options: Record<string, unknown>
+            tools: ReadonlyArray<unknown>,
+            options: Readonly<Record<string, unknown>>
           ) => Promise<unknown>;
         }
-      ).act(task, tools as unknown[], {
-        temperature: options.temperature || 0.7,
-        maxSteps: options.maxSteps || 10,
+      ).act(task, tools as ReadonlyArray<unknown>, {
+        temperature: options.temperature ?? 0.7,
+        maxSteps: options.maxSteps ?? 10,
         ...options,
       });
 
@@ -376,11 +382,11 @@ export class LMStudioProvider {
     }
   }
 
-  async healthCheck(): Promise<boolean> {
+  public healthCheck(): boolean {
     try {
       // Simple health check - verify client is initialized and has expected structure
       // This doesn't require any models to be loaded, just that LM Studio is running
-      if (this.client && this.client.llm && typeof this.client.llm.model === 'function') {
+      if (typeof this.client?.llm?.model === 'function') {
         logger.debug('LMStudioProvider health check - SDK client available');
         return true;
       }
@@ -393,32 +399,32 @@ export class LMStudioProvider {
     }
   }
 
-  getConfig(): LMStudioConfig {
+  public getConfig(): LMStudioConfig {
     return { ...this.config };
   }
 
-  getModel(): string {
+  public getModel(): string {
     return this.model;
   }
 
-  setModel(model: string): void {
+  public setModel(model: string): void {
     this.model = model;
     logger.debug('LMStudioProvider model updated', { model: this.model });
   }
 
   // Legacy compatibility methods
-  async processRequest(request: LLMRequest): Promise<LLMResponse | string> {
+  public async processRequest(request: Readonly<LLMRequest>): Promise<LLMResponse | string> {
     logger.debug('LMStudioProvider processRequest called (legacy compatibility)');
 
     if (request.messages) {
-      const content = await this.chat(request.messages, request.options || {});
+      const content = await this.chat(request.messages, request.options ?? {});
       return {
         content,
         model: this.model,
         metadata: { requestType: 'chat' },
       };
     } else if (request.prompt) {
-      const content = await this.generateText(request.prompt, request.options || {});
+      const content = await this.generateText(request.prompt, request.options ?? {});
       return {
         content,
         model: this.model,
@@ -429,7 +435,7 @@ export class LMStudioProvider {
     }
   }
 
-  async checkStatus(): Promise<boolean> {
+  public checkStatus(): boolean {
     return this.healthCheck();
   }
 }

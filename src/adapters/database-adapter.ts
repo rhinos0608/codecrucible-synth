@@ -31,7 +31,7 @@ export interface CodeAnalysisRecord {
   projectId: number;
   filePath: string;
   analysisType: string;
-  results: any;
+  results: unknown;
   qualityScore?: number;
   createdAt?: Date;
 }
@@ -74,10 +74,10 @@ export interface DatabaseHealth {
  * Provides clean interface for all database operations
  */
 export class DatabaseAdapter extends EventEmitter {
-  private client: PostgreSQLClient;
-  private analyticsService: DataAnalyticsService;
+  private readonly client: PostgreSQLClient;
+  private readonly analyticsService: DataAnalyticsService;
 
-  constructor(client: PostgreSQLClient) {
+  public constructor(client: PostgreSQLClient) {
     super();
     this.client = client;
     this.analyticsService = new DataAnalyticsService();
@@ -89,7 +89,7 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Initialize the database adapter
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     await this.client.initialize();
     this.emit('initialized');
   }
@@ -99,7 +99,7 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Store a voice interaction with performance tracking
    */
-  async storeVoiceInteraction(interaction: VoiceInteractionRecord): Promise<number> {
+  public async storeVoiceInteraction(interaction: Readonly<VoiceInteractionRecord>): Promise<number> {
     const query = `
       INSERT INTO voice_interactions 
       (session_id, voice_name, prompt, response, confidence, tokens_used, response_time, created_at)
@@ -114,30 +114,30 @@ export class DatabaseAdapter extends EventEmitter {
       interaction.response,
       interaction.confidence,
       interaction.tokensUsed,
-      interaction.responseTime || null,
-      interaction.createdAt || new Date(),
+      interaction.responseTime ?? null,
+      interaction.createdAt ?? new Date(),
     ];
 
     try {
       const result = await this.client.query(query, params);
-      const id = result.rows[0]?.['id'];
+      const id: number = result.rows[0]?.id as number;
 
       this.emit('voiceInteractionStored', { id, sessionId: interaction.sessionId });
       return id;
     } catch (error) {
       this.emit('voiceInteractionError', { error, interaction });
-      throw new Error(`Failed to store voice interaction: ${error}`);
+      throw new Error(`Failed to store voice interaction: ${String(error)}`);
     }
   }
 
   /**
    * Retrieve session history with pagination
    */
-  async getSessionHistory(query: SessionHistoryQuery): Promise<VoiceInteractionRecord[]> {
+  public async getSessionHistory(query: Readonly<SessionHistoryQuery>): Promise<VoiceInteractionRecord[]> {
     const cacheKey = `session_history:${query.sessionId}:${query.limit}:${query.offset}`;
 
     // Try cache first
-    const cached = await this.client.getCachedResult(cacheKey);
+    const cached = (await this.client.getCachedResult(cacheKey)) as VoiceInteractionRecord[] | null;
     if (cached) {
       this.emit('sessionHistoryCacheHit', query);
       return cached;
@@ -147,7 +147,7 @@ export class DatabaseAdapter extends EventEmitter {
       SELECT * FROM voice_interactions 
       WHERE session_id = $1
     `;
-    const params: any[] = [query.sessionId];
+    const params: unknown[] = [query.sessionId];
     let paramIndex = 2;
 
     // Add date filters if provided
@@ -178,7 +178,17 @@ export class DatabaseAdapter extends EventEmitter {
 
     try {
       const result = await this.client.query(sql, params, { readReplica: true });
-      const interactions = this.mapToVoiceInteractionRecords(result.rows);
+      const interactions = this.mapToVoiceInteractionRecords(result.rows as Array<{
+        id?: number;
+        session_id: string;
+        voice_name: string;
+        prompt: string;
+        response: string;
+        confidence: number;
+        tokens_used: number;
+        response_time?: number | null;
+        created_at?: Date;
+      }>);
 
       // Cache results for 1 minute
       await this.client.setCachedResult(cacheKey, interactions, 60);
@@ -191,18 +201,18 @@ export class DatabaseAdapter extends EventEmitter {
       return interactions;
     } catch (error) {
       this.emit('sessionHistoryError', { error, query });
-      throw new Error(`Failed to retrieve session history: ${error}`);
+      throw new Error(`Failed to retrieve session history: ${String(error)}`);
     }
   }
 
   /**
    * Get voice interaction analytics
    */
-  async getVoiceAnalytics(query: AnalyticsQuery = {}): Promise<any> {
+  public async getVoiceAnalytics(query: Readonly<AnalyticsQuery> = {}): Promise<ReturnType<DataAnalyticsService['analyzeVoiceInteractions']>> {
     const cacheKey = `voice_analytics:${JSON.stringify(query)}`;
 
     // Try cache first
-    const cached = await this.client.getCachedResult(cacheKey);
+    const cached = await this.client.getCachedResult(cacheKey) as ReturnType<DataAnalyticsService['analyzeVoiceInteractions']> | null;
     if (cached) {
       return cached;
     }
@@ -212,7 +222,7 @@ export class DatabaseAdapter extends EventEmitter {
       FROM voice_interactions
       WHERE 1=1
     `;
-    const params: any[] = [];
+    const params: unknown[] = [];
     let paramIndex = 1;
 
     // Add filters
@@ -239,7 +249,7 @@ export class DatabaseAdapter extends EventEmitter {
     try {
       const result = await this.client.query(sql, params, { readReplica: true });
 
-      // Use domain service to analyze the data
+
       interface VoiceInteractionAnalyticsData {
         sessionId: string;
         voiceName: string;
@@ -249,13 +259,13 @@ export class DatabaseAdapter extends EventEmitter {
         responseTime?: number;
       }
 
-      const analyticsData: VoiceInteractionAnalyticsData[] = result.rows.map((row: any) => ({
-        sessionId: row['session_id'],
-        voiceName: row['voice_name'],
-        confidence: row['confidence'],
-        tokensUsed: row['tokens_used'],
-        createdAt: row['created_at'],
-        responseTime: typeof row['response_time'] === 'number' ? row['response_time'] : undefined,
+      const analyticsData: Readonly<VoiceInteractionAnalyticsData>[] = result.rows.map((row: Readonly<Record<string, unknown>>) => ({
+        sessionId: row.session_id as string,
+        voiceName: row.voice_name as string,
+        confidence: row.confidence as number,
+        tokensUsed: row.tokens_used as number,
+        createdAt: row.created_at as Date,
+        responseTime: (row.response_time as number | null) ?? undefined,
       }));
 
       const analytics = this.analyticsService.analyzeVoiceInteractions(analyticsData);
@@ -271,7 +281,7 @@ export class DatabaseAdapter extends EventEmitter {
       return analytics;
     } catch (error) {
       this.emit('voiceAnalyticsError', { error, query });
-      throw new Error(`Failed to generate voice analytics: ${error}`);
+      throw new Error(`Failed to generate voice analytics: ${String(error)}`);
     }
   }
 
@@ -280,7 +290,7 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Store code analysis result
    */
-  async storeCodeAnalysis(analysis: CodeAnalysisRecord): Promise<number> {
+  public async storeCodeAnalysis(analysis: Readonly<CodeAnalysisRecord>): Promise<number> {
     const query = `
       INSERT INTO code_analysis 
       (project_id, file_path, analysis_type, results, quality_score, created_at)
@@ -293,29 +303,31 @@ export class DatabaseAdapter extends EventEmitter {
       analysis.filePath,
       analysis.analysisType,
       JSON.stringify(analysis.results),
-      analysis.qualityScore || null,
-      analysis.createdAt || new Date(),
+      analysis.qualityScore ?? null,
+      analysis.createdAt ?? new Date(),
     ];
 
     try {
       const result = await this.client.query(query, params);
-      const id = result.rows[0]?.['id'];
+      const id: number = result.rows[0]?.id as number;
 
       this.emit('codeAnalysisStored', { id, projectId: analysis.projectId });
       return id;
     } catch (error) {
       this.emit('codeAnalysisError', { error, analysis });
-      throw new Error(`Failed to store code analysis: ${error}`);
+      throw new Error(`Failed to store code analysis: ${String(error)}`);
     }
   }
 
   /**
    * Get code analysis analytics
    */
-  async getCodeAnalysisAnalytics(query: AnalyticsQuery = {}): Promise<any> {
+  public async getCodeAnalysisAnalytics(
+    query: Readonly<AnalyticsQuery> = {}
+  ): Promise<ReturnType<DataAnalyticsService['analyzeCodeAnalysisResults']>> {
     const cacheKey = `code_analytics:${JSON.stringify(query)}`;
 
-    const cached = await this.client.getCachedResult(cacheKey);
+    const cached = await this.client.getCachedResult(cacheKey) as ReturnType<DataAnalyticsService['analyzeCodeAnalysisResults']> | null;
     if (cached) {
       return cached;
     }
@@ -325,7 +337,7 @@ export class DatabaseAdapter extends EventEmitter {
       FROM code_analysis
       WHERE 1=1
     `;
-    const params: any[] = [];
+    const params: unknown[] = [];
     let paramIndex = 1;
 
     if (query.fromDate) {
@@ -357,12 +369,12 @@ export class DatabaseAdapter extends EventEmitter {
       const result = await this.client.query(sql, params, { readReplica: true });
 
       const analytics = this.analyticsService.analyzeCodeAnalysisResults(
-        result.rows.map(row => ({
-          projectId: row['project_id'],
-          filePath: row['file_path'],
-          analysisType: row['analysis_type'],
-          qualityScore: row['quality_score'],
-          createdAt: row['created_at'],
+        result.rows.map((row: Readonly<Record<string, unknown>>) => ({
+          projectId: row.project_id as number,
+          filePath: row.file_path as string,
+          analysisType: row.analysis_type as string,
+          qualityScore: (row.quality_score as number | null) ?? 0,
+          createdAt: row.created_at as Date,
           results: {}, // Results not needed for analytics
         }))
       );
@@ -386,8 +398,8 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Create a new project
    */
-  async createProject(
-    project: Omit<ProjectRecord, 'id' | 'createdAt' | 'updatedAt'>
+  public async createProject(
+    project: Readonly<Omit<ProjectRecord, 'id' | 'createdAt' | 'updatedAt'>>
   ): Promise<number> {
     const query = `
       INSERT INTO projects (name, description, repository_url, created_at, updated_at)
@@ -398,34 +410,34 @@ export class DatabaseAdapter extends EventEmitter {
     const now = new Date();
     const params = [
       project.name,
-      project.description || null,
-      project.repositoryUrl || null,
+      project.description ?? null,
+      project.repositoryUrl ?? null,
       now,
       now,
     ];
 
     try {
       const result = await this.client.query(query, params);
-      const id = result.rows[0]?.['id'];
+      const id: number = result.rows[0]?.id as number;
 
       // Clear project-related caches
       await this.client.clearCache('project_*');
 
       this.emit('projectCreated', { id, name: project.name });
       return id;
-    } catch (error) {
+    } catch (error: unknown) {
       this.emit('projectCreationError', { error, project });
-      throw new Error(`Failed to create project: ${error}`);
+      throw new Error(`Failed to create project: ${String(error)}`);
     }
   }
 
   /**
    * Get all projects
    */
-  async getProjects(): Promise<ProjectRecord[]> {
+  public async getProjects(): Promise<ProjectRecord[]> {
     const cacheKey = 'projects_all';
 
-    const cached = await this.client.getCachedResult(cacheKey);
+    const cached = await this.client.getCachedResult(cacheKey) as ProjectRecord[] | null;
     if (cached) {
       return cached;
     }
@@ -438,14 +450,21 @@ export class DatabaseAdapter extends EventEmitter {
 
     try {
       const result = await this.client.query(query, [], { readReplica: true });
-      const projects = this.mapToProjectRecords(result.rows);
+      const projects = this.mapToProjectRecords(result.rows as Array<{
+        id?: number;
+        name: string;
+        description?: string | null;
+        repository_url?: string | null;
+        created_at?: Date;
+        updated_at?: Date;
+      }>);
 
       await this.client.setCachedResult(cacheKey, projects, 600); // 10 minutes
 
       return projects;
-    } catch (error) {
+    } catch (error: unknown) {
       this.emit('projectRetrievalError', { error });
-      throw new Error(`Failed to retrieve projects: ${error}`);
+      throw new Error(`Failed to retrieve projects: ${String(error)}`);
     }
   }
 
@@ -454,29 +473,29 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Bulk insert voice interactions
    */
-  async bulkInsertVoiceInteractions(interactions: VoiceInteractionRecord[]): Promise<void> {
+  public async bulkInsertVoiceInteractions(interactions: Readonly<VoiceInteractionRecord[]>): Promise<void> {
     if (interactions.length === 0) return;
 
     const query = `
       INSERT INTO voice_interactions 
       (session_id, voice_name, prompt, response, confidence, tokens_used, response_time, created_at)
       VALUES ${interactions
-        .map((_, i) => {
+        .map((_: Readonly<VoiceInteractionRecord>, i: number) => {
           const base = i * 8 + 1;
           return `($${base}, $${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`;
         })
         .join(', ')}
     `;
 
-    const params = interactions.flatMap(interaction => [
+    const params = interactions.flatMap((interaction: Readonly<VoiceInteractionRecord>) => [
       interaction.sessionId,
       interaction.voiceName,
       interaction.prompt,
       interaction.response,
       interaction.confidence,
       interaction.tokensUsed,
-      interaction.responseTime || null,
-      interaction.createdAt || new Date(),
+      interaction.responseTime ?? null,
+      interaction.createdAt ?? new Date(),
     ]);
 
     try {
@@ -565,7 +584,15 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Get comprehensive analytics combining all data types
    */
-  async getComprehensiveAnalytics(query: AnalyticsQuery = {}): Promise<any> {
+  public async getComprehensiveAnalytics(
+    query: Readonly<AnalyticsQuery> = {}
+  ): Promise<{
+    voice: ReturnType<DataAnalyticsService['analyzeVoiceInteractions']>;
+    code: ReturnType<DataAnalyticsService['analyzeCodeAnalysisResults']>;
+    database: ReturnType<PostgreSQLClient['getMetrics']>;
+    recommendations: unknown;
+    generatedAt: Date;
+  }> {
     const [voiceAnalytics, codeAnalytics] = await Promise.all([
       this.getVoiceAnalytics(query),
       this.getCodeAnalysisAnalytics(query),
@@ -609,8 +636,20 @@ export class DatabaseAdapter extends EventEmitter {
     this.client.on('healthCheckCompleted', data => this.emit('healthCheckCompleted', data));
   }
 
-  private mapToVoiceInteractionRecords(rows: any[]): VoiceInteractionRecord[] {
-    return rows.map(row => ({
+  private mapToVoiceInteractionRecords(
+    rows: ReadonlyArray<{
+      id?: number;
+      session_id: string;
+      voice_name: string;
+      prompt: string;
+      response: string;
+      confidence: number;
+      tokens_used: number;
+      response_time?: number | null;
+      created_at?: Date;
+    }>
+  ): VoiceInteractionRecord[] {
+    return rows.map((row) => ({
       id: row.id,
       sessionId: row.session_id,
       voiceName: row.voice_name,
@@ -618,17 +657,26 @@ export class DatabaseAdapter extends EventEmitter {
       response: row.response,
       confidence: row.confidence,
       tokensUsed: row.tokens_used,
-      responseTime: row.response_time,
+      responseTime: row.response_time ?? undefined,
       createdAt: row.created_at,
     }));
   }
 
-  private mapToProjectRecords(rows: any[]): ProjectRecord[] {
-    return rows.map(row => ({
+  private mapToProjectRecords(
+    rows: ReadonlyArray<{
+      id?: number;
+      name: string;
+      description?: string | null;
+      repository_url?: string | null;
+      created_at?: Date;
+      updated_at?: Date;
+    }>
+  ): ProjectRecord[] {
+    return rows.map((row) => ({
       id: row.id,
       name: row.name,
-      description: row.description,
-      repositoryUrl: row.repository_url,
+      description: row.description ?? undefined,
+      repositoryUrl: row.repository_url ?? undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));

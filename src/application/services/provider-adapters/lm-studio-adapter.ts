@@ -3,6 +3,7 @@ import {
   ModelResponse,
   StreamToken,
 } from '../../../domain/interfaces/model-client.js';
+import { LLMResponse } from '../../../domain/interfaces/llm-interfaces.js';
 import { LMStudioProvider } from '../../../providers/hybrid/lm-studio-provider.js';
 import { logger } from '../../../infrastructure/logging/unified-logger.js';
 import { ProviderAdapter } from './provider-adapter.js';
@@ -31,7 +32,19 @@ export class LMStudioAdapter implements ProviderAdapter {
     try {
       const requestOptions = {
         model: req.model || cfg.defaultModel,
-        messages: req.messages,
+        messages: req.messages?.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          tool_calls: msg.tool_calls?.map(tc => ({
+            id: (tc as any).id || '',
+            type: 'function' as const,
+            function: {
+              name: (tc as any).function?.name || '',
+              arguments: (tc as any).function?.arguments || '{}',
+            },
+          })),
+          tool_call_id: msg.tool_call_id,
+        })),
         prompt: req.prompt,
         maxTokens: req.maxTokens,
         temperature: req.temperature,
@@ -40,7 +53,7 @@ export class LMStudioAdapter implements ProviderAdapter {
         timeout: req.timeout,
       };
 
-      const response = await this.provider.request(requestOptions);
+      const response = await this.provider.request(requestOptions) as LLMResponse;
 
       return {
         id: response.id || `${this.name}_${Date.now()}`,
@@ -55,7 +68,7 @@ export class LMStudioAdapter implements ProviderAdapter {
         responseTime: response.responseTime,
         finishReason: response.finishReason || response.metadata?.finishReason || 'stop',
         toolCalls: response.toolCalls
-          ? response.toolCalls.map(tc => ({
+          ? response.toolCalls.map((tc: any) => ({
               id: tc.id,
               type: tc.type as 'function',
               function: {

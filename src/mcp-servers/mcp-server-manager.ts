@@ -8,26 +8,26 @@
  */
 
 import { logger } from '../infrastructure/logging/unified-logger.js';
-import { mcpServerRegistry, MCPServerDefinition } from './core/mcp-server-registry.js';
+import { MCPServerDefinition, mcpServerRegistry } from './core/mcp-server-registry.js';
 import {
-  enterpriseErrorHandler,
   EnterpriseErrorHandler,
+  enterpriseErrorHandler,
 } from '../infrastructure/error-handling/enterprise-error-handler.js';
 import {
   ErrorCategory,
   ErrorSeverity,
 } from '../infrastructure/error-handling/structured-error-system.js';
 import { mcpServerLifecycle } from './core/mcp-server-lifecycle.js';
-import { mcpServerSecurity, SecurityContext } from './core/mcp-server-security.js';
+import { SecurityContext, mcpServerSecurity } from './core/mcp-server-security.js';
 import { mcpServerMonitoring } from './core/mcp-server-monitoring.js';
 import { unifiedToolRegistry } from '../infrastructure/tools/unified-tool-registry.js';
-import { SmitheryMCPServer, SmitheryMCPConfig } from './smithery-mcp-server.js';
+import { SmitheryMCPConfig, SmitheryMCPServer } from './smithery-mcp-server.js';
 import { PathUtilities } from '../utils/path-utilities.js';
 import {
   ToolExecutionArgs,
   ToolExecutionContext,
-  ToolExecutionResult,
   ToolExecutionOptions,
+  ToolExecutionResult,
 } from '../infrastructure/types/tool-execution-types.js';
 
 // Define proper types for server management
@@ -100,11 +100,11 @@ export interface ServerHealth {
  * Clean, focused MCP Server Manager using dependency injection
  */
 export class MCPServerManager {
-  private config: MCPServerConfig;
+  private readonly config: Readonly<MCPServerConfig>;
   private smitheryServer?: SmitheryMCPServer;
   private isInitialized = false;
 
-  constructor(config: MCPServerConfig) {
+  public constructor(config: Readonly<MCPServerConfig>) {
     this.config = config;
     this.registerServerDefinitions();
   }
@@ -176,7 +176,7 @@ export class MCPServerManager {
     }
 
     // Register all definitions
-    serverDefinitions.forEach(definition => {
+    serverDefinitions.forEach((definition: Readonly<MCPServerDefinition>) => {
       mcpServerRegistry.register(definition);
     });
 
@@ -186,7 +186,7 @@ export class MCPServerManager {
   /**
    * Initialize the MCP server system
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     if (this.isInitialized) {
       logger.warn('MCPServerManager already initialized');
       return;
@@ -224,14 +224,14 @@ export class MCPServerManager {
         }
       }
 
-      throw structuredError;
+      if (structuredError instanceof Error) {
+        throw structuredError;
+      } else {
+        throw new Error('Unknown initialization error');
+      }
     }
   }
-
-  /**
-   * Start all registered servers
-   */
-  async startServers(): Promise<void> {
+  public async startServers(): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize();
     }
@@ -253,12 +253,9 @@ export class MCPServerManager {
     logger.info('All MCP servers started via lifecycle manager');
   }
 
-  /**
-   * Start a specific server
-   */
-  async startServer(serverName: string): Promise<void> {
+  public async startServer(serverName: string): Promise<void> {
     if (!mcpServerRegistry.isServerAvailable(serverName)) {
-      const error = EnterpriseErrorHandler.createEnterpriseError(
+      const errorObj = EnterpriseErrorHandler.createEnterpriseError(
         `Server ${serverName} not registered or disabled`,
         ErrorCategory.NOT_FOUND,
         ErrorSeverity.MEDIUM,
@@ -270,12 +267,21 @@ export class MCPServerManager {
         }
       );
 
-      throw error;
+      if (errorObj instanceof Error) {
+        throw errorObj;
+      } else {
+        throw new Error('Unknown server access error');
+      }
     }
 
-    const server = await mcpServerRegistry.getServer(serverName);
-    if (server && typeof server.initialize === 'function') {
-      await server.initialize();
+    const server: unknown = await mcpServerRegistry.getServer(serverName);
+    if (
+      server &&
+      typeof server === 'object' &&
+      'initialize' in server &&
+      typeof (server as { initialize: () => Promise<void> }).initialize === 'function'
+    ) {
+      await (server as { initialize: () => Promise<void> }).initialize();
     }
 
     logger.info(`Server ${serverName} started`);
@@ -285,11 +291,11 @@ export class MCPServerManager {
    * Execute a tool with unified security and monitoring using strict typing
    * Ensures initialization is complete before tool execution
    */
-  async executeTool(
+  public async executeTool(
     toolName: string,
-    args: ToolExecutionArgs,
-    context: ToolExecutionContext = {},
-    options: ToolExecutionOptions = {}
+    args: Readonly<ToolExecutionArgs>,
+    context: Readonly<ToolExecutionContext> = {},
+    _options: Readonly<ToolExecutionOptions> = {}
   ): Promise<ToolExecutionResult> {
     // Ensure initialization is complete before executing tools
     if (!this.isInitialized) {
@@ -297,7 +303,7 @@ export class MCPServerManager {
       await this.initialize();
     }
     // Normalize paths before security validation to handle AI-generated paths
-    const normalizedPath = this.normalizeAIPath(args.path || args.directory || args.filePath);
+    const normalizedPath = this.normalizeAIPath(args.path ?? args.directory ?? args.filePath);
 
     const securityContext: SecurityContext = {
       userId: context.userId,
@@ -305,11 +311,12 @@ export class MCPServerManager {
       operation: this.inferOperation(toolName),
       resourceType: this.inferResourceType(toolName),
       requestedPath: normalizedPath,
-      riskLevel: context.riskLevel || 'medium',
+      riskLevel: context.riskLevel ?? 'medium',
     };
 
     // Security validation
     let securityResult: { allowed: boolean; reason?: string; sanitizedPath?: string } | null = null;
+    let sanitizedArgs: Readonly<Record<string, unknown>> = args;
     if (securityContext.requestedPath) {
       securityResult = await mcpServerSecurity.validateFileSystemOperation(
         securityContext.requestedPath,
@@ -322,16 +329,19 @@ export class MCPServerManager {
 
       // Use sanitized path if available
       if (securityResult.sanitizedPath) {
-        args.path = securityResult.sanitizedPath;
-        args.directory = securityResult.sanitizedPath;
-        args.filePath = securityResult.sanitizedPath;
+        sanitizedArgs = {
+          ...args,
+          path: securityResult.sanitizedPath,
+          directory: securityResult.sanitizedPath,
+          filePath: securityResult.sanitizedPath,
+        };
       }
     }
 
     // Execute through unified tool registry
     const startTime = Date.now();
     try {
-      const result = await unifiedToolRegistry.executeTool(toolName, args, context);
+      const result = await unifiedToolRegistry.executeTool(toolName, sanitizedArgs, context);
 
       // Record successful operation
       const serverId = this.getServerIdForTool(toolName);
@@ -359,7 +369,7 @@ export class MCPServerManager {
       return executionResult;
     } catch (error) {
       // Use enterprise error handler for tool execution failures
-      const structuredError = await enterpriseErrorHandler.handleEnterpriseError(error as Error, {
+      await enterpriseErrorHandler.handleEnterpriseError(error as Error, {
         operation: 'tool_execution',
         resource: 'mcp_tool',
         context: {
@@ -409,26 +419,29 @@ export class MCPServerManager {
   /**
    * Secure file operations - delegates to filesystem server
    */
-  async readFileSecure(filePath: string): Promise<string> {
+  public async readFileSecure(filePath: string): Promise<string> {
     const result = await this.executeTool('read_file', { path: filePath });
-    return result.data || '';
+    // Ensure result.data is a string
+    return typeof result.data === 'string' ? result.data : '';
   }
 
-  async writeFileSecure(filePath: string, content: string): Promise<void> {
+  public async writeFileSecure(filePath: string, content: string): Promise<void> {
     await this.executeTool('write_file', { path: filePath, content });
   }
 
-  async listDirectorySecure(directoryPath: string): Promise<string[]> {
+  public async listDirectorySecure(directoryPath: string): Promise<string[]> {
     const result = await this.executeTool('list_files', { directory: directoryPath });
-    return result.data || [];
+    // Ensure result.data is an array of strings
+    return Array.isArray(result.data) ? result.data as string[] : [];
   }
 
-  async getFileStats(
+  public async getFileStats(
     filePath: string
   ): Promise<{ exists: boolean; size?: number; modified?: Date }> {
     try {
       // First check if file exists
-      const exists = await this.executeTool('file_exists', { path: filePath });
+      const existsResult = await this.executeTool('file_exists', { path: filePath });
+      const exists = !!(existsResult.data as boolean);
 
       if (!exists) {
         return { exists: false };
@@ -436,12 +449,22 @@ export class MCPServerManager {
 
       // Get real file stats using filesystem tools
       const statsResult = await this.executeTool('get_file_info', { path: filePath });
-      const stats = statsResult.data;
+      const stats = statsResult.data as { size?: number; modified?: string | number | Date } | undefined;
+
+      let size: number | undefined = undefined;
+      let modified: Date | undefined = undefined;
+
+      if (stats && typeof stats === 'object') {
+        size = typeof stats.size === 'number' ? stats.size : undefined;
+        if (stats.modified !== undefined) {
+          modified = new Date(stats.modified);
+        }
+      }
 
       return {
         exists: true,
-        size: stats?.size || 0,
-        modified: stats?.modified ? new Date(stats.modified) : new Date(),
+        size: size ?? 0,
+        modified: modified ?? new Date(),
       };
     } catch (error) {
       logger.warn(`Failed to get file stats for ${filePath}:`, error);
@@ -449,7 +472,8 @@ export class MCPServerManager {
       // Fallback to basic exists check
       try {
         const existsResult = await this.executeTool('file_exists', { path: filePath });
-        return { exists: existsResult.data || false, size: undefined, modified: undefined };
+        const exists = !!(existsResult.data as boolean);
+        return { exists, size: undefined, modified: undefined };
       } catch (fallbackError) {
         return { exists: false };
       }
@@ -459,15 +483,16 @@ export class MCPServerManager {
   /**
    * Secure command execution - delegates to terminal server
    */
-  async executeCommandSecure(command: string, args: string[] = []): Promise<string> {
-    const result = await this.executeTool('execute_command', { command, args });
-    return result.data || '';
+  public async executeCommandSecure(command: string, args: ReadonlyArray<string> = []): Promise<string> {
+    const result = await this.executeTool('execute_command', { command, args: [...args] });
+    // Ensure result.data is a string
+    return typeof result.data === 'string' ? result.data : '';
   }
 
   /**
    * Get health status of all servers (matches McpManager interface)
    */
-  async getHealthStatus(): Promise<{
+  public getHealthStatus(): {
     overall: 'healthy' | 'degraded' | 'critical';
     servers: Array<{
       serverId: string;
@@ -484,26 +509,32 @@ export class MCPServerManager {
       smitheryTools?: number;
       smitheryServers?: number;
     };
-  }> {
+  } {
     const healthStatuses = mcpServerLifecycle.getHealthStatus();
 
     // Get real capability counts
-    const capabilities = await this.getServerCapabilities();
+    const capabilities = this.getServerCapabilities();
 
     // Transform server health data to match expected format
-    const servers = healthStatuses.map(healthStatus => {
+    type HealthStatus = Readonly<{
+      serverId: string;
+      status: string;
+      lastCheck?: Date;
+    }>;
+
+    const servers = healthStatuses.map((healthStatus: Readonly<HealthStatus>) => {
       const serverMetrics = mcpServerMonitoring.getServerMetrics(healthStatus.serverId);
 
       return {
         serverId: healthStatus.serverId,
         status: this.mapHealthToMcpStatus(healthStatus.status),
-        uptime: Date.now() - (healthStatus.lastCheck?.getTime() || Date.now()),
+        uptime: Date.now() - (healthStatus.lastCheck?.getTime() ?? Date.now()),
         successRate: serverMetrics
           ? (serverMetrics.metrics.successfulRequests /
               Math.max(1, serverMetrics.metrics.totalRequests)) *
             100
           : 0,
-        lastSeen: healthStatus.lastCheck || new Date(),
+        lastSeen: healthStatus.lastCheck ? healthStatus.lastCheck : new Date(),
       };
     });
 
@@ -524,7 +555,7 @@ export class MCPServerManager {
 
     // Get Smithery stats if available
     const smitheryEnabled = !!this.smitheryServer;
-    const smitheryTools = smitheryEnabled ? this.smitheryServer!.getAvailableTools().length : 0;
+    const smitheryTools = smitheryEnabled ? this.smitheryServer?.getAvailableTools().length ?? 0 : 0;
     const smitheryServers = smitheryEnabled ? 1 : 0;
 
     // Get actual registry status based on server registrations
@@ -558,11 +589,11 @@ export class MCPServerManager {
   /**
    * Get real server capabilities from active services
    */
-  private async getServerCapabilities(): Promise<{
+  private getServerCapabilities(): {
     toolCount: number;
     resourceCount: number;
     promptCount: number;
-  }> {
+  } {
     let totalToolCount = 0;
     let totalResourceCount = 0;
     let totalPromptCount = 0;
@@ -605,14 +636,14 @@ export class MCPServerManager {
   /**
    * List available servers
    */
-  async listServers(): Promise<string[]> {
+  public listServers(): string[] {
     return mcpServerRegistry.getRegisteredServerIds();
   }
 
   /**
    * Get monitoring summary (matches McpManager interface)
    */
-  getMonitoringSummary(): {
+  public getMonitoringSummary(): {
     totalRequests: number;
     successCount: number;
     errorCount: number;
@@ -624,8 +655,8 @@ export class MCPServerManager {
     const servers = mcpServerMonitoring.getAllServerMetrics();
 
     // Calculate interface-expected values from available data
-    const successCount = servers.reduce((sum, s) => sum + s.metrics.successfulRequests, 0);
-    const totalRequests = actualSummary.totalRequests;
+    const successCount = servers.reduce((sum: number, s: Readonly<{ readonly metrics: { readonly successfulRequests: number } }>) => sum + s.metrics.successfulRequests, 0);
+    const { totalRequests } = actualSummary;
     const errorCount = totalRequests - successCount;
     const uptimePercentage =
       (actualSummary.healthyServers / Math.max(1, actualSummary.totalServers)) * 100;
@@ -643,7 +674,7 @@ export class MCPServerManager {
   /**
    * Graceful shutdown
    */
-  async shutdown(): Promise<void> {
+  public async shutdown(): Promise<void> {
     logger.info('🛑 Shutting down MCP Server Manager');
 
     // Shutdown Smithery server
@@ -742,7 +773,7 @@ export class MCPServerManager {
     return null;
   }
 
-  getServerStatus(serverId: string): ServerStatus {
+  public getServerStatus(serverId: string): ServerStatus {
     // Return basic server status for the given server ID
     return {
       id: serverId,
@@ -785,13 +816,13 @@ export class MCPServerManager {
     }
   }
 
-  async healthCheck(): Promise<HealthCheckResult> {
-    const serverIds = await this.listServers();
+  public async healthCheck(): Promise<HealthCheckResult> {
+    const serverIds = this.listServers();
     const serverStatuses = await Promise.all(
-      serverIds.map(async serverId => {
-        const status = await this.getServerStatus(serverId);
+      serverIds.map((serverId) => {
+        const status = this.getServerStatus(serverId);
         return {
-          serverId: serverId,
+          serverId,
           status: status.status,
           uptime: 0, // Would need to track actual uptime
           lastChecked: new Date(),
@@ -799,7 +830,7 @@ export class MCPServerManager {
       })
     );
 
-    const allHealthy = serverStatuses.every(server => server.status === 'running');
+    const allHealthy = serverStatuses.every((server: Readonly<{ status: string }>) => server.status === 'running');
 
     return {
       status: allHealthy ? 'healthy' : 'degraded',

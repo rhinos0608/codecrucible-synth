@@ -194,7 +194,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
           // Trim content if it exceeds maximum length (sliding window)
           if (progress.currentContent.length > maxContentLength) {
             const trimStart = progress.currentContent.length - maxContentLength * 0.8; // Keep 80%
-            progress.currentContent = '...' + progress.currentContent.slice(trimStart);
+            progress.currentContent = `...${progress.currentContent.slice(trimStart)}`;
           }
 
           progress.tokensGenerated += this.estimateTokensInDelta(chunk.delta);
@@ -291,21 +291,21 @@ export class StreamingWorkflowIntegration extends EventEmitter {
   /**
    * Get current streaming status for a step
    */
-  getStreamingStatus(stepId: string): StreamingProgress | undefined {
+  public getStreamingStatus(stepId: string): StreamingProgress | undefined {
     return this.activeStreams.get(stepId);
   }
 
   /**
    * Get all active streaming sessions
    */
-  getActiveStreams(): StreamingProgress[] {
+  public getActiveStreams(): StreamingProgress[] {
     return Array.from(this.activeStreams.values());
   }
 
   /**
    * Stop streaming for a specific step
    */
-  stopStreaming(stepId: string): void {
+  public stopStreaming(stepId: string): void {
     const interval = this.progressIntervals.get(stepId);
     if (interval) {
       clearInterval(interval);
@@ -319,11 +319,11 @@ export class StreamingWorkflowIntegration extends EventEmitter {
   /**
    * Update configuration
    */
-  updateConfig(config: Partial<StreamingWorkflowConfig>): void {
+  public updateConfig(config: Readonly<Partial<StreamingWorkflowConfig>>): void {
     this.config = { ...this.config, ...config };
 
     // Update streaming manager config too
-    if (config.chunkSize || config.bufferSize || config.timeout) {
+    if ((config.chunkSize ?? config.bufferSize ?? config.timeout) !== undefined) {
       this.streamingManager.updateConfig(config);
     }
   }
@@ -331,7 +331,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
   /**
    * Cleanup all active streams
    */
-  async cleanup(): Promise<void> {
+  public async cleanup(): Promise<void> {
     // Clear all progress intervals
     for (const [stepId, interval] of this.progressIntervals) {
       clearInterval(interval);

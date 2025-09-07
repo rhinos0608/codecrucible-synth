@@ -1,15 +1,15 @@
 import type { Command, CommandHandler } from '../command-bus.js';
 import type { OrchestrationRequest } from '../../services/unified-orchestration-service.js';
 
-export class AgentOperationHandler
-  implements CommandHandler<{ request: OrchestrationRequest }, any>
+export class AgentOperationHandler<TResponse>
+  implements CommandHandler<{ request: OrchestrationRequest }, TResponse>
 {
-  constructor(
+  public constructor(
     public readonly type: string,
-    private readonly processAgentRequest: (req: OrchestrationRequest) => Promise<any>
+    private readonly processAgentRequest: (req: Readonly<OrchestrationRequest>) => Promise<TResponse>
   ) {}
 
-  async handle(command: Command<{ request: OrchestrationRequest }>): Promise<any> {
+  public async handle(command: Command<{ readonly request: OrchestrationRequest }>): Promise<TResponse> {
     return this.processAgentRequest(command.payload.request);
   }
 }

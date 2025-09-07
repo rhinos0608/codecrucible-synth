@@ -78,35 +78,30 @@ export class ServerMode implements ServerModeInterface {
 
       // Create mock user interaction for server mode
       const mockUserInteraction = {
-        display(message: string): Promise<void> {
+        async display(message: string): Promise<void> {
           logger.info(`[Server] ${message}`);
-          return Promise.resolve();
         },
-        warn(message: string): Promise<void> {
+        async warn(message: string): Promise<void> {
           logger.warn(`[Server] ${message}`);
-          return Promise.resolve();
         },
-        error(message: string): Promise<void> {
+        async error(message: string): Promise<void> {
           logger.error(`[Server] ${message}`);
-          return Promise.resolve();
         },
-        success(message: string): Promise<void> {
+        async success(message: string): Promise<void> {
           logger.info(`[Server] Success: ${message}`);
-          return Promise.resolve();
         },
-        progress(message: string, progress?: number): Promise<void> {
+        async progress(message: string, progress?: number): Promise<void> {
           logger.info(`[Server] Progress: ${message}${progress ? ` (${progress}%)` : ''}`);
-          return Promise.resolve();
         },
-        prompt(question: string): Promise<string> {
+        async prompt(question: string): Promise<string> {
           logger.info(`[Server] Prompt: ${question} (auto-responding: yes)`);
-          return Promise.resolve('yes'); // Default response for server mode
+          return 'yes'; // Default response for server mode
         },
-        confirm(question: string): Promise<boolean> {
+        async confirm(question: string): Promise<boolean> {
           logger.info(`[Server] Confirm: ${question} (auto-responding: true)`);
-          return Promise.resolve(true); // Default response for server mode
+          return true; // Default response for server mode
         },
-        select(question: string, choices: readonly string[]): Promise<string> {
+        async select(question: string, choices: readonly string[]): Promise<string> {
           logger.info(`[Server] Select: ${question} (auto-responding: ${choices[0]})`);
           return Promise.resolve(choices[0] || 'default'); // Default to first choice
         },
@@ -189,22 +184,26 @@ export class ServerMode implements ServerModeInterface {
       console.log(chalk.cyan('🔧 MCP Protocol: enabled'));
 
       // Setup graceful shutdown
-      process.on('SIGINT', async () => {
+      process.on('SIGINT', () => {
         logger.info('Server shutdown initiated via SIGINT');
         console.log(chalk.yellow('\n🛑 Shutting down server...'));
         if (this.unifiedServer) {
-          await this.unifiedServer.stopAllServers();
+          void this.unifiedServer.stopAllServers()
+            .finally(() => process.exit(0));
+        } else {
+          process.exit(0);
         }
-        process.exit(0);
       });
 
-      process.on('SIGTERM', async () => {
+      process.on('SIGTERM', () => {
         logger.info('Server shutdown initiated via SIGTERM');
         console.log(chalk.yellow('\n🛑 Received SIGTERM, shutting down server...'));
         if (this.unifiedServer) {
-          await this.unifiedServer.stopAllServers();
+          this.unifiedServer.stopAllServers()
+            .finally(() => process.exit(0));
+        } else {
+          process.exit(0);
         }
-        process.exit(0);
       });
     } catch (error) {
       logger.error('Failed to start server mode', { error });
@@ -214,7 +213,7 @@ export class ServerMode implements ServerModeInterface {
   }
 
   // Additional legacy methods for compatibility
-  async getStatus(): Promise<ServerStatus> {
+  public getStatus(): ServerStatus {
     if (!this.unifiedServer) {
       return {
         running: false,
@@ -227,7 +226,7 @@ export class ServerMode implements ServerModeInterface {
     }
 
     return (
-      this.unifiedServer.getServerStatus('http') || {
+      this.unifiedServer.getServerStatus('http') ?? {
         running: false,
         type: 'http',
         connections: 0,
@@ -238,7 +237,7 @@ export class ServerMode implements ServerModeInterface {
     );
   }
 
-  async stop(): Promise<void> {
+  public async stop(): Promise<void> {
     if (this.unifiedServer) {
       await this.unifiedServer.stopAllServers();
     }

@@ -153,7 +153,7 @@ export class ProviderClient implements IProviderManager {
     }
   }
 
-  public registerProvider(provider: Readonly<IProvider>): void {
+  public async registerProvider(provider: Readonly<IProvider>): Promise<void> {
     if (this.providers.has(provider.id)) {
       throw new ProviderError(
         `Provider ${provider.id} is already registered`,

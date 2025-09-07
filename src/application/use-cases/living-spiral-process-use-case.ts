@@ -6,9 +6,11 @@
  * Imports: Domain services only (follows ARCHITECTURE.md)
  */
 
-import { IVoiceOrchestrationService } from '../../domain/services/voice-orchestration-service.js';
-import { ProcessingRequest } from '../../domain/entities/request.js';
+import { IVoiceOrchestrationService, SynthesisMode } from '../../domain/services/voice-orchestration-service.js';
+import { ProcessingRequest, RequestType } from '../../domain/entities/request.js';
+import { RequestPriority } from '../../domain/value-objects/voice-values.js';
 import { IModelClient } from '../../domain/interfaces/model-client.js';
+// SynthesisMode is now properly imported from voice-orchestration-service
 
 export interface LivingSpiralInput {
   initialPrompt: string;
@@ -41,12 +43,12 @@ export interface SpiralIteration {
  * Simplified single responsibility implementation
  */
 export class LivingSpiralProcessUseCase {
-  constructor(
-    private voiceOrchestrationService: IVoiceOrchestrationService,
-    private modelClient: IModelClient
+  public constructor(
+    private readonly voiceOrchestrationService: Readonly<IVoiceOrchestrationService>,
+    private readonly modelClient: Readonly<IModelClient>
   ) {}
 
-  async execute(input: LivingSpiralInput): Promise<LivingSpiralOutput> {
+  public async execute(input: Readonly<LivingSpiralInput>): Promise<LivingSpiralOutput> {
     const config = this.buildConfig(input);
     const iterations: SpiralIteration[] = [];
     let currentInput = input.initialPrompt;
@@ -77,10 +79,12 @@ export class LivingSpiralProcessUseCase {
     };
   }
 
+  // (Removed duplicate buildConfig method)
+
   private async executeSingleSpiral(
     input: string,
     iteration: number,
-    config: any
+    config: Readonly<{ maxIterations: number; qualityThreshold: number; enableReflection: boolean }>
   ): Promise<SpiralIteration> {
     const startTime = Date.now();
 
@@ -131,24 +135,29 @@ export class LivingSpiralProcessUseCase {
     }
   }
 
-  private async councilPhase(collapsed: {
-    output: string;
-    voices: string[];
-  }): Promise<{ output: string; voices: string[] }> {
-    const request = ProcessingRequest.create(
-      collapsed.output,
-      'multi-perspective-analysis' as any,
-      'medium',
-      {},
-      {}
-    );
+  private async councilPhase(
+    collapsed: Readonly<{ output: string; voices: readonly string[] }>
+  ): Promise<{ output: string; voices: string[] }> {
+    // Build the council request
+        const requestId = `council-${Date.now()}`;
+        const requestType = 'MultiPerspective' as unknown as RequestType; // Use proper RequestType
+        const priority = RequestPriority.medium(); // Create proper RequestPriority instance
+    
+        const request: ProcessingRequest = new ProcessingRequest(
+          requestId, // id
+          collapsed.output, // content
+          requestType, // type
+          priority, // priority
+          {}, // context
+          {} as Record<string, unknown> // constraints
+        );
 
     // Use multi-voice synthesis for council
-    const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
-      maxVoices: 3,
-      minVoices: 2,
-      synthesisMode: 'COLLABORATIVE' as any,
-    });
+        const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
+          maxVoices: 3,
+          minVoices: 2,
+          synthesisMode: SynthesisMode.COLLABORATIVE,
+        });
 
     const allVoices = [voiceSelection.primaryVoice, ...voiceSelection.supportingVoices];
 
@@ -175,7 +184,7 @@ export class LivingSpiralProcessUseCase {
     }
 
     // Synthesize council perspectives
-    const synthesisResult = await this.voiceOrchestrationService.synthesizeVoiceResponses(
+    const synthesisResult = this.voiceOrchestrationService.synthesizeVoiceResponses(
       responses,
       voiceSelection.synthesisMode
     );
@@ -186,10 +195,10 @@ export class LivingSpiralProcessUseCase {
     };
   }
 
-  private async synthesisPhase(council: {
+  private async synthesisPhase(council: Readonly<{
     output: string;
     voices: string[];
-  }): Promise<{ output: string; voices: string[] }> {
+  }>): Promise<{ output: string; voices: string[] }> {
     const prompt = this.buildSynthesisPrompt(council.output);
 
     try {

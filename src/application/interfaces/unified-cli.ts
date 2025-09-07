@@ -18,7 +18,6 @@ import {
 } from '../services/unified-cli-coordinator.js';
 import { IWorkflowOrchestrator } from '../../domain/interfaces/workflow-orchestrator.js';
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
-import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { IEventBus, getGlobalEventBus } from '../../domain/interfaces/event-bus.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-user-interaction.js';
@@ -26,9 +25,37 @@ import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import { cleanupApprovalManager } from '../../infrastructure/security/approval-modes-manager.js';
 import chalk from 'chalk';
-import { parseCommand, enrichContext, routeThroughTools, formatOutput } from '../cli/index.js';
+import { enrichContext, formatOutput, parseCommand, routeThroughTools } from '../cli/index.js';
 import { ApprovalHandler } from '../cli/approval-handler.js';
 import { InteractiveSessionHandler } from '../cli/interactive-session-handler.js';
+import { createUnifiedOrchestrationServiceWithContext } from '../services/unified-orchestration-service.js';
+import type { UnifiedConfigurationManager as DomainUnifiedConfigurationManager } from '../../domain/config/config-manager.js';
+
+// NOTE: Some service type declaration files may be missing or RuntimeContext may not be exported
+// from the original module; declare minimal local types here to avoid compile errors while keeping
+// the runtime behavior unchanged. These are intentionally lightweight and can be replaced with
+// upstream types when those modules are available.
+export interface UnifiedConfigurationManager {
+  get: <T = unknown>(key: string) => Promise<T | undefined>;
+  set: <T = unknown>(key: string, value: T) => Promise<void>;
+  has: (key: string) => Promise<boolean>;
+  // add other methods as required by the coordinator when types become available
+}
+
+export interface UnifiedResourceCoordinator {
+  acquireResource: (name: string) => Promise<unknown>;
+  releaseResource: (name: string) => Promise<void>;
+  listResources: () => Promise<string[]>;
+  // add other methods as required by the coordinator when types become available
+}
+
+export interface RuntimeContext {
+  workspaceRoot?: string;
+  env?: Record<string, string | undefined>;
+  // eventBus and resourceCoordinator may be provided at runtime; type them loosely here
+  eventBus?: IEventBus;
+  resourceCoordinator?: UnifiedResourceCoordinator;
+}
 
 export interface CLIOptions {
   verbose?: boolean;
@@ -67,6 +94,8 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   private coordinatorOverloadHandler?: (data: unknown) => void;
   private sigintHandler?: () => Promise<void>;
   private sigtermHandler?: () => Promise<void>;
+  private _sigintWrapper?: () => void;
+  private _sigtermWrapper?: () => void;
 
   public constructor(options: Readonly<CLIOptions> = {}) {
     super();
@@ -117,22 +146,61 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
 
     // Set up callbacks for interactive session handler
     this.interactiveSessionHandler.setCallbacks({
-      processPrompt: (prompt: string, options?: Record<string, unknown>) =>
+      processPrompt: async (prompt: string, options?: Readonly<Record<string, unknown>>) =>
         this.processPrompt(prompt, options),
       getSuggestions: async () => {
         const suggestions = await this.getSuggestions();
-        return suggestions.map(s => ({
+        return suggestions.map((s: Readonly<{ command: string; description: string; relevance: number }>) => ({
           command: s.command,
           description: s.description,
           relevance: s.relevance,
         }));
       },
-      showStatus: () => this.showStatus(),
-      execCommand: (name: string, args: readonly unknown[]) =>
+      showStatus: async () => { await this.showStatus(); },
+      execCommand: async (name: string, args: readonly unknown[]) =>
         this.execCommand(name, Array.from(args)),
     });
 
     this.setupEventHandlers();
+  }
+
+
+  /**
+   * Execute a plugin command by name with arguments.
+   */
+  public async execCommand(name: string, args: unknown[]): Promise<unknown> {
+    // Define an extended session interface to include missing properties with proper types
+    interface ExtendedCLISession extends CLISession {
+      configurationManager: Readonly<DomainUnifiedConfigurationManager>;
+      resourceCoordinator: UnifiedResourceCoordinator;
+    }
+    // Retrieve runtimeContext and configurationManager from coordinator/session as required
+    const session = this.currentSession;
+    const context = session?.context;
+    const extendedSession = session as ExtendedCLISession | null;
+    const configurationManager: Readonly<DomainUnifiedConfigurationManager> | undefined = extendedSession?.configurationManager;
+    const resourceCoordinator: UnifiedResourceCoordinator | undefined = extendedSession?.resourceCoordinator;
+    if (!session || !context || !configurationManager || !resourceCoordinator) {
+      throw new Error('Current session, context, configuration manager, or resource coordinator is not available.');
+    }
+    // Ensure runtimeContext has required properties: eventBus, resourceCoordinator
+    // Ensure eventBus is always defined for runtimeContext to satisfy type requirements
+    const runtimeContext: Readonly<RuntimeContext> = {
+      ...context,
+      eventBus: this.eventBus,
+      resourceCoordinator,
+    };
+
+    if (!runtimeContext.eventBus) {
+      throw new Error('EventBus is required in runtimeContext but was not provided.');
+    }
+
+    const svc = createUnifiedOrchestrationServiceWithContext(
+      runtimeContext as unknown as import('../runtime/runtime-context').RuntimeContext,
+      configurationManager,
+      this.userInteraction
+    );
+    return svc.executePluginCommand(name, ...args);
   }
 
   /**
@@ -264,7 +332,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
       const response = await this.coordinator.processOperation(request);
 
       if (response.success) {
-        return response.result as unknown;
+        return response.result;
       } else {
         throw new Error(response.error ?? 'Analysis failed');
       }
@@ -310,7 +378,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
       const response = await this.coordinator.processOperation(request);
 
       if (response.success) {
-        return response.result as unknown;
+        return response.result;
       } else {
         throw new Error(response.error ?? 'Tool execution failed');
       }
@@ -342,7 +410,12 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         description: string;
         examples: ReadonlyArray<string>;
         contextRelevance: number;
-      }> = await this.coordinator.getIntelligentCommands(context);
+      }> = await (this.coordinator.getIntelligentCommands as (context?: string) => Promise<ReadonlyArray<{
+        command: string;
+        description: string;
+        examples: ReadonlyArray<string>;
+        contextRelevance: number;
+      }>>)(context);
       return commands.map(
         (
           cmd: Readonly<{
@@ -376,14 +449,12 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
     // Get context information for display
     let contextInfo: { type?: string; language?: string; confidence?: number } = {};
     try {
-      const contextStatus = await this.coordinator.getQuickContextStatus();
-      if (contextStatus.basic) {
-        contextInfo = {
-          type: contextStatus.basic.type,
-          language: contextStatus.basic.language,
-          confidence: contextStatus.confidence,
-        };
-      }
+      const contextStatus = this.coordinator.getQuickContextStatus();
+      contextInfo = {
+        type: contextStatus.basic.type,
+        language: contextStatus.basic.language,
+        confidence: contextStatus.confidence,
+      };
     } catch (error) {
       // Silent fail for context status
     }
@@ -412,7 +483,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
             } catch {
               // ignore
             }
-            process.stdin.on('data', (chunk: Buffer | string) => {
+            process.stdin.on('data', (chunk: Readonly<Buffer> | string) => {
               data += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
             });
             process.stdin.on('end', () => {
@@ -563,7 +634,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
     riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'medium',
     hasWriteAccess: boolean = false
   ): Promise<{ approved: boolean; reason?: string }> {
-    return await this.approvalHandler.checkOperationApproval({
+    return this.approvalHandler.checkOperationApproval({
       operation,
       description,
       riskLevel,
@@ -627,7 +698,7 @@ ${chalk.yellow('Examples:')}
   public async showStatus(): Promise<void> {
     try {
       const metrics = this.coordinator.getSystemMetrics();
-      const contextStatus = await this.coordinator.getQuickContextStatus();
+      const contextStatus = this.coordinator.getQuickContextStatus();
 
       const status = `
 ${chalk.cyan('📊 System Status')}
@@ -695,7 +766,8 @@ ${chalk.yellow('Capabilities:')}
   public async listModels(): Promise<void> {
     try {
       // Mock model list until coordinator method is implemented
-      const models = [
+      interface Model { name: string; description?: string; provider?: string }
+      const models: Model[] = [
         { name: 'qwen2.5-coder:7b', description: 'Fast coding model', provider: 'Ollama' },
         { name: 'deepseek-coder:8b', description: 'Advanced reasoning model', provider: 'Ollama' },
         { name: 'llama3.2:3b', description: 'General purpose model', provider: 'Ollama' },
@@ -707,7 +779,7 @@ ${chalk.yellow('Capabilities:')}
       }
 
       let output = `\n${chalk.cyan('🤖 Available Models:')}\n`;
-      models.forEach((model: any, index: number) => {
+      models.forEach((model: Model, index: number) => {
         output += `\n${chalk.green(`${index + 1}.`)} ${model.name}`;
         if (model.description) {
           output += `\n   ${model.description}`;
@@ -726,34 +798,37 @@ ${chalk.yellow('Capabilities:')}
   /**
    * Execute prompt processing (alias for processPrompt for backward compatibility)
    */
-  public async executePromptProcessing(prompt: string, options: any = {}): Promise<string> {
-    return await this.processPrompt(prompt, options);
+  public async executePromptProcessing(
+    prompt: string,
+    options: Readonly<Record<string, unknown>> = {}
+  ): Promise<string> {
+    return this.processPrompt(prompt, options);
   }
 
   /**
    * Get current session
    */
-  getCurrentSession(): CLISession | null {
+  public getCurrentSession(): CLISession | null {
     return this.currentSession;
   }
 
   /**
    * Get system metrics
    */
-  getMetrics(): any {
+  public getMetrics(): ReturnType<UnifiedCLICoordinator['getSystemMetrics']> {
     return this.coordinator.getSystemMetrics();
   }
 
   /**
    * Shutdown and cleanup
    */
-  async shutdown(): Promise<void> {
+  public shutdown(): void {
     if (this.currentSession) {
-      await this.coordinator.closeSession(this.currentSession.id);
+      this.coordinator.closeSession(this.currentSession.id);
       this.currentSession = null;
     }
 
-    await this.coordinator.shutdown();
+    this.coordinator.shutdown();
     this.cleanupEventHandlers();
 
     // Cleanup modular components
@@ -767,57 +842,28 @@ ${chalk.yellow('Capabilities:')}
     this.removeAllListeners();
   }
 
-  async dispose(): Promise<void> {
-    await this.shutdown();
+  public dispose(): void {
+    this.shutdown();
   }
 
   private cleanupEventHandlers(): void {
     if (this.coordinatorInitializedHandler) {
       this.coordinator.off('initialized', this.coordinatorInitializedHandler);
-      this.coordinatorInitializedHandler = undefined;
     }
     if (this.coordinatorCriticalHandler) {
       this.coordinator.off('error:critical', this.coordinatorCriticalHandler);
-      this.coordinatorCriticalHandler = undefined;
     }
     if (this.coordinatorOverloadHandler) {
-      this.coordinator.off('error:overload', this.coordinatorOverloadHandler);
-      this.coordinatorOverloadHandler = undefined;
+    if (this._sigintWrapper) {
+      process.off('SIGINT', this._sigintWrapper);
     }
-    if (this.sigintHandler) {
-      process.off('SIGINT', this.sigintHandler);
-      this.sigintHandler = undefined;
+    if (this._sigtermWrapper) {
+      process.off('SIGTERM', this._sigtermWrapper);
     }
-    if (this.sigtermHandler) {
-      process.off('SIGTERM', this.sigtermHandler);
-      this.sigtermHandler = undefined;
-    }
-  }
-
-  private async showCommands(): Promise<void> {
-    try {
-      const { UnifiedOrchestrationService } = await import(
-        '../services/unified-orchestration-service.js'
-      );
-      const svc = await UnifiedOrchestrationService.getInstance();
-      const cmds = svc.listPluginCommands();
-      if (!cmds.length) {
-        await this.userInteraction.display('No plugin commands registered.');
-        return;
+      if (this._sigtermWrapper) {
+        process.off('SIGTERM', this._sigtermWrapper);
       }
-      const lines = cmds.map(c => `- ${c.name}${c.description ? `: ${c.description}` : ''}`);
-      await this.userInteraction.display(['Available commands:', ...lines].join('\n'));
-    } catch (err) {
-      await this.userInteraction.error(`Failed to list commands: ${getErrorMessage(err)}`);
     }
-  }
-
-  private async execCommand(name: string, args: any[]): Promise<any> {
-    const { UnifiedOrchestrationService } = await import(
-      '../services/unified-orchestration-service.js'
-    );
-    const svc = await UnifiedOrchestrationService.getInstance();
-    return svc.executePluginCommand(name, ...(args || []));
   }
 
   /**
@@ -825,64 +871,77 @@ ${chalk.yellow('Capabilities:')}
    */
   private setupEventHandlers(): void {
     // Forward coordinator events
-    this.coordinatorInitializedHandler = () => {
+    this.coordinatorInitializedHandler = (): void => {
       this.emit('coordinator:initialized');
     };
     this.coordinator.on('initialized', this.coordinatorInitializedHandler);
 
-    this.coordinatorCriticalHandler = data => {
+    this.coordinatorCriticalHandler = (data: unknown): void => {
       this.emit('error:critical', data);
       this.logger.error('Critical error in CLI coordinator:', data);
     };
     this.coordinator.on('error:critical', this.coordinatorCriticalHandler);
 
-    this.coordinatorOverloadHandler = data => {
+    this.coordinatorOverloadHandler = (data: unknown): void => {
       this.emit('error:overload', data);
       this.logger.warn('System overload in CLI coordinator:', data);
     };
     this.coordinator.on('error:overload', this.coordinatorOverloadHandler);
 
     // Handle process termination
-    this.sigintHandler = async () => {
+    // Wrap async handlers in a synchronous function for process.on/off
+    this.sigintHandler = async (): Promise<void> => {
       await this.userInteraction.display('\n👋 Shutting down gracefully...');
-      await this.shutdown();
-      process.exit(0);
+      this.shutdown();
     };
-    process.on('SIGINT', this.sigintHandler);
+    const sigintWrapper: () => void = () => {
+      // Call the async handler, but don't await since process.on expects a sync function
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      this.sigintHandler?.();
+    };
+    process.on('SIGINT', sigintWrapper);
 
-    this.sigtermHandler = async () => {
-      await this.shutdown();
+    this.sigtermHandler = async (): Promise<void> => {
+      this.shutdown();
       process.exit(0);
     };
-    process.on('SIGTERM', this.sigtermHandler);
+    const sigtermWrapper: () => void = () => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      this.sigtermHandler?.();
+    };
+    process.on('SIGTERM', sigtermWrapper);
+
+    // Store wrappers for removal
+    this._sigintWrapper = sigintWrapper;
+    this._sigtermWrapper = sigtermWrapper;
   }
 
   // REPLInterface implementation
-  async start(): Promise<void> {
+  public async start(): Promise<void> {
     await this.startInteractive();
   }
 
-  async stop(): Promise<void> {
-    await this.shutdown();
+  public async stop(): Promise<void> {
+    this.shutdown();
   }
 
-  async processCommand(command: string): Promise<string> {
-    return await this.processPrompt(command);
+  public async processCommand(command: string): Promise<string> {
+    return this.processPrompt(command);
   }
 
-  async read(): Promise<string> {
-    return await this.userInteraction.prompt('🤖 > ');
+  public async read(): Promise<string> {
+    return this.userInteraction.prompt('🤖 > ');
   }
 
-  async eval(input: string): Promise<string> {
-    return await this.processPrompt(input);
+  public async eval(input: string): Promise<string> {
+    return this.processPrompt(input);
   }
 
-  async print(output: string): Promise<void> {
+  public async print(output: string): Promise<void> {
     await this.userInteraction.display(output);
   }
 
-  async loop(): Promise<void> {
+  public async loop(): Promise<void> {
     await this.startInteractive();
   }
 

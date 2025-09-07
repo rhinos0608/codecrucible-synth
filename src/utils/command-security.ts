@@ -5,7 +5,7 @@ let allowedCommands: string[] = [];
 const allowlistPath = path.resolve(process.cwd(), 'shared/command-allowlist.json');
 try {
   const data = fs.readFileSync(allowlistPath, 'utf-8');
-  allowedCommands = JSON.parse(data);
+  allowedCommands = JSON.parse(data) as string[];
 } catch (err) {
   console.error(`Failed to load allowlist from ${allowlistPath}:`, err);
   allowedCommands = [];
@@ -24,7 +24,7 @@ export function validateCommand(command: string): { isValid: boolean; reason?: s
     }
   }
 
-  const baseCommand = command.split(' ')[0];
+  const [baseCommand] = command.split(' ');
   if (!allowedCommands.includes(baseCommand)) {
     return { isValid: false, reason: `Command not allowed: ${baseCommand}` };
   }

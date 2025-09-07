@@ -14,7 +14,7 @@ import {
   UnifiedConfigurationManager,
   getUnifiedConfigurationManager,
 } from '../../domain/config/config-manager.js';
-import { UnifiedAgentSystem, ProjectContext } from '../../domain/services/unified-agent-system.js';
+import { ProjectContext, UnifiedAgentSystem } from '../../domain/services/unified-agent-system.js';
 import { UnifiedServerSystem } from '../../domain/services/unified-server-system.js';
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { UnifiedPerformanceSystem } from '../../domain/services/unified-performance-system.js';
@@ -30,8 +30,8 @@ import { RuntimeContext } from '../runtime/runtime-context.js';
 // Interface for runtime context with optional Rust backend
 interface RuntimeContextWithBackend extends RuntimeContext {
   rustBackend?: {
-    isAvailable(): boolean;
-    execute(request: unknown): Promise<unknown>;
+    isAvailable: () => boolean;
+    execute: (request: unknown) => Promise<unknown>;
   };
 }
 
@@ -165,8 +165,8 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
       this.securityValidator = new UnifiedSecurityValidator(securityLogger);
       this.performanceSystem = new UnifiedPerformanceSystem(performanceLogger, this.eventBus);
-      this.registerCleanup(async (): Promise<void> => {
-        await this.performanceSystem.shutdown();
+      this.registerCleanup((): void => {
+        this.performanceSystem.shutdown();
       });
 
       // Initialize agent system
@@ -225,7 +225,9 @@ export class UnifiedOrchestrationService extends EventEmitter {
       this.commandBus = new CommandBus();
       this.commandRegistry = new CommandRegistry(this.commandBus);
       // register generic plugin dispatch
-      this.commandBus.register(new PluginDispatchHandler(this.commandRegistry) as any);
+      this.commandBus.register(
+        new PluginDispatchHandler(this.commandRegistry) as unknown as Readonly<import('../cqrs/command-bus.js').CommandHandler<unknown, unknown>>
+      );
       const agentOps: Array<OrchestrationRequest['type']> = [
         'analyze',
         'generate',
@@ -237,14 +239,24 @@ export class UnifiedOrchestrationService extends EventEmitter {
       ];
       for (const op of agentOps) {
         this.commandBus.register(
-          new AgentOperationHandler(`agent:${op}`, async (req): Promise<unknown> => this.processAgentRequest(req)) as any
+          new AgentOperationHandler(
+            `agent:${op}`,
+            async (req: Readonly<OrchestrationRequest>): Promise<unknown> => this.processAgentRequest(req)
+          ) as unknown as Readonly<import('../cqrs/command-bus.js').CommandHandler<unknown, unknown>>
         );
       }
 
       // Initialize Plugin System
       this.pluginManager = new PluginManager({
-        registerCommand: (name: string, handler: Function) => {
-          this.commandRegistry?.register(name, handler as (...args: any[]) => any, { plugin: 'plugin' });
+        registerCommand: (
+          name: Readonly<string>,
+          handler: (...args: ReadonlyArray<unknown>) => unknown
+        ): void => {
+          this.commandRegistry?.register(
+            name,
+            handler,
+            { plugin: 'plugin' }
+          );
           this.eventBus.emit('plugin:command_registered', { name });
         },
       });
@@ -271,7 +283,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
     }
   }
 
-  async processRequest(request: OrchestrationRequest): Promise<OrchestrationResponse> {
+  public async processRequest(request: Readonly<OrchestrationRequest>): Promise<OrchestrationResponse> {
     if (!this.initialized) {
       throw new Error('Orchestration service not initialized');
     }
@@ -315,7 +327,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
       }
 
       const processingTime = Date.now() - startTime;
-      const resourceUsage = await this.getResourceUsage();
+      const resourceUsage = this.getResourceUsage();
 
       const response: OrchestrationResponse = {
         id: request.id,
@@ -340,7 +352,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
         metadata: {
           processingTime,
           componentsUsed: [],
-          resourceUsage: await this.getResourceUsage(),
+          resourceUsage: this.getResourceUsage(),
         },
       };
 
@@ -353,17 +365,17 @@ export class UnifiedOrchestrationService extends EventEmitter {
     }
   }
 
-  private async processAgentRequest(request: OrchestrationRequest): Promise<unknown> {
+  private async processAgentRequest(request: Readonly<OrchestrationRequest>): Promise<unknown> {
     // Map OrchestrationRequest types to AgentRequest types
     const typeMapping: Record<OrchestrationRequest['type'], string> = {
-      'analyze': 'analyze',
-      'generate': 'generate', 
-      'refactor': 'refactor',
-      'test': 'test',
-      'document': 'document',
-      'debug': 'debug',
-      'optimize': 'optimize',
-      'serve': 'file-operation' // Map serve to file-operation since serve isn't supported by AgentRequest
+      analyze: 'analyze',
+      generate: 'generate', 
+      refactor: 'refactor',
+      test: 'test',
+      document: 'document',
+      debug: 'debug',
+      optimize: 'optimize',
+      serve: 'file-operation' // Map serve to file-operation since serve isn't supported by AgentRequest
     };
 
     const agentRequest = {
@@ -414,7 +426,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
     }
 
     const response = await this.agentSystem.processRequest(agentRequest);
-    return response.result;
+    return response.result as unknown;
   }
 
   private async processServerRequest(request: OrchestrationRequest): Promise<{
@@ -559,7 +571,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
   }
 
   // Service management methods
-  async startServer(port: number = 3002, options?: Record<string, unknown>): Promise<unknown> {
+  public async startServer(port: number = 3002, options?: Readonly<Record<string, unknown>>): Promise<unknown> {
     const serverRequest: OrchestrationRequest = {
       id: `server-${Date.now()}`,
       type: 'serve',
@@ -567,16 +579,14 @@ export class UnifiedOrchestrationService extends EventEmitter {
       options: { priority: 'high' },
     };
 
-    return await this.processRequest(serverRequest);
+    return this.processRequest(serverRequest);
   }
 
-  async stopServer(): Promise<void> {
-    if (this.serverSystem) {
-      await this.serverSystem.stopAllServers();
-    }
+  public async stopServer(): Promise<void> {
+    await this.serverSystem.stopAllServers();
   }
 
-  async processAnalysis(input: string, options?: Record<string, unknown>): Promise<unknown> {
+  public async processAnalysis(input: string, options?: Readonly<Record<string, unknown>>): Promise<unknown> {
     const analysisRequest: OrchestrationRequest = {
       id: `analysis-${Date.now()}`,
       type: 'analyze',
@@ -588,7 +598,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
     return response.result;
   }
 
-  async processGeneration(input: string, options?: Record<string, unknown>): Promise<unknown> {
+  public async processGeneration(input: string, options?: Readonly<Record<string, unknown>>): Promise<unknown> {
     const generationRequest: OrchestrationRequest = {
       id: `generation-${Date.now()}`,
       type: 'generate',
@@ -601,7 +611,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
   }
 
   // System status and metrics
-  getSystemStatus(): {
+  public getSystemStatus(): {
     initialized: boolean;
     activeRequests: number;
     components: {
@@ -615,17 +625,15 @@ export class UnifiedOrchestrationService extends EventEmitter {
       initialized: this.initialized,
       activeRequests: this.activeRequests.size,
       components: {
-        agentSystem: this.agentSystem ? this.agentSystem.getSystemStats() : null,
-        serverSystem: this.serverSystem ? this.serverSystem.getSystemMetrics() : null,
-        securityValidator: this.securityValidator?.isInitialized || false,
-        performanceSystem: this.performanceSystem
-          ? this.performanceSystem.getSystemMetrics()
-          : null,
+        agentSystem: this.agentSystem.getSystemStats(),
+        serverSystem: this.serverSystem.getSystemMetrics(),
+        securityValidator: this.securityValidator.isInitialized || false,
+        performanceSystem: this.performanceSystem.getSystemMetrics(),
       },
     };
   }
 
-  async shutdown(): Promise<void> {
+  public async shutdown(): Promise<void> {
     this.logger.info('Shutting down Unified Orchestration Service...');
 
     try {
@@ -661,7 +669,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
   /**
    * Get performance statistics for the orchestration service
    */
-  getPerformanceStats(): {
+  public getPerformanceStats(): {
     orchestrationMetrics: {
       activeRequests: number;
       totalProcessed: number;
@@ -677,9 +685,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
   } & Record<string, unknown> {
     this.logger.debug('Getting performance stats');
 
-    const performanceStats = this.performanceSystem
-      ? this.performanceSystem.getMetrics()
-      : this.getBasicPerformanceStats();
+    const performanceStats = this.performanceSystem.getMetrics();
 
     return {
       ...performanceStats,
@@ -701,7 +707,10 @@ export class UnifiedOrchestrationService extends EventEmitter {
   /**
    * Synthesize integrated result from multiple components
    */
-  synthesizeIntegratedResult(results: unknown[], options: Record<string, unknown> = {}): {
+  public synthesizeIntegratedResult(
+    results: ReadonlyArray<unknown>,
+    options: Readonly<Record<string, unknown>> = {}
+  ): {
     success: boolean;
     content?: string;
     confidence?: number;
@@ -711,7 +720,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
   } & Record<string, unknown> {
     this.logger.info('Synthesizing integrated result from components');
 
-    if (!results || results.length === 0) {
+    if (results.length === 0) {
       return {
         success: false,
         error: 'No results to synthesize',
@@ -721,9 +730,16 @@ export class UnifiedOrchestrationService extends EventEmitter {
     }
 
     try {
+      // Define an interface for result objects
+      interface SynthesisResult { success?: boolean; [key: string]: unknown; }
+
       // Aggregate successful results
-      const successfulResults = results.filter(r => r && (r as any)?.success !== false);
-      const failedResults = results.filter(r => !r || (r as any)?.success === false);
+      const successfulResults = results.filter(
+        (r): r is SynthesisResult => !!r && typeof r === 'object' && (r as SynthesisResult).success !== false
+      );
+      const failedResults = results.filter(
+        (r): r is SynthesisResult => !r || (typeof r === 'object' && (r as SynthesisResult).success === false)
+      );
 
       // Calculate confidence based on success rate
       const confidence = successfulResults.length / results.length;
@@ -732,7 +748,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
       const synthesizedContent = this.combineResults(successfulResults, options);
 
       // Extract metadata from all results
-      const metadata = this.extractMetadata(results);
+      const metadata = this.extractMetadata([...results]);
 
       const synthesis = {
         success: true,
@@ -789,150 +805,491 @@ export class UnifiedOrchestrationService extends EventEmitter {
     };
   }
 
-  private getTotalProcessedRequests(): number {
-    // In a real implementation, this would track actual request counts
-    return 0;
-  }
+    private totalRequestsProcessed = 0;
+    private requestMetrics: Array<{ timestamp: number; responseTime: number; success: boolean }> = [];
+    private readonly maxMetricsHistory = 1000;
+    private readonly serviceStartTime = Date.now();
 
-  private getAverageResponseTime(): number {
-    // In a real implementation, this would calculate actual average
-    return 0;
-  }
-
-  private getSuccessRate(): number {
-    // In a real implementation, this would calculate actual success rate
-    return 1.0;
-  }
-
-  private getUptime(): number {
-    return process.uptime() * 1000; // Convert to milliseconds
-  }
-
-  private combineResults(results: unknown[], options: Record<string, unknown>): string {
-    // Simple combination strategy - in a real implementation this would be more sophisticated
-    const contents = results
-      .map(r => (r as any)?.content || (r as any)?.result || (r as any)?.response || JSON.stringify(r))
-      .filter(c => c && typeof c === 'string');
-
-    if (options.synthesisStrategy === 'concatenate') {
-      return contents.join('\n\n---\n\n');
+    private getTotalProcessedRequests(): number {
+      return this.totalRequestsProcessed;
     }
 
-    // Default: extract key insights
-    return `Integrated analysis based on ${results.length} components:\n\n${contents.join('\n\n')}`;
-  }
+    private getAverageResponseTime(): number {
+      if (this.requestMetrics.length === 0) return 0;
+      
+      const totalTime = this.requestMetrics.reduce((sum, metric) => sum + metric.responseTime, 0);
+      return totalTime / this.requestMetrics.length;
+    }
 
-  private extractMetadata(results: unknown[]): {
-    componentsUsed: string[];
-    totalProcessingTime: number;
-  } {
-    const componentsUsed: string[] = [];
-    let totalProcessingTime = 0;
+    private getSuccessRate(): number {
+      if (this.requestMetrics.length === 0) return 1.0;
+      
+      const successfulRequests = this.requestMetrics.filter(metric => metric.success).length;
+      return successfulRequests / this.requestMetrics.length;
+    }
 
-    results.forEach((result: unknown) => {
-      const r = result as {
-        metadata?: {
-          componentsUsed?: string[];
-          processingTime?: number;
-        };
-      };
-      if (r.metadata?.componentsUsed) {
-        componentsUsed.push(...r.metadata.componentsUsed);
-      }
-      if (r.metadata?.processingTime) {
-        totalProcessingTime += r.metadata.processingTime;
-      }
-    });
+    private getUptime(): number {
+      return Date.now() - this.serviceStartTime;
+    }
 
-    return {
-      componentsUsed: [...new Set(componentsUsed)], // Remove duplicates
-      totalProcessingTime,
-    };
-  }
-
-  private calculateCompleteness(results: unknown[]): number {
-    // Simple heuristic - percentage of results that have substantial content
-    const substantialResults = results.filter(
-      (r: unknown) => {
-        const result = r as {
-          content?: string;
-          result?: unknown;
-        };
-        return (result.content && result.content.length > 100) || 
-               (result.result && JSON.stringify(result.result).length > 100);
-      }
-    );
-    return results.length > 0 ? substantialResults.length / results.length : 0;
-  }
-
-  private calculateConsistency(_results: unknown[]): number {
-    return 0.8;
-  }
-
-  private calculateAverageConfidence(results: unknown[]): number {
-    const confidenceValues = results
-      .map((r: unknown) => {
-        const result = r as {
-          confidence?: number;
-          score?: number;
-        };
-        return result.confidence || result.score || 0.5;
-      })
-      .filter((c: unknown): c is number => typeof c === 'number');
-    return confidenceValues.length > 0
-      ? confidenceValues.reduce((sum: number, c: number) => sum + c, 0) / confidenceValues.length
-      : 0.5;
-  }
-
-  listPluginCommands() {
-    if (!this.commandRegistry) return [];
-    try {
-      return this.commandRegistry.list().map((c: unknown) => {
-        const command = c as {
-          name: string;
-          meta?: {
-            description?: string;
-            plugin?: string;
-            version?: string;
-          };
-        };
-        return {
-          name: command.name,
-          description: command.meta?.description,
-          plugin: command.meta?.plugin,
-          version: command.meta?.version,
-        };
+    private recordRequestMetric(responseTime: number, success: boolean): void {
+      this.totalRequestsProcessed++;
+      this.requestMetrics.push({
+        timestamp: Date.now(),
+        responseTime,
+        success
       });
-    } catch {
-      return [];
+
+      // Maintain circular buffer of metrics
+      if (this.requestMetrics.length > this.maxMetricsHistory) {
+        this.requestMetrics.shift();
+      }
+    }
+
+    private combineResults(
+      results: ReadonlyArray<unknown>,
+      options: Readonly<Record<string, unknown>>
+    ): string {
+      if (results.length === 0) return '';
+
+      const extractContent = (result: unknown): string => {
+        if (typeof result === 'string') return result;
+        if (typeof result === 'object' && result !== null) {
+          const obj = result as Record<string, unknown>;
+          
+          // Try different property names for content
+          const contentKeys = ['content', 'result', 'response', 'output', 'data', 'text'];
+          for (const key of contentKeys) {
+            if (typeof obj[key] === 'string' && obj[key]) {
+              return obj[key];
+            }
+          }
+          
+          // If no string content found, try to extract meaningful info
+          if (obj.error) return `Error: ${JSON.stringify(obj.error)}`;
+          if (obj.message) return String(obj.message);
+          
+          // Last resort: stringify but clean it up
+          const stringified = JSON.stringify(obj, null, 2);
+          return stringified.length > 500 ? 
+            `${stringified.substring(0, 500)}...` : 
+            stringified;
+        }
+        return String(result);
+      };
+
+      const contents = results
+        .map(extractContent)
+        .filter(content => content.trim().length > 0);
+
+      const strategy = options.synthesisStrategy as string || 'intelligent';
+
+      switch (strategy) {
+        case 'concatenate':
+          return contents.join('\n\n---\n\n');
+        
+        case 'merge':
+          return this.mergeContentIntelligently(contents);
+        
+        case 'summarize':
+          return this.summarizeContents(contents);
+        
+        case 'intelligent':
+        default:
+          return this.intelligentCombination(contents, results.length);
+      }
+    }
+
+    private mergeContentIntelligently(contents: string[]): string {
+      if (contents.length === 0) return '';
+      if (contents.length === 1) return contents[0];
+
+      // Group similar content types
+      const codeBlocks: string[] = [];
+      const explanations: string[] = [];
+      const errors: string[] = [];
+      const other: string[] = [];
+
+      contents.forEach(content => {
+        if (content.includes('```') || content.includes('function') || content.includes('class')) {
+          codeBlocks.push(content);
+        } else if (content.toLowerCase().includes('error') || content.toLowerCase().includes('failed')) {
+          errors.push(content);
+        } else if (content.length > 100) {
+          explanations.push(content);
+        } else {
+          other.push(content);
+        }
+      });
+
+      const sections: string[] = [];
+      
+      if (explanations.length > 0) {
+        sections.push(`## Analysis\n${explanations.join('\n\n')}`);
+      }
+      
+      if (codeBlocks.length > 0) {
+        sections.push(`## Code Examples\n${codeBlocks.join('\n\n')}`);
+      }
+      
+      if (other.length > 0) {
+        sections.push(`## Additional Information\n${other.join('\n')}`);
+      }
+      
+      if (errors.length > 0) {
+        sections.push(`## Issues Encountered\n${errors.join('\n')}`);
+      }
+
+      return sections.join('\n\n');
+    }
+
+    private summarizeContents(contents: string[]): string {
+      if (contents.length === 0) return '';
+      if (contents.length === 1) return contents[0];
+
+      const totalLength = contents.reduce((sum, content) => sum + content.length, 0);
+      const avgLength = totalLength / contents.length;
+
+      let summary = `Summary of ${contents.length} components (avg length: ${Math.round(avgLength)} chars):\n\n`;
+      
+      contents.forEach((content, index) => {
+        const preview = content.length > 150 ? 
+          `${content.substring(0, 150)}...` : 
+          content;
+        summary += `${index + 1}. ${preview}\n\n`;
+      });
+
+      return summary;
+    }
+
+    private intelligentCombination(contents: string[], totalResults: number): string {
+      if (contents.length === 0) return 'No content generated from components.';
+      
+      const header = `Integrated analysis from ${totalResults} components:\n\n`;
+      
+      if (contents.length === 1) {
+        return header + contents[0];
+      }
+
+      // Detect if results are complementary or redundant
+      const uniqueWords = new Set<string>();
+      const allWords: string[] = [];
+      
+      contents.forEach(content => {
+        const words = content.toLowerCase()
+          .replace(/[^\w\s]/g, ' ')
+          .split(/\s+/)
+          .filter(word => word.length > 3);
+        allWords.push(...words);
+        words.forEach(word => uniqueWords.add(word));
+      });
+
+      const redundancyRatio = uniqueWords.size / allWords.length;
+      
+      if (redundancyRatio < 0.3) {
+        // High redundancy - summarize
+        return header + this.summarizeContents(contents);
+      } else {
+        // Low redundancy - merge intelligently
+        return header + this.mergeContentIntelligently(contents);
+      }
+    }
+
+    private extractMetadata(results: ReadonlyArray<unknown>): {
+      componentsUsed: string[];
+      totalProcessingTime: number;
+    } {
+      const componentsUsed = new Set<string>();
+      let totalProcessingTime = 0;
+
+      results.forEach((result: unknown) => {
+        if (typeof result === 'object' && result !== null) {
+          const r = result as {
+            metadata?: {
+              componentsUsed?: string | string[];
+              processingTime?: number;
+              component?: string;
+              source?: string;
+            };
+            component?: string;
+            source?: string;
+          };
+
+          // Extract component names from various locations
+          if (r.metadata?.componentsUsed) {
+            if (Array.isArray(r.metadata.componentsUsed)) {
+              r.metadata.componentsUsed.forEach(comp => componentsUsed.add(comp));
+            } else if (typeof r.metadata.componentsUsed === 'string') {
+              componentsUsed.add(r.metadata.componentsUsed);
+            }
+          }
+
+          if (r.metadata?.component) componentsUsed.add(r.metadata.component);
+          if (r.metadata?.source) componentsUsed.add(r.metadata.source);
+          if (r.component) componentsUsed.add(String(r.component));
+          if (r.source) componentsUsed.add(String(r.source));
+
+          // Extract processing time
+          if (typeof r.metadata?.processingTime === 'number') {
+            totalProcessingTime += r.metadata.processingTime;
+          }
+        }
+      });
+
+      return {
+        componentsUsed: Array.from(componentsUsed).filter(comp => comp.length > 0),
+        totalProcessingTime,
+      };
+    }
+
+    private calculateCompleteness(results: unknown[]): number {
+      if (results.length === 0) return 0;
+
+      const substantialResults = results.filter((r: unknown) => {
+        if (typeof r === 'string') return r.length > 50;
+        
+        if (typeof r === 'object' && r !== null) {
+          const result = r as Record<string, unknown>;
+          
+          // Check various content properties
+          const contentKeys = ['content', 'result', 'response', 'output', 'data', 'text'];
+          for (const key of contentKeys) {
+            const value = result[key];
+            if (typeof value === 'string' && value.length > 50) return true;
+            if (value && typeof value === 'object') {
+              const stringified = JSON.stringify(value);
+              if (stringified.length > 100) return true;
+            }
+          }
+          
+          // Consider successful results as substantial
+          if (result.success === true || result.status === 'success') return true;
+        }
+        
+        return false;
+      });
+
+      return substantialResults.length / results.length;
+    }
+
+    private calculateConsistency(results: unknown[]): number {
+      if (results.length <= 1) return 1.0;
+
+      // Analyze consistency across multiple dimensions
+      let successConsistency = 0;
+      let contentConsistency = 0;
+      let formatConsistency = 0;
+
+      // Check success/failure consistency
+      const successStatuses = results.map((r: unknown) => {
+        if (typeof r === 'object' && r !== null) {
+          const result = r as { success?: boolean; status?: string; error?: unknown };
+          return result.success === true || result.status === 'success' || !result.error;
+        }
+        return true; // Assume success if no clear indicator
+      });
+
+      const successCount = successStatuses.filter(s => s).length;
+      successConsistency = Math.abs(successCount - results.length / 2) / (results.length / 2);
+
+      // Check content length consistency
+      const contentLengths = results.map((r: unknown) => {
+        if (typeof r === 'string') return r.length;
+        if (typeof r === 'object' && r !== null) {
+          return JSON.stringify(r).length;
+        }
+        return 0;
+      });
+
+      if (contentLengths.length > 0) {
+        const avgLength = contentLengths.reduce((sum, len) => sum + len, 0) / contentLengths.length;
+        const variance = contentLengths.reduce((sum, len) => sum + Math.pow(len - avgLength, 2), 0) / contentLengths.length;
+        const standardDeviation = Math.sqrt(variance);
+        contentConsistency = avgLength > 0 ? Math.max(0, 1 - (standardDeviation / avgLength)) : 0;
+      }
+
+      // Check format consistency (all strings, all objects, etc.)
+      const types = results.map(r => typeof r);
+      const uniqueTypes = new Set(types);
+      formatConsistency = 1 - (uniqueTypes.size - 1) / Math.max(1, types.length - 1);
+
+      // Weighted average of consistency metrics
+      return (successConsistency * 0.4 + contentConsistency * 0.4 + formatConsistency * 0.2);
+    }
+
+    private calculateAverageConfidence(results: unknown[]): number {
+      if (results.length === 0) return 0.5;
+
+      const confidenceValues = results
+        .map((r: unknown) => {
+          if (typeof r === 'object' && r !== null) {
+            const result = r as {
+              confidence?: number;
+              score?: number;
+              quality?: number;
+              certainty?: number;
+              reliability?: number;
+            };
+            
+            // Try multiple confidence indicators
+            return result.confidence ?? 
+                   result.score ?? 
+                   result.quality ?? 
+                   result.certainty ?? 
+                   result.reliability ?? 
+                   null;
+          }
+          return null;
+        })
+        .filter((c): c is number => typeof c === 'number' && c >= 0 && c <= 1);
+
+      if (confidenceValues.length === 0) {
+        // Infer confidence from success indicators
+        const successCount = results.filter((r: unknown) => {
+          if (typeof r === 'object' && r !== null) {
+            const result = r as { success?: boolean; error?: unknown; status?: string };
+            return result.success === true || (!result.error && result.status !== 'error');
+          }
+          return true;
+        }).length;
+        
+        return successCount / results.length;
+      }
+
+      return confidenceValues.reduce((sum, c) => sum + c, 0) / confidenceValues.length;
+    }
+
+    public listPluginCommands(): Array<{
+      name: string;
+      description?: string;
+      plugin?: string;
+      version?: string;
+      category?: string;
+      parameters?: Array<{ name: string; type: string; required: boolean; description?: string }>;
+    }> {
+      if (!this.commandRegistry) {
+        this.logger.warn('Command registry not initialized');
+        return [];
+      }
+
+      try {
+        return this.commandRegistry.list().map((c: unknown) => {
+          const command = c as {
+            name: string;
+            meta?: {
+              description?: string;
+              plugin?: string;
+              version?: string;
+              category?: string;
+              parameters?: Array<{ name: string; type: string; required: boolean; description?: string }>;
+            };
+          };
+
+          return {
+            name: command.name,
+            description: command.meta?.description ?? 'No description available',
+            plugin: command.meta?.plugin ?? 'unknown',
+            version: command.meta?.version ?? '1.0.0',
+            category: command.meta?.category ?? 'general',
+            parameters: command.meta?.parameters ?? [],
+          };
+        });
+      } catch (error) {
+        this.logger.error('Error listing plugin commands:', error);
+        return [];
+      }
+    }
+
+    public async executePluginCommand(
+      name: Readonly<string>,
+      ...args: ReadonlyArray<unknown>
+    ): Promise<unknown> {
+      if (!this.commandRegistry) {
+        throw new Error('Command registry not initialized');
+      }
+
+      const startTime = Date.now();
+      
+      try {
+        this.logger.info(`Executing plugin command: ${name} with ${args.length} arguments`);
+        
+        // Validate command exists
+        const commands = this.listPluginCommands();
+        const command = commands.find((cmd: Readonly<{ name: string }>) => cmd.name === name);
+        
+        if (!command) {
+          throw new Error(
+            `Plugin command '${name}' not found. Available commands: ${commands.map((c: Readonly<{ name: string }>) => c.name).join(', ')}`
+          );
+        }
+
+        // Execute the command
+        const result = await this.commandRegistry.execute(
+          name,
+          ...(args as unknown[])
+        ) as unknown;
+        
+        const executionTime = Date.now() - startTime;
+        this.logger.info(`Plugin command '${name}' executed successfully in ${executionTime}ms`);
+        
+        // Record metrics
+        this.recordRequestMetric(executionTime, true);
+        
+        // Emit event for monitoring
+        this.eventBus.emit('plugin:command_executed', {
+          name,
+          args: args.length,
+          executionTime,
+          success: true,
+          timestamp: Date.now(),
+        });
+
+        return result;
+      } catch (error) {
+        const executionTime = Date.now() - startTime;
+        this.logger.error(`Plugin command '${name}' failed after ${executionTime}ms:`, error);
+        
+        // Record failed metrics
+        this.recordRequestMetric(executionTime, false);
+        
+        // Emit error event
+        this.eventBus.emit('plugin:command_failed', {
+          name,
+          args: args.length,
+          executionTime,
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: Date.now(),
+        });
+
+        throw error;
+      }
     }
   }
 
-  async executePluginCommand(name: string, ...args: unknown[]): Promise<unknown> {
-    if (!this.commandRegistry) throw new Error('Command registry not initialized');
-    return this.commandRegistry.execute(name, ...args);
+  // Factory function for easy creation
+  export function createUnifiedOrchestrationService(
+    configManager: Readonly<UnifiedConfigurationManager>,
+    eventBus: Readonly<IEventBus>,
+    userInteraction: Readonly<IUserInteraction>
+  ): UnifiedOrchestrationService {
+    return new UnifiedOrchestrationService(
+      configManager as UnifiedConfigurationManager,
+      eventBus as IEventBus,
+      userInteraction as IUserInteraction
+    );
   }
-}
 
-// Factory function for easy creation
-export function createUnifiedOrchestrationService(
-  configManager: UnifiedConfigurationManager,
-  eventBus: IEventBus,
-  userInteraction: IUserInteraction
-): UnifiedOrchestrationService {
-  return new UnifiedOrchestrationService(configManager, eventBus, userInteraction);
-}
+  // New factory function that uses RuntimeContext for dependency injection
+  export function createUnifiedOrchestrationServiceWithContext(
+    runtimeContext: Readonly<RuntimeContext>,
+    configManager: Readonly<UnifiedConfigurationManager>,
+    userInteraction: Readonly<IUserInteraction>
+  ): UnifiedOrchestrationService {
+    return new UnifiedOrchestrationService(
+      configManager as UnifiedConfigurationManager,
+      runtimeContext.eventBus,
+      userInteraction as IUserInteraction,
+      runtimeContext as RuntimeContext
+    );
+  }
 
-// New factory function that uses RuntimeContext for dependency injection
-export function createUnifiedOrchestrationServiceWithContext(
-  runtimeContext: RuntimeContext,
-  configManager: UnifiedConfigurationManager,
-  userInteraction: IUserInteraction
-): UnifiedOrchestrationService {
-  return new UnifiedOrchestrationService(
-    configManager,
-    runtimeContext.eventBus,
-    userInteraction,
-    runtimeContext
-  );
-}

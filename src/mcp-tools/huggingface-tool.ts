@@ -71,7 +71,7 @@ export class HuggingFaceTool {
   /**
    * Search for models with advanced filtering
    */
-  async searchModels(
+  public async searchModels(
     query: string,
     options: {
       task?: string;
@@ -101,15 +101,28 @@ export class HuggingFaceTool {
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
       if (options.filter) params.append('filter', options.filter);
 
-      const response = await axios.get(`${this.config.baseUrl}/models?${params.toString()}`, {
+      const response = await axios.get<{ 
+        id: string;
+        name?: string;
+        description?: string;
+        downloads?: number;
+        likes?: number;
+        tags?: string[];
+        pipeline_tag?: string;
+        library_name?: string;
+        language?: string[];
+        license?: string;
+      }[]>(`${this.config.baseUrl}/models?${params.toString()}`, {
         headers: this.getHeaders(),
         timeout: this.config.timeout,
       });
 
       this.requestCount++;
 
-      return response.data.map((model: any) => this.processModelInfo(model));
-    } catch (error: any) {
+      return Array.isArray(response.data)
+        ? response.data.map((model) => this.processModelInfo(model))
+        : [];
+    } catch (error) {
       logger.error('Hugging Face model search failed:', error);
       this.handleError(error);
       throw error;
@@ -119,13 +132,24 @@ export class HuggingFaceTool {
   /**
    * Get detailed information about a specific model
    */
-  async getModelInfo(modelId: string): Promise<ModelInfo> {
+  public async getModelInfo(modelId: string): Promise<ModelInfo> {
     if (!this.config.enabled) {
       throw new Error('Hugging Face integration is not enabled');
     }
 
     try {
-      const response = await axios.get(`${this.config.baseUrl}/models/${modelId}`, {
+      const response = await axios.get<{
+        id: string;
+        name?: string;
+        description?: string;
+        downloads?: number;
+        likes?: number;
+        tags?: string[];
+        pipeline_tag?: string;
+        library_name?: string;
+        language?: string[];
+        license?: string;
+      }>(`${this.config.baseUrl}/models/${modelId}`, {
         headers: this.getHeaders(),
         timeout: this.config.timeout,
       });
@@ -133,7 +157,7 @@ export class HuggingFaceTool {
       this.requestCount++;
 
       return this.processModelInfo(response.data);
-    } catch (error: any) {
+    } catch (error) {
       logger.error('Failed to get model info:', error);
       this.handleError(error);
       throw error;
@@ -143,9 +167,9 @@ export class HuggingFaceTool {
   /**
    * Search for datasets
    */
-  async searchDatasets(
+  public async searchDatasets(
     query: string,
-    options: {
+    options: Readonly<{
       task?: string;
       language?: string;
       size?: string;
@@ -153,7 +177,7 @@ export class HuggingFaceTool {
       sort?: 'downloads' | 'likes' | 'updated' | 'created';
       direction?: 'asc' | 'desc';
       limit?: number;
-    } = {}
+    }> = {}
   ): Promise<DatasetInfo[]> {
     if (!this.config.enabled) {
       throw new Error('Hugging Face integration is not enabled');
@@ -171,15 +195,27 @@ export class HuggingFaceTool {
       if (options.direction) params.append('direction', options.direction);
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
 
-      const response = await axios.get(`${this.config.baseUrl}/datasets?${params.toString()}`, {
+      const response = await axios.get<Array<{
+        id: string;
+        name?: string;
+        description?: string;
+        downloads?: number;
+        likes?: number;
+        tags?: string[];
+        size_categories?: string[];
+        language?: string[];
+        license?: string;
+      }>>(`${this.config.baseUrl}/datasets?${params.toString()}`, {
         headers: this.getHeaders(),
         timeout: this.config.timeout,
       });
 
       this.requestCount++;
 
-      return response.data.map((dataset: any) => this.processDatasetInfo(dataset));
-    } catch (error: any) {
+      return Array.isArray(response.data)
+        ? response.data.map((dataset) => this.processDatasetInfo(dataset))
+        : [];
+    } catch (error) {
       logger.error('Hugging Face dataset search failed:', error);
       this.handleError(error);
       throw error;
@@ -189,14 +225,14 @@ export class HuggingFaceTool {
   /**
    * Search for Spaces (demos/applications)
    */
-  async searchSpaces(
+  public async searchSpaces(
     query: string,
-    options: {
+    options: Readonly<{
       sdk?: string;
       sort?: 'likes' | 'updated' | 'created';
       direction?: 'asc' | 'desc';
       limit?: number;
-    } = {}
+    }> = {}
   ): Promise<SpaceInfo[]> {
     if (!this.config.enabled) {
       throw new Error('Hugging Face integration is not enabled');
@@ -211,15 +247,25 @@ export class HuggingFaceTool {
       if (options.direction) params.append('direction', options.direction);
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
 
-      const response = await axios.get(`${this.config.baseUrl}/spaces?${params.toString()}`, {
+      const response = await axios.get<Array<{
+        id: string;
+        name?: string;
+        description?: string;
+        likes?: number;
+        sdk?: string;
+        tags?: string[];
+        runtime?: string;
+      }>>(`${this.config.baseUrl}/spaces?${params.toString()}`, {
         headers: this.getHeaders(),
         timeout: this.config.timeout,
       });
 
       this.requestCount++;
 
-      return response.data.map((space: any) => this.processSpaceInfo(space));
-    } catch (error: any) {
+      return Array.isArray(response.data)
+        ? response.data.map((space) => this.processSpaceInfo(space))
+        : [];
+    } catch (error) {
       logger.error('Hugging Face spaces search failed:', error);
       this.handleError(error);
       throw error;
@@ -229,7 +275,7 @@ export class HuggingFaceTool {
   /**
    * Find models suitable for a specific coding task
    */
-  async findCodeModels(
+  public async findCodeModels(
     task:
       | 'code-generation'
       | 'code-completion'
@@ -246,7 +292,7 @@ export class HuggingFaceTool {
       'code-translation': 'translation',
     };
 
-    const searchQuery = `${task} ${language || 'code'}`;
+    const searchQuery = `${task} ${language ?? 'code'}`;
 
     return this.searchModels(searchQuery, {
       task: taskMappings[task],
@@ -260,9 +306,8 @@ export class HuggingFaceTool {
   /**
    * Get trending models in a specific category
    */
-  async getTrendingModels(
-    category: string = 'text-generation',
-    timeframe: 'day' | 'week' | 'month' = 'week'
+  public async getTrendingModels(
+    category: string = 'text-generation'
   ): Promise<ModelInfo[]> {
     return this.searchModels('', {
       task: category,
@@ -275,15 +320,26 @@ export class HuggingFaceTool {
   /**
    * Find models by specific criteria for coding assistance
    */
-  async findModelsByCriteria(criteria: {
-    language?: string[];
-    size?: 'small' | 'medium' | 'large';
-    performance?: 'fast' | 'balanced' | 'quality';
-    license?: 'commercial' | 'research' | 'open';
-    task?: string;
-  }): Promise<ModelInfo[]> {
+  public async findModelsByCriteria(
+    criteria: Readonly<{
+      language?: string[];
+      size?: 'small' | 'medium' | 'large';
+      performance?: 'fast' | 'balanced' | 'quality';
+      license?: 'commercial' | 'research' | 'open';
+      task?: string;
+    }>
+  ): Promise<ModelInfo[]> {
     let query = '';
-    const options: any = {
+    const options: {
+      task?: string;
+      library?: string;
+      language?: string;
+      license?: string;
+      sort?: 'downloads' | 'likes' | 'updated' | 'created';
+      direction?: 'asc' | 'desc';
+      limit?: number;
+      filter?: string;
+    } = {
       limit: 25,
       sort: 'downloads',
       direction: 'desc',
@@ -307,7 +363,7 @@ export class HuggingFaceTool {
     }
 
     if (criteria.license) {
-      const licenseMap = {
+      const licenseMap: Record<'commercial' | 'research' | 'open', string> = {
         commercial: 'apache-2.0',
         research: 'cc-by-nc-4.0',
         open: 'mit',
@@ -321,14 +377,14 @@ export class HuggingFaceTool {
   /**
    * Get model recommendations based on a use case description
    */
-  async getModelRecommendations(
+  public async getModelRecommendations(
     useCase: string,
-    constraints: {
+    constraints: Readonly<{
       maxSize?: string;
       requiresCommercialLicense?: boolean;
       preferredLibrary?: string;
       performanceRequirement?: 'speed' | 'quality' | 'balanced';
-    } = {}
+    }> = {}
   ): Promise<{
     recommended: ModelInfo[];
     alternatives: ModelInfo[];
@@ -359,44 +415,74 @@ export class HuggingFaceTool {
   /**
    * Private helper methods
    */
-  private processModelInfo(data: any): ModelInfo {
+  private processModelInfo(data: Readonly<{
+    id?: string;
+    modelId?: string;
+    name?: string;
+    description?: string;
+    downloads?: number;
+    likes?: number;
+    tags?: string[];
+    pipeline_tag?: string;
+    library_name?: string;
+    language?: string[];
+    license?: string;
+  }>): ModelInfo {
     return {
-      id: data.id || data.modelId || '',
-      name: data.name || data.id || '',
-      description: data.description || '',
-      downloads: data.downloads || 0,
-      likes: data.likes || 0,
-      tags: data.tags || [],
+      id: data.id ?? data.modelId ?? '',
+      name: data.name ?? data.id ?? '',
+      description: data.description ?? '',
+      downloads: data.downloads ?? 0,
+      likes: data.likes ?? 0,
+      tags: data.tags ?? [],
       pipeline_tag: data.pipeline_tag,
       library_name: data.library_name,
       language: data.language,
       license: data.license,
-      modelType: this.categorizeModel(data.pipeline_tag, data.tags),
+      modelType: this.categorizeModel(data.pipeline_tag, data.tags ?? []),
     };
   }
 
-  private processDatasetInfo(data: any): DatasetInfo {
+  private processDatasetInfo(data: Readonly<{
+    id?: string;
+    name?: string;
+    description?: string;
+    downloads?: number;
+    likes?: number;
+    tags?: string[];
+    size_categories?: string[];
+    language?: string[];
+    license?: string;
+  }>): DatasetInfo {
     return {
-      id: data.id || '',
-      name: data.name || data.id || '',
-      description: data.description || '',
-      downloads: data.downloads || 0,
-      likes: data.likes || 0,
-      tags: data.tags || [],
+      id: data.id ?? '',
+      name: data.name ?? data.id ?? '',
+      description: data.description ?? '',
+      downloads: data.downloads ?? 0,
+      likes: data.likes ?? 0,
+      tags: data.tags ?? [],
       size: data.size_categories?.[0],
       language: data.language,
       license: data.license,
     };
   }
 
-  private processSpaceInfo(data: any): SpaceInfo {
+  private processSpaceInfo(data: {
+    id?: string;
+    name?: string;
+    description?: string;
+    likes?: number;
+    sdk?: string;
+    tags?: string[];
+    runtime?: string;
+  }): SpaceInfo {
     return {
-      id: data.id || '',
-      name: data.name || data.id || '',
-      description: data.description || '',
-      likes: data.likes || 0,
+      id: data.id ?? '',
+      name: data.name ?? data.id ?? '',
+      description: data.description ?? '',
+      likes: data.likes ?? 0,
       sdk: data.sdk,
-      tags: data.tags || [],
+      tags: data.tags ?? [],
       runtime: data.runtime,
     };
   }
@@ -457,31 +543,268 @@ export class HuggingFaceTool {
 
     return { primaryTask: 'text-generation', confidence: 0.5 };
   }
+  private filterModelsByConstraints(
+    models: ReadonlyArray<ModelInfo>,
+    constraints: Readonly<{
+      maxSize?: string;
+      requiresCommercialLicense?: boolean;
+      preferredLibrary?: string;
+      performanceRequirement?: 'speed' | 'quality' | 'balanced';
+    }>
+  ): ModelInfo[] {
+    return models
+      .filter((model: Readonly<ModelInfo>) => {
+        // Size constraint - extract parameter count from tags or model name
+        if (constraints.maxSize) {
+          const modelSize = this.extractModelSize(model);
+          const maxSizeBytes = this.parseModelSize(constraints.maxSize);
+          
+          if (modelSize !== null && maxSizeBytes !== null && modelSize > maxSizeBytes) {
+            return false;
+          }
+        }
 
-  private filterModelsByConstraints(models: ModelInfo[], constraints: any): ModelInfo[] {
-    return models.filter(model => {
-      // Size constraint
-      if (constraints.maxSize) {
-        const _hasSize = model.tags.some(tag => tag.includes('size') || tag.includes('param'));
-        // This is a simplified check - in practice, you'd parse size information
-      }
+        // Commercial license constraint
+        if (constraints.requiresCommercialLicense) {
+          const commercialLicenses = [
+            'apache-2.0',
+            'mit',
+            'bsd-3-clause',
+            'bsd-2-clause',
+            'cc0-1.0',
+            'unlicense',
+            'apache',
+            'bsd'
+          ];
+          
+          if (model.license) {
+            const normalizedLicense = model.license.toLowerCase().trim();
+            const isCommercial = commercialLicenses.some(license => 
+              normalizedLicense.includes(license) || 
+              normalizedLicense === license
+            );
+            
+            if (!isCommercial) {
+              return false;
+            }
+          } else {
+            // If no license specified and commercial is required, exclude
+            return false;
+          }
+        }
 
-      // Commercial license constraint
-      if (constraints.requiresCommercialLicense) {
-        const commercialLicenses = ['apache-2.0', 'mit', 'bsd-3-clause'];
-        if (model.license && !commercialLicenses.includes(model.license.toLowerCase())) {
-          return false;
+        // Preferred library constraint
+        if (constraints.preferredLibrary) {
+          const preferredLib = constraints.preferredLibrary.toLowerCase();
+          const modelLibrary = model.library_name?.toLowerCase();
+          
+          if (modelLibrary && modelLibrary !== preferredLib) {
+            // Allow if library is mentioned in tags as fallback
+            const hasLibraryTag = model.tags.some(tag => 
+              tag.toLowerCase().includes(preferredLib)
+            );
+            
+            if (!hasLibraryTag) {
+              return false;
+            }
+          }
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        // Sort based on performance requirement
+        if (constraints.performanceRequirement === 'speed') {
+          // Prioritize smaller models and higher download counts
+          const aSize = this.extractModelSize(a) ?? 0;
+          const bSize = this.extractModelSize(b) ?? 0;
+          const sizeDiff = aSize - bSize;
+          
+          if (Math.abs(sizeDiff) > 1e9) { // 1B parameter difference
+            return sizeDiff;
+          }
+          
+          return b.downloads - a.downloads;
+        } else if (constraints.performanceRequirement === 'quality') {
+          // Prioritize models with more likes and larger sizes
+          const likeDiff = b.likes - a.likes;
+          
+          if (Math.abs(likeDiff) > 100) {
+            return likeDiff;
+          }
+          
+          const aSize = this.extractModelSize(a) ?? 0;
+          const bSize = this.extractModelSize(b) ?? 0;
+          return bSize - aSize;
+        } else {
+          // Balanced: combination of downloads and likes
+          const aScore = a.downloads * 0.6 + a.likes * 0.4;
+          const bScore = b.downloads * 0.6 + b.likes * 0.4;
+          return bScore - aScore;
+        }
+      });
+  }
+
+  /**
+   * Extract model size in parameters from model information
+   */
+  private extractModelSize(model: Readonly<ModelInfo>): number | null {
+    // Check model name for size indicators
+    const nameSize = this.extractSizeFromText(model.name);
+    if (nameSize !== null) return nameSize;
+
+    // Check model ID for size indicators
+    const idSize = this.extractSizeFromText(model.id);
+    if (idSize !== null) return idSize;
+
+    // Check tags for size information
+    for (const tag of model.tags) {
+      const tagSize = this.extractSizeFromText(tag);
+      if (tagSize !== null) return tagSize;
+    }
+
+    // Check description for size information
+    if (model.description) {
+      const descSize = this.extractSizeFromText(model.description);
+      if (descSize !== null) return descSize;
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract parameter count from text using various patterns
+   */
+  private extractSizeFromText(text: string): number | null {
+    if (!text) return null;
+
+    const normalizedText = text.toLowerCase();
+    
+    // Patterns to match parameter counts
+    const patterns = [
+      // Exact patterns: "7b", "13b", "70b", etc.
+      /(\d+(?:\.\d+)?)\s*b(?:illion)?(?:\s*param(?:eter)?s?)?/g,
+      /(\d+(?:\.\d+)?)\s*m(?:illion)?(?:\s*param(?:eter)?s?)?/g,
+      /(\d+(?:\.\d+)?)\s*k(?:ilo)?(?:\s*param(?:eter)?s?)?/g,
+      
+      // Hyphenated patterns: "llama-7b", "gpt-3.5"
+      /-(\d+(?:\.\d+)?)\s*b/g,
+      /-(\d+(?:\.\d+)?)\s*m/g,
+      
+      // Parameter patterns: "7 billion parameters"
+      /(\d+(?:\.\d+)?)\s*billion\s*param/g,
+      /(\d+(?:\.\d+)?)\s*million\s*param/g,
+      /(\d+(?:\.\d+)?)\s*thousand\s*param/g,
+      
+      // Model size patterns: "small", "base", "large", "xl"
+      /\b(tiny|small|mini|base|medium|large|xl|xxl|3xl)\b/g
+    ];
+
+    for (const pattern of patterns) {
+      const matches = [...normalizedText.matchAll(pattern)];
+      
+      for (const match of matches) {
+        if (match[1] && !isNaN(Number(match[1]))) {
+          const value = parseFloat(match[1]);
+          const unit = match[0].toLowerCase();
+          
+          if (unit.includes('b')) {
+            return value * 1e9; // billion parameters
+          } else if (unit.includes('m')) {
+            return value * 1e6; // million parameters
+          } else if (unit.includes('k')) {
+            return value * 1e3; // thousand parameters
+          }
+        } else if (match[1]) {
+          // Handle named sizes
+          const sizeMap: Record<string, number> = {
+            tiny: 100e6, // 100M
+            mini: 100e6, // 100M
+            small: 300e6, // 300M
+            base: 700e6, // 700M
+            medium: 1.5e9, // 1.5B
+            large: 7e9, // 7B
+            xl: 13e9, // 13B
+            xxl: 30e9, // 30B
+            '3xl': 70e9, // 70B
+          };
+          
+          const size = sizeMap[match[1]];
+          if (size) return size;
         }
       }
+    }
 
-      return true;
-    });
+    return null;
+  }
+
+  /**
+   * Parse size constraint string to parameter count
+   */
+  private parseModelSize(sizeConstraint: string): number | null {
+    const normalizedConstraint = sizeConstraint.toLowerCase().trim();
+    
+    // Handle size categories
+    const categorySizes: Record<string, number> = {
+      tiny: 100e6,
+      small: 1e9,
+      medium: 10e9,
+      large: 50e9,
+      huge: 100e9,
+      xl: 100e9,
+      xxl: 500e9
+    };
+
+    if (categorySizes[normalizedConstraint]) {
+      return categorySizes[normalizedConstraint];
+    }
+
+    // Handle explicit parameter counts
+    const sizePatterns = [
+      /(\d+(?:\.\d+)?)\s*b(?:illion)?/,
+      /(\d+(?:\.\d+)?)\s*m(?:illion)?/,
+      /(\d+(?:\.\d+)?)\s*k(?:ilo)?/,
+      /(\d+(?:\.\d+)?)\s*param/
+    ];
+
+    for (const pattern of sizePatterns) {
+      const match = normalizedConstraint.match(pattern);
+      if (match?.[1]) {
+        const [unit, valueStr] = match;
+        const value = parseFloat(valueStr);
+        
+        if (unit.includes('b')) {
+          return value * 1e9;
+        } else if (unit.includes('m')) {
+          return value * 1e6;
+        } else if (unit.includes('k')) {
+          return value * 1e3;
+        } else {
+          return value; // Assume raw parameter count
+        }
+      }
+    }
+
+    // Try to parse as a raw number
+    const rawNumber = parseFloat(normalizedConstraint);
+    if (!isNaN(rawNumber)) {
+      // If it's a large number, assume it's parameter count
+      // If it's small, assume it's in billions
+      return rawNumber > 1000 ? rawNumber : rawNumber * 1e9;
+    }
+
+    return null;
   }
 
   private generateRecommendationReasoning(
-    taskAnalysis: any,
-    constraints: any,
-    models: ModelInfo[]
+    taskAnalysis: { primaryTask: string; confidence: number },
+    constraints: Readonly<{
+      maxSize?: string;
+      requiresCommercialLicense?: boolean;
+      preferredLibrary?: string;
+      performanceRequirement?: 'speed' | 'quality' | 'balanced';
+    }>,
+    models: ReadonlyArray<ModelInfo>
   ): string {
     let reasoning = `Based on your use case, I identified this as a ${taskAnalysis.primaryTask} task with ${taskAnalysis.confidence * 100}% confidence. `;
 
@@ -507,18 +830,20 @@ export class HuggingFaceTool {
     };
 
     if (this.config.apiKey) {
-      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+      headers.Authorization = `Bearer ${this.config.apiKey}`;
     }
 
     return headers;
   }
 
-  private handleError(error: any): void {
-    if (error.response?.status === 401) {
+  private handleError(error: unknown): void {
+    // Type guard for AxiosError
+    const err = error as { response?: { status?: number }, code?: string };
+    if (err.response?.status === 401) {
       logger.error('Hugging Face API authentication failed');
-    } else if (error.response?.status === 429) {
+    } else if (err.response?.status === 429) {
       logger.error('Hugging Face API rate limit exceeded');
-    } else if (error.code === 'ECONNABORTED') {
+    } else if (err.code === 'ECONNABORTED') {
       logger.error('Hugging Face API request timed out');
     }
   }
@@ -530,7 +855,7 @@ export class HuggingFaceTool {
   /**
    * Test API connectivity
    */
-  async testConnection(): Promise<boolean> {
+  public async testConnection(): Promise<boolean> {
     if (!this.config.enabled) {
       return false;
     }
@@ -547,7 +872,7 @@ export class HuggingFaceTool {
   /**
    * Get usage statistics
    */
-  getUsageStats(): any {
+  public getUsageStats(): { requestCount: number; isEnabled: boolean; hasApiKey: boolean } {
     return {
       requestCount: this.requestCount,
       isEnabled: this.config.enabled,
@@ -558,14 +883,14 @@ export class HuggingFaceTool {
   /**
    * Get model download URL for local use
    */
-  getModelDownloadUrl(modelId: string): string {
+  public getModelDownloadUrl(modelId: string): string {
     return `${this.config.baseUrl.replace('/api', '')}/${modelId}`;
   }
 
   /**
    * Get model card URL for detailed information
    */
-  getModelCardUrl(modelId: string): string {
+  public getModelCardUrl(modelId: string): string {
     return `https://huggingface.co/${modelId}`;
   }
 }

@@ -202,7 +202,6 @@ export async function initialize(
     const modelClientConfig = {
       adapters, // Now properly populated with adapter instances
       defaultProvider: selectedModelInfo.provider,
-      providers: providersConfig,
       fallbackStrategy: 'priority',
       timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '30000', 10),
       retryAttempts: 3,
@@ -296,7 +295,7 @@ export async function initialize(
       eventBus,
       modelClient,
       mcpManager: mcpManagerAdapter
-        ? (mcpManagerAdapter as unknown) // Use unknown to satisfy type, or replace with correct interface if available
+        ? (mcpManagerAdapter as unknown as import('./domain/interfaces/mcp-manager.js').IMcpManager)
         : undefined,
       runtimeContext,
     });

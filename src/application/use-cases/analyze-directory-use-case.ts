@@ -6,12 +6,12 @@
  */
 
 import { performance } from 'perf_hooks';
-import { readdirSync, statSync, readFileSync, existsSync } from 'fs';
-import { join, extname, relative, basename } from 'path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { basename, extname, join, relative } from 'path';
 import {
-  IAnalyzeDirectoryUseCase,
   AnalysisRequest,
   AnalysisResponse,
+  IAnalyzeDirectoryUseCase,
 } from '../../domain/interfaces/use-cases.js';
 import {
   IWorkflowOrchestrator,
@@ -38,9 +38,9 @@ interface DirectoryStructure {
 }
 
 export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
-  constructor(private orchestrator: IWorkflowOrchestrator) {}
+  public constructor(private orchestrator: IWorkflowOrchestrator) {}
 
-  async execute(request: AnalysisRequest): Promise<AnalysisResponse> {
+  public async execute(request: Readonly<AnalysisRequest>): Promise<AnalysisResponse> {
     const startTime = performance.now();
 
     try {
@@ -59,9 +59,9 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
       }
 
       // Scan directory structure
-      const directoryStructure = await this.scanDirectory(
+      const directoryStructure = this.scanDirectory(
         request.directoryPath,
-        request.options?.depth || 3
+        request.options?.depth ?? 3
       );
 
       // Build analysis prompt with directory insights
@@ -133,14 +133,14 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
     }
   }
 
-  private async scanDirectory(
+  private scanDirectory(
     directoryPath: string,
     maxDepth: number
-  ): Promise<DirectoryStructure> {
+  ): DirectoryStructure {
     const files: FileInfo[] = [];
     const dependencies = new Set<string>();
 
-    const scanRecursive = (currentPath: string, currentDepth: number) => {
+    const scanRecursive = (currentPath: string, currentDepth: number): void => {
       if (currentDepth > maxDepth) return;
 
       try {
@@ -339,12 +339,14 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
       const fileName = basename(filePath).toLowerCase();
 
       if (fileName === 'package.json') {
-        const packageJson = JSON.parse(content);
-        if (packageJson.dependencies) {
-          dependencies.push(...Object.keys(packageJson.dependencies));
-        }
-        if (packageJson.devDependencies) {
-          dependencies.push(...Object.keys(packageJson.devDependencies));
+        const packageJson = JSON.parse(content) as { dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
+        if (packageJson && typeof packageJson === 'object') {
+          if (packageJson.dependencies && typeof packageJson.dependencies === 'object') {
+            dependencies.push(...Object.keys(packageJson.dependencies));
+          }
+          if (packageJson.devDependencies && typeof packageJson.devDependencies === 'object') {
+            dependencies.push(...Object.keys(packageJson.devDependencies));
+          }
         }
       } else if (fileName === 'requirements.txt') {
         const lines = content.split('\n');
@@ -374,9 +376,9 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
   }
 
   private buildDirectoryAnalysisPrompt(
-    structure: DirectoryStructure,
+    structure: Readonly<DirectoryStructure>,
     directoryPath: string,
-    options?: AnalysisRequest['options']
+    options?: Readonly<AnalysisRequest['options']>
   ): string {
     const dirName = basename(directoryPath);
 
@@ -387,7 +389,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
     prompt += `- Total Lines of Code: ${structure.totalLines.toLocaleString()}\n`;
     prompt += `- File Types:\n`;
 
-    Object.entries(structure.filesByType).forEach(([type, count]) => {
+    Object.entries(structure.filesByType).forEach(([type, count]: readonly [string, number]) => {
       prompt += `  - ${type}: ${count} files\n`;
     });
 
@@ -437,13 +439,19 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
   }
 
   private parseDirectoryAnalysisResult(
-    result: any,
-    structure: DirectoryStructure
+    result: unknown,
+    structure: Readonly<DirectoryStructure>
   ): AnalysisResponse['analysis'] {
     // If result is already structured, use it
-    if (result && typeof result === 'object' && result.analysis) {
+    if (
+      typeof result === 'object' &&
+      result !== null &&
+      'analysis' in result &&
+      typeof (result as { analysis?: unknown }).analysis === 'object' &&
+      (result as { analysis?: unknown }).analysis !== null
+    ) {
       return {
-        ...result.analysis,
+        ...(result as { analysis: Omit<AnalysisResponse['analysis'], 'structure'> }).analysis,
         structure: this.buildStructureSummary(structure),
       };
     }

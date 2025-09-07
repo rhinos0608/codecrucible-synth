@@ -11,7 +11,7 @@
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
 import * as path from 'path';
-import { promises as fs, statSync } from 'fs';
+import { promises as fs } from 'fs';
 import { PathUtilities } from '../../utils/path-utilities.js';
 
 export interface SecurityConfig {
@@ -55,10 +55,10 @@ export class MCPServerSecurity {
   private concurrentOperations = 0;
   private blockedOperations = 0; // Track actual blocked operations
   private blockedPathPatterns: RegExp[] = [];
-  private riskLevelCounts = { low: 0, medium: 0, high: 0, critical: 0 }; // Track risk levels
+  private riskLevelCounts: Record<'low' | 'medium' | 'high' | 'critical', number> = { low: 0, medium: 0, high: 0, critical: 0 }; // Track risk levels
 
   // Throttling for verbose path debug logs
-  private pathLogThrottler = {
+  private readonly pathLogThrottler = {
     count: 0,
     lastLogged: 0,
     logInterval: 30000, // Log every 30 seconds max
@@ -66,7 +66,7 @@ export class MCPServerSecurity {
     warningThreshold: 1000, // Warn if high volume
   };
 
-  constructor(config: Partial<SecurityConfig> = {}) {
+  public constructor(config: Readonly<Partial<SecurityConfig>> = {}) {
     this.config = {
       maxFileSize: 100 * 1024 * 1024, // 100MB default
       maxPathDepth: 10,
@@ -124,7 +124,7 @@ export class MCPServerSecurity {
   /**
    * Track security validation results and update counters
    */
-  private trackSecurityResult(result: SecurityValidationResult): SecurityValidationResult {
+  private trackSecurityResult(result: Readonly<SecurityValidationResult>): SecurityValidationResult {
     // Track blocked operations
     if (!result.allowed) {
       this.blockedOperations++;
@@ -133,8 +133,8 @@ export class MCPServerSecurity {
 
     // Track risk level counts
     const riskLevel = result.riskAssessment.level;
-    if (riskLevel in this.riskLevelCounts) {
-      (this.riskLevelCounts as any)[riskLevel]++;
+    if (Object.prototype.hasOwnProperty.call(this.riskLevelCounts, riskLevel)) {
+      this.riskLevelCounts[riskLevel]++;
     }
 
     return result;
@@ -143,14 +143,14 @@ export class MCPServerSecurity {
   /**
    * Validate file system operation with comprehensive security checks
    */
-  async validateFileSystemOperation(
+  public async validateFileSystemOperation(
     filePath: string,
-    context: SecurityContext
+    context: Readonly<SecurityContext>
   ): Promise<SecurityValidationResult> {
     // Check cache first for performance
     const cacheKey = `${filePath}:${context.operation}`;
-    const cached = this.pathCache.get(cacheKey);
-    if (cached && Date.now() - (cached as any).timestamp < 30000) {
+    const cached = this.pathCache.get(cacheKey) as (SecurityValidationResult & { timestamp?: number }) | undefined;
+    if (cached && cached.timestamp !== undefined && Date.now() - cached.timestamp < 30000) {
       // 30s cache
       return cached;
     }
@@ -176,8 +176,8 @@ export class MCPServerSecurity {
 
       // Cache successful validations
       if (result.allowed) {
-        (result as any).timestamp = Date.now();
-        this.pathCache.set(cacheKey, result);
+        const resultWithTimestamp = { ...result, timestamp: Date.now() };
+        this.pathCache.set(cacheKey, resultWithTimestamp);
 
         // Limit cache size
         if (this.pathCache.size > 1000) {
@@ -199,7 +199,7 @@ export class MCPServerSecurity {
    */
   private async performSecurityValidation(
     filePath: string,
-    context: SecurityContext
+    context: Readonly<SecurityContext>
   ): Promise<SecurityValidationResult> {
     const warnings: string[] = [];
     const riskFactors: string[] = [];
@@ -383,7 +383,7 @@ export class MCPServerSecurity {
       allowAbsolute: true,
       allowRelative: true,
       allowTraversal: false,
-      basePath: basePath,
+      basePath,
     });
   }
 
@@ -438,11 +438,11 @@ export class MCPServerSecurity {
   /**
    * Validate command execution for security
    */
-  async validateCommandExecution(
+  public validateCommandExecution(
     command: string,
-    args: string[],
-    context: SecurityContext
-  ): Promise<SecurityValidationResult> {
+    args: readonly string[],
+    context: Readonly<SecurityContext>
+  ): SecurityValidationResult {
     const warnings: string[] = [];
     const riskFactors: string[] = [];
     let riskScore = 0;
@@ -508,7 +508,7 @@ export class MCPServerSecurity {
   /**
    * Get security statistics for monitoring
    */
-  getSecurityStats(): {
+  public getSecurityStats(): {
     cacheSize: number;
     concurrentOperations: number;
     blockedOperations: number;
@@ -530,7 +530,7 @@ export class MCPServerSecurity {
   /**
    * Clear security cache
    */
-  clearCache(): void {
+  public clearCache(): void {
     this.pathCache.clear();
     logger.info('Security validation cache cleared');
   }
@@ -540,12 +540,11 @@ export class MCPServerSecurity {
    */
   private generateSpecificPathError(
     sanitizedPath: string,
-    context: SecurityContext
+    context: Readonly<SecurityContext>
   ): { reason: string; actionableAdvice: string } {
     const pathExtension = path.extname(sanitizedPath);
     const hasExtension = pathExtension.length > 0;
-    const operation = context.operation;
-    const resourceType = context.resourceType;
+    const { operation, resourceType } = context;
 
     // Determine likely intended type based on context clues
     const isLikelyFile =
@@ -636,7 +635,7 @@ export class MCPServerSecurity {
       advice.push(`Check if directory '${directory}' exists`);
     }
 
-    return advice.join('. ') + '.';
+    return `${advice.join('. ')}.`;
   }
 
   /**
@@ -678,7 +677,7 @@ export class MCPServerSecurity {
       advice.push(`Consider creating the directory first`);
     }
 
-    return advice.join('. ') + '.';
+    return `${advice.join('. ')}.`;
   }
 
   /**

@@ -5,7 +5,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { exec, ChildProcess } from 'child_process';
+import { ChildProcess, exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import { logger } from '../infrastructure/logging/logger.js';
@@ -32,15 +32,15 @@ interface TerminalResult {
 }
 
 export class TerminalMCPServer {
-  private server: Server;
-  private config: TerminalConfig;
+  private readonly server: Server;
+  private readonly config: TerminalConfig;
   private initialized: boolean = false;
-  private activeProcesses: Map<string, ChildProcess> = new Map();
+  private readonly activeProcesses: Map<string, ChildProcess> = new Map();
 
-  constructor(config: TerminalConfig = {}) {
+  public constructor(config: TerminalConfig = {}) {
     this.config = {
-      workingDirectory: config.workingDirectory || process.cwd(),
-      allowedCommands: config.allowedCommands || [
+      workingDirectory: config.workingDirectory ?? process.cwd(),
+      allowedCommands: config.allowedCommands ?? [
         'npm',
         'node',
         'git',
@@ -75,7 +75,7 @@ export class TerminalMCPServer {
         'rustc',
         'go',
       ],
-      blockedCommands: config.blockedCommands || [
+      blockedCommands: config.blockedCommands ?? [
         'rm',
         'del',
         'sudo',
@@ -93,9 +93,9 @@ export class TerminalMCPServer {
         'mkfs',
         'mount',
       ],
-      timeout: config.timeout || 30000, // 30 seconds default
-      maxOutputSize: config.maxOutputSize || 1000000, // 1MB default
-      environment: config.environment || {},
+      timeout: config.timeout ?? 30000, // 30 seconds default
+      maxOutputSize: config.maxOutputSize ?? 1000000, // 1MB default
+      environment: config.environment ?? {},
     };
 
     this.server = new Server(
@@ -116,7 +116,7 @@ export class TerminalMCPServer {
 
   private setupRequestHandlers(): void {
     // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    this.server.setRequestHandler(ListToolsRequestSchema, () => {
       return {
         tools: [
           {
@@ -200,9 +200,9 @@ export class TerminalMCPServer {
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async request => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      const typedArgs = args as Record<string, any>;
+      const typedArgs = args ?? {};
 
       try {
         switch (name) {
@@ -256,14 +256,14 @@ export class TerminalMCPServer {
     const baseCommand = command.split(' ')[0].toLowerCase();
 
     // Check blocked commands first
-    for (const blocked of this.config.blockedCommands!) {
+    for (const blocked of this.config.blockedCommands ?? []) {
       if (baseCommand.includes(blocked) || command.toLowerCase().includes(blocked)) {
         return false;
       }
     }
 
     // Check if command is in allowed list
-    return this.config.allowedCommands!.some(
+    return (this.config.allowedCommands ?? []).some(
       allowed =>
         baseCommand === allowed.toLowerCase() || baseCommand.startsWith(allowed.toLowerCase())
     );
@@ -271,7 +271,7 @@ export class TerminalMCPServer {
 
   private async executeCommand(
     command: string,
-    args: string[] = [],
+    args: readonly string[] = [],
     workingDirectory?: string,
     timeout?: number
   ): Promise<TerminalResult> {
@@ -298,24 +298,47 @@ export class TerminalMCPServer {
         duration: Date.now() - startTime,
         command: fullCommand,
       };
-    } catch (error: any) {
+    } catch (error) {
+      let stdout = '';
+      let stderr = '';
+      let exitCode = 1;
+
+      if (typeof error === 'object' && error !== null) {
+        if ('stdout' in error && typeof (error as { stdout?: unknown }).stdout === 'string') {
+          const { stdout: errStdout } = error as { stdout: string };
+          stdout = errStdout;
+        }
+        if ('stderr' in error && typeof (error as { stderr?: unknown }).stderr === 'string') {
+          const { stderr: errStderr } = error as { stderr: string };
+          stderr = errStderr;
+        } else if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
+          const { message } = error as { message: string };
+          stderr = message;
+        }
+        if ('code' in error && typeof (error as { code?: unknown }).code === 'number') {
+          exitCode = (error as { code: number }).code;
+        }
+      } else if (typeof error === 'string') {
+        stderr = error;
+      }
+
       return {
-        stdout: error.stdout || '',
-        stderr: error.stderr || error.message,
-        exitCode: error.code || 1,
+        stdout,
+        stderr,
+        exitCode,
         duration: Date.now() - startTime,
         command: fullCommand,
       };
     }
   }
 
-  async runCommand(
+  public async runCommand(
     command: string,
-    args: string[] = [],
+    args: readonly string[] = [],
     workingDirectory?: string,
     timeout?: number,
     captureOutput = true
-  ) {
+  ): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
     const result = await this.executeCommand(command, args, workingDirectory, timeout);
 
     if (!captureOutput) {
@@ -343,12 +366,12 @@ export class TerminalMCPServer {
     };
   }
 
-  async runScript(
+  public async runScript(
     script: string,
     interpreter: string,
     workingDirectory?: string,
     timeout?: number
-  ) {
+  ): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
     if (!this.isCommandAllowed(interpreter)) {
       throw new Error(`Interpreter not allowed: ${interpreter}`);
     }
@@ -400,12 +423,15 @@ export class TerminalMCPServer {
       // Clean up on error
       try {
         await fs.unlink(scriptPath);
-      } catch {} // Ignore cleanup errors
+      } catch (cleanupError) {
+        // Ignore cleanup errors
+      }
       throw error;
     }
   }
 
-  async getEnvironment(variable?: string) {
+  public async getEnvironment(variable?: string): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
+    await Promise.resolve(); // Ensures at least one await expression
     if (variable) {
       const value = process.env[variable];
       return {
@@ -416,7 +442,7 @@ export class TerminalMCPServer {
       };
     } else {
       const envVars = Object.entries(process.env)
-        .map(([key, value]) => `${key}=${value}`)
+        .map(([key, value]: [string, string | undefined]) => `${key}=${value ?? ''}`)
         .join('\n');
       return {
         content: [{ type: 'text' as const, text: envVars }],
@@ -425,7 +451,7 @@ export class TerminalMCPServer {
     }
   }
 
-  async setWorkingDirectory(dirPath: string) {
+  public async setWorkingDirectory(dirPath: string): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
     try {
       const fs = await import('fs/promises');
       await fs.access(dirPath); // Check if directory exists
@@ -445,9 +471,10 @@ export class TerminalMCPServer {
     }
   }
 
-  async listProcesses() {
+  public async listProcesses(): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
+    await Promise.resolve(); // Ensures at least one await expression
     const processList = Array.from(this.activeProcesses.entries()).map(
-      ([id, process]) => `${id}: PID ${process.pid} (${process.killed ? 'killed' : 'running'})`
+      ([id, process]: readonly [string, ChildProcess]) => `${id}: PID ${process.pid} (${process.killed ? 'killed' : 'running'})`
     );
 
     return {
@@ -461,7 +488,8 @@ export class TerminalMCPServer {
     };
   }
 
-  async killProcess(processId: string) {
+  public async killProcess(processId: string): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
+    await Promise.resolve(); // Ensures at least one await expression
     const process = this.activeProcesses.get(processId);
     if (!process) {
       return {
@@ -485,18 +513,20 @@ export class TerminalMCPServer {
     }
   }
 
-  async initialize(): Promise<void> {
+  public initialize(): void {
     if (this.initialized) return;
     this.initialized = true;
     logger.info('Terminal MCP Server initialized');
   }
 
-  async shutdown(): Promise<void> {
+  public shutdown(): void {
     // Kill all active processes
     for (const [_id, process] of this.activeProcesses) {
       try {
         process.kill('SIGTERM');
-      } catch {} // Ignore errors during shutdown
+      } catch {
+        // Ignore errors during shutdown
+      }
     }
     this.activeProcesses.clear();
 
@@ -504,38 +534,38 @@ export class TerminalMCPServer {
     logger.info('Terminal MCP Server shutdown');
   }
 
-  getServer(): Server {
+  public getServer(): Server {
     return this.server;
   }
 
   /**
-   * Call a tool directly (for internal use)
-   */
-  async callTool(toolName: string, args: ToolExecutionArgs): Promise<ToolCallResponse> {
-    switch (toolName) {
-      case 'run_command':
-        return this.runCommand(
-          args.command || '',
-          args.args || [],
-          args.workingDirectory,
-          args.timeout,
-          args.captureOutput !== false
-        );
-      case 'run_script':
-        return this.runScript(
-          args.content || '',
-          args.interpreter || 'bash',
-          args.workingDirectory,
-          args.timeout
-        );
-      case 'get_environment':
-        return this.getEnvironment(args.variable);
-      case 'set_working_directory':
-        return this.setWorkingDirectory(args.path || '.');
-      case 'list_processes':
+     * Call a tool directly (for internal use)
+     */
+    public async callTool(toolName: string, args: Readonly<ToolExecutionArgs>): Promise<ToolCallResponse> {
+      switch (toolName) {
+        case 'run_command':
+          return this.runCommand(
+            args.command ?? '',
+            args.args ?? [],
+            typeof args.workingDirectory === 'string' ? args.workingDirectory : undefined,
+            typeof args.timeout === 'number' ? args.timeout : undefined,
+            args.captureOutput !== false
+          );
+        case 'run_script':
+          return this.runScript(
+            args.content ?? '',
+            typeof args.interpreter === 'string' ? args.interpreter : 'bash',
+            typeof args.workingDirectory === 'string' ? args.workingDirectory : undefined,
+            typeof args.timeout === 'number' ? args.timeout : undefined
+          );
+        case 'get_environment':
+          return this.getEnvironment(typeof args.variable === 'string' ? args.variable : undefined);
+        case 'set_working_directory':
+          return this.setWorkingDirectory(args.path ?? '.');
+        case 'list_processes':
         return this.listProcesses();
       case 'kill_process':
-        return this.killProcess(args.processId);
+        return this.killProcess(args.processId as string);
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }

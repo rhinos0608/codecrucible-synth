@@ -578,8 +578,12 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
 
   protected setupEventHandlers(): void {
     this.eventBus.on('system:shutdown', async () => this.shutdown());
-    this.eventBus.on('agent:update-config', (config: UnifiedConfiguration) => {
-      this.config = { ...this.config, ...config };
+    this.eventBus.on('agent:update-config', (data: unknown) => {
+      // Type guard to ensure data is UnifiedConfiguration
+      if (data && typeof data === 'object') {
+        const config = data as UnifiedConfiguration;
+        this.config = { ...this.config, ...config };
+      }
     });
   }
 

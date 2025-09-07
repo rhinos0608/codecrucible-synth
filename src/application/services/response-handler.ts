@@ -2,33 +2,58 @@ import { ModelResponse } from '../../domain/interfaces/model-client.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 
 export interface ResponseHandler {
-  parse(raw: any, provider: string): ModelResponse;
-  handleError(error: unknown): never;
+  parse: (raw: unknown, provider: string) => ModelResponse;
+  handleError: (error: unknown) => never;
 }
 
 export class BasicResponseHandler implements ResponseHandler {
-  parse(raw: any, provider: string): ModelResponse {
+  public parse(raw: unknown, provider: string): ModelResponse {
+    const hasProp = <T extends object>(obj: T, prop: string): boolean =>
+      Object.prototype.hasOwnProperty.call(obj, prop);
+
     logger.debug('ResponseHandler parsing response', {
       provider,
       responseType: typeof raw,
-      hasContent: !!raw?.content,
-      hasResponse: !!raw?.response,
-      hasText: !!raw?.text,
+      hasContent: typeof raw === 'object' && raw !== null && hasProp(raw, 'content'),
+      hasResponse: typeof raw === 'object' && raw !== null && hasProp(raw, 'response'),
+      hasText: typeof raw === 'object' && raw !== null && hasProp(raw, 'text'),
       isString: typeof raw === 'string',
     });
 
     // Handle direct ModelResponse objects
-    if (raw && typeof raw === 'object' && 'content' in raw && 'model' in raw) {
+    if (
+      raw &&
+      typeof raw === 'object' &&
+      hasProp(raw, 'content') &&
+      hasProp(raw, 'model')
+    ) {
+      const contentVal =
+        typeof (raw as { content?: unknown }).content === 'string'
+          ? (raw as { content?: string }).content
+          : undefined;
+
       // Validate that content is not empty
-      if (!raw.content || (typeof raw.content === 'string' && raw.content.trim().length === 0)) {
+      if (
+        !(raw as { content?: unknown }).content ||
+        (typeof contentVal === 'string' && contentVal.trim().length === 0)
+      ) {
         logger.warn('ResponseHandler received ModelResponse with empty content', {
           provider,
-          hasToolCalls: !!raw.toolCalls?.length,
+          hasToolCalls:
+            typeof (raw as { toolCalls?: unknown[] }).toolCalls !== 'undefined' &&
+            Array.isArray((raw as { toolCalls?: unknown[] }).toolCalls) &&
+            ((raw as { toolCalls?: unknown[] }).toolCalls?.length ?? 0) > 0,
           responseKeys: Object.keys(raw),
         });
 
         // If we have tool calls but no content, that's potentially valid
-        if (!raw.toolCalls?.length) {
+        if (
+          !(
+            typeof (raw as { toolCalls?: unknown[] }).toolCalls !== 'undefined' &&
+            Array.isArray((raw as { toolCalls?: unknown[] }).toolCalls) &&
+            ((raw as { toolCalls?: unknown[] }).toolCalls?.length ?? 0) > 0
+          )
+        ) {
           throw new Error(
             `${provider} returned empty response content. The model may not be responding correctly.`
           );
@@ -43,18 +68,37 @@ export class BasicResponseHandler implements ResponseHandler {
     if (typeof raw === 'string') {
       content = raw;
     } else if (raw && typeof raw === 'object') {
+      // Use type assertion to index signature for safe property access
+      const rawObj = raw as Record<string, unknown>;
+
       // Handle nested message objects
-      if (raw.message && typeof raw.message === 'object') {
-        content = raw.message.content || raw.message.text || raw.message.response || '';
+      if (
+        typeof rawObj.message === 'object' &&
+        rawObj.message !== null
+      ) {
+        const msg = rawObj.message as Record<string, unknown>;
+        content =
+          (typeof msg.content === 'string' && msg.content) ||
+          (typeof msg.text === 'string' && msg.text) ||
+          (typeof msg.response === 'string' && msg.response) ||
+          '';
       } else {
-        content = raw.content || raw.text || raw.response || raw.message || '';
+        content =
+          (typeof rawObj.content === 'string' && rawObj.content) ||
+          (typeof rawObj.text === 'string' && rawObj.text) ||
+          (typeof rawObj.response === 'string' && rawObj.response) ||
+          (typeof rawObj.message === 'string' && rawObj.message) ||
+          '';
       }
 
       // If content is still an object, try to extract from it
       if (content && typeof content === 'object') {
-        const contentObj = content as any;
+        const contentObj = content as Record<string, unknown>;
         content =
-          contentObj.content || contentObj.text || contentObj.response || JSON.stringify(content);
+          (typeof contentObj.content === 'string' && contentObj.content) ||
+          (typeof contentObj.text === 'string' && contentObj.text) ||
+          (typeof contentObj.response === 'string' && contentObj.response) ||
+          JSON.stringify(content);
       }
     } else {
       content = String(raw || '');
@@ -62,12 +106,24 @@ export class BasicResponseHandler implements ResponseHandler {
 
     // Validate that we have meaningful content - but allow empty content if tool calls are present
     if (!content || content.trim().length === 0) {
-      const hasToolCalls = raw?.toolCalls?.length > 0;
+      let hasToolCalls = false;
+      if (raw && typeof raw === 'object') {
+        const rawObj = raw as Record<string, unknown>;
+        if (
+          Array.isArray(rawObj.toolCalls) &&
+          rawObj.toolCalls.length > 0
+        ) {
+          hasToolCalls = true;
+        }
+      }
 
       if (hasToolCalls) {
         logger.debug('ResponseHandler: empty content but tool calls present - proceeding', {
           provider,
-          toolCallCount: raw.toolCalls.length,
+          toolCallCount:
+            (raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>).toolCalls))
+              ? ((raw as Record<string, unknown>).toolCalls as unknown[]).length
+              : 0,
         });
         content = ''; // Explicitly set to empty string for tool-only responses
       } else {
@@ -88,19 +144,21 @@ export class BasicResponseHandler implements ResponseHandler {
       contentPreview: content.substring(0, 100),
     });
 
+    const rawObj = (raw ?? {}) as Record<string, unknown>;
+
     return {
-      id: raw?.id || `resp_${Date.now()}`,
+      id: typeof rawObj.id === 'string' ? rawObj.id : `resp_${Date.now()}`,
       content,
-      model: raw?.model || 'unknown',
+      model: typeof rawObj.model === 'string' ? rawObj.model : 'unknown',
       provider,
-      usage: raw?.usage,
-      responseTime: raw?.responseTime,
-      finishReason: raw?.finishReason,
-      toolCalls: raw?.toolCalls,
+      usage: rawObj.usage as ModelResponse['usage'],
+      responseTime: rawObj.responseTime as ModelResponse['responseTime'],
+      finishReason: rawObj.finishReason as ModelResponse['finishReason'],
+      toolCalls: rawObj.toolCalls as ModelResponse['toolCalls'],
     };
   }
 
-  handleError(error: unknown): never {
+  public handleError(error: unknown): never {
     if (error instanceof Error) {
       logger.error('ResponseHandler error:', error);
       throw error;

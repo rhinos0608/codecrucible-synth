@@ -9,7 +9,7 @@
 
 import { IVoiceOrchestrationService } from '../../domain/services/voice-orchestration-service.js';
 import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
-import { ProcessingRequest } from '../../domain/entities/request.js';
+import { ProcessingRequest, RequestType } from '../../domain/entities/request.js';
 import { SimpleCouncilCoordinator } from './simple-council-coordinator.js';
 
 export type SpiralPhase = 'collapse' | 'council' | 'synthesis' | 'rebirth' | 'reflection';
@@ -40,44 +40,46 @@ export interface PhaseOutput {
  * Single responsibility: Phase execution only
  */
 export class SpiralPhaseExecutor {
-  private councilCoordinator: SimpleCouncilCoordinator;
+  private readonly councilCoordinator: SimpleCouncilCoordinator;
+  private readonly modelSelectionService: IModelSelectionService;
 
-  constructor(
-    voiceOrchestrationService: IVoiceOrchestrationService,
-    private modelSelectionService: IModelSelectionService
+  public constructor(
+    readonly voiceOrchestrationService: Readonly<IVoiceOrchestrationService>,
+    modelSelectionService: Readonly<IModelSelectionService>
   ) {
     this.councilCoordinator = new SimpleCouncilCoordinator(
       voiceOrchestrationService,
       modelSelectionService
     );
+    this.modelSelectionService = modelSelectionService;
   }
 
   /**
    * Execute a specific phase of the spiral
    */
-  async executePhase(input: PhaseInput): Promise<PhaseOutput> {
+  public async executePhase(input: Readonly<PhaseInput>): Promise<PhaseOutput> {
     const startTime = Date.now();
 
     switch (input.phase) {
       case 'collapse':
-        return await this.executeCollapsePhase(input, startTime);
+        return this.executeCollapsePhase(input, startTime);
       case 'council':
-        return await this.executeCouncilPhase(input, startTime);
+        return this.executeCouncilPhase(input, startTime);
       case 'synthesis':
-        return await this.executeSynthesisPhase(input, startTime);
+        return this.executeSynthesisPhase(input, startTime);
       case 'rebirth':
-        return await this.executeRebirthPhase(input, startTime);
+        return this.executeRebirthPhase(input, startTime);
       case 'reflection':
-        return await this.executeReflectionPhase(input, startTime);
+        return this.executeReflectionPhase(input, startTime);
       default:
         throw new Error('Unknown spiral phase');
     }
   }
 
-  private async executeCollapsePhase(input: PhaseInput, startTime: number): Promise<PhaseOutput> {
+  private async executeCollapsePhase(input: Readonly<PhaseInput>, startTime: number): Promise<PhaseOutput> {
     const request = ProcessingRequest.create(
       this.buildCollapsePrompt(input.content),
-      'problem-decomposition' as any,
+      'problem-decomposition' as RequestType,
       'medium',
       input.context,
       { mustIncludeVoices: ['explorer'] }
@@ -86,7 +88,7 @@ export class SpiralPhaseExecutor {
     const model = await this.modelSelectionService.selectOptimalModel(request);
     const response = model.generateResponse
       ? await model.generateResponse(request.prompt)
-      : await this.generateFallbackResponse('collapse', request.prompt, input.content);
+      : this.generateFallbackResponse('collapse', input.content);
 
     return {
       content: response,
@@ -118,10 +120,10 @@ export class SpiralPhaseExecutor {
     };
   }
 
-  private async executeSynthesisPhase(input: PhaseInput, startTime: number): Promise<PhaseOutput> {
+  private async executeSynthesisPhase(input: Readonly<PhaseInput>, startTime: number): Promise<PhaseOutput> {
     const request = ProcessingRequest.create(
       this.buildSynthesisPrompt(input.content),
-      'solution-synthesis' as any,
+      'solution-synthesis' as RequestType,
       'medium',
       input.context,
       { mustIncludeVoices: ['architect'] }
@@ -130,7 +132,7 @@ export class SpiralPhaseExecutor {
     const model = await this.modelSelectionService.selectOptimalModel(request);
     const response = model.generateResponse
       ? await model.generateResponse(request.prompt)
-      : await this.generateFallbackResponse('synthesis', request.prompt, input.content);
+      : this.generateFallbackResponse('synthesis', input.content);
 
     return {
       content: response,
@@ -142,10 +144,10 @@ export class SpiralPhaseExecutor {
     };
   }
 
-  private async executeRebirthPhase(input: PhaseInput, startTime: number): Promise<PhaseOutput> {
+  private async executeRebirthPhase(input: Readonly<PhaseInput>, startTime: number): Promise<PhaseOutput> {
     const request = ProcessingRequest.create(
       this.buildRebirthPrompt(input.content),
-      'implementation-planning' as any,
+      'implementation-planning' as RequestType,
       'medium',
       input.context,
       { mustIncludeVoices: ['implementor'] }
@@ -154,7 +156,7 @@ export class SpiralPhaseExecutor {
     const model = await this.modelSelectionService.selectOptimalModel(request);
     const response = model.generateResponse
       ? await model.generateResponse(request.prompt)
-      : await this.generateFallbackResponse('rebirth', request.prompt, input.content);
+      : this.generateFallbackResponse('rebirth', input.content);
 
     return {
       content: response,
@@ -166,10 +168,10 @@ export class SpiralPhaseExecutor {
     };
   }
 
-  private async executeReflectionPhase(input: PhaseInput, startTime: number): Promise<PhaseOutput> {
+  private async executeReflectionPhase(input: Readonly<PhaseInput>, startTime: number): Promise<PhaseOutput> {
     const request = ProcessingRequest.create(
       this.buildReflectionPrompt(input.content, input.previousPhases),
-      'quality-assessment' as any,
+      'quality-assessment' as RequestType,
       'medium',
       input.context,
       { mustIncludeVoices: ['guardian'] }
@@ -178,7 +180,7 @@ export class SpiralPhaseExecutor {
     const model = await this.modelSelectionService.selectOptimalModel(request);
     const response = model.generateResponse
       ? await model.generateResponse(request.prompt)
-      : await this.generateFallbackResponse('reflection', request.prompt, input.content);
+      : this.generateFallbackResponse('reflection', input.content);
 
     // Combine original content with reflection insights
     const enhancedContent = `${input.content}\n\n---\n\n## REFLECTION INSIGHTS:\n${response}`;
@@ -280,31 +282,30 @@ Be honest about quality and provide specific guidance for next steps.`;
   }
 
   /**
-   * Generate intelligent fallback responses when models don't support generateResponse
-   * This ensures the system continues to function gracefully with meaningful output
-   */
-  private async generateFallbackResponse(
-    phase: SpiralPhase,
-    prompt: string,
-    originalContent: string
-  ): Promise<string> {
-    switch (phase) {
-      case 'collapse':
-        return this.generateCollapseResponse(originalContent);
-
-      case 'synthesis':
-        return this.generateSynthesisResponse(originalContent);
-
-      case 'rebirth':
-        return this.generateRebirthResponse(originalContent);
-
-      case 'reflection':
-        return this.generateReflectionResponse(originalContent);
-
-      default:
-        return this.generateGenericResponse(phase, originalContent);
+     * Generate intelligent fallback responses when models don't support generateResponse
+     * This ensures the system continues to function gracefully with meaningful output
+     */
+    private generateFallbackResponse(
+      phase: SpiralPhase,
+      originalContent: string
+    ): string {
+      switch (phase) {
+        case 'collapse':
+          return this.generateCollapseResponse(originalContent);
+  
+        case 'synthesis':
+          return this.generateSynthesisResponse(originalContent);
+  
+        case 'rebirth':
+          return this.generateRebirthResponse(originalContent);
+  
+        case 'reflection':
+          return this.generateReflectionResponse(originalContent);
+  
+        default:
+          return this.generateGenericResponse(phase, originalContent);
+      }
     }
-  }
 
   private generateCollapseResponse(content: string): string {
     // Analyze the content and break it down into components

@@ -9,9 +9,9 @@ export default function createAnalysisPlugin(): IPlugin {
       lifecycle: 'both',
       tags: ['analysis'],
     },
-    async initialize(ctx: PluginContext) {
+    initialize(ctx: Readonly<PluginContext>): void {
       if (ctx.registerCommand) {
-        ctx.registerCommand('analysis:refresh-index', async () => {
+        ctx.registerCommand('analysis:refresh-index', () => {
           return { success: true, message: 'Index refreshed' };
         });
       }

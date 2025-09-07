@@ -5,13 +5,12 @@
 
 import { logger } from '../../infrastructure/logging/logger.js';
 import {
+  LLMCapabilities,
   LLMProvider,
   LLMResponse,
-  LLMCapabilities,
   LLMStatus,
 } from '../../domain/interfaces/llm-interfaces.js';
 import {
-  generateSystemPrompt,
   generateContextualSystemPrompt,
 } from '../../domain/prompts/system-prompt.js';
 
@@ -45,7 +44,7 @@ export interface OllamaRequest {
   format?: 'json';
   stream?: boolean;
   id?: string;
-  onStreamingToken?: (token: string, metadata?: any) => void;
+  onStreamingToken?: (token: string, metadata?: OllamaStreamingMetadata | undefined) => void;
   taskType?: string;
   temperature?: number;
   top_p?: number;
@@ -84,8 +83,8 @@ export interface OllamaTool {
   // Legacy properties for backward compatibility
   name?: string;
   description?: string;
-  inputSchema?: any;
-  parameters?: any;
+  inputSchema?: Record<string, unknown>;
+  parameters?: Record<string, unknown>;
 }
 
 export interface OllamaResponse {
@@ -162,9 +161,9 @@ export interface OllamaConfig {
 }
 
 export class OllamaProvider implements LLMProvider {
-  readonly name = 'ollama';
-  readonly endpoint: string;
-  private config: OllamaConfig;
+  public readonly name = 'ollama';
+  public readonly endpoint: string;
+  private readonly config: Readonly<OllamaConfig>;
   private currentLoad = 0;
   private lastError?: string;
   private responseTimeHistory: number[] = [];
@@ -176,23 +175,20 @@ export class OllamaProvider implements LLMProvider {
   private readonly maxRequestsPerMinute: number;
   private readonly rateLimitWindow = 60000; // 1 minute in milliseconds
 
-  constructor(config: OllamaConfig) {
+  public constructor(config: Readonly<OllamaConfig>) {
     this.config = config;
     this.endpoint = config.endpoint;
     // Initialize rate limiting after methods are available
-    this.maxRequestsPerMinute = parseInt(process.env.MAX_REQUESTS_PER_MINUTE || '60');
+    this.maxRequestsPerMinute = parseInt(process.env.MAX_REQUESTS_PER_MINUTE ?? '60', 10);
   }
 
   /**
    * Check if Ollama is available and responding
    */
-  async isAvailable(): Promise<boolean> {
+  public async isAvailable(): Promise<boolean> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        this.parseEnvInt('OLLAMA_HEALTH_CHECK_TIMEOUT', 5000, 1000, 30000)
-      );
+      const timeoutId = setTimeout(() => { controller.abort(); }, this.parseEnvInt('OLLAMA_HEALTH_CHECK_TIMEOUT', 5000, 1000, 30000));
 
       const response = await fetch(`${this.endpoint}/api/tags`, {
         method: 'GET',
@@ -208,13 +204,24 @@ export class OllamaProvider implements LLMProvider {
 
       // Check if at least one model is available
       try {
-        const data = await response.json();
-        if (!data.models || data.models.length === 0) {
-          logger.warn('Ollama service is running but no models are available');
-          logger.info('To fix: Run "ollama pull llama3.1:8b" or "ollama pull deepseek-coder:8b"');
+        const data: unknown = await response.json();
+        if (
+          typeof data === 'object' &&
+          data !== null &&
+          'models' in data &&
+          Array.isArray((data as { models: unknown }).models)
+        ) {
+          const { models } = data as { models: unknown[] };
+          if (models.length === 0) {
+            logger.warn('Ollama service is running but no models are available');
+            logger.info('To fix: Run "ollama pull llama3.1:8b" or "ollama pull deepseek-coder:8b"');
+            return false;
+          }
+          logger.debug(`Ollama service available with ${models.length} models`);
+        } else {
+          logger.warn('Ollama service response does not contain a valid models array');
           return false;
         }
-        logger.debug(`Ollama service available with ${data.models.length} models`);
       } catch (jsonError) {
         logger.debug('Could not parse model list, but service is responsive');
       }
@@ -277,7 +284,7 @@ export class OllamaProvider implements LLMProvider {
       /data:text\/html/gi, // Data URLs
     ];
 
-    suspiciousPatterns.forEach(pattern => {
+    suspiciousPatterns.forEach((pattern: Readonly<RegExp>) => {
       if (pattern.test(prompt)) {
         throw new Error('Prompt contains potentially unsafe content');
       }
@@ -287,7 +294,7 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Generate code using Ollama
    */
-  async generateCode(prompt: string, options: OllamaOptions = {}): Promise<LLMResponse> {
+  public async generateCode(prompt: Readonly<string>, options: Readonly<OllamaOptions> = {}): Promise<LLMResponse> {
     this.checkRateLimit();
     this.validateInputLength(prompt);
 
@@ -306,18 +313,18 @@ export class OllamaProvider implements LLMProvider {
       }
 
       // Calculate confidence based on response quality indicators
-      const content = response.message?.content || response.response || '';
+      const content = response.message?.content ?? response.response ?? '';
       const confidence = this.calculateConfidence(
         content,
         responseTime,
-        options.taskType || 'default'
+        options.taskType ?? 'default'
       );
 
       return {
-        content: content,
+        content,
         confidence,
         responseTime,
-        model: response.model || this.config.defaultModel,
+        model: response.model ?? this.config.defaultModel,
         provider: this.name,
         metadata: {
           totalDuration: response.total_duration,
@@ -362,7 +369,7 @@ export class OllamaProvider implements LLMProvider {
         },
       };
 
-      const result = await this.request(requestObj);
+      const result = await this.request(requestObj) as LLMResponse;
       // Adapt LLMResponse to OllamaResponse shape
       const toolCalls: OllamaToolCall[] | undefined = result.toolCalls
         ? result.toolCalls.map(tc => ({
@@ -425,7 +432,7 @@ export class OllamaProvider implements LLMProvider {
     });
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeout || this.config.timeout);
+    const timeout = setTimeout(() => { controller.abort(); }, options.timeout ?? this.config.timeout);
 
     try {
       const response = await fetch(`${this.endpoint}/api/generate`, {
@@ -445,19 +452,20 @@ export class OllamaProvider implements LLMProvider {
       }
 
       // Robust JSON parsing with multiple fallback strategies
-      const data = await this.parseRobustJSON(response);
+      const dataUnknown = await this.parseRobustJSON(response);
+      const data = dataUnknown as Partial<OllamaResponse>;
 
       logger.debug('Ollama response structure:', {
         keys: Object.keys(data),
         hasResponse: !!data.response,
-        hasContent: !!data.content,
-        responseLength: data.response?.length || 0,
-        contentLength: data.content?.length || 0,
+        hasContent: !!data.response,
+        responseLength: typeof data.response === 'string' ? data.response.length : 0,
+        contentLength: typeof data.response === 'string' ? data.response.length : 0,
         model: data.model,
         done: data.done,
       });
 
-      if (!data.response && !data.content) {
+      if (!data.response) {
         // Check if Ollama is actually running and the model exists
         const isOllamaAvailable = await this.isAvailable();
         if (!isOllamaAvailable) {
@@ -478,34 +486,50 @@ export class OllamaProvider implements LLMProvider {
         );
       }
 
-      const finalContent = data.response || data.content || '';
+      // Safely extract response and content fields
+      const responseField = typeof data.response === 'string' ? data.response : '';
+      const contentField = (typeof data === 'object' && data !== null && 'content' in data && typeof (data as { content?: unknown }).content === 'string')
+        ? (data as { content: string }).content
+        : '';
+      const finalContent: string = typeof responseField === 'string' ? responseField : (typeof contentField === 'string' ? contentField : '');
 
       if (finalContent.length === 0) {
         const errorMessage = `Ollama returned zero-length content from model ${payload.model}. Model may be initializing or prompt may be inappropriate.`;
 
         // Check if there are ACTUAL tool calls with meaningful data
+        const toolCallsFromData = (data as { tool_calls?: unknown }).tool_calls;
+        const toolCallsFromMessage = data.message && typeof data.message === 'object'
+          ? (data.message as { tool_calls?: unknown }).tool_calls
+          : undefined;
         const hasValidToolCalls =
-          (data.tool_calls &&
-            Array.isArray(data.tool_calls) &&
-            data.tool_calls.length > 0 &&
-            data.tool_calls[0]?.function?.name) ||
-          (data.message?.tool_calls &&
-            Array.isArray(data.message.tool_calls) &&
-            data.message.tool_calls.length > 0 &&
-            data.message.tool_calls[0]?.function?.name);
+          (Array.isArray(toolCallsFromData) &&
+            toolCallsFromData.length > 0 &&
+            typeof (toolCallsFromData[0]) === 'object' &&
+            toolCallsFromData[0] !== null &&
+            'function' in toolCallsFromData[0] &&
+            typeof (toolCallsFromData[0] as { function?: { name?: unknown } }).function?.name === 'string') ||
+          (Array.isArray(toolCallsFromMessage) &&
+            toolCallsFromMessage.length > 0 &&
+            typeof (toolCallsFromMessage[0]) === 'object' &&
+                toolCallsFromMessage[0] !== null &&
+                'function' in toolCallsFromMessage[0] &&
+                typeof (toolCallsFromMessage[0] as { function?: { name?: unknown } }).function?.name === 'string'
+            );
 
         logger.error(errorMessage, {
           model: payload.model,
           promptLength: builtPrompt.length,
           hasValidToolCalls,
-          toolCallsCount: data.tool_calls?.length || data.message?.tool_calls?.length || 0,
+          toolCallsCount:
+            (Array.isArray(toolCallsFromData) ? toolCallsFromData.length : 0) +
+            (Array.isArray(toolCallsFromMessage) ? toolCallsFromMessage.length : 0),
           responseKeys: Object.keys(data),
         });
 
         // Only allow zero-length content if there are VALID tool calls with function names
         if (!hasValidToolCalls) {
           throw new Error(
-            errorMessage + ' No valid tool calls found to compensate for empty content.'
+            `${errorMessage} No valid tool calls found to compensate for empty content.`
           );
         } else {
           logger.debug('Empty content allowed due to valid tool calls being present');
@@ -513,14 +537,16 @@ export class OllamaProvider implements LLMProvider {
       }
 
       return {
-        model: data.model || this.config.defaultModel,
+        model: data.model ?? this.config.defaultModel,
         created_at: new Date().toISOString(),
         message: {
           role: 'assistant',
           content: finalContent,
-          tool_calls: data.tool_calls,
+          tool_calls: (typeof data === 'object' && data !== null && 'tool_calls' in data && Array.isArray((data as { tool_calls?: unknown }).tool_calls)
+            ? (data as { tool_calls?: OllamaToolCall[] }).tool_calls
+            : data.message?.tool_calls),
         },
-        response: data.response || finalContent,
+        response: typeof data.response === 'string' ? data.response : finalContent,
         done: !!data.done,
         context: data.context,
         total_duration: data.total_duration,
@@ -775,7 +801,7 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Get provider capabilities
    */
-  getCapabilities(): LLMCapabilities {
+  public getCapabilities(): LLMCapabilities {
     return {
       strengths: [
         'analysis',
@@ -802,7 +828,7 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Get current provider status
    */
-  async getStatus(): Promise<LLMStatus> {
+  public async getStatus(): Promise<LLMStatus> {
     const isAvailable = await this.isAvailable();
     const avgResponseTime =
       this.responseTimeHistory.length > 0
@@ -825,7 +851,7 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Get available models from Ollama
    */
-  async getAvailableModels(): Promise<string[]> {
+  public async getAvailableModels(): Promise<string[]> {
     try {
       const response = await fetch(`${this.endpoint}/api/tags`);
       if (!response.ok) {
@@ -833,7 +859,7 @@ export class OllamaProvider implements LLMProvider {
       }
 
       const data = (await response.json()) as OllamaModelList;
-      return data.models?.map((model: OllamaModel) => model.name) || [];
+      return data.models.map((model: Readonly<OllamaModel>) => model.name);
     } catch (error) {
       logger.error('Failed to get available Ollama models:', error);
       return [];
@@ -844,52 +870,58 @@ export class OllamaProvider implements LLMProvider {
    * CRITICAL FIX: Implement IModelProvider interface with proper tool support
    * This method is called by UnifiedModelClient and must handle function calling
    */
-  async request(request: OllamaRequest): Promise<LLMResponse> {
+  public async request(request: unknown): Promise<unknown> {
+    // Type guard to ensure request is OllamaRequest
+    if (!request || typeof request !== 'object') {
+      throw new Error('Invalid request: expected an object');
+    }
+    const typedRequest = request as OllamaRequest;
+    
     // Check rate limiting and validate input before processing
     this.checkRateLimit();
-    if (request.prompt) {
-      this.validateInputLength(request.prompt);
+    if (typedRequest.prompt) {
+      this.validateInputLength(typedRequest.prompt);
     }
     const startTime = Date.now();
 
     logger.debug('OllamaProvider.request() method entry', {
-      requestId: request.id,
-      hasPrompt: !!request.prompt,
-      promptLength: request.prompt?.length || 0,
+      requestId: typedRequest.id,
+      hasPrompt: !!typedRequest.prompt,
+      promptLength: typedRequest.prompt?.length ?? 0,
     });
     logger.info('OllamaProvider.request() called', {
-      hasTools: !!request.tools,
-      toolCount: request.tools?.length || 0,
+      hasTools: !!typedRequest.tools,
+      toolCount: typedRequest.tools?.length ?? 0,
       requestKeys: Object.keys(request),
     });
 
     // For requests with tools, use function calling support
-    if (request.tools && request.tools.length > 0) {
-      logger.info(`Ollama function calling: Processing ${request.tools.length} tools`);
+    if (typedRequest.tools && typedRequest.tools.length > 0) {
+      logger.info(`Ollama function calling: Processing ${typedRequest.tools.length} tools`);
 
       try {
         // Validate and transform tools safely
-        const validatedTools = this.validateAndTransformTools(request.tools);
+        const validatedTools = this.validateAndTransformTools(typedRequest.tools);
 
         if (validatedTools.length === 0) {
           logger.warn('No valid tools found after validation, falling back to prompt-only mode');
-          return await this.generateCode(request.prompt ?? '', request.options || {});
+          return await this.generateCode(typedRequest.prompt ?? '', typedRequest.options ?? {});
         }
 
         // Sanitize options to only include Ollama-supported parameters
-        const sanitizedOptions = this.sanitizeOllamaOptions(request.options || {});
+        const sanitizedOptions = this.sanitizeOllamaOptions(typedRequest.options ?? {});
 
         // Generate comprehensive system prompt with tool context
         const availableToolNames = validatedTools
-          .map(tool => tool.function?.name || 'unknown')
-          .filter(name => name !== 'unknown');
+          .map((tool: Readonly<OllamaTool>) => tool.function.name ?? 'unknown')
+          .filter((name: string) => name !== 'unknown');
         const systemPrompt = generateContextualSystemPrompt(
           availableToolNames,
-          `Working with model: ${request.model || this.config.defaultModel}`
+          `Working with model: ${typedRequest.model ?? this.config.defaultModel}`
         );
 
         const ollamaRequest = {
-          model: request.model || this.config.defaultModel,
+          model: typedRequest.model ?? this.config.defaultModel,
           messages: [
             {
               role: 'system',
@@ -897,21 +929,21 @@ export class OllamaProvider implements LLMProvider {
             },
             {
               role: 'user',
-              content: request.prompt,
+              content: typedRequest.prompt,
             },
           ],
           tools: validatedTools,
-          stream: request.stream ?? false,
+          stream: typedRequest.stream ?? false,
           options: {
             temperature:
-              request.temperature || this.parseEnvFloat('MODEL_TEMPERATURE', 0.7, 0.0, 2.0),
-            num_ctx: request.num_ctx || this.parseEnvInt('OLLAMA_NUM_CTX', 131072, 1024, 1048576),
+              typedRequest.temperature ?? this.parseEnvFloat('MODEL_TEMPERATURE', 0.7, 0.0, 2.0),
+            num_ctx: typedRequest.num_ctx ?? this.parseEnvInt('OLLAMA_NUM_CTX', 131072, 1024, 1048576),
             // Enable GPU offloading if available
             num_gpu: this.getGPULayers(),
             // Only include sanitized Ollama options (exclude conflicting keys)
             ...Object.fromEntries(
               Object.entries(sanitizedOptions).filter(
-                ([key]) => !['num_ctx', 'num_gpu', 'temperature'].includes(key)
+                ([key]: readonly [string, unknown]) => !['num_ctx', 'num_gpu', 'temperature'].includes(key)
               )
             ),
           },
@@ -950,7 +982,7 @@ export class OllamaProvider implements LLMProvider {
           logger.error('🔍 DEBUGGING: Ollama error response:', {
             status: response.status,
             statusText: response.statusText,
-            errorText: errorText,
+            errorText,
             errorTextLength: errorText.length,
           });
 
@@ -978,7 +1010,7 @@ export class OllamaProvider implements LLMProvider {
             logger.info(
               'Ollama fallback: Model does not support tools, using prompt-based approach'
             );
-            return await this.generateCode(request.prompt ?? '', request.options || {});
+            return await this.generateCode(typedRequest.prompt ?? '', typedRequest.options || {});
           }
 
           throw new Error(
@@ -988,7 +1020,7 @@ export class OllamaProvider implements LLMProvider {
 
         // Handle streaming vs non-streaming responses
         let result;
-        if (request.stream && request.onStreamingToken) {
+        if (typedRequest.stream && typedRequest.onStreamingToken) {
           // For streaming requests, process the stream and collect chunks
           logger.debug('Processing streaming response for function calling');
           const reader = response.body?.getReader();
@@ -1002,48 +1034,66 @@ export class OllamaProvider implements LLMProvider {
           let toolCalls: ParsedToolCall[] = [];
           let lastMetadata: OllamaStreamingMetadata = {};
 
-          while (true) {
+          let streamDone = false;
+          while (!streamDone) {
             const { done, value } = await reader.read();
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+            buffer = lines.pop() ?? '';
 
             for (const line of lines) {
               if (!line.trim()) continue;
 
               try {
-                const chunk = JSON.parse(line);
+                const chunk: unknown = JSON.parse(line);
+                if (typeof chunk === 'object' && chunk !== null) {
+                  const obj = chunk as {
+                    message?: { content?: unknown; tool_calls?: unknown };
+                    response?: unknown;
+                    model?: unknown;
+                    done?: unknown;
+                  };
 
-                // Emit streaming token if content is present
-                if (chunk.message?.content) {
-                  accumulatedContent += chunk.message.content;
-                  request.onStreamingToken(chunk.message.content, {
-                    isComplete: false,
-                    model: chunk.model,
-                  });
-                } else if (chunk.response) {
-                  accumulatedContent += chunk.response;
-                  request.onStreamingToken(chunk.response, {
-                    isComplete: false,
-                    model: chunk.model,
-                  });
-                }
+                  // Emit streaming token if content is present
+                  if (obj.message && typeof obj.message === 'object' && obj.message.content && typeof obj.message.content === 'string') {
+                    accumulatedContent += obj.message.content;
+                    typedRequest.onStreamingToken(String(obj.message.content), {
+                      isComplete: false,
+                      model: typeof obj.model === 'string' ? obj.model : undefined,
+                    });
+                  } else if (obj.response && typeof obj.response === 'string') {
+                    accumulatedContent += obj.response;
+                    typedRequest.onStreamingToken(String(obj.response), {
+                      isComplete: false,
+                      model: typeof obj.model === 'string' ? obj.model : undefined,
+                    });
+                  }
 
-                // Collect tool calls
-                if (chunk.message?.tool_calls) {
-                  toolCalls = toolCalls.concat(chunk.message.tool_calls);
-                }
+                  // Collect tool calls
+                  if (
+                    obj.message &&
+                    typeof obj.message === 'object' &&
+                    Array.isArray((obj.message as { tool_calls?: ParsedToolCall[] }).tool_calls)
+                  ) {
+                    toolCalls = toolCalls.concat(
+                      (obj.message as { tool_calls: ParsedToolCall[] }).tool_calls
+                    );
+                  }
 
-                // Keep metadata from chunks with done flag
-                if (chunk.done) {
-                  lastMetadata = chunk;
-                  // Emit final token
-                  request.onStreamingToken('', {
-                    isComplete: true,
-                    model: chunk.model || ollamaRequest.model || this.config.defaultModel,
-                  });
+                  // Keep metadata from chunks with done flag
+                  if (obj.done === true) {
+                    lastMetadata = { ...(obj as OllamaStreamingMetadata) };
+                    // Emit final token
+                    typedRequest.onStreamingToken('', {
+                      isComplete: true,
+                      model: typeof obj.model === 'string'
+                        ? obj.model
+                        : ollamaRequest.model ?? this.config.defaultModel,
+                    });
+                    streamDone = true;
+                  }
                 }
               } catch (e) {
                 // Skip malformed JSON lines
@@ -1055,17 +1105,30 @@ export class OllamaProvider implements LLMProvider {
           // Process any remaining buffer
           if (buffer.trim()) {
             try {
-              const chunk = JSON.parse(buffer);
-              if (chunk.message?.content) {
-                accumulatedContent += chunk.message.content;
-              } else if (chunk.response) {
-                accumulatedContent += chunk.response;
-              }
-              if (chunk.message?.tool_calls) {
-                toolCalls = toolCalls.concat(chunk.message.tool_calls);
-              }
-              if (chunk.done) {
-                lastMetadata = chunk;
+              const chunk: unknown = JSON.parse(buffer);
+              if (typeof chunk === 'object' && chunk !== null) {
+                const obj = chunk as {
+                  message?: { content?: unknown; tool_calls?: unknown };
+                  response?: unknown;
+                  done?: unknown;
+                };
+                if (obj.message && typeof obj.message === 'object' && obj.message.content && typeof obj.message.content === 'string') {
+                  accumulatedContent += obj.message.content;
+                } else if (obj.response && typeof obj.response === 'string') {
+                  accumulatedContent += obj.response;
+                }
+                if (
+                  obj.message &&
+                  typeof obj.message === 'object' &&
+                  Array.isArray((obj.message as { tool_calls?: ParsedToolCall[] }).tool_calls)
+                ) {
+                  toolCalls = toolCalls.concat(
+                    (obj.message as { tool_calls: ParsedToolCall[] }).tool_calls
+                  );
+                }
+                if (obj.done === true) {
+                  lastMetadata = { ...(obj as OllamaStreamingMetadata) };
+                }
               }
             } catch (e) {
               // Skip malformed final buffer
@@ -1091,82 +1154,96 @@ export class OllamaProvider implements LLMProvider {
 
           // Reset response for parseRobustJSON (since we already consumed the text)
           const mockResponse = {
-            text: async () => responseText,
+            text: async () => {
+              // Add an await expression to satisfy the async requirement
+              await Promise.resolve();
+              return responseText;
+            },
           };
-          result = await this.parseRobustJSON(mockResponse as Response);
+          await this.parseRobustJSON(mockResponse as Response);
+
         }
 
         // CRITICAL DEBUG: Log the parsed result structure
-        logger.info('🔍 DEBUGGING: Ollama parsed result:', {
-          resultKeys: Object.keys(result || {}),
-          hasMessage: !!result?.message,
-          messageKeys: result?.message ? Object.keys(result.message) : [],
-          messageContent: result?.message?.content || 'NO MESSAGE CONTENT',
-          messageContentLength: (result?.message?.content || '').length,
-          hasToolCalls: !!result?.message?.tool_calls,
-          toolCallsLength: result?.message?.tool_calls?.length || 0,
-          rawResultPreview: JSON.stringify(result || {}).substring(0, 500),
-        });
+        if (result && typeof result === 'object') {
+          const { message } = result;
+          const messageContent = message && typeof message === 'object' ? (message as { content?: string }).content : undefined;
+          const toolCalls = message && typeof message === 'object' ? (message as { tool_calls?: unknown[] }).tool_calls : undefined;
+          logger.info('🔍 DEBUGGING: Ollama parsed result:', {
+            resultKeys: Object.keys(result),
+            hasMessage: !!message,
+            messageKeys: message ? Object.keys(message) : [],
+            messageContent: typeof messageContent === 'string' ? messageContent : 'NO MESSAGE CONTENT',
+            messageContentLength: typeof messageContent === 'string' ? messageContent.length : 0,
+            hasToolCalls: Array.isArray(toolCalls) && toolCalls.length > 0,
+            toolCallsLength: Array.isArray(toolCalls) ? toolCalls.length : 0,
+            rawResultPreview: JSON.stringify(result).substring(0, 500),
+          });
 
-        logger.debug('Ollama function calling response received', {
-          hasToolCalls: !!result.message?.tool_calls,
-          toolCallCount: result.message?.tool_calls?.length || 0,
-        });
+          logger.debug('Ollama function calling response received', {
+            hasToolCalls: Array.isArray(toolCalls) && toolCalls.length > 0,
+            toolCallCount: Array.isArray(toolCalls) ? toolCalls.length : 0,
+          });
 
-        logger.debug('OllamaProvider function calling: result keys:', Object.keys(result));
-        logger.debug(
-          'OllamaProvider function calling: result.message keys:',
-          result.message ? Object.keys(result.message) : 'no message'
-        );
-        logger.debug(
-          'OllamaProvider function calling: result.message.tool_calls exists:',
-          !!result.message?.tool_calls
-        );
-        logger.debug(
-          'OllamaProvider function calling: result.message.tool_calls length:',
-          result.message?.tool_calls?.length || 0
-        );
-        if (result.message?.tool_calls?.length > 0) {
+          logger.debug('OllamaProvider function calling: result keys:', Object.keys(result));
           logger.debug(
-            'OllamaProvider function calling: first tool call:',
-            JSON.stringify(result.message.tool_calls[0], null, 2)
+            'OllamaProvider function calling: result.message keys:',
+            message ? Object.keys(message) : 'no message'
           );
+          logger.debug(
+            'OllamaProvider function calling: result.message.tool_calls exists:',
+            Array.isArray(toolCalls) && toolCalls.length > 0
+          );
+          logger.debug(
+            'OllamaProvider function calling: result.message.tool_calls length:',
+            Array.isArray(toolCalls) ? toolCalls.length : 0
+          );
+          if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+            logger.debug(
+              'OllamaProvider function calling: first tool call:',
+              JSON.stringify(toolCalls[0], null, 2)
+            );
+          }
         }
 
         // Return response in expected format
         // Validate content before returning - fail fast if no content and no valid tool calls
+        if (!result) {
+          throw new Error(
+            `Ollama request ${typedRequest.id} returned undefined result. This indicates a provider failure.`
+          );
+        }
+
         const finalContent = result.message?.content || result.content || result.response;
         const hasValidToolCalls =
-          result.message?.tool_calls &&
-          Array.isArray(result.message.tool_calls) &&
+          Array.isArray(result.message?.tool_calls) &&
           result.message.tool_calls.length > 0 &&
-          result.message.tool_calls[0]?.function?.name;
+          !!result.message.tool_calls[0].function?.name;
 
         if (!finalContent && !hasValidToolCalls) {
           throw new Error(
-            `Ollama request ${request.id} returned no content and no valid tool calls. This indicates a provider failure.`
+            `Ollama request ${typedRequest.id} returned no content and no valid tool calls. This indicates a provider failure.`
           );
         }
 
         // CRITICAL FIX: Try multiple sources for tool calls
-        let extractedToolCalls = [];
+        let extractedToolCalls: ParsedToolCall[] = [];
 
         // First, try structured tool_calls from result.message.tool_calls
         if (
-          result.message?.tool_calls &&
-          Array.isArray(result.message.tool_calls) &&
+          Array.isArray(result.message?.tool_calls) &&
           result.message.tool_calls.length > 0
         ) {
           logger.debug('Using structured tool_calls from Ollama response');
-          extractedToolCalls = result.message.tool_calls.map((toolCall: OllamaToolCall) => ({
-            id: toolCall.function?.name || `tool_${Date.now()}`,
+          extractedToolCalls = result.message.tool_calls.map((toolCall: Readonly<OllamaToolCall>) => ({
+            id: toolCall.function.name || `tool_${Date.now()}`,
             function: {
-              name: toolCall.function?.name,
+              name: toolCall.function.name,
               // CRITICAL FIX: Check if arguments are already a string to prevent double-encoding
               arguments:
-                typeof toolCall.function?.arguments === 'string'
+                typeof toolCall.function.arguments === 'string'
                   ? toolCall.function.arguments
-                  : JSON.stringify(toolCall.function?.arguments || {}),
+                  : JSON.stringify(toolCall.function.arguments),
             },
           }));
         } else {
@@ -1191,19 +1268,21 @@ export class OllamaProvider implements LLMProvider {
         const confidence = this.calculateConfidence(
           finalContent || '',
           responseTime,
-          request.taskType || 'default'
+          typedRequest.taskType || 'default'
         );
 
         return {
-          id: request.id || `ollama_${Date.now()}`,
+          id: typedRequest.id || `ollama_${Date.now()}`,
           content: finalContent || '',
           confidence,
           responseTime,
           toolCalls: extractedToolCalls,
           usage: {
-            promptTokens: result.prompt_eval_count || 0,
-            completionTokens: result.eval_count || 0,
-            totalTokens: (result.prompt_eval_count || 0) + (result.eval_count || 0),
+            promptTokens: Number((result as OllamaStreamingMetadata).promptEvalCount ?? 0),
+            completionTokens: Number((result as OllamaStreamingMetadata).evalCount ?? 0),
+            totalTokens:
+              Number((result as OllamaStreamingMetadata).promptEvalCount ?? 0) +
+              Number((result as OllamaStreamingMetadata).evalCount ?? 0),
           },
           model: this.config.defaultModel,
           provider: this.name,
@@ -1215,7 +1294,7 @@ export class OllamaProvider implements LLMProvider {
     }
 
     // Fallback to regular generateCode for non-tool requests
-    return await this.generateCode(request.prompt ?? '', request.options || {});
+    return this.generateCode(typedRequest.prompt ?? '', typedRequest.options ?? {});
   }
 
   /**
@@ -1229,16 +1308,29 @@ export class OllamaProvider implements LLMProvider {
 
     try {
       // Try to parse the entire content as JSON first
-      const parsed = JSON.parse(content.trim());
+      const parsedRaw: unknown = JSON.parse(content.trim());
 
-      // Check if it looks like a tool call structure
-      if (parsed.name && (parsed.arguments || parsed.parameters)) {
+      // Type guard to ensure parsed is an object with expected properties
+      if (
+        parsedRaw &&
+        typeof parsedRaw === 'object' &&
+        'name' in parsedRaw &&
+        typeof (parsedRaw as { name: unknown }).name === 'string' &&
+        (
+          ('arguments' in parsedRaw && typeof (parsedRaw as { arguments?: unknown }).arguments !== 'undefined') ||
+          ('parameters' in parsedRaw && typeof (parsedRaw as { parameters?: unknown }).parameters !== 'undefined')
+        )
+      ) {
+        const { name } = parsedRaw as { name: string };
+        const args = 'arguments' in parsedRaw
+          ? (parsedRaw as { arguments?: unknown }).arguments
+          : ('parameters' in parsedRaw ? (parsedRaw as { parameters?: unknown }).parameters : {});
         logger.info('🔧 Detected tool call in content field - converting to structured format');
         return [
           {
             function: {
-              name: parsed.name,
-              arguments: parsed.arguments || parsed.parameters || {},
+              name,
+              arguments: typeof args === 'string' ? args : JSON.stringify(args ?? {}),
             },
           },
         ];
@@ -1252,16 +1344,20 @@ export class OllamaProvider implements LLMProvider {
         // Try to extract JSON objects from text
         const jsonMatches = content.match(/\{[^}]*"name"[^}]*\}/g);
         if (jsonMatches) {
-          const toolCalls = [];
+          const toolCalls: ParsedToolCall[] = [];
           for (const match of jsonMatches) {
             try {
-              const parsed = JSON.parse(match);
-              if (parsed.name) {
+              const parsed = JSON.parse(match) as { name?: string; arguments?: unknown; parameters?: unknown };
+              if (typeof parsed?.name === 'string') {
                 toolCalls.push({
-                  id: `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                  id: `tool_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
                   function: {
                     name: parsed.name,
-                    arguments: parsed.arguments || parsed.parameters || {},
+                    arguments: typeof parsed.arguments === 'string'
+                      ? parsed.arguments
+                      : typeof parsed.parameters === 'string'
+                        ? parsed.parameters
+                        : JSON.stringify(parsed.arguments ?? parsed.parameters ?? {}),
                   },
                 });
               }
@@ -1297,13 +1393,13 @@ export class OllamaProvider implements LLMProvider {
       const normalizedCall = { ...toolCall };
 
       // Validate and normalize arguments if present
-      if (normalizedCall.function && normalizedCall.function.arguments) {
+      if (normalizedCall.function?.arguments) {
         const args = normalizedCall.function.arguments;
 
         // Handle double-encoded JSON arguments
         if (typeof args === 'string') {
           try {
-            let parsedArgs = JSON.parse(args);
+            let parsedArgs: unknown = JSON.parse(args);
 
             // Check for additional levels of encoding
             let parseAttempts = 0;
@@ -1316,7 +1412,10 @@ export class OllamaProvider implements LLMProvider {
               }
             }
 
-            normalizedCall.function.arguments = parsedArgs;
+            // Ensure arguments is always a string
+            normalizedCall.function.arguments = typeof parsedArgs === 'string'
+              ? parsedArgs
+              : JSON.stringify(parsedArgs ?? {});
 
             if (parseAttempts > 0) {
               logger.debug(
@@ -1376,9 +1475,12 @@ export class OllamaProvider implements LLMProvider {
               type: 'function',
               function: {
                 name: tool.name,
-                description: tool.description || '',
-                parameters: tool.inputSchema ||
-                  tool.parameters || { type: 'object', properties: {} },
+                description: tool.description ?? '',
+                parameters: (tool.inputSchema && typeof tool.inputSchema === 'object'
+                  ? tool.inputSchema as { type: string; properties: Record<string, unknown>; required?: string[] }
+                  : (tool.parameters && typeof tool.parameters === 'object'
+                    ? tool.parameters as { type: string; properties: Record<string, unknown>; required?: string[] }
+                    : { type: 'object', properties: {} })),
               },
             };
           }
@@ -1389,7 +1491,7 @@ export class OllamaProvider implements LLMProvider {
           logger.debug(`Validated tool: ${transformedTool.function.name}`);
         } else {
           logger.warn(`Invalid tool at index ${i}, skipping`, {
-            toolKeys: tool ? Object.keys(tool) : 'null/undefined',
+            toolKeys: Object.keys(tool),
             toolType: typeof tool,
           });
         }
@@ -1405,9 +1507,8 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Check if a function specification is valid
    */
-  private isValidFunctionSpec(func: FunctionSpec): boolean {
+  private isValidFunctionSpec(func: Readonly<FunctionSpec>): boolean {
     return (
-      func &&
       typeof func === 'object' &&
       typeof func.name === 'string' &&
       func.name.length > 0 &&
@@ -1470,7 +1571,7 @@ export class OllamaProvider implements LLMProvider {
     // Check for explicit configuration first
     const explicitLayers = process.env.OLLAMA_NUM_GPU;
     if (explicitLayers) {
-      const layers = parseInt(explicitLayers);
+      const layers = parseInt(explicitLayers, 10);
       if (!isNaN(layers) && layers >= 0) {
         return layers;
       }
@@ -1533,7 +1634,7 @@ export class OllamaProvider implements LLMProvider {
     const value = process.env[envVar];
     if (!value) return defaultValue;
 
-    const parsed = parseInt(value);
+    const parsed = parseInt(value, 10);
     if (isNaN(parsed)) {
       logger.warn(
         `Invalid environment variable ${envVar}=${value}, using default: ${defaultValue}`
@@ -1586,12 +1687,12 @@ export class OllamaProvider implements LLMProvider {
    * Robust JSON parsing with multiple fallback strategies
    * Handles malformed responses, memory errors, and streaming issues
    */
-  private async parseRobustJSON(response: Response): Promise<any> {
+  private async parseRobustJSON(response: Readonly<Response>): Promise<unknown> {
     const responseText = await response.text();
 
     try {
       // Strategy 1: Standard JSON parsing
-      return JSON.parse(responseText);
+      return JSON.parse(responseText) as unknown;
     } catch (primaryError) {
       const errorMessage =
         primaryError instanceof Error ? primaryError.message : String(primaryError);
@@ -1613,25 +1714,42 @@ export class OllamaProvider implements LLMProvider {
 
           for (const line of lines) {
             try {
-              const parsed = JSON.parse(line);
+              const parsed = JSON.parse(line) as Partial<{
+                message?: { content?: unknown; tool_calls?: unknown };
+                response?: unknown;
+                content?: unknown;
+                done?: unknown;
+                [key: string]: unknown;
+              }>;
 
               // Accumulate content from streaming chunks
-              if (parsed.message?.content) {
+              if (
+                parsed.message &&
+                typeof parsed.message === 'object' &&
+                'content' in parsed.message &&
+                typeof parsed.message.content === 'string'
+              ) {
                 accumulatedContent += parsed.message.content;
-              } else if (parsed.response) {
+              } else if (typeof parsed.response === 'string') {
                 accumulatedContent += parsed.response;
-              } else if (parsed.content) {
+              } else if (typeof parsed.content === 'string') {
                 accumulatedContent += parsed.content;
               }
 
               // Collect tool calls
-              if (parsed.message?.tool_calls) {
-                toolCalls = toolCalls.concat(parsed.message.tool_calls);
+              if (
+                parsed.message &&
+                typeof parsed.message === 'object' &&
+                Array.isArray((parsed.message as { tool_calls?: unknown }).tool_calls)
+              ) {
+                toolCalls = toolCalls.concat(
+                  (parsed.message as { tool_calls: ParsedToolCall[] }).tool_calls
+                );
               }
 
               // Keep metadata from last chunk (usually has timing info)
-              if (parsed.done) {
-                lastMetadata = parsed;
+              if ('done' in parsed && parsed.done) {
+                lastMetadata = parsed as OllamaStreamingMetadata;
               }
             } catch (lineError) {
               // Continue to next line
@@ -1668,14 +1786,22 @@ export class OllamaProvider implements LLMProvider {
         // Fallback to single-line extraction if not streaming format
         for (const line of lines) {
           try {
-            const parsed = JSON.parse(line);
-            // Look for complete response with tool calls or content
-            if (parsed.message && (parsed.message.tool_calls || parsed.message.content)) {
-              logger.info('Extracted single JSON response', {
-                hasToolCalls: !!parsed.message.tool_calls,
-                hasContent: !!parsed.message.content,
-              });
-              return parsed;
+            const parsed = JSON.parse(line) as unknown;
+            // Type guard for expected structure
+            if (
+              typeof parsed === 'object' &&
+              parsed !== null &&
+              'message' in parsed &&
+              typeof (parsed as { message?: unknown }).message === 'object'
+            ) {
+              const { message } = parsed as { message: { tool_calls?: unknown; content?: unknown } };
+              if (message.tool_calls || message.content) {
+                logger.info('Extracted single JSON response', {
+                  hasToolCalls: !!message.tool_calls,
+                  hasContent: !!message.content,
+                });
+                return parsed as Record<string, unknown>;
+              }
             }
           } catch (lineError) {
             continue;
@@ -1685,12 +1811,12 @@ export class OllamaProvider implements LLMProvider {
         // Fallback to original strategy if no tool calls found
         const jsonMatch = responseText.match(/^({.*?})\s*[\s\S]*$/);
         if (jsonMatch) {
-          const extractedJson = jsonMatch[1];
+          const [, extractedJson] = jsonMatch;
           logger.info('Extracted JSON from mixed content (fallback)', {
             originalLength: responseText.length,
             extractedLength: extractedJson.length,
           });
-          return JSON.parse(extractedJson);
+          return JSON.parse(extractedJson) as Record<string, unknown>;
         }
       } catch (extractError) {
         const errorMessage =
@@ -1703,32 +1829,65 @@ export class OllamaProvider implements LLMProvider {
         const lines = responseText.split('\n').filter(line => line.trim());
         for (const line of lines) {
           try {
-            const parsed = JSON.parse(line);
-            // Check for various response formats
+            const parsed = JSON.parse(line) as unknown;
             if (
-              parsed.response ||
-              parsed.content ||
-              (parsed.message && (parsed.message.response || parsed.message.content))
+              parsed &&
+              typeof parsed === 'object'
             ) {
-              logger.info('Parsed JSON from streaming response line');
-              return {
-                response:
-                  parsed.response ||
-                  parsed.content ||
-                  parsed.message?.response ||
-                  parsed.message?.content,
-                content:
-                  parsed.content ||
-                  parsed.response ||
-                  parsed.message?.content ||
-                  parsed.message?.response,
-                model: parsed.model || this.config.defaultModel,
-                total_duration: parsed.total_duration,
-                load_duration: parsed.load_duration,
-                prompt_eval_count: parsed.prompt_eval_count,
-                eval_count: parsed.eval_count,
-                eval_duration: parsed.eval_duration,
+              const obj = parsed as {
+                response?: unknown;
+                content?: unknown;
+                model?: unknown;
+                total_duration?: unknown;
+                load_duration?: unknown;
+                prompt_eval_count?: unknown;
+                eval_count?: unknown;
+                eval_duration?: unknown;
+                message?: {
+                  response?: unknown;
+                  content?: unknown;
+                };
               };
+
+              // Check for various response formats with safe property access
+              const hasResponse =
+                typeof obj.response === 'string' ||
+                typeof obj.content === 'string' ||
+                (obj.message &&
+                  (typeof obj.message.response === 'string' ||
+                    typeof obj.message.content === 'string'));
+
+              if (hasResponse) {
+                logger.info('Parsed JSON from streaming response line');
+                return {
+                  response:
+                    (typeof obj.response === 'string'
+                      ? obj.response
+                      : typeof obj.content === 'string'
+                        ? obj.content
+                        : obj.message && typeof obj.message.response === 'string'
+                          ? obj.message.response
+                          : obj.message && typeof obj.message.content === 'string'
+                            ? obj.message.content
+                            : undefined),
+                  content:
+                    (typeof obj.content === 'string'
+                      ? obj.content
+                      : typeof obj.response === 'string'
+                        ? obj.response
+                        : obj.message && typeof obj.message.content === 'string'
+                          ? obj.message.content
+                          : obj.message && typeof obj.message.response === 'string'
+                            ? obj.message.response
+                            : undefined),
+                  model: typeof obj.model === 'string' ? obj.model : this.config.defaultModel,
+                  total_duration: typeof obj.total_duration === 'number' ? obj.total_duration : undefined,
+                  load_duration: typeof obj.load_duration === 'number' ? obj.load_duration : undefined,
+                  prompt_eval_count: typeof obj.prompt_eval_count === 'number' ? obj.prompt_eval_count : undefined,
+                  eval_count: typeof obj.eval_count === 'number' ? obj.eval_count : undefined,
+                  eval_duration: typeof obj.eval_duration === 'number' ? obj.eval_duration : undefined,
+                };
+              }
             }
           } catch (lineError) {
             // Continue to next line
@@ -1763,7 +1922,7 @@ export class OllamaProvider implements LLMProvider {
 
         for (const pattern of patterns) {
           const match = responseText.match(pattern);
-          if (match && match[1]) {
+          if (match?.[1]) {
             logger.info('Extracted content using regex fallback');
             return {
               response: match[1],
@@ -1793,15 +1952,27 @@ export class OllamaProvider implements LLMProvider {
 
         // Try to extract message content from JSON response
         try {
-          const jsonResponse = JSON.parse(responseText.trim());
-          if (jsonResponse.message?.content) {
-            actualContent = jsonResponse.message.content;
+          const jsonResponse = JSON.parse(responseText.trim()) as unknown;
+          if (
+            typeof jsonResponse === 'object' &&
+            jsonResponse !== null &&
+            'message' in jsonResponse &&
+            typeof (jsonResponse as { message?: unknown }).message === 'object' &&
+            'content' in (jsonResponse as { message: object }).message &&
+            typeof ((jsonResponse as { message: { content?: unknown } }).message as { content?: unknown }).content === 'string'
+          ) {
+            actualContent = ((jsonResponse as { message: { content: string } }).message).content;
             logger.debug(
               'OllamaProvider: extracted message.content:',
               actualContent.substring(0, 100)
             );
-          } else if (jsonResponse.response) {
-            actualContent = jsonResponse.response;
+          } else if (
+            typeof jsonResponse === 'object' &&
+            jsonResponse !== null &&
+            'response' in jsonResponse &&
+            typeof (jsonResponse as { response?: unknown }).response === 'string'
+          ) {
+            actualContent = (jsonResponse as { response: string }).response;
             logger.debug(
               'OllamaProvider: extracted response field:',
               actualContent.substring(0, 100)
@@ -1865,13 +2036,13 @@ export class OllamaProvider implements LLMProvider {
     let sanitized = error;
 
     // Replace sensitive information
-    sensitivePatterns.forEach(pattern => {
+    sensitivePatterns.forEach((pattern: Readonly<RegExp>) => {
       sanitized = sanitized.replace(pattern, '[REDACTED]');
     });
 
     // Truncate very long error messages
     if (sanitized.length > 500) {
-      sanitized = sanitized.substring(0, 500) + '... [TRUNCATED]';
+      sanitized = `${sanitized.substring(0, 500)}... [TRUNCATED]`;
     }
 
     return sanitized;
@@ -1880,13 +2051,12 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Stream method for OllamaAdapter compatibility
    */
-  async *stream(request: OllamaRequest): AsyncIterable<string> {
+  public async *stream(request: Readonly<OllamaRequest>): AsyncIterable<string> {
     this.checkRateLimit();
     if (request.prompt) {
       this.validateInputLength(request.prompt);
     }
 
-    const startTime = Date.now();
     this.currentLoad++;
     this.requestCount++;
 
@@ -1894,15 +2064,15 @@ export class OllamaProvider implements LLMProvider {
       // Build payload similar to makeRequest but with streaming enabled
       const builtPrompt = this.buildPrompt(request.prompt ?? '', request.taskType ?? 'default');
       const payload = {
-        model: request.model || this.config.defaultModel,
+        model: request.model ?? this.config.defaultModel,
         prompt: builtPrompt,
         stream: true, // Enable streaming
         options: {
-          temperature: request.temperature || this.getTemperature(request.taskType ?? 'default'),
-          top_p: request.top_p || this.parseEnvFloat('MODEL_TOP_P', 0.9, 0.0, 1.0),
-          top_k: request.top_k || this.parseEnvInt('MODEL_TOP_K', 40, 1, 200),
+          temperature: request.temperature ?? this.getTemperature(request.taskType ?? 'default'),
+          top_p: request.top_p ?? this.parseEnvFloat('MODEL_TOP_P', 0.9, 0.0, 1.0),
+          top_k: request.top_k ?? this.parseEnvInt('MODEL_TOP_K', 40, 1, 200),
           num_ctx:
-            request.num_ctx ||
+            request.num_ctx ??
             this.getContextLength(request.taskType ?? 'default', builtPrompt.length),
           num_gpu: this.getGPULayers(),
         },
@@ -1915,7 +2085,7 @@ export class OllamaProvider implements LLMProvider {
       });
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), request.timeout || this.config.timeout);
+      const timeout = setTimeout(() => { controller.abort(); }, request.timeout ?? this.config.timeout);
 
       try {
         const response = await fetch(`${this.endpoint}/api/generate`, {
@@ -1944,7 +2114,6 @@ export class OllamaProvider implements LLMProvider {
 
         const decoder = new TextDecoder();
         let buffer = '';
-        let tokenIndex = 0;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -1952,13 +2121,14 @@ export class OllamaProvider implements LLMProvider {
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          buffer = lines.pop() ?? ''; // Keep incomplete line in buffer
 
           for (const line of lines) {
             if (line.trim()) {
               try {
-                const data = JSON.parse(line.trim());
-                if (data.response) {
+                const parsedLine: unknown = JSON.parse(line.trim());
+                const data: { response?: unknown; done?: unknown } = parsedLine as { response?: unknown; done?: unknown };
+                if (data.response !== undefined) {
                   yield String(data.response);
                 }
                 if (data.done) {
@@ -1987,7 +2157,7 @@ export class OllamaProvider implements LLMProvider {
   /**
    * Reset statistics (for testing or maintenance)
    */
-  resetStats(): void {
+  public resetStats(): void {
     this.responseTimeHistory = [];
     this.errorCount = 0;
     this.requestCount = 0;

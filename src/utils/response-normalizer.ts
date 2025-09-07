@@ -17,8 +17,9 @@ export class ResponseNormalizer {
    * Normalize any input to a proper string representation
    * CRITICAL: This prevents "string 58" display issues from Buffer objects
    */
-  static normalizeToString(input: any): string {
-    if (!input && input !== 0 && input !== false) return '';
+  public static normalizeToString(input: unknown): string {
+    if (input === undefined || input === null || (typeof input === 'number' && isNaN(input))) return '';
+    if (input === '' || input === 0 || input === false) return String(input);
 
     // Handle Buffer types (primary cause of "string 58" issue)
     if (Buffer.isBuffer(input)) {
@@ -39,20 +40,25 @@ export class ResponseNormalizer {
 
     // Handle Uint8Array and other typed arrays
     if (
-      input &&
       typeof input === 'object' &&
-      input.constructor &&
-      (input.constructor === Uint8Array || input.constructor.name.endsWith('Array'))
+      typeof (input as { constructor?: unknown }).constructor === 'function'
     ) {
-      logger.debug('ResponseNormalizer: Converting typed array to string', {
-        arrayType: input.constructor.name,
-        length: input.length,
-      });
-      return Buffer.from(input).toString('utf8');
+      const ctor = (input as { constructor: { name: string } }).constructor;
+      const ctorName = ctor.name;
+      if (
+        ctor === Uint8Array ||
+        (typeof ctorName === 'string' && ctorName.endsWith('Array'))
+      ) {
+        logger.debug('ResponseNormalizer: Converting typed array to string', {
+          arrayType: ctorName,
+          length: (input as { length?: number }).length ?? 0,
+        });
+        return Buffer.from(input as ArrayLike<number>).toString('utf8');
+      }
     }
 
     // Handle complex objects (serialize to JSON)
-    if (typeof input === 'object' && input !== null) {
+    if (typeof input === 'object') {
       try {
         const serialized = JSON.stringify(input, null, 2);
         logger.debug('ResponseNormalizer: Serialized object to JSON', {
@@ -87,7 +93,7 @@ export class ResponseNormalizer {
    * Normalize a complete ModelResponse object
    * Ensures all text fields are properly normalized
    */
-  static normalizeResponse(response: ModelResponse): ModelResponse {
+  public static normalizeResponse(response: Readonly<ModelResponse>): ModelResponse {
     const normalized = {
       ...response,
       content: this.normalizeToString(response.content),
@@ -111,18 +117,32 @@ export class ResponseNormalizer {
    * Normalize tool execution results
    * Special handling for MCP tool outputs which are often complex objects
    */
-  static normalizeToolResult(result: any): string {
+  public static normalizeToolResult(result: unknown): string {
     if (!result) return '';
 
-    // Handle tool results with nested content structures
-    const content = result.output?.content || result.content || result.output || result;
+    // Type guard for object with possible output/content fields
+    const isObject = (val: unknown): val is { [key: string]: unknown } =>
+      typeof val === 'object' && val !== null;
+
+    let content: unknown = result;
+    if (isObject(result)) {
+      if (isObject(result.output) && 'content' in result.output) {
+        const { content: outputContent } = result.output as { content?: unknown };
+        content = outputContent;
+      } else if ('content' in result) {
+        const { content: resultContent } = result as { content?: unknown };
+        content = resultContent;
+      } else if ('output' in result) {
+        content = (result as { output?: unknown }).output;
+      }
+    }
 
     // Apply standard normalization
     const normalized = this.normalizeToString(content);
 
     logger.debug('ResponseNormalizer: Normalized tool result', {
-      hasOutput: !!result.output,
-      hasContent: !!result.content,
+      hasOutput: isObject(result) && 'output' in result,
+      hasContent: isObject(result) && 'content' in result,
       originalType: typeof content,
       normalizedLength: normalized.length,
     });
@@ -134,14 +154,14 @@ export class ResponseNormalizer {
    * Validate that a normalized response is actually a string
    * Safety check to catch any normalization failures
    */
-  static validateNormalization(input: any, normalized: string): boolean {
+  public static validateNormalization(input: unknown, normalized: string): boolean {
     const isValid = typeof normalized === 'string' && normalized.length > 0;
 
     if (!isValid) {
       logger.error('ResponseNormalizer: Normalization validation failed', {
         inputType: typeof input,
         normalizedType: typeof normalized,
-        normalizedLength: normalized?.length || 0,
+        normalizedLength: normalized.length || 0,
         inputPreview: String(input).substring(0, 100),
       });
     }

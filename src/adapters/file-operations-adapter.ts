@@ -11,18 +11,17 @@
 
 import { EventEmitter } from 'events';
 import {
-  FileSystemClient,
-  FileMetadata,
   DirectoryListing,
+  FileMetadata,
+  FileSystemClient,
 } from '../infrastructure/filesystem/file-system-client.js';
 import {
-  FileSecurityService,
   FileSecurityPolicy,
-  FileOperation as SecurityFileOperation,
+  FileSecurityService,
   PolicyUseCase,
   RiskLevel,
+  FileOperation as SecurityFileOperation,
 } from '../domain/services/file-security-service.js';
-
 // Application layer interfaces
 export interface SecureFileOperation {
   path: string;
@@ -68,10 +67,16 @@ export enum FileOperationType {
   LIST_DIRECTORY = 'list_directory',
 }
 
-export interface SecureFileResult<T = any> {
+export interface SecurityViolation {
+  readonly code: string;
+  readonly message: string;
+  readonly [key: string]: unknown;
+}
+
+export interface SecureFileResult<T = unknown> {
   success: boolean;
   data?: T;
-  securityViolations: any[];
+  securityViolations: SecurityViolation[];
   riskLevel: string;
   operationId: string;
   timestamp: Date;
@@ -81,16 +86,15 @@ export interface SecureFileResult<T = any> {
 export interface FileSearchOptions {
   pattern: string;
   maxResults?: number;
-  includeHidden?: boolean;
-  recursive?: boolean;
   policy?: Partial<FileSecurityPolicy>;
+  includeHidden?: boolean;
 }
 
 export interface SecureFileMetadata extends FileMetadata {
   securityStatus: {
     isSecure: boolean;
     riskLevel: string;
-    violations: any[];
+    violations: SecurityViolation[];
     recommendations: string[];
   };
 }
@@ -100,14 +104,17 @@ export interface SecureFileMetadata extends FileMetadata {
  * Provides secure file operations with business rule enforcement
  */
 export class FileOperationsAdapter extends EventEmitter {
-  private fileSystemClient: FileSystemClient;
-  private securityService: FileSecurityService;
+  private readonly fileSystemClient: FileSystemClient;
+  private readonly securityService: FileSecurityService;
   private operationCounter: number = 0;
 
-  constructor(fileSystemClient: FileSystemClient, securityService?: FileSecurityService) {
+  public constructor(
+    fileSystemClient: FileSystemClient,
+    securityService?: FileSecurityService
+  ) {
     super();
     this.fileSystemClient = fileSystemClient;
-    this.securityService = securityService || new FileSecurityService();
+    this.securityService = securityService ?? new FileSecurityService();
 
     // Forward events from infrastructure layer
     this.setupEventForwarding();
@@ -116,7 +123,7 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Initialize the adapter
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     await this.fileSystemClient.initialize();
     this.emit('initialized');
   }
@@ -144,7 +151,7 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Read file with security validation
    */
-  async readFile(request: FileReadRequest): Promise<SecureFileResult<string | Buffer>> {
+  public async readFile(request: Readonly<FileReadRequest>): Promise<SecureFileResult<string | Buffer>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
@@ -154,9 +161,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.READ,
-          userId: request.userId || 'anonymous',
-          userRole: request.userRole || 'user',
-          context: request.context || 'file-operation',
+          userId: request.userId ?? 'anonymous',
+          userRole: request.userRole ?? 'user',
+          context: request.context ?? 'file-operation',
         },
         request.policy
       );
@@ -167,12 +174,18 @@ export class FileOperationsAdapter extends EventEmitter {
           operationId,
           operation: 'read',
           path: request.path,
-          violations: securityValidation.violations,
+          violations: securityValidation.violations.map(v => ({
+            code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
+            message: (v as any).message
+          })),
         });
 
         return {
           success: false,
-          securityViolations: securityValidation.violations,
+          securityViolations: securityValidation.violations.map(v => ({
+            code: (v as any).code ?? 'UNKNOWN',
+            message: (v as any).message ?? 'Unknown violation'
+          })),
           riskLevel: securityValidation.riskLevel,
           operationId,
           timestamp,
@@ -195,7 +208,10 @@ export class FileOperationsAdapter extends EventEmitter {
         this.emit('contentSecurityWarning', {
           operationId,
           path: request.path,
-          violations: contentValidation.violations,
+          violations: contentValidation.violations.map(v => ({
+            code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
+            message: typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation'
+          })),
         });
       }
 
@@ -209,7 +225,11 @@ export class FileOperationsAdapter extends EventEmitter {
       return {
         success: true,
         data,
-        securityViolations: contentValidation.violations,
+        securityViolations: contentValidation.violations.map(v => ({
+          code: (v as any).code,
+          message: (v as any).message,
+          ...v
+        })),
         riskLevel: contentValidation.riskLevel,
         operationId,
         timestamp,
@@ -236,7 +256,7 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Write file with security validation
    */
-  async writeFile(request: FileWriteRequest): Promise<SecureFileResult<void>> {
+  public async writeFile(request: FileWriteRequest): Promise<SecureFileResult<void>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
@@ -246,9 +266,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.WRITE,
-          userId: request.userId || 'anonymous',
-          userRole: request.userRole || 'user',
-          context: request.context || 'file-operation',
+          userId: request.userId ?? 'anonymous',
+          userRole: request.userRole ?? 'user',
+          context: request.context ?? 'file-operation',
         },
         request.policy
       );
@@ -256,7 +276,10 @@ export class FileOperationsAdapter extends EventEmitter {
       if (!securityValidation.isValid) {
         return {
           success: false,
-          securityViolations: securityValidation.violations,
+          securityViolations: securityValidation.violations.map(v => ({
+            code: v.type,
+            message: v.description
+          })),
           riskLevel: securityValidation.riskLevel,
           operationId,
           timestamp,
@@ -283,7 +306,11 @@ export class FileOperationsAdapter extends EventEmitter {
       if (!contentValidation.isValid && contentValidation.riskLevel === 'critical') {
         return {
           success: false,
-          securityViolations: contentValidation.violations,
+          securityViolations: contentValidation.violations.map(v => ({
+            code: v.type,
+            message: v.description,
+            ...v
+          })),
           riskLevel: contentValidation.riskLevel,
           operationId,
           timestamp,
@@ -305,7 +332,11 @@ export class FileOperationsAdapter extends EventEmitter {
 
       return {
         success: true,
-        securityViolations: contentValidation.violations,
+        securityViolations: contentValidation.violations.map(v => ({
+          code: v.type,
+          message: v.description,
+          ...v
+        })),
         riskLevel: contentValidation.riskLevel,
         operationId,
         timestamp,
@@ -332,7 +363,7 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Delete file with security validation
    */
-  async deleteFile(request: SecureFileOperation): Promise<SecureFileResult<void>> {
+  public async deleteFile(request: Readonly<SecureFileOperation>): Promise<SecureFileResult<void>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
@@ -342,9 +373,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.DELETE,
-          userId: request.userId || 'anonymous',
-          userRole: request.userRole || 'user',
-          context: request.context || 'file-operation',
+          userId: request.userId ?? 'anonymous',
+          userRole: request.userRole ?? 'user',
+          context: request.context ?? 'file-operation',
         },
         request.policy
       );
@@ -352,7 +383,10 @@ export class FileOperationsAdapter extends EventEmitter {
       if (!securityValidation.isValid) {
         return {
           success: false,
-          securityViolations: securityValidation.violations,
+          securityViolations: securityValidation.violations.map(v => ({
+            code: (v as any).code ?? 'UNKNOWN',
+            message: (v as any).message ?? 'Unknown violation'
+          })),
           riskLevel: securityValidation.riskLevel,
           operationId,
           timestamp,
@@ -397,7 +431,7 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Copy file with security validation
    */
-  async copyFile(request: FileCopyRequest): Promise<SecureFileResult<void>> {
+  public async copyFile(request: Readonly<FileCopyRequest>): Promise<SecureFileResult<void>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
@@ -407,9 +441,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.READ,
-          userId: request.userId || 'anonymous',
-          userRole: request.userRole || 'user',
-          context: request.context || 'file-operation',
+          userId: request.userId ?? 'anonymous',
+          userRole: request.userRole ?? 'user',
+          context: request.context ?? 'file-operation',
         },
         request.policy
       );
@@ -419,14 +453,17 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.targetPath,
           operation: SecurityFileOperation.WRITE,
-          userId: request.userId || 'anonymous',
-          userRole: request.userRole || 'user',
-          context: request.context || 'file-operation',
+          userId: request.userId ?? 'anonymous',
+          userRole: request.userRole ?? 'user',
+          context: request.context ?? 'file-operation',
         },
         request.policy
       );
 
-      const combinedViolations = [...sourceValidation.violations, ...targetValidation.violations];
+      const combinedViolations = [
+        ...sourceValidation.violations,
+        ...targetValidation.violations,
+      ];
 
       if (
         combinedViolations.length > 0 &&
@@ -434,7 +471,10 @@ export class FileOperationsAdapter extends EventEmitter {
       ) {
         return {
           success: false,
-          securityViolations: combinedViolations,
+          securityViolations: combinedViolations.map(v => ({
+            code: (v as any).code ?? 'UNKNOWN',
+            message: (v as any).message ?? 'Unknown violation'
+          })),
           riskLevel: this.getHigherRiskLevel(
             sourceValidation.riskLevel,
             targetValidation.riskLevel
@@ -469,7 +509,10 @@ export class FileOperationsAdapter extends EventEmitter {
 
       return {
         success: true,
-        securityViolations: combinedViolations,
+        securityViolations: combinedViolations.map(v => ({
+          code: v.type,
+          message: v.description
+        })),
         riskLevel: this.getHigherRiskLevel(sourceValidation.riskLevel, targetValidation.riskLevel),
         operationId,
         timestamp,
@@ -497,7 +540,7 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Move file with security validation
    */
-  async moveFile(request: FileMoveRequest): Promise<SecureFileResult<void>> {
+  public async moveFile(request: Readonly<FileMoveRequest>): Promise<SecureFileResult<void>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
@@ -507,9 +550,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.DELETE, // Moving requires delete permission on source
-          userId: request.userId || 'anonymous',
-          userRole: request.userRole || 'user',
-          context: request.context || 'file-operation',
+          userId: request.userId ?? 'anonymous',
+          userRole: request.userRole ?? 'user',
+          context: request.context ?? 'file-operation',
         },
         request.policy
       );
@@ -519,14 +562,23 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.targetPath,
           operation: SecurityFileOperation.WRITE,
-          userId: request.userId || 'anonymous',
-          userRole: request.userRole || 'user',
-          context: request.context || 'file-operation',
+          userId: request.userId ?? 'anonymous',
+          userRole: request.userRole ?? 'user',
+          context: request.context ?? 'file-operation',
         },
         request.policy
       );
 
-      const combinedViolations = [...sourceValidation.violations, ...targetValidation.violations];
+      const combinedViolations: ReadonlyArray<SecurityViolation> = [
+        ...sourceValidation.violations.map(v => ({
+          code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
+          message: typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation'
+        })),
+        ...targetValidation.violations.map(v => ({
+          code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
+          message: typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation'
+        })),
+      ];
 
       if (
         combinedViolations.length > 0 &&
@@ -534,7 +586,7 @@ export class FileOperationsAdapter extends EventEmitter {
       ) {
         return {
           success: false,
-          securityViolations: combinedViolations,
+          securityViolations: [...combinedViolations],
           riskLevel: this.getHigherRiskLevel(
             sourceValidation.riskLevel,
             targetValidation.riskLevel
@@ -569,7 +621,7 @@ export class FileOperationsAdapter extends EventEmitter {
 
       return {
         success: true,
-        securityViolations: combinedViolations,
+        securityViolations: [...combinedViolations],
         riskLevel: this.getHigherRiskLevel(sourceValidation.riskLevel, targetValidation.riskLevel),
         operationId,
         timestamp,
@@ -599,7 +651,7 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Create directory with security validation
    */
-  async createDirectory(request: SecureFileOperation): Promise<SecureFileResult<void>> {
+  public async createDirectory(request: Readonly<SecureFileOperation>): Promise<SecureFileResult<void>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
@@ -610,7 +662,11 @@ export class FileOperationsAdapter extends EventEmitter {
       if (!securityValidation.isValid) {
         return {
           success: false,
-          securityViolations: securityValidation.violations,
+          securityViolations: securityValidation.violations.map(v => ({
+            code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
+            message: typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation',
+            ...v
+          })),
           riskLevel: 'medium',
           operationId,
           timestamp,
@@ -655,8 +711,8 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * List directory with security filtering
    */
-  async listDirectory(
-    request: SecureFileOperation & { recursive?: boolean }
+  public async listDirectory(
+    request: Readonly<SecureFileOperation & { recursive?: boolean }>
   ): Promise<SecureFileResult<DirectoryListing>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
@@ -667,9 +723,9 @@ export class FileOperationsAdapter extends EventEmitter {
         {
           path: request.path,
           operation: SecurityFileOperation.READ,
-          userId: request.userId || 'anonymous',
-          userRole: request.userRole || 'user',
-          context: request.context || 'file-operation',
+          userId: request.userId ?? 'anonymous',
+          userRole: request.userRole ?? 'user',
+          context: request.context ?? 'file-operation',
         },
         request.policy
       );
@@ -677,7 +733,10 @@ export class FileOperationsAdapter extends EventEmitter {
       if (!securityValidation.isValid) {
         return {
           success: false,
-          securityViolations: securityValidation.violations,
+          securityViolations: securityValidation.violations.map(v => ({
+            code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
+            message: typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation'
+          })),
           riskLevel: securityValidation.riskLevel,
           operationId,
           timestamp,
@@ -746,7 +805,7 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Search files with security filtering
    */
-  async searchFiles(options: FileSearchOptions): Promise<SecureFileResult<string[]>> {
+  public async searchFiles(options: Readonly<FileSearchOptions>): Promise<SecureFileResult<string[]>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
@@ -816,16 +875,16 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Get secure file metadata
    */
-  async getSecureFileMetadata(
+  public async getSecureFileMetadata(
     filePath: string,
-    policy?: Partial<FileSecurityPolicy>
+    policy?: Readonly<Partial<FileSecurityPolicy>>
   ): Promise<SecureFileResult<SecureFileMetadata>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
     try {
       const metadata = await this.fileSystemClient.getFileMetadata(filePath);
-      const secureMetadata = await this.addSecurityMetadata(metadata, policy);
+      const secureMetadata = this.addSecurityMetadata(metadata, policy);
 
       return {
         success: true,
@@ -852,22 +911,22 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Create security policy for specific use case
    */
-  createSecurityPolicy(useCase: PolicyUseCase): FileSecurityPolicy {
+  public createSecurityPolicy(useCase: PolicyUseCase): FileSecurityPolicy {
     return this.securityService.createPolicy(useCase);
   }
 
   /**
    * Generate secure filename
    */
-  generateSecureFilename(originalName: string, includeTimestamp: boolean = true): string {
+  public generateSecureFilename(originalName: string, includeTimestamp: boolean = true): string {
     return this.securityService.generateSecureFilename(originalName, includeTimestamp);
   }
 
   /**
    * Close the adapter and cleanup resources
    */
-  async close(): Promise<void> {
-    await this.fileSystemClient.close();
+  public close(): void {
+    this.fileSystemClient.close();
     this.emit('closed');
   }
 
@@ -896,10 +955,10 @@ export class FileOperationsAdapter extends EventEmitter {
     return `op_${Date.now()}_${++this.operationCounter}`;
   }
 
-  private async addSecurityMetadata(
-    metadata: FileMetadata,
-    policy?: Partial<FileSecurityPolicy>
-  ): Promise<SecureFileMetadata> {
+  private addSecurityMetadata(
+    metadata: Readonly<FileMetadata>,
+    policy?: Readonly<Partial<FileSecurityPolicy>>
+  ): SecureFileMetadata {
     const pathValidation = this.securityService.validatePath(metadata.absolutePath, policy);
     const fileValidation = this.securityService.validateFile(
       metadata.absolutePath,
@@ -907,28 +966,41 @@ export class FileOperationsAdapter extends EventEmitter {
       policy
     );
 
-    const allViolations = [...pathValidation.violations, ...fileValidation.violations];
+    // Map violations to ensure they have code and message properties
+    const allViolations: SecurityViolation[] = [
+      ...pathValidation.violations.map(v => ({
+        code: (v as any).code ?? 'UNKNOWN',
+        message: (v as any).message ?? 'Unknown violation',
+        ...v
+      })),
+      ...fileValidation.violations.map(v => ({
+        code: (v as any).code ?? 'UNKNOWN',
+        message: (v as any).message ?? 'Unknown violation',
+        ...v
+      }))
+    ];
     const isSecure = allViolations.length === 0;
     const recommendations = [
-      ...new Set([...pathValidation.recommendations, ...fileValidation.recommendations]),
+      ...new Set([...(pathValidation.recommendations ?? []), ...(fileValidation.recommendations ?? [])]),
     ];
 
     return {
-      ...metadata,
-      securityStatus: {
-        isSecure,
-        riskLevel: fileValidation.riskLevel,
-        violations: allViolations,
-        recommendations,
-      },
-    };
-  }
+    ...metadata,
+    securityStatus: {
+      isSecure,
+      riskLevel: fileValidation.riskLevel,
+      violations: allViolations,
+      recommendations,
+    },
+  };
+}
 
-  private isHiddenFile(filePath: string): boolean {
-    const parts = filePath.split('/');
-    const filename = parts[parts.length - 1];
-    return filename ? filename.startsWith('.') && filename !== '.' && filename !== '..' : false;
-  }
+/**
+ * Helper to check if a file is hidden (starts with a dot, but not '.' or '..')
+ */
+private isHiddenFile(filename: string): boolean {
+  return filename ? filename.startsWith('.') && filename !== '.' && filename !== '..' : false;
+}
 }
 
 // Factory function for creating configured file operations adapters

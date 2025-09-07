@@ -1,16 +1,16 @@
 import {
-  ProviderCapability,
   IProviderCapabilityRegistry,
+  ProviderCapability,
 } from '../../domain/interfaces/provider-capability-registry.js';
 
 export class ProviderCapabilityRegistry implements IProviderCapabilityRegistry {
-  private registry = new Map<string, ProviderCapability>();
+  private readonly registry = new Map<string, ProviderCapability>();
 
-  register(provider: string, capability: ProviderCapability): void {
+  public register(provider: string, capability: Readonly<ProviderCapability>): void {
     this.registry.set(provider, capability);
   }
 
-  supports(provider: string, capability: keyof ProviderCapability): boolean {
+  public supports(provider: string, capability: keyof ProviderCapability): boolean {
     return !!this.registry.get(provider)?.[capability];
   }
 }

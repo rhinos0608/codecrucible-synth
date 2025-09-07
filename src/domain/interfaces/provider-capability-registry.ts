@@ -5,6 +5,6 @@ export interface ProviderCapability {
 }
 
 export interface IProviderCapabilityRegistry {
-  register(provider: string, capability: ProviderCapability): void;
-  supports(provider: string, capability: keyof ProviderCapability): boolean;
+  register: (provider: string, capability: Readonly<ProviderCapability>) => void;
+  supports: (provider: string, capability: keyof ProviderCapability) => boolean;
 }

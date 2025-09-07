@@ -9,7 +9,7 @@ import { logger } from '../../../infrastructure/logging/logger.js';
 export class ToolRegistry {
   private registryCache: Map<string, ModelTool> | null = null;
 
-  constructor(private readonly mcpManager?: IMcpManager) {}
+  public constructor(private readonly mcpManager?: Readonly<IMcpManager>) {}
 
   private initializeRegistry(): Map<string, ModelTool> {
     if (!this.registryCache) {
@@ -18,9 +18,9 @@ export class ToolRegistry {
     return this.registryCache;
   }
 
-  async getToolsForModel(userQuery?: string): Promise<ModelTool[]> {
+  public async getToolsForModel(userQuery?: string): Promise<ModelTool[]> {
     if (!this.mcpManager) {
-      return [];
+      return Promise.resolve([]);
     }
 
     try {
@@ -31,7 +31,7 @@ export class ToolRegistry {
       if (!userQuery || userQuery.trim().length === 0) {
         const essentialTools = this.getEssentialTools(registry);
         logger.info(`🎯 No query context - providing ${essentialTools.length} essential tools`);
-        return essentialTools;
+        return await Promise.resolve(essentialTools);
       }
 
       // Apply contextual filtering based on user query
@@ -41,11 +41,15 @@ export class ToolRegistry {
         `🎯 Contextual filtering: ${filteredTools.length}/${allTools.length} tools selected for query context`
       );
 
-      return filteredTools;
+      return await Promise.resolve(filteredTools);
     } catch (error) {
       logger.warn('Failed to get MCP tools for model:', error);
       const registry = this.initializeRegistry();
-      return ['filesystem_list', 'filesystem_read'].map(key => registry.get(key)!).filter(Boolean);
+      return Promise.resolve(
+        ['filesystem_list', 'filesystem_read']
+          .map(key => registry.get(key))
+          .filter((tool): tool is ModelTool => Boolean(tool))
+      );
     }
   }
 

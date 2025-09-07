@@ -1,19 +1,18 @@
-import type { RAGQuery, RAGResult, HybridSearchConfig } from './types.js';
+import type { RAGQuery, RAGResult } from './types.js';
 import { CommandLineSearchEngine } from './command-line-search-engine.js';
 import { AdvancedSearchCacheManager } from './advanced-search-cache.js';
 import { PerformanceMonitor } from './performance-monitor.js';
 import { VectorRAGSystem } from '../rag/vector-rag-system.js';
 
 export class HybridSearchCoordinator {
-  constructor(
-    private searchEngine: CommandLineSearchEngine,
-    private config: HybridSearchConfig,
-    private ragSystem?: VectorRAGSystem,
-    private cacheManager?: AdvancedSearchCacheManager,
-    private performanceMonitor?: PerformanceMonitor
+  public constructor(
+    private readonly searchEngine: CommandLineSearchEngine,
+    private readonly ragSystem?: VectorRAGSystem,
+    private readonly cacheManager?: AdvancedSearchCacheManager,
+    private readonly performanceMonitor?: PerformanceMonitor
   ) {}
 
-  async search(query: RAGQuery): Promise<RAGResult> {
+  public async search(query: Readonly<RAGQuery>): Promise<RAGResult> {
     const cacheKey = JSON.stringify(query);
     const start = this.performanceMonitor?.startTimer();
 
@@ -43,7 +42,7 @@ export class HybridSearchCoordinator {
     return result;
   }
 
-  async shutdown(): Promise<void> {
-    // no-op in this simplified implementation
+  public async shutdown(): Promise<void> {
+    // Add shutdown logic here if needed
   }
 }

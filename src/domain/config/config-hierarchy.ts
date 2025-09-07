@@ -13,12 +13,12 @@ export function getDefaultConfig(): UnifiedConfiguration {
         logLevel: 'info',
         features: [],
       },
-      models: {} as any,
-      voices: {} as any,
-      tools: {} as any,
-      security: {} as any,
-      performance: {} as any,
-      infrastructure: {} as any,
+      models: {} as Record<string, unknown>,
+      voices: {} as Record<string, unknown>,
+      tools: {} as Record<string, unknown>,
+      security: {} as Record<string, unknown>,
+      performance: {} as Record<string, unknown>,
+      infrastructure: {} as Record<string, unknown>,
     },
     application: {
       name: 'CodeCrucible Synth',
@@ -29,7 +29,7 @@ export function getDefaultConfig(): UnifiedConfiguration {
     },
     model: {
       defaultProvider: 'ollama',
-      defaultModel: process.env.MODEL_DEFAULT_NAME || '',
+      defaultModel: process.env.MODEL_DEFAULT_NAME ?? '',
       providers: [],
       routing: {
         strategy: 'round_robin',
@@ -140,17 +140,17 @@ export function getDefaultConfig(): UnifiedConfiguration {
         tls: { enabled: false, version: 'TLS1.3', verifyPeer: true },
       },
     },
-  } as UnifiedConfiguration;
+  } as unknown as UnifiedConfiguration;
 }
 
 export function mergeConfigurations<T extends object>(base: T, override: Partial<T>): T {
   for (const [key, value] of Object.entries(override)) {
     if (Array.isArray(value)) {
-      (base as any)[key] = value;
+      (base as Record<string, unknown>)[key] = value;
     } else if (value && typeof value === 'object') {
-      (base as any)[key] = mergeConfigurations((base as any)[key] || {}, value);
+      (base as Record<string, unknown>)[key] = mergeConfigurations((base as Record<string, unknown>)[key] as object || {}, value);
     } else if (value !== undefined) {
-      (base as any)[key] = value;
+      (base as Record<string, unknown>)[key] = value as unknown;
     }
   }
   return base;
@@ -159,26 +159,29 @@ export function mergeConfigurations<T extends object>(base: T, override: Partial
 function loadEnvConfig(): Partial<UnifiedConfiguration> {
   const env: Partial<UnifiedConfiguration> = {};
   if (process.env.NODE_ENV) {
-    env.application = env.application || ({} as any);
-    env.application!.environment = process.env.NODE_ENV as any;
+    env.application = env.application ?? { name: '', version: '', environment: 'development', logLevel: 'info', features: [] };
+    env.application.environment = process.env.NODE_ENV as 'development' | 'testing' | 'staging' | 'production' || 'development';
   }
   if (process.env.LOG_LEVEL) {
-    env.application = env.application || ({} as any);
-    env.application!.logLevel = process.env.LOG_LEVEL as any;
+    env.application = env.application ?? { name: '', version: '', environment: 'development', logLevel: 'info', features: [] };
+    env.application.logLevel = process.env.LOG_LEVEL as 'info' | 'debug' | 'warn' | 'error' || 'info';
   }
   if (process.env.MODEL_DEFAULT_NAME) {
-    env.model = env.model || ({} as any);
-    env.model!.defaultModel = process.env.MODEL_DEFAULT_NAME;
+    env.model = env.model || { defaultProvider: '', defaultModel: '', providers: [], routing: { strategy: 'round_robin', healthCheckInterval: 30000, failoverThreshold: 3 }, fallback: { enabled: true, chain: [], maxRetries: 3, backoffMs: 1000 } };
+    if (env.model) {
+      env.model.defaultModel = process.env.MODEL_DEFAULT_NAME || '';
+    }
   }
   return env;
 }
 
 function loadCliConfig(): Partial<UnifiedConfiguration> {
   const cli: Partial<UnifiedConfiguration> = {};
+  cli.application = { name: '', version: '', environment: 'development', logLevel: 'info', features: [] };
   for (const arg of process.argv.slice(2)) {
-    if (arg.startsWith('--log-level=')) {
-      cli.application = cli.application || ({} as any);
-      cli.application!.logLevel = arg.split('=')[1] as any;
+    const [key, value] = arg.split('=');
+    if (key === 'logLevel') {
+      cli.application.logLevel = value as 'info' | 'debug' | 'warn' | 'error' || 'info';
     }
   }
   return cli;

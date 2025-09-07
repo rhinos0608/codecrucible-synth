@@ -1,6 +1,5 @@
 // Team Collaboration Database Schema - AI_INSTRUCTIONS.md Security Patterns
 import { pgTable, serial, text, timestamp, boolean, integer, jsonb } from 'drizzle-orm/pg-core';
-import { users } from './schema';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
 

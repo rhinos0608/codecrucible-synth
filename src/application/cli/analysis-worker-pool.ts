@@ -88,7 +88,7 @@ export class AnalysisWorkerPool {
   }
 
   public async destroy(): Promise<void> {
-    await Promise.all(this.workers.map((w: Worker) => w.terminate()));
+    await Promise.all(this.workers.map(async (w: Readonly<Worker>) => w.terminate()));
     this.workers = [];
     this.available = [];
   }

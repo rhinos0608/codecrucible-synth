@@ -14,7 +14,7 @@ import { EventEmitter } from 'events';
 import { logger } from '../logging/logger.js';
 import { getErrorMessage, toError } from '../../utils/error-utils.js';
 import { ModelRequest, ModelResponse } from '../../domain/interfaces/model-client.js';
-import { ProjectContext } from '../../domain/types/unified-types.js';
+import { ProjectContext, ProviderType } from '../../domain/types/unified-types.js';
 import {
   ActiveProcess,
   ActiveProcessManager,
@@ -97,7 +97,6 @@ export class GlobalEvidenceCollector {
 // (Removed duplicate export to avoid redeclaration error)
 
 export type ExecutionMode = 'fast' | 'quality' | 'balanced';
-export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
 
 export interface ExecutionStrategy {
   mode: ExecutionMode;
@@ -383,7 +382,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     _abortSignal?: Readonly<AbortSignal>
   ): Promise<ModelResponse> {
     const fallbackChain =
-      strategy.provider === 'auto'
+      strategy.provider === 'ollama'
         ? ['ollama', 'lm-studio', 'huggingface'] // Default fallback chain
         : [strategy.provider, 'ollama', 'lm-studio', 'huggingface'].filter(
             (p: string, i: number, arr: string[]) => arr.indexOf(p) === i
@@ -684,7 +683,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     // Default strategy
     const strategy: ExecutionStrategy = {
       mode: 'balanced',
-      provider: 'auto',
+      provider: 'ollama',
       timeout: this.config.complexityTimeouts.medium,
       complexity,
     };

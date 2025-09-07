@@ -5,7 +5,7 @@
 
 import { createRequire } from 'module';
 import { existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { logger } from '../infrastructure/logging/unified-logger.js';
 
@@ -15,10 +15,10 @@ const require = createRequire(import.meta.url);
  * Load prebuilt binary using napi-rs approach
  * Falls back to manual loading if prebuilt is not available
  */
-function loadPrebuiltBinding(name: string, fallbackPath?: string): any {
+function loadPrebuiltBinding(name: string, fallbackPath?: string): unknown {
   try {
     // Try to load from optionalDependencies first (napi-rs approach)
-    let packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}`;
+    const packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}`;
 
     if (process.platform === 'win32') {
       // Windows uses MSVC ABI
@@ -74,8 +74,7 @@ export interface PlatformInfo {
  * Get current platform information for NAPI binary selection
  */
 export function getPlatformInfo(): PlatformInfo {
-  const platform = process.platform;
-  const arch = process.arch;
+  const { platform, arch } = process;
 
   // Map Node.js platform names to NAPI naming convention
   const platformMap: Record<string, string> = {
@@ -122,15 +121,16 @@ export function getPlatformInfo(): PlatformInfo {
 function detectLinuxABI(): string {
   try {
     // Check if we're on Alpine Linux (uses Musl)
-    const fs = require('fs');
+    // Use explicit import type for fs
+    const fs = require('fs') as typeof import('fs');
     if (fs.existsSync('/etc/alpine-release')) {
       return 'musl';
     }
 
     // Check ldd version for musl
-    const { execSync } = require('child_process');
+    const { execSync } = require('child_process') as typeof import('child_process');
     try {
-      const lddOutput = execSync('ldd --version 2>&1', { encoding: 'utf8' });
+      const lddOutput: string = execSync('ldd --version 2>&1', { encoding: 'utf8' });
       if (lddOutput.toLowerCase().includes('musl')) {
         return 'musl';
       }
@@ -200,10 +200,18 @@ export function findNAPIBinary(searchPaths: string[], baseName: string): string 
  * Load Rust executor module with cross-platform support
  * Uses napi-rs prebuild approach with fallback to local binary
  */
-export function loadRustExecutor(baseDir?: string): any {
+export interface RustExecutorModule {
+  RustExecutor: new (...args: unknown[]) => unknown;
+  createRustExecutor?: (...args: readonly unknown[]) => unknown;
+  initLogging?: (...args: readonly unknown[]) => void;
+  getVersion?: () => string;
+  benchmarkExecution?: (...args: readonly unknown[]) => unknown;
+}
+
+export function loadRustExecutor(baseDir?: string): RustExecutorModule {
   // First try to load from prebuilt binaries (napi-rs approach)
   try {
-    return loadPrebuiltBinding('codecrucible-rust-executor');
+    return loadPrebuiltBinding('codecrucible-rust-executor') as RustExecutorModule;
   } catch (prebuiltError) {
     // FIXED: Reduce noise - use debug level instead of warn for expected fallback behavior
     logger.debug(
@@ -243,7 +251,7 @@ export function loadRustExecutor(baseDir?: string): any {
     try {
       const rustModule = loadPrebuiltBinding('codecrucible-rust-executor', binaryPath);
       logger.info(`Successfully loaded Rust executor from local build: ${binaryPath}`);
-      return rustModule;
+      return rustModule as RustExecutorModule;
     } catch (error) {
       const loadError = new Error(
         `Failed to load Rust executor from ${binaryPath}: ${error instanceof Error ? error.message : String(error)}`
@@ -258,7 +266,7 @@ export function loadRustExecutor(baseDir?: string): any {
  * Supports both prebuilt binaries and local development builds
  */
 export function loadRustExecutorSafely(baseDir?: string): {
-  module: any | null;
+  module: RustExecutorModule | null;
   available: boolean;
   error?: string;
   binaryPath?: string;
@@ -324,50 +332,50 @@ export function loadRustExecutorSafely(baseDir?: string): {
 /**
  * Create fallback Rust executor for when binary is not available
  */
-export function createFallbackRustExecutor(error: string): any {
+export function createFallbackRustExecutor(error: string): RustExecutorModule {
   return {
     RustExecutor: class RustExecutor {
-      constructor() {
+      public constructor() {
         throw new Error(`Rust module not available: ${error}`);
       }
 
-      static create() {
+      public static create(): never {
         throw new Error(`Rust module not available: ${error}`);
       }
 
-      initialize() {
+      public initialize(): never {
         throw new Error(`Rust module not available: ${error}`);
       }
 
-      id() {
+      public id(): never {
         throw new Error(`Rust module not available: ${error}`);
       }
 
-      get_supported_tools() {
+      public get_supported_tools(): never {
         throw new Error(`Rust module not available: ${error}`);
       }
 
-      getFilesystemOperations() {
+      public getFilesystemOperations(): never {
         throw new Error(`Rust module not available: ${error}`);
       }
 
-      getSupportedCommands() {
+      public getSupportedCommands(): never {
         throw new Error(`Rust module not available: ${error}`);
       }
 
-      execute(toolId: string, args: string, options?: any) {
+      public execute(_toolId: string, _args: string, _options?: unknown): never {
         throw new Error(`Rust module not available: ${error}`);
       }
 
-      executeFilesystem(operation: string, path: string, content?: string, options?: any) {
+      public executeFilesystem(_operation: string, _path: string, _content?: string, _options?: unknown): never {
         throw new Error(`Rust module not available: ${error}`);
       }
 
-      executeCommand(command: string, args: string[], options?: any) {
+      public executeCommand(_command: string, _args: readonly string[], _options?: unknown): never {
         throw new Error(`Rust module not available: ${error}`);
       }
 
-      get_performance_metrics() {
+      public get_performance_metrics(): string {
         return JSON.stringify({
           total_requests: 0,
           successful_requests: 0,
@@ -377,40 +385,40 @@ export function createFallbackRustExecutor(error: string): any {
         });
       }
 
-      reset_performance_metrics() {
+      public reset_performance_metrics(): void {
         logger.warn('Rust performance metrics not available - module failed to load');
       }
 
-      healthCheck() {
+      public async healthCheck(): Promise<string> {
         return Promise.resolve(`unhealthy: ${error}`);
       }
 
-      cleanup() {
+      public async cleanup(): Promise<void> {
         return Promise.resolve();
       }
 
-      streamFile() {
+      public streamFile(): never {
         throw new Error(`Rust streaming not available: ${error}`);
       }
 
-      streamCommand() {
+      public streamCommand(): never {
         throw new Error(`Rust streaming not available: ${error}`);
       }
     },
 
-    createRustExecutor() {
+    createRustExecutor(): never {
       throw new Error(`Rust module not available: ${error}`);
     },
 
-    initLogging() {
+    initLogging(): void {
       logger.warn('Rust logging not available - module failed to load');
     },
 
-    getVersion() {
+    getVersion(): string {
       return 'unavailable';
     },
 
-    benchmarkExecution() {
+    benchmarkExecution(): never {
       throw new Error(`Rust benchmarks not available: ${error}`);
     },
   };

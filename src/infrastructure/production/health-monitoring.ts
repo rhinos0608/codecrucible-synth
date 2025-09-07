@@ -13,7 +13,7 @@ const defaultHealth: IntegratedSystemHealth = {
   systemMetrics: {
     uptime: 0,
     totalOperations: 0,
-    successRate: 1,
+    successRate: 1.0, // successRate is normalized between 0 (0%) and 1 (100%)
     avgResponseTime: 0,
     currentThroughput: 0,
   },

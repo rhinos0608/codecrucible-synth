@@ -36,7 +36,7 @@ export class ProductionHardeningSystem extends EventEmitter {
   private readonly stats: ProductionStats = {
     uptime: 0,
     totalOperations: 0,
-    successRate: 1,
+    successRate: 0,
     averageResponseTime: 0,
     resourceUsage: {
       memory: { current: 0, peak: 0, utilizationPercent: 0 },

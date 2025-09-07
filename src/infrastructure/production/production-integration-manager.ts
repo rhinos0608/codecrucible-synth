@@ -273,7 +273,11 @@ export class ProductionIntegrationManager extends EventEmitter {
     switch (componentName) {
       case 'resourceEnforcer':
         if (this.resourceEnforcer) {
+
+          this.resourceEnforcer.stop();
+
           await this.resourceEnforcer.stop();
+
         }
         break;
 

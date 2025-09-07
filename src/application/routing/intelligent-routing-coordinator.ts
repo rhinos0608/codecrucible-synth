@@ -83,7 +83,16 @@ export class IntelligentRoutingCoordinator
           primaryModel: {
             name: { value: 'fallback-model' },
             providerType: 'lm-studio',
-          } as unknown as Model,
+            // Add other required Model properties with failsafe defaults
+            // If Model is an interface, add all required fields here
+            // If Model is a class, instantiate it if possible
+            // The following are common Model fields; adjust as needed
+            id: 'fallback-model',
+            version: '1.0.0',
+            description: 'Failsafe fallback model',
+            isActive: true,
+            // Add more fields if Model requires them
+          },
           fallbackModels: [],
           selectionReason: 'Failsafe model selection',
           routingStrategy: RoutingStrategy.SHARED,

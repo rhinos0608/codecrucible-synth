@@ -21,10 +21,17 @@ export class StatusTracker {
     for (const line of lines) {
       if (line.startsWith('??')) {
         untracked.push(line.slice(3));
-      } else if (/^[A-Z]/.test(line[0])) {
-        staged.push(line.slice(3));
       } else {
-        modified.push(line.slice(3));
+        // line is at least 3 chars: XY filename
+        const indexStatus = line[0];
+        const workTreeStatus = line[1];
+        const filename = line.slice(3);
+        if (indexStatus !== ' ' && indexStatus !== '?') {
+          staged.push(filename);
+        }
+        if (workTreeStatus !== ' ' && workTreeStatus !== '?') {
+          modified.push(filename);
+        }
       }
     }
     return {

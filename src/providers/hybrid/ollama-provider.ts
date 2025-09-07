@@ -70,7 +70,7 @@ export class OllamaProvider implements LLMProvider {
   ): Promise<LLMResponse> {
     const model = options.model ?? this.config.defaultModel;
     const messages: OllamaMessage[] = [
-      { role: 'system', content: generateContextualSystemPrompt([]) },
+      { role: 'system', content: generateContextualSystemPrompt() },
       { role: 'user', content: prompt },
     ];
 

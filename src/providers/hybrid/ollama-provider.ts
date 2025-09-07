@@ -7,9 +7,16 @@ import {
 } from '../../domain/interfaces/llm-interfaces.js';
 import {
   OllamaConfig,
+
+  OllamaRequest,
+  OllamaStreamingMetadata,
+  OllamaMessage,
+  OllamaResponse,
+
   OllamaMessage,
   OllamaRequest,
   OllamaStreamingMetadata,
+
   ParsedToolCall,
   parseEnvInt,
 } from './ollama-config.js';
@@ -19,18 +26,33 @@ import { extractToolCalls } from './ollama-tool-processor.js';
 import { parseResponse } from './ollama-response-parser.js';
 import { generateContextualSystemPrompt } from '../../domain/prompts/system-prompt.js';
 
+
+interface GenerateCodeOptions {
+
 interface GenerateCodeOptions extends Record<string, unknown> {
+
   model?: string;
   onStreamingToken?: (token: string, metadata?: OllamaStreamingMetadata) => void;
 }
 
+
+type LLMToolCall = NonNullable<LLMResponse['toolCalls']>[number];
+
+function toLLMToolCall(call: ParsedToolCall): LLMToolCall {
+  return {
+
 function toLLMToolCalls(calls: ParsedToolCall[]): LLMResponse['toolCalls'] {
   return calls.map(call => ({
+
     id: call.id ?? '',
     type: 'function',
     name: call.function.name,
     arguments: call.function.arguments,
+
+  };
+
   }));
+
 }
 
 export class OllamaProvider implements LLMProvider {
@@ -74,10 +96,15 @@ export class OllamaProvider implements LLMProvider {
       { role: 'user', content: prompt },
     ];
 
+    const stream = typeof options.onStreamingToken === 'function';
     const request: OllamaRequest = {
       model,
       messages,
+
+      stream,
+
       stream: typeof options.onStreamingToken === 'function',
+
     };
 
     const controller = new AbortController();
@@ -86,6 +113,20 @@ export class OllamaProvider implements LLMProvider {
     try {
       const response = await this.http.post('/api/chat', request, controller.signal);
       if (!response.ok) {
+
+        const errText = await response.text().catch(() => '');
+        throw new Error(`Ollama API request failed with status ${response.status}: ${errText}`);
+      }
+      let text = '';
+      let metadata: OllamaStreamingMetadata = {};
+      let toolCalls: LLMToolCall[] = [];
+
+      if (stream && options.onStreamingToken) {
+        const result = await handleStreaming(response, options.onStreamingToken);
+        text = result.text;
+        metadata = result.metadata;
+        toolCalls = extractToolCalls(result.toolCalls).map(toLLMToolCall);
+
         const errorText = await response.text().catch(() => '');
         throw new Error(`Ollama API request failed with status ${response.status}: ${errorText}`);
       }
@@ -100,6 +141,7 @@ export class OllamaProvider implements LLMProvider {
         text = result.text;
         metadata = result.metadata;
         toolCalls = toLLMToolCalls(extractToolCalls(result.toolCalls));
+
       } else {
         const json = await parseResponse(response);
         text = json.message?.content ?? json.response ?? '';
@@ -110,7 +152,11 @@ export class OllamaProvider implements LLMProvider {
           evalCount: json.eval_count,
           context: json.context,
         };
+
+        toolCalls = extractToolCalls(json.message?.tool_calls).map(toLLMToolCall);
+
         toolCalls = toLLMToolCalls(extractToolCalls(json.message?.tool_calls));
+
       }
 
       return {
@@ -131,6 +177,31 @@ export class OllamaProvider implements LLMProvider {
     }
   }
 
+
+  public async request(request: unknown): Promise<unknown> {
+    const req = request as OllamaRequest;
+    const response = await this.http.post('/api/chat', req);
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`Ollama API request failed with status ${response.status}: ${errText}`);
+    }
+    if (req.stream && req.onStreamingToken) {
+      const result = await handleStreaming(response, req.onStreamingToken);
+      return {
+        model: result.metadata.model ?? this.config.defaultModel,
+        message: { role: 'assistant', content: result.text, tool_calls: result.toolCalls },
+        done: true,
+        total_duration: result.metadata.totalDuration,
+        load_duration: result.metadata.loadDuration,
+        prompt_eval_count: result.metadata.promptEvalCount,
+        prompt_eval_duration: result.metadata.promptEvalDuration,
+        eval_count: result.metadata.evalCount,
+        eval_duration: result.metadata.evalDuration,
+        context: result.metadata.context,
+      } as OllamaResponse;
+    }
+    return parseResponse(response);
+
   public async request(request: unknown): Promise<LLMResponse> {
     const req = request as OllamaRequest;
     if (req.prompt) {
@@ -147,6 +218,7 @@ export class OllamaProvider implements LLMProvider {
       });
     }
     throw new Error('Invalid request: missing prompt or messages');
+
   }
 
   public getCapabilities(): LLMCapabilities {

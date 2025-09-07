@@ -54,7 +54,23 @@ export class ProductionHardeningSystem extends EventEmitter {
     config: Partial<ProductionHardeningConfig> = {}
   ): ProductionHardeningSystem {
     if (!this.instance) {
-      this.instance = new ProductionHardeningSystem({ ...defaultConfig, ...config });
+      const merged: ProductionHardeningConfig = {
+        security: {
+          rateLimiting: {
+            ...defaultConfig.security.rateLimiting,
+            ...(config.security?.rateLimiting ?? {}),
+          },
+          inputValidation: {
+            ...defaultConfig.security.inputValidation,
+            ...(config.security?.inputValidation ?? {}),
+          },
+          auditLogging: {
+            ...defaultConfig.security.auditLogging,
+            ...(config.security?.auditLogging ?? {}),
+          },
+        },
+      };
+      this.instance = new ProductionHardeningSystem(merged);
     }
     return this.instance;
   }
@@ -90,7 +106,7 @@ export class ProductionHardeningSystem extends EventEmitter {
     this.stats.totalOperations++;
     const n = this.stats.totalOperations;
     this.stats.averageResponseTime = (this.stats.averageResponseTime * (n - 1) + duration) / n;
-    this.stats.successRate = (this.stats.successRate * (n - 1) + 1) / n;
+    this.stats.successRate = (this.stats.successRate * (n - 1) + 100) / n;
   }
 
   private recordFailure(duration: number): void {

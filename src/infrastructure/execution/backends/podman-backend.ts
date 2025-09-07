@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto';
 import { resolve } from 'path';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { logger } from '../../logging/logger.js';
 import {
@@ -14,6 +14,7 @@ import type { ExecutionOptions, ExecutionResult, BackendConfig } from '../execut
 import { ExecutionBackend } from '../base-execution-backend.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class PodmanBackend extends ExecutionBackend {
   private readonly containerPrefix = 'codecrucible_pod';
@@ -121,7 +122,7 @@ export class PodmanBackend extends ExecutionBackend {
       logger.debug(`Executing in Podman: ${command}`, { containerId });
       this.activeContainers.add(containerId);
 
-      const result = await execAsync(`podman ${podmanArgs.join(' ')}`, {
+      const result = await execFileAsync('podman', podmanArgs, {
         timeout: options.timeout || 30000,
         maxBuffer: options.maxOutputSize || 1024 * 1024 * 10,
       });

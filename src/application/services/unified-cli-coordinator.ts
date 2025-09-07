@@ -7,11 +7,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { performance } from 'perf_hooks';
-import { randomUUID } from 'crypto';
-import {
-  IWorkflowOrchestrator,
-} from '../../domain/interfaces/workflow-orchestrator.js';
+import { IWorkflowOrchestrator } from '../../domain/interfaces/workflow-orchestrator.js';
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
@@ -28,7 +24,9 @@ import {
   ResilientCLIWrapper,
   ResilientOptions,
 } from '../../infrastructure/resilience/resilient-cli-wrapper.js';
-import { setupResilienceEvents } from './cli/resilience-manager.js';
+import { CLIResilienceManager } from './cli/resilience-manager.js';
+import { CLICommandParser, ICLIParser } from './cli/command-parser.js';
+import { CLIOrchestrator, ICLIOrchestrator } from './cli/cli-orchestrator.js';
 
 // Re-export session types from modular components
 export type { CLISession, CLISessionMetrics } from '../cli/session-manager.js';
@@ -147,11 +145,21 @@ export class UnifiedCLICoordinator extends EventEmitter {
   private readonly metricsCollector: MetricsCollector;
   private readonly useCaseRouter: UseCaseRouter;
   private readonly resilientWrapper: ResilientCLIWrapper;
+  private readonly parser: ICLIParser;
+  private readonly resilienceManager: CLIResilienceManager;
+  private readonly cliOrchestrator: ICLIOrchestrator;
 
   private readonly defaultOptions: UnifiedCLIOptions;
   private isInitialized = false;
 
-  public constructor(readonly options: Readonly<Partial<UnifiedCLIOptions>> = {}) {
+  public constructor(
+    options: Readonly<Partial<UnifiedCLIOptions>> = {},
+    deps: Readonly<{
+      parser?: ICLIParser;
+      resilienceManager?: CLIResilienceManager;
+      orchestrator?: ICLIOrchestrator;
+    }> = {}
+  ) {
     super();
 
     // Initialize Security Framework
@@ -173,12 +181,29 @@ export class UnifiedCLICoordinator extends EventEmitter {
     this.metricsCollector = new MetricsCollector({
       enableDetailedMetrics: options.enablePerformanceOptimization !== false,
       enableSystemMonitoring: true,
-      metricsRetentionMs: 3600000, // 1 hour
-      healthCheckIntervalMs: 30000, // 30 seconds
+      metricsRetentionMs: 3600000,
+      healthCheckIntervalMs: 30000,
     });
 
     this.useCaseRouter = new UseCaseRouter();
-    this.resilientWrapper = new ResilientCLIWrapper();
+
+    this.parser = deps.parser ?? new CLICommandParser();
+    this.resilienceManager =
+      deps.resilienceManager ?? new CLIResilienceManager(new ResilientCLIWrapper());
+    this.resilientWrapper = this.resilienceManager.getWrapper();
+
+    this.cliOrchestrator =
+      deps.orchestrator ??
+      new CLIOrchestrator({
+        securityFramework: this.securityFramework,
+        metricsCollector: this.metricsCollector,
+        resilientWrapper: this.resilientWrapper,
+        useCaseRouter: this.useCaseRouter,
+        sessionManager: this.sessionManager,
+        calculateSystemHealth: this.calculateSystemHealth.bind(this),
+      });
+
+    this.resilienceManager.wire(this);
 
     // Set default options
     this.defaultOptions = {
@@ -213,9 +238,6 @@ export class UnifiedCLICoordinator extends EventEmitter {
       this.sessionManager.initialize(this.eventBus);
       this.useCaseRouter.initialize(this.orchestrator);
 
-      // Initialize resilience policies
-      setupResilienceEvents(this.resilientWrapper, this);
-
       this.isInitialized = true;
       this.emit('initialized');
 
@@ -232,156 +254,19 @@ export class UnifiedCLICoordinator extends EventEmitter {
   /**
    * Process a CLI operation using modular components
    */
-  public async processOperation(request: Readonly<CLIOperationRequest>): Promise<CLIOperationResponse> {
+  public async processOperation(
+    request: Readonly<CLIOperationRequest>
+  ): Promise<CLIOperationResponse> {
     if (!this.isInitialized) {
       throw new Error('CLI Coordinator not initialized. Call initialize() first.');
     }
-
-    const startTime = performance.now();
-    const operationId = request.id || randomUUID();
     const options = { ...this.defaultOptions, ...request.options };
+    return this.cliOrchestrator.processOperation(request, options);
+  }
 
-    // Start operation tracking
-    const traceSpan = this.metricsCollector.startOperation(operationId, request.type, {
-      sessionId: request.session?.id,
-    });
-
-    try {
-      // Security validation
-      const securityValidation = await this.securityFramework.validateOperation(
-        JSON.stringify(request.input),
-        { operationType: request.type, sessionId: request.session?.id }
-      );
-
-      if (!securityValidation.allowed) {
-        logger.warn(
-          `🚫 Security validation failed for operation ${operationId}:`,
-          securityValidation.violations
-        );
-
-        this.metricsCollector.recordOperation(
-          operationId,
-          false,
-          `Security validation failed: ${securityValidation.violations.join(', ')}`,
-          undefined,
-          traceSpan
-        );
-
-        return {
-          id: operationId,
-          success: false,
-          error: `Security validation failed: ${securityValidation.violations.join(', ')}`,
-          metrics: {
-            processingTime: performance.now() - startTime,
-            contextConfidence: 0,
-            systemHealth: this.calculateSystemHealth(),
-          },
-        };
-      }
-
-      logger.info(
-        `🔐 Security validation passed (Risk score: ${securityValidation.riskScore.toFixed(2)})`
-      );
-
-      // Use resilient execution with modular routing
-      const resilientResult = await this.resilientWrapper.executeWithRecovery(
-        async () => {
-          // Convert CLISession to required format for UseCaseRouter
-          const routerRequest = {
-            ...request,
-            input: typeof request.input === 'string' ? request.input : '',
-            session: request.session
-              ? {
-                  id: request.session.id,
-                  workingDirectory: request.session.workingDirectory || process.cwd(),
-                  context: request.session.context || {
-                    sessionId: request.session.id,
-                    workingDirectory: request.session.workingDirectory || process.cwd(),
-                    permissions: ['read', 'write', 'execute'],
-                    securityLevel: 'medium' as const,
-                  },
-                }
-              : undefined,
-          };
-
-          return this.useCaseRouter.executeOperation(routerRequest);
-        },
-        {
-          name: `CLI-${request.type}`,
-          component: 'UnifiedCLICoordinator',
-          critical: request.type === 'execute',
-        },
-        {
-          enableGracefulDegradation: options.enableGracefulDegradation,
-          retryAttempts: options.retryAttempts,
-          timeoutMs: options.timeoutMs,
-          fallbackMode: options.fallbackMode,
-          errorNotification: options.errorNotification,
-        }
-      );
-
-      const processingTime = performance.now() - startTime;
-
-      // Record operation completion
-      this.metricsCollector.recordOperation(
-        operationId,
-        resilientResult.success,
-        resilientResult.error,
-        { recoveryActions: resilientResult.metrics?.recoveryActions || 0 },
-        traceSpan
-      );
-
-      // Update session metrics if session exists
-      if (request.session?.id) {
-        this.sessionManager.updateSessionMetrics(request.session.id, {
-          commandsExecuted: 1,
-          contextEnhancements: 1,
-          errorsRecovered: resilientResult.metrics?.recoveryActions || 0,
-          totalProcessingTime: processingTime,
-        });
-      }
-
-      return {
-        id: operationId,
-        success: resilientResult.success,
-        result: resilientResult.data,
-        error: resilientResult.error,
-        enhancements: {
-          contextAdded: true,
-          performanceOptimized: true,
-          errorsRecovered: resilientResult.metrics?.recoveryActions || 0,
-        },
-        metrics: {
-          processingTime,
-          contextConfidence: 0.8,
-          systemHealth: this.calculateSystemHealth(),
-        },
-      };
-    } catch (error) {
-      const processingTime = performance.now() - startTime;
-
-      // Record error metrics
-      this.metricsCollector.recordOperation(
-        operationId,
-        false,
-        (error as Error).message,
-        undefined,
-        traceSpan
-      );
-
-      logger.error(`CLI operation ${operationId} failed:`, error);
-
-      return {
-        id: operationId,
-        success: false,
-        error: (error as Error).message,
-        metrics: {
-          processingTime,
-          contextConfidence: 0,
-          systemHealth: this.calculateSystemHealth(),
-        },
-      };
-    }
+  public async executeFromArgs(args: readonly string[]): Promise<CLIOperationResponse> {
+    const request = this.parser.parse(args);
+    return this.processOperation(request);
   }
 
   /**
@@ -467,10 +352,11 @@ export class UnifiedCLICoordinator extends EventEmitter {
   private transformSystemHealth(rawHealth: any): SystemHealth {
     // Handle different possible formats of system health data
     if (rawHealth && typeof rawHealth === 'object') {
-      const isHealthy = rawHealth.status === 'healthy' || 
-                       rawHealth.isHealthy === true ||
-                       (rawHealth.errorRate !== undefined && rawHealth.errorRate < 0.1);
-      
+      const isHealthy =
+        rawHealth.status === 'healthy' ||
+        rawHealth.isHealthy === true ||
+        (rawHealth.errorRate !== undefined && rawHealth.errorRate < 0.1);
+
       let healthScore: number;
       if (typeof rawHealth.healthScore === 'number') {
         healthScore = Math.max(0, Math.min(1, rawHealth.healthScore));
@@ -480,9 +366,15 @@ export class UnifiedCLICoordinator extends EventEmitter {
         healthScore = 0.6;
       } else if (rawHealth.status === 'critical') {
         healthScore = 0.3;
-      } else if (typeof rawHealth.recoveryRate === 'number' && typeof rawHealth.errorRate === 'number') {
+      } else if (
+        typeof rawHealth.recoveryRate === 'number' &&
+        typeof rawHealth.errorRate === 'number'
+      ) {
         // Calculate health score based on error and recovery rates
-        healthScore = Math.max(0.1, Math.min(1.0, (rawHealth.recoveryRate * 0.7) + ((1 - rawHealth.errorRate) * 0.3)));
+        healthScore = Math.max(
+          0.1,
+          Math.min(1.0, rawHealth.recoveryRate * 0.7 + (1 - rawHealth.errorRate) * 0.3)
+        );
       } else {
         healthScore = isHealthy ? 0.8 : 0.4;
       }
@@ -547,12 +439,14 @@ export class UnifiedCLICoordinator extends EventEmitter {
   /**
    * Get intelligent command suggestions based on context
    */
-  public async getIntelligentCommands(context?: string): Promise<ReadonlyArray<{
-    command: string;
-    description: string;
-    examples: ReadonlyArray<string>;
-    contextRelevance: number;
-  }>> {
+  public async getIntelligentCommands(context?: string): Promise<
+    ReadonlyArray<{
+      command: string;
+      description: string;
+      examples: ReadonlyArray<string>;
+      contextRelevance: number;
+    }>
+  > {
     // Basic implementation - could be enhanced with AI-powered suggestions
     return [
       {
@@ -562,7 +456,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
         contextRelevance: context ? 0.8 : 0.5,
       },
       {
-        command: 'generate', 
+        command: 'generate',
         description: 'Generate code based on specifications',
         examples: ['generate component MyComponent', 'generate test MyModule'],
         contextRelevance: context ? 0.7 : 0.4,

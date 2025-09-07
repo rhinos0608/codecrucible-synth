@@ -21,7 +21,7 @@ export class AccessControlManager {
 
   }
 
-  public checkAccess(userId: string, permission: string): void {
+  public checkAccess(userId: string, permission: string): boolean {
     if (this.accessMap.size === 0) {
 
       logger.warn(
@@ -41,5 +41,7 @@ export class AccessControlManager {
       logger.warn(`Access denied for user ${userId} attempting ${permission}`);
       throw new Error('Access denied');
     }
+    logger.info(`Access granted for user ${userId} to ${permission}`);
+    return true;
   }
 }

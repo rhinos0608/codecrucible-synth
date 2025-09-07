@@ -221,4 +221,12 @@ export class FeedbackProcessor {
       if (timeoutId) clearTimeout(timeoutId);
     }) as Promise<T>;
   }
+
+  public async initialize(): Promise<void> {
+    // Initialize feedback processor
+  }
+
+  public async shutdown(): Promise<void> {
+    // Cleanup feedback processor
+  }
 }

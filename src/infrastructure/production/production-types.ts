@@ -1,5 +1,7 @@
 import { ProductionAlert } from './production-hardening-system.js';
 
+export { ProductionAlert };
+
 export interface ProductionIntegrationConfig {
   components: {
     hardeningSystem: boolean;

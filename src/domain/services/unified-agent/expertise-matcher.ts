@@ -271,6 +271,15 @@ export class ExpertiseMatcher {
     }
     return s;
   }
+
+  public async initialize(): Promise<void> {
+    // Initialize expertise matcher
+    // Future: Load expertise mappings and configurations
+  }
+
+  public async shutdown(): Promise<void> {
+    // Cleanup expertise matcher
+  }
 }
 
 // -------------------------

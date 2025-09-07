@@ -3,6 +3,7 @@ import {
   ModelInfo,
   modelDiscoveryService,
 } from '../../infrastructure/discovery/model-discovery-service.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 import { 
   unifiedResultFormatter,
   FormattingOptions 
@@ -159,7 +160,7 @@ export class OutputFormatter {
       console.log('  ⚠️ deepseek-coder:6.7b (Ollama)');
       console.log('  ⚠️ local-model (LM Studio)');
 
-      logger.error('Model discovery failed:', error);
+      logger.error('Model discovery failed:', toErrorOrUndefined(error));
     }
   }
 

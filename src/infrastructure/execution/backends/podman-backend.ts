@@ -239,7 +239,7 @@ export class PodmanBackend extends ExecutionBackend {
       try {
         await execAsync(`podman rm -f ${containerId}`);
       } catch (error) {
-        logger.warn(`Failed to remove container ${containerId}:`, error);
+        logger.warn(`Failed to remove container ${containerId}:`, { error: error instanceof Error ? error.message : String(error) });
       }
     }
     this.activeContainers.clear();

@@ -1,5 +1,5 @@
 import { resolve } from 'path';
-import type { ExecutionOptions, ExecutionResult, BackendConfig } from './execution-types.js';
+import type { BackendConfig, ExecutionOptions, ExecutionResult } from './execution-types.js';
 import type { ServiceResponse } from '../error-handling/structured-error-system.js';
 
 export abstract class ExecutionBackend {

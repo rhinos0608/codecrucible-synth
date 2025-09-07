@@ -12,7 +12,7 @@ import {
 } from '../../domain/interfaces/user-interaction.js';
 import chalk from 'chalk';
 import ora, { Ora } from 'ora';
-import inquirer, { InputQuestion } from 'inquirer';
+import inquirer from 'inquirer';
 
 export class CLIUserInteraction implements IUserInteraction {
   private currentSpinner: Ora | null = null;
@@ -91,7 +91,7 @@ export class CLIUserInteraction implements IUserInteraction {
       this.currentSpinner = null;
     }
 
-    const inquirerOptions: InputQuestion<{ answer: string }> = {
+    const inquirerOptions = {
       type: 'input',
       name: 'answer',
       message: question,
@@ -121,7 +121,7 @@ export class CLIUserInteraction implements IUserInteraction {
       this.currentSpinner = null;
     }
 
-    const answers: { confirmed: boolean } = await inquirer.prompt([
+    const confirmAnswers: { confirmed: boolean } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'confirmed',
@@ -130,7 +130,7 @@ export class CLIUserInteraction implements IUserInteraction {
       },
     ]);
 
-    return answers.confirmed;
+    return confirmAnswers.confirmed;
   }
 
   public async select(question: string, choices: readonly string[]): Promise<string> {
@@ -140,7 +140,7 @@ export class CLIUserInteraction implements IUserInteraction {
       this.currentSpinner = null;
     }
 
-    const answers: { selected: string } = await inquirer.prompt([
+    const selectAnswers: { selected: string } = await inquirer.prompt([
       {
         type: 'list',
         name: 'selected',
@@ -149,7 +149,7 @@ export class CLIUserInteraction implements IUserInteraction {
       },
     ]);
 
-    return answers.selected;
+    return selectAnswers.selected;
   }
 
   /**

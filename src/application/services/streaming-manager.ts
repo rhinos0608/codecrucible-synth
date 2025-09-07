@@ -13,6 +13,7 @@ import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { StreamToken } from '../../domain/types/core-types.js';
 import { ModelRequest } from '../../domain/interfaces/model-client.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 import { ProviderAdapter } from './provider-adapters/index.js';
 
 // Enhanced: AI SDK v5.0 Compatible Streaming Interfaces
@@ -360,8 +361,8 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       this.destroySession(sessionId);
 
       logger.error('Modern stream session failed', {
-        sessionId,
-        error: error instanceof Error ? error.message : String(error),
+        streamSessionId: sessionId,
+        error: toErrorOrUndefined(error),
       });
 
       throw error;

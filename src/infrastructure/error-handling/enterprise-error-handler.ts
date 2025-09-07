@@ -4,25 +4,22 @@
  */
 
 import {
-  ErrorHandler as BaseErrorHandler,
-  ErrorFactory as BaseErrorFactory,
-} from './structured-error-system.js';
-import {
-  SecurityAuditLogger,
-  AuditEventType,
-  AuditSeverity,
-  AuditOutcome,
-} from '../security/security-audit-logger.js';
-import { EnterpriseConfigManager } from '../../application/config/enterprise-config-manager.js';
-import { AdvancedInputValidator } from '../security/input-validation-system.js';
-import {
   ErrorHandler as AdvancedErrorHandler,
-  ErrorFactory,
-  StructuredError,
+  ErrorHandler as BaseErrorHandler,
   ErrorCategory,
+  ErrorFactory,
   ErrorSeverity,
   ServiceResponse,
+  StructuredError,
 } from './structured-error-system.js';
+import {
+  AuditEventType,
+  AuditOutcome,
+  AuditSeverity,
+  SecurityAuditLogger,
+} from '../security/security-audit-logger.js';
+import { EnterpriseConfigManager } from '../../application/config/enterprise-config-manager.js';
+import { AdvancedInputValidator, ValidationLevel } from '../security/input-validation-system.js';
 
 export interface EnterpriseErrorConfig {
   enableAuditLogging: boolean;
@@ -48,7 +45,7 @@ export class EnterpriseErrorHandler {
     }
   >();
 
-  constructor(
+  public constructor(
     auditLogger?: SecurityAuditLogger,
     configManager?: EnterpriseConfigManager,
     config: Partial<EnterpriseErrorConfig> = {}
@@ -70,9 +67,9 @@ export class EnterpriseErrorHandler {
   /**
    * Handle error with enterprise features
    */
-  async handleEnterpriseError(
-    error: Error | StructuredError,
-    context: {
+  public async handleEnterpriseError(
+    error: Readonly<Error> | Readonly<StructuredError>,
+    context: Readonly<{
       userId?: string;
       sessionId?: string;
       requestId?: string;
@@ -80,8 +77,8 @@ export class EnterpriseErrorHandler {
       userAgent?: string;
       operation?: string;
       resource?: string;
-      [key: string]: any;
-    } = {}
+      [key: string]: unknown;
+    }> = {}
   ): Promise<StructuredError> {
     // First handle with static error handler
     const structuredError = await AdvancedErrorHandler.handleError(error, context);
@@ -95,7 +92,7 @@ export class EnterpriseErrorHandler {
   /**
    * Process error with enterprise features
    */
-  private async processEnterpriseError(error: StructuredError, context: any): Promise<void> {
+  private async processEnterpriseError(error: Readonly<StructuredError>, context: Readonly<Record<string, unknown>>): Promise<void> {
     try {
       // Update metrics
       if (this.config.enableMetrics) {
@@ -125,11 +122,11 @@ export class EnterpriseErrorHandler {
   /**
    * Create enterprise error with enhanced context
    */
-  static createEnterpriseError(
+  public static createEnterpriseError(
     message: string,
     category: ErrorCategory,
     severity: ErrorSeverity,
-    context: {
+    context: Readonly<{
       userId?: string;
       sessionId?: string;
       requestId?: string;
@@ -139,8 +136,8 @@ export class EnterpriseErrorHandler {
       securityImplications?: string[];
       businessImpact?: string;
       complianceIssues?: string[];
-      [key: string]: any;
-    } = {}
+      [key: string]: unknown;
+    }> = {}
   ): StructuredError {
     return ErrorFactory.createError(message, category, severity, {
       context,
@@ -161,27 +158,27 @@ export class EnterpriseErrorHandler {
   /**
    * Validate input with enterprise security
    */
-  static async validateEnterpriseInput(
-    input: any,
+  public static validateEnterpriseInput(
+    input: unknown,
     fieldName: string,
-    options: {
+    options: Readonly<{
       required?: boolean;
       maxLength?: number;
-      allowedPatterns?: RegExp[];
-      securityLevel?: 'basic' | 'standard' | 'strict' | 'paranoid';
+      allowedPatterns?: ReadonlyArray<RegExp>;
+      securityLevel?: ValidationLevel;
       sanitize?: boolean;
-    } = {}
-  ): Promise<ServiceResponse<any>> {
+    }> = {}
+  ): ServiceResponse {
     try {
       // Use advanced input validator for security validation
       const validation = AdvancedInputValidator.validateInput(input, fieldName, {
-        level: (options.securityLevel as any) || 'standard',
-        maxLength: options.maxLength || 10000,
+        level: (options.securityLevel ?? ValidationLevel.STANDARD) as ValidationLevel,
+        maxLength: options.maxLength ?? 10000,
         allowHtml: false,
         allowScripts: false,
         allowFileOperations: false,
         allowSystemCommands: false,
-        customPatterns: options.allowedPatterns || [],
+        customPatterns: options.allowedPatterns ? Array.from(options.allowedPatterns) : [],
       });
 
       if (!validation.success) {
@@ -221,13 +218,22 @@ export class EnterpriseErrorHandler {
   /**
    * Circuit breaker pattern for external services
    */
-  async executeWithCircuitBreaker<T>(
+  public async executeWithCircuitBreaker<T>(
     operation: () => Promise<T>,
     serviceName: string,
-    context: any = {}
+    context: Readonly<{
+      [key: string]: unknown;
+      userId?: string;
+      sessionId?: string;
+      requestId?: string;
+      ipAddress?: string;
+      userAgent?: string;
+      operation?: string;
+      resource?: string;
+    }> = {}
   ): Promise<ServiceResponse<T>> {
     const circuitBreakerKey = `circuit_breaker_${serviceName}`;
-    const failures = this.errorMetrics.get(circuitBreakerKey)?.count || 0;
+    const failures = this.errorMetrics.get(circuitBreakerKey)?.count ?? 0;
 
     // Check if circuit breaker is open
     if (failures >= this.config.circuitBreakerThreshold) {
@@ -258,7 +264,7 @@ export class EnterpriseErrorHandler {
       // Record failure
       const currentMetric = this.errorMetrics.get(circuitBreakerKey);
       this.errorMetrics.set(circuitBreakerKey, {
-        count: (currentMetric?.count || 0) + 1,
+        count: (currentMetric?.count ?? 0) + 1,
         lastOccurrence: new Date(),
         severity: ErrorSeverity.HIGH,
         category: ErrorCategory.EXTERNAL_API,
@@ -277,12 +283,12 @@ export class EnterpriseErrorHandler {
   /**
    * Update error metrics
    */
-  private updateErrorMetrics(error: StructuredError): void {
+  private updateErrorMetrics(error: Readonly<StructuredError>): void {
     const key = `${error.category}_${error.severity}`;
     const current = this.errorMetrics.get(key);
 
     this.errorMetrics.set(key, {
-      count: (current?.count || 0) + 1,
+      count: (current?.count ?? 0) + 1,
       lastOccurrence: new Date(),
       severity: error.severity,
       category: error.category,
@@ -292,7 +298,19 @@ export class EnterpriseErrorHandler {
   /**
    * Log to security audit system
    */
-  private async logToSecurityAudit(error: StructuredError, context: any): Promise<void> {
+  private logToSecurityAudit(
+    error: Readonly<StructuredError>,
+    context: Readonly<{
+      [key: string]: unknown;
+      userId?: string;
+      sessionId?: string;
+      requestId?: string;
+      ipAddress?: string;
+      userAgent?: string;
+      operation?: string;
+      resource?: string;
+    }>
+  ): void {
     if (!this.auditLogger) return;
 
     const auditSeverity = this.mapToAuditSeverity(error.severity);
@@ -304,7 +322,7 @@ export class EnterpriseErrorHandler {
       outcome: AuditOutcome.ERROR,
       userId: context.userId,
       sessionId: context.sessionId,
-      resource: context.resource || 'system',
+      resource: context.resource ?? 'system',
       action: 'error_occurred',
       errorMessage: `Error: ${error.message}`,
       details: {
@@ -326,7 +344,19 @@ export class EnterpriseErrorHandler {
   /**
    * Validate security implications
    */
-  private async validateSecurityImplications(error: StructuredError, context: any): Promise<void> {
+  private validateSecurityImplications(
+    error: Readonly<StructuredError>,
+    context: Readonly<{
+      [key: string]: unknown;
+      userId?: string;
+      sessionId?: string;
+      requestId?: string;
+      ipAddress?: string;
+      userAgent?: string;
+      operation?: string;
+      resource?: string;
+    }>
+  ): void {
     const securityCategories = [
       ErrorCategory.AUTHENTICATION,
       ErrorCategory.AUTHORIZATION,
@@ -335,7 +365,7 @@ export class EnterpriseErrorHandler {
 
     if (securityCategories.includes(error.category) && this.auditLogger) {
       this.auditLogger.logSecurityViolation(
-        context.userId || 'unknown',
+        context.userId ?? 'unknown',
         `Security-related error: ${error.message}`,
         {
           sessionId: context.sessionId,
@@ -352,14 +382,17 @@ export class EnterpriseErrorHandler {
   /**
    * Process alerts for critical errors
    */
-  private async processAlerts(error: StructuredError, context: any): Promise<void> {
+  private processAlerts(
+    error: StructuredError,
+    context: Readonly<Record<string, unknown>>
+  ): void {
     if (error.severity === ErrorSeverity.CRITICAL) {
       // Critical alerts would trigger immediate notifications
       console.error('🚨 CRITICAL ERROR ALERT:', {
         errorId: error.id,
         message: error.message,
         category: error.category,
-        context: context,
+        context,
         timestamp: new Date().toISOString(),
       });
 
@@ -378,7 +411,7 @@ export class EnterpriseErrorHandler {
     category: ErrorCategory,
     severity: ErrorSeverity
   ): string {
-    const enterpriseMessages: Record<ErrorCategory, Record<ErrorSeverity, string>> = {
+    const enterpriseMessages: Partial<Record<ErrorCategory, Partial<Record<ErrorSeverity, string>>>> = {
       [ErrorCategory.VALIDATION]: {
         [ErrorSeverity.LOW]: 'Please review your input',
         [ErrorSeverity.MEDIUM]: 'Input validation failed - please check your data',
@@ -409,7 +442,7 @@ export class EnterpriseErrorHandler {
         [ErrorSeverity.HIGH]: 'Critical network failure',
         [ErrorSeverity.CRITICAL]: 'Complete network outage detected',
       },
-    } as any;
+    };
 
     return enterpriseMessages[category]?.[severity] || 'An error occurred in the system';
   }
@@ -481,10 +514,24 @@ export class EnterpriseErrorHandler {
   private static determineImpactLevel(
     severity: ErrorSeverity
   ): 'low' | 'medium' | 'high' | 'critical' {
-    return severity as any;
+    switch (severity) {
+      case ErrorSeverity.LOW:
+        return 'low';
+      case ErrorSeverity.MEDIUM:
+        return 'medium';
+      case ErrorSeverity.HIGH:
+        return 'high';
+      case ErrorSeverity.CRITICAL:
+        return 'critical';
+      default:
+        return 'medium';
+    }
   }
 
-  private static identifyAffectedComponents(category: ErrorCategory, context: any): string[] {
+  private static identifyAffectedComponents(
+    category: ErrorCategory,
+    context: { operation?: string }
+  ): string[] {
     const components: string[] = [];
 
     switch (category) {
@@ -503,9 +550,12 @@ export class EnterpriseErrorHandler {
       case ErrorCategory.EXTERNAL_API:
         components.push('external-apis', 'third-party-services');
         break;
+      default:
+        components.push('general');
+        break;
     }
 
-    if (context.operation) {
+    if (context && typeof context.operation === 'string') {
       components.push(`operation:${context.operation}`);
     }
 
@@ -533,6 +583,9 @@ export class EnterpriseErrorHandler {
       case ErrorCategory.DATABASE:
         mitigations.push('Failover to replica database');
         mitigations.push('Enable read-only mode');
+        break;
+      default:
+        // No specific mitigations for other categories
         break;
     }
 
@@ -595,7 +648,7 @@ export class EnterpriseErrorHandler {
     }
   }
 
-  private assessSecurityThreat(error: StructuredError, context: any): string {
+  private assessSecurityThreat(error: StructuredError, _context: Readonly<Record<string, unknown>>): string {
     if (error.category === ErrorCategory.AUTHENTICATION) {
       return 'potential_credential_attack';
     }
@@ -611,7 +664,7 @@ export class EnterpriseErrorHandler {
   /**
    * Get enterprise error metrics
    */
-  getEnterpriseMetrics(): {
+  public getEnterpriseMetrics(): {
     totalErrors: number;
     errorsByCategory: Record<string, number>;
     errorsBySeverity: Record<string, number>;
@@ -641,8 +694,16 @@ export class EnterpriseErrorHandler {
     }
 
     const recentErrors = Array.from(this.errorMetrics.entries())
-      .map(([key, metric]) => ({ key, count: metric.count, lastOccurrence: metric.lastOccurrence }))
-      .sort((a, b) => b.lastOccurrence.getTime() - a.lastOccurrence.getTime())
+      .map((readonlyEntry: readonly [string, {
+        count: number;
+        lastOccurrence: Date;
+        severity: ErrorSeverity;
+        category: ErrorCategory;
+      }]) => {
+        const [key, metric] = readonlyEntry;
+        return { key, count: metric.count, lastOccurrence: metric.lastOccurrence };
+      })
+      .sort((a: Readonly<{ key: string; count: number; lastOccurrence: Date }>, b: Readonly<{ key: string; count: number; lastOccurrence: Date }>) => b.lastOccurrence.getTime() - a.lastOccurrence.getTime())
       .slice(0, 10);
 
     return {

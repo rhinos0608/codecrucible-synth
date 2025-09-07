@@ -7,6 +7,7 @@ export interface IAgent {
   status: AgentStatus;
   capabilities: AgentCapability[];
   expertiseDomains: string[];
+  isActive?: boolean;
   initialize: () => Promise<void>;
   process: (request: Readonly<AgentRequest>) => Promise<AgentResponse>;
   collaborate: (agents: ReadonlyArray<IAgent>, task: Readonly<CollaborativeTask>) => Promise<CollaborativeResponse>;

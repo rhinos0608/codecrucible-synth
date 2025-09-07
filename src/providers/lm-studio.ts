@@ -1,6 +1,7 @@
 import { LMStudioClient } from '@lmstudio/sdk';
 import { logger } from '../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../utils/error-utils.js';
+import { toErrorOrUndefined } from '../utils/type-guards.js';
 
 export interface LMStudioConfig {
   endpoint?: string;
@@ -220,8 +221,8 @@ export class LMStudioProvider {
       }());
     } catch (error) {
       logger.error('LMStudioProvider generateTextStreaming failed', {
-        error: getErrorMessage(error),
         model: this.model,
+        error: toErrorOrUndefined(error),
       });
       throw error;
     }
@@ -266,8 +267,8 @@ export class LMStudioProvider {
       return response.content;
     } catch (error) {
       logger.error('LMStudioProvider chat failed', {
-        error: getErrorMessage(error),
         model: this.model,
+        error: toErrorOrUndefined(error),
       });
       throw error;
     }
@@ -323,8 +324,8 @@ export class LMStudioProvider {
       };
     } catch (error) {
       logger.error('LMStudioProvider act failed', {
-        error: getErrorMessage(error),
         model: this.model,
+        error: toErrorOrUndefined(error),
       });
       throw error;
     }
@@ -376,7 +377,7 @@ export class LMStudioProvider {
       throw new Error('No available models found. Please load a model in LM Studio first.');
     } catch (error) {
       logger.error('LMStudioProvider model detection failed', {
-        error: getErrorMessage(error),
+        error: toErrorOrUndefined(error),
       });
       throw error;
     }

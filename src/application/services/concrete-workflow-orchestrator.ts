@@ -36,6 +36,7 @@ import type { ToolExecutionResult } from '../../domain/interfaces/tool-execution
 import type { IModelProvider } from '../../domain/interfaces/model-client.js';
 import type { ProviderType, ProjectContext } from '../../domain/types/unified-types.js';
 import type { Provider } from '../../infrastructure/execution/request-execution-manager.js';
+import { toError } from '../../utils/type-guards.js';
 
 /**
  * ToolExecutionError type definition for error mapping in executeTool
@@ -302,8 +303,8 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
           '  - requestExecutionManager: ✅ Initialized with advanced execution strategies'
         );
       } catch (innerError: unknown) {
-        logger.error('Failed to initialize requestExecutionManager:', innerError);
-        throw innerError;
+        logger.error('Failed to initialize requestExecutionManager:', toError(innerError));
+        throw toError(innerError);
       }
 
       this.isInitialized = true;
@@ -311,8 +312,8 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       logger.info('ConcreteWorkflowOrchestrator initialized successfully');
       this.eventBus.emit('orchestrator:initialized', { timestamp: Date.now() });
     } catch (error: unknown) {
-      logger.error('Failed to initialize ConcreteWorkflowOrchestrator:', error);
-      throw error;
+      logger.error('Failed to initialize ConcreteWorkflowOrchestrator:', toError(error));
+      throw toError(error);
     }
   }
   /**
@@ -621,12 +622,9 @@ User Request: ${userPrompt}`;
     modelRequest: ModelRequest
   ): Promise<ModelResponse> {
     logger.debug('ConcreteWorkflowOrchestrator: Checking for tool calls');
-    logger.debug('ConcreteWorkflowOrchestrator: response keys:', Object.keys(response));
-    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls exists:', !!response.toolCalls);
-    logger.debug(
-      'ConcreteWorkflowOrchestrator: response.toolCalls length:',
-      response.toolCalls?.length
-    );
+    logger.debug('ConcreteWorkflowOrchestrator: response keys:', { keys: Object.keys(response) });
+    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls exists:', { hasToolCalls: !!response.toolCalls });
+    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls length:', { length: response.toolCalls?.length });
 
     if (
       response.toolCalls &&
@@ -969,11 +967,10 @@ User Request: ${userPrompt}`;
       this.eventBus.emit('workflow:analysis_completed', { id: request.id, path: resolvedPath });
       return result;
     } catch (err: unknown) {
-      logger.error(
-        'Analysis request failed for',
-        typeof resolvedPath !== 'undefined' ? resolvedPath : '',
-        err
-      );
+      logger.error('Analysis request failed', {
+        path: typeof resolvedPath !== 'undefined' ? resolvedPath : '',
+        error: toError(err),
+      });
       this.eventBus.emit('workflow:analysis_failed', {
         id: request?.id,
         path: typeof resolvedPath !== 'undefined' ? resolvedPath : '',

@@ -35,7 +35,7 @@ export interface TimeoutStats {
 }
 
 export class TimeoutError extends Error {
-  constructor(
+  public constructor(
     message: string,
     public readonly context: string,
     public readonly level: TimeoutLevel,
@@ -48,8 +48,8 @@ export class TimeoutError extends Error {
 
 export class TimeoutManager {
   private static instance: TimeoutManager;
-  private timeouts: Map<string, NodeJS.Timeout> = new Map();
-  private timeoutStats: Map<string, { startTime: number; level: TimeoutLevel; duration: number }> =
+  private readonly timeouts: Map<string, NodeJS.Timeout> = new Map();
+  private readonly timeoutStats: Map<string, { startTime: number; level: TimeoutLevel; duration: number }> =
     new Map();
 
   // Default timeout configurations by level
@@ -63,17 +63,17 @@ export class TimeoutManager {
 
   private constructor() {}
 
-  static getInstance(): TimeoutManager {
+  public static getInstance(): TimeoutManager {
     if (!TimeoutManager.instance) {
       TimeoutManager.instance = new TimeoutManager();
     }
     return TimeoutManager.instance;
   }
 
-  withTimeout<T>(
-    promiseOrOperation: Promise<T> | (() => Promise<T>),
-    contextIdOrTimeout: string | number,
-    options: TimeoutOptions = {}
+  public async withTimeout<T>(
+    promiseOrOperation: Readonly<Promise<T>> | (() => Promise<T>),
+    contextIdOrTimeout: Readonly<string | number>,
+    options: Readonly<TimeoutOptions> = {}
   ): Promise<T> {
     let promise: Promise<T>;
     let contextId: string;
@@ -88,13 +88,13 @@ export class TimeoutManager {
 
     if (typeof contextIdOrTimeout === 'string') {
       contextId = contextIdOrTimeout;
-      timeoutMs = options.duration || this.defaultTimeouts[options.level || TimeoutLevel.MEDIUM];
+      timeoutMs = options.duration ?? this.defaultTimeouts[options.level ?? TimeoutLevel.MEDIUM];
     } else {
       contextId = `timeout_${Date.now()}`;
       timeoutMs = contextIdOrTimeout;
     }
 
-    const level = options.level || TimeoutLevel.MEDIUM;
+    const level = options.level ?? TimeoutLevel.MEDIUM;
     const startTime = Date.now();
 
     // Track timeout statistics
@@ -104,7 +104,7 @@ export class TimeoutManager {
       let timeoutHandle: NodeJS.Timeout | null = null;
       let isSettled = false;
 
-      const cleanup = () => {
+      const cleanup = (): void => {
         if (timeoutHandle) {
           clearTimeout(timeoutHandle);
           timeoutHandle = null;
@@ -113,7 +113,7 @@ export class TimeoutManager {
         this.timeoutStats.delete(contextId);
       };
 
-      const settlePromise = (settler: () => void) => {
+      const settlePromise = (settler: () => void): void => {
         if (!isSettled) {
           isSettled = true;
           cleanup();
@@ -144,24 +144,27 @@ export class TimeoutManager {
       // Handle promise resolution/rejection
       promise
         .then(result => {
-          settlePromise(() => resolve(result));
+          settlePromise(() => { resolve(result); });
         })
         .catch(error => {
-          settlePromise(() => reject(error));
+          settlePromise(() => { reject(error); });
         });
     });
   }
 
-  setTimeout(id: string, callback: () => void, delay: number): void {
+  public setTimeout(id: string, callback: () => void, delay: number): void {
     if (this.timeouts.has(id)) {
-      clearTimeout(this.timeouts.get(id)!);
+      const existingTimeout = this.timeouts.get(id);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
     }
 
     const timeout = setTimeout(callback, delay);
     this.timeouts.set(id, timeout);
   }
 
-  clearTimeout(id: string): void {
+  public clearTimeout(id: string): void {
     const timeout = this.timeouts.get(id);
     if (timeout) {
       clearTimeout(timeout);
@@ -169,7 +172,7 @@ export class TimeoutManager {
     }
   }
 
-  clearAllTimeouts(): void {
+  public clearAllTimeouts(): void {
     for (const timeout of this.timeouts.values()) {
       clearTimeout(timeout);
     }
@@ -180,7 +183,7 @@ export class TimeoutManager {
   /**
    * Get timeout statistics
    */
-  getStats(): TimeoutStats {
+  public getStats(): TimeoutStats {
     const stats = Array.from(this.timeoutStats.values());
     const currentTime = Date.now();
 
@@ -210,28 +213,28 @@ export class TimeoutManager {
   /**
    * Configure default timeout for a specific level
    */
-  setDefaultTimeout(level: TimeoutLevel, duration: number): void {
+  public setDefaultTimeout(level: TimeoutLevel, duration: number): void {
     this.defaultTimeouts[level] = duration;
   }
 
   /**
    * Get default timeout for a level
    */
-  getDefaultTimeout(level: TimeoutLevel): number {
+  public getDefaultTimeout(level: TimeoutLevel): number {
     return this.defaultTimeouts[level];
   }
 
   /**
    * Check if a timeout is currently active
    */
-  hasActiveTimeout(id: string): boolean {
+  public hasActiveTimeout(id: string): boolean {
     return this.timeouts.has(id);
   }
 
   /**
    * Get list of active timeout IDs
    */
-  getActiveTimeouts(): string[] {
+  public getActiveTimeouts(): string[] {
     return Array.from(this.timeouts.keys());
   }
 }

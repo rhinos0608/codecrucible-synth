@@ -110,7 +110,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Read file contents
    */
-  async readFile(filePath: string, encoding: BufferEncoding = 'utf8'): Promise<string> {
+  public async readFile(filePath: string, encoding: BufferEncoding = 'utf8'): Promise<string> {
     const absolutePath = this.resolveAbsolutePath(filePath);
     const operation: FileOperation = {
       type: 'read',
@@ -147,7 +147,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Read file contents as buffer
    */
-  async readFileBuffer(filePath: string): Promise<Buffer> {
+  public async readFileBuffer(filePath: string): Promise<Buffer> {
     const absolutePath = this.resolveAbsolutePath(filePath);
 
     try {
@@ -170,9 +170,9 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Write file contents
    */
-  async writeFile(
+  public async writeFile(
     filePath: string,
-    content: string | Buffer,
+    content: Readonly<string> | Readonly<Buffer>,
     encoding: BufferEncoding = 'utf8'
   ): Promise<void> {
     const absolutePath = this.resolveAbsolutePath(filePath);
@@ -217,9 +217,9 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Append content to file
    */
-  async appendFile(
+  public async appendFile(
     filePath: string,
-    content: string | Buffer,
+    content: Readonly<string> | Readonly<Buffer>,
     encoding: BufferEncoding = 'utf8'
   ): Promise<void> {
     const absolutePath = this.resolveAbsolutePath(filePath);
@@ -243,7 +243,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Delete file
    */
-  async deleteFile(filePath: string): Promise<void> {
+  public async deleteFile(filePath: string): Promise<void> {
     const absolutePath = this.resolveAbsolutePath(filePath);
     const operation: FileOperation = {
       type: 'delete',
@@ -275,7 +275,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Copy file
    */
-  async copyFile(sourcePath: string, targetPath: string): Promise<void> {
+  public async copyFile(sourcePath: string, targetPath: string): Promise<void> {
     const absoluteSource = this.resolveAbsolutePath(sourcePath);
     const absoluteTarget = this.resolveAbsolutePath(targetPath);
     const operation: FileOperation = {
@@ -313,7 +313,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Move/rename file
    */
-  async moveFile(sourcePath: string, targetPath: string): Promise<void> {
+  public async moveFile(sourcePath: string, targetPath: string): Promise<void> {
     const absoluteSource = this.resolveAbsolutePath(sourcePath);
     const absoluteTarget = this.resolveAbsolutePath(targetPath);
     const operation: FileOperation = {
@@ -353,7 +353,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Create directory (recursive)
    */
-  async createDirectory(dirPath: string): Promise<void> {
+  public async createDirectory(dirPath: string): Promise<void> {
     const absolutePath = this.resolveAbsolutePath(dirPath);
 
     try {
@@ -369,7 +369,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Delete directory (recursive)
    */
-  async deleteDirectory(dirPath: string, recursive: boolean = false): Promise<void> {
+  public async deleteDirectory(dirPath: string, recursive: boolean = false): Promise<void> {
     const absolutePath = this.resolveAbsolutePath(dirPath);
 
     try {
@@ -389,7 +389,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * List directory contents
    */
-  async listDirectory(dirPath: string, recursive: boolean = false): Promise<DirectoryListing> {
+  public async listDirectory(dirPath: string, recursive: boolean = false): Promise<DirectoryListing> {
     const absolutePath = this.resolveAbsolutePath(dirPath);
 
     try {
@@ -445,7 +445,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Get file metadata
    */
-  async getFileMetadata(filePath: string): Promise<FileMetadata> {
+  public async getFileMetadata(filePath: string): Promise<FileMetadata> {
     const absolutePath = this.resolveAbsolutePath(filePath);
 
     try {
@@ -460,7 +460,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Check if file/directory exists
    */
-  async exists(filePath: string): Promise<boolean> {
+  public async exists(filePath: string): Promise<boolean> {
     const absolutePath = this.resolveAbsolutePath(filePath);
 
     try {
@@ -474,9 +474,9 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Find files matching pattern
    */
-  async findFiles(
+  public async findFiles(
     pattern: string,
-    options: { cwd?: string; maxResults?: number } = {}
+    options: Readonly<{ cwd?: string; maxResults?: number }> = {}
   ): Promise<string[]> {
     const searchPath = options.cwd ? this.resolveAbsolutePath(options.cwd) : this.config.rootPath;
 
@@ -507,9 +507,9 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Create read stream for large files
    */
-  createReadStream(
+  public createReadStream(
     filePath: string,
-    options?: { start?: number; end?: number }
+    options?: Readonly<{ start?: number; end?: number }>
   ): NodeJS.ReadableStream {
     const absolutePath = this.resolveAbsolutePath(filePath);
     return createReadStream(absolutePath, options);
@@ -518,7 +518,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Create write stream for large files
    */
-  createWriteStream(filePath: string, options?: { flags?: string }): NodeJS.WritableStream {
+  public createWriteStream(filePath: Readonly<string>, options?: { flags?: string }): NodeJS.WritableStream {
     const absolutePath = this.resolveAbsolutePath(filePath);
     return createWriteStream(absolutePath, options);
   }
@@ -526,7 +526,7 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Stream copy for large files
    */
-  async streamCopy(sourcePath: string, targetPath: string): Promise<void> {
+  public async streamCopy(sourcePath: string, targetPath: string): Promise<void> {
     const absoluteSource = this.resolveAbsolutePath(sourcePath);
     const absoluteTarget = this.resolveAbsolutePath(targetPath);
 
@@ -608,21 +608,21 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Get file system configuration
    */
-  getConfig(): FileSystemConfig {
+  public getConfig(): FileSystemConfig {
     return { ...this.config };
   }
 
   /**
    * Get operation history
    */
-  getOperationHistory(limit?: number): FileOperation[] {
+  public getOperationHistory(limit?: number): FileOperation[] {
     return limit ? this.operationHistory.slice(-limit) : [...this.operationHistory];
   }
 
   /**
    * Clear operation history
    */
-  clearOperationHistory(): void {
+  public clearOperationHistory(): void {
     this.operationHistory = [];
     this.emit('historyCleared');
   }
@@ -630,14 +630,14 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Get file system statistics
    */
-  getStatistics(): {
+  public getStatistics(): {
     totalOperations: number;
     successfulOperations: number;
     failedOperations: number;
     activeWatchers: number;
   } {
     const totalOperations = this.operationHistory.length;
-    const successfulOperations = this.operationHistory.filter(op => op.success).length;
+    const successfulOperations = this.operationHistory.filter((op: Readonly<FileOperation>) => op.success).length;
     const failedOperations = totalOperations - successfulOperations;
 
     return {
@@ -682,7 +682,7 @@ export class FileSystemClient extends EventEmitter {
     }
   }
 
-  private async createFileMetadata(filePath: string, stats: Stats): Promise<FileMetadata> {
+  private async createFileMetadata(filePath: Readonly<string>, stats: Stats): Promise<FileMetadata> {
     const relativePath = relative(this.config.rootPath, filePath);
 
     // Check permissions
@@ -729,7 +729,7 @@ export class FileSystemClient extends EventEmitter {
     };
   }
 
-  private recordOperation(operation: FileOperation): void {
+  private recordOperation(operation: Readonly<FileOperation>): void {
     this.operationHistory.push(operation);
 
     // Keep only last 1000 operations to prevent memory leaks
@@ -741,7 +741,7 @@ export class FileSystemClient extends EventEmitter {
 
 // Factory function for creating configured file system clients
 export function createFileSystemClient(
-  config: Partial<FileSystemConfig> & { rootPath: string }
+  config: Readonly<Partial<FileSystemConfig> & { rootPath: string }>
 ): FileSystemClient {
   const defaultConfig: FileSystemConfig = {
     rootPath: config.rootPath,

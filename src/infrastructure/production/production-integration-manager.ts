@@ -146,8 +146,8 @@ export interface ProductionOperationContext {
 export class ProductionIntegrationManager extends EventEmitter {
   private static instance?: ProductionIntegrationManager;
   private readonly orchestrator: DeploymentOrchestrator;
-  private readonly env: EnvironmentManager;
-  private readonly health: HealthMonitoring;
+  private readonly env: unknown; // TODO: Implement EnvironmentManager
+  private readonly health: unknown; // TODO: Implement HealthMonitoring
   
   // Component instances
   private hardeningSystem?: ProductionHardeningSystem;

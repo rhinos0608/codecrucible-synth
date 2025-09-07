@@ -102,14 +102,17 @@ export class UnifiedAgentSystem {
   }): Promise<{ result: unknown }> {
     const task: AgentTask = {
       id: request.id,
+      type: request.type,
+      name: request.type,
       description: request.input,
-      type: request.type as any,
       priority: this.mapPriority(request.priority),
+      status: 'pending',
+      agentId: 'system',
       context: request.context || {},
-      constraints: {
-        maxDuration: request.constraints?.maxExecutionTime,
-        resourceLimits: {},
-      },
+      parameters: {},
+      dependencies: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     const strategy = this.determineStrategy(request.preferences?.mode || 'balanced');

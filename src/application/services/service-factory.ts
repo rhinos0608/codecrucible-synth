@@ -31,7 +31,7 @@ import {
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 import type { ILogger } from '../../domain/interfaces/logger.js';
 import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-user-interaction.js';
-import { EventBus } from '../../infrastructure/messaging/event-bus.js';
+import { OptimizedEventBus as EventBus } from '../../infrastructure/messaging/optimized-event-bus';
 /* (removed duplicate import of RustExecutionBackend) */
 import { unifiedToolRegistry } from '../../infrastructure/tools/unified-tool-registry.js';
 import { setGlobalToolIntegrationRustBackend } from '../../infrastructure/tools/tool-integration.js';
@@ -67,7 +67,7 @@ export class ServiceFactory {
   ) {
     this.runtimeContext = createRuntimeContext({
       eventBus: new EventBus(),
-    });
+    }) as RuntimeContext;
     // Initialize Rust execution backend asynchronously and attach to runtime context
     this.ensureRustBackend().catch(err => {
       this.logger.warn('Error initializing RustExecutionBackend in constructor', err);

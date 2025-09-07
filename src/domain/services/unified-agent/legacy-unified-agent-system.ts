@@ -597,17 +597,16 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
   protected async validateRequest(request: AgentRequest): Promise<boolean> {
     // Security validation
     if (typeof request.input === 'string') {
-      const validation = await this.securityValidator.validateInput(request.input, {
-        userId: 'system',
-        sessionId: `agent-${this.id}`,
-        requestId: Date.now().toString(),
-        userAgent: 'CodeCrucible-Agent',
-        ipAddress: '127.0.0.1',
+      const validation = this.securityValidator.validateInput({
+        agentId: this.id,
+        operation: 'agent-request',
+        workspace: process.cwd(),
+        requestedPermissions: ['read', 'write'],
+        securityLevel: 'medium',
         timestamp: new Date(),
-        operationType: 'agent-request',
-      } as SecurityValidationContext);
+      });
       if (!validation.isValid) {
-        throw new Error(`Invalid request: ${validation.violations.map(v => v.message).join(', ')}`);
+        throw new Error(`Invalid request: ${validation.errors.join(', ')}`);
       }
     }
 
@@ -760,22 +759,20 @@ export class SecurityAgent extends BaseAgent {
 
   private async analyzeVulnerabilities(task: AgentTask): Promise<ExecutionResult> {
     // Use the unified security validator for analysis
-    const content = typeof task.input === 'string' ? task.input : JSON.stringify(task.input);
-    const validation = await this.securityValidator.validateInput(content, {
-      userId: 'system',
-      sessionId: `security-${this.id}`,
-      requestId: Date.now().toString(),
-      userAgent: 'CodeCrucible-SecurityAgent',
-      ipAddress: '127.0.0.1',
+    const validation = this.securityValidator.validateInput({
+      agentId: this.id,
+      operation: 'security-analysis',
+      workspace: process.cwd(),
+      requestedPermissions: ['read'],
+      securityLevel: 'high',
       timestamp: new Date(),
-      operationType: 'security-analysis',
-    } as SecurityValidationContext);
+    });
 
     return {
       success: validation.isValid,
       content: validation.isValid
         ? 'No vulnerabilities detected'
-        : `Vulnerabilities found: ${validation.violations.map(v => v.message).join(', ') || 'unknown issues'}`,
+        : `Vulnerabilities found: ${validation.errors.join(', ') || 'unknown issues'}`,
       metadata: { model: 'security', tokens: 150, latency: 2000 },
       executionTime: 2000,
       resourcesUsed: ['cpu', 'security-scanner'],
@@ -1418,7 +1415,7 @@ export class UnifiedAgentSystem extends EventEmitter {
 
     // Performance monitoring
     this.on('agent-created', (agent: IAgent) => {
-      this.performanceSystem.trackResourceUsage('agent-creation', 1);
+      this.performanceSystem.trackResourceUsage(agent.id, 'agent-creation', 'memory', 1);
     });
   }
 

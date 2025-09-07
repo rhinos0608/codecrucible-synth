@@ -1,4 +1,4 @@
-import { ProjectContext } from './agent-types.js';
+import { ProjectContext, FileMetadata } from './agent-types.js';
 import * as fs from 'fs';
 import * as path from 'path';
 /**
@@ -8,7 +8,7 @@ export class ProjectContextAnalyzer {
   async analyze(rootPath: string): Promise<ProjectContext> {
     // Perform a basic analysis of the repository: collect file extensions, directories, and files.
     const directories: string[] = [];
-    const files: Map<string, string> = new Map();
+    const files: Map<string, FileMetadata> = new Map();
     const languageSet: Set<string> = new Set();
 
     function getLanguageFromExtension(ext: string): string | null {
@@ -38,7 +38,14 @@ export class ProjectContextAnalyzer {
           directories.push(fullPath);
           traverse(fullPath);
         } else if (entry.isFile()) {
-          files.set(fullPath, path.extname(entry.name));
+          const stats = fs.statSync(fullPath);
+          const fileMetadata: FileMetadata = {
+            path: fullPath,
+            size: stats.size,
+            type: path.extname(entry.name),
+            lastModified: stats.mtime,
+          };
+          files.set(fullPath, fileMetadata);
           const lang = getLanguageFromExtension(path.extname(entry.name));
           if (lang) languageSet.add(lang);
         }
@@ -61,5 +68,13 @@ export class ProjectContextAnalyzer {
       },
       documentation: { readme: [], guides: [], api: [], examples: [], changelog: [] },
     };
+  }
+
+  public async initialize(): Promise<void> {
+    // Initialize project context analyzer
+  }
+
+  public async shutdown(): Promise<void> {
+    // Cleanup project context analyzer
   }
 }

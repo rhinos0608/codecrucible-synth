@@ -28,4 +28,12 @@ export class CollaborationEngine {
     const mutableAgents: IAgent[] = [...agents];
     return handler(mutableAgents, task);
   }
+
+  public async initialize(): Promise<void> {
+    // Initialize collaboration engine
+  }
+
+  public async shutdown(): Promise<void> {
+    // Cleanup collaboration engine
+  }
 }

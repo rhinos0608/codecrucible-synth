@@ -68,7 +68,7 @@ export class ModelClient extends EventEmitter implements IModelClient {
     this.requestProcessor = options.requestProcessor ?? new BasicRequestProcessor();
     this.responseHandler = options.responseHandler ?? new BasicResponseHandler();
     this.streamingManager = options.streamingManager ?? new StreamingManager();
-    this.logger = options.logger ?? defaultLogger;
+    this.logger = options.logger ?? (defaultLogger as ILogger);
   }
 
   private getAdapter(name?: string): ProviderAdapter {

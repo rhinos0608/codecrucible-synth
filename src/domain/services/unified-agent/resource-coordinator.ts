@@ -16,4 +16,12 @@ export class ResourceCoordinator {
       { memory: 0, cpu: 0 }
     );
   }
+
+  public async initialize(): Promise<void> {
+    // Initialize resource coordinator
+  }
+
+  public async shutdown(): Promise<void> {
+    // Cleanup resource coordinator
+  }
 }

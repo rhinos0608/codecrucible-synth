@@ -167,7 +167,7 @@ export class LMStudioClient extends EventEmitter {
       this.healthCheckTimer = setInterval(() => {
         // Call the async function but don't return the Promise
         this.testConnection().catch((error) => {
-          logger.error('Health check failed:', error);
+          logger.error('Health check failed:', error instanceof Error ? error : new Error(String(error)));
         });
       }, this.config.healthCheckInterval);
     }
@@ -299,7 +299,7 @@ export class LMStudioClient extends EventEmitter {
       // If no list method is available, return empty array
       return [];
     } catch (error) {
-      logger.error('Error listing models from LM Studio:', error);
+      logger.error('Error listing models from LM Studio:', error instanceof Error ? error : new Error(String(error)));
       return [];
     }
   }
@@ -323,7 +323,7 @@ export class LMStudioClient extends EventEmitter {
       logger.warn('No loaded model listing method available in LM Studio SDK');
       return [];
     } catch (error) {
-      logger.error('Error listing loaded models from LM Studio:', error);
+      logger.error('Error listing loaded models from LM Studio:', error instanceof Error ? error : new Error(String(error)));
       return [];
     }
   }

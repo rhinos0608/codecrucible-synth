@@ -6,6 +6,7 @@ import { MetricsCollector } from '../../cli/metrics-collector.js';
 import { UseCaseRouter } from '../../cli/use-case-router.js';
 import { SessionManager } from '../../cli/session-manager.js';
 import { logger } from '../../../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined, stringArrayToRecord } from '../../../utils/type-guards.js';
 import type {
   CLIOperationRequest,
   CLIOperationResponse,
@@ -59,7 +60,7 @@ export class CLIOrchestrator implements ICLIOrchestrator {
       if (!securityValidation.allowed) {
         logger.warn(
           `🚫 Security validation failed for operation ${operationId}:`,
-          securityValidation.violations
+          stringArrayToRecord(securityValidation.violations)
         );
 
         metricsCollector.recordOperation(
@@ -175,7 +176,7 @@ export class CLIOrchestrator implements ICLIOrchestrator {
         traceSpan
       );
 
-      logger.error(`CLI operation ${operationId} failed:`, error);
+      logger.error(`CLI operation ${operationId} failed:`, toErrorOrUndefined(error));
 
       return {
         id: operationId,

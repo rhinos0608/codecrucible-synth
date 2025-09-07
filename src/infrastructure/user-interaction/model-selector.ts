@@ -192,7 +192,6 @@ export class ModelSelector {
             rl.close();
             console.log('\n\n👋 Goodbye!');
             process.exit(0);
-            break;
           }
           default:
             // Do nothing for other keys

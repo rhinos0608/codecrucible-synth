@@ -8,7 +8,7 @@ import {
 } from './resource-types.js';
 
 // Re-export types for external consumption
-export { ResourceType, ResourceSnapshot } from './resource-types.js';
+export type { ResourceType, ResourceSnapshot } from './resource-types.js';
 import { ResourceMonitor } from './resource-monitor.js';
 import { QuotaEnforcer } from './quota-enforcer.js';
 import { ScalingController } from './scaling-controller.js';
@@ -107,7 +107,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
       ctx.state = 'pending';
       this.operationQueue.push(ctx);
     } else {
-      ctx.state = 'rejected';
+      ctx.state = 'failed';
       this.rejectedOperations += 1;
       const violation = this.quota.enforce(
         ResourceType.CONCURRENCY,
@@ -200,7 +200,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
 
     this.registerOperation(ctx);
 
-    if (ctx.state === 'rejected') {
+    if (ctx.state === 'failed') {
       throw new Error(`Operation ${operationId} rejected due to resource limits`);
     }
 

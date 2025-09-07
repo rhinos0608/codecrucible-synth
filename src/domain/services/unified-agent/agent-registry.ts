@@ -18,4 +18,14 @@ export class AgentRegistry {
   public listAgents(): IAgent[] {
     return Array.from(this.agents.values());
   }
+
+  public async initialize(): Promise<void> {
+    // Initialize agent registry
+    // Future: Load agents from configuration
+  }
+
+  public async shutdown(): Promise<void> {
+    // Clear agents and cleanup
+    this.agents.clear();
+  }
 }

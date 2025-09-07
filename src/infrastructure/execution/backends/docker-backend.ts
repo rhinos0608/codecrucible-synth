@@ -202,7 +202,7 @@ export class DockerBackend extends ExecutionBackend {
       try {
         await execFileAsync('docker', ['rm', '-f', containerId]);
       } catch (error) {
-        logger.warn(`Failed to remove container ${containerId}:`, error);
+        logger.warn(`Failed to remove container ${containerId}:`, { error: error instanceof Error ? error.message : String(error) });
       }
     }
     this.activeContainers.clear();

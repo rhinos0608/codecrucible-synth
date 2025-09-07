@@ -48,13 +48,13 @@ export interface StructuredError {
   category: ErrorCategory;
   severity: ErrorSeverity;
   timestamp: number;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   stackTrace?: string;
   userMessage?: string;
   suggestedActions?: string[];
   recoverable: boolean;
   retryable: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // Error response interface for APIs and tools
@@ -67,16 +67,16 @@ export interface ErrorResponse {
 }
 
 // Success response interface
-export interface SuccessResponse<T = any> {
+export interface SuccessResponse<T = unknown> {
   success: true;
   data: T;
   request_id?: string;
   service?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // Union type for all responses
-export type ServiceResponse<T = any> = SuccessResponse<T> | ErrorResponse;
+export type ServiceResponse<T = unknown> = SuccessResponse<T> | ErrorResponse;
 
 /**
  * Error factory for creating structured errors
@@ -84,19 +84,19 @@ export type ServiceResponse<T = any> = SuccessResponse<T> | ErrorResponse;
 export class ErrorFactory {
   private static errorCounter = 0;
 
-  static createError(
+  public static createError(
     message: string,
     category: ErrorCategory,
     severity: ErrorSeverity = ErrorSeverity.MEDIUM,
-    options: {
-      context?: Record<string, any>;
+    options: Readonly<{
+      context?: Readonly<Record<string, unknown>>;
       userMessage?: string;
-      suggestedActions?: string[];
+      suggestedActions?: ReadonlyArray<string>;
       recoverable?: boolean;
       retryable?: boolean;
-      metadata?: Record<string, any>;
+      metadata?: Readonly<Record<string, unknown>>;
       originalError?: Error;
-    } = {}
+    }> = {}
   ): StructuredError {
     const id = `ERR_${Date.now()}_${++this.errorCounter}`;
 
@@ -108,8 +108,8 @@ export class ErrorFactory {
       timestamp: Date.now(),
       context: options.context,
       stackTrace: options.originalError?.stack,
-      userMessage: options.userMessage || this.generateUserMessage(message, category),
-      suggestedActions: options.suggestedActions || this.generateSuggestedActions(category),
+      userMessage: options.userMessage ?? this.generateUserMessage(message, category),
+      suggestedActions: options.suggestedActions ? Array.from(options.suggestedActions) : this.generateSuggestedActions(category),
       recoverable: options.recoverable ?? this.isRecoverable(category, severity),
       retryable: options.retryable ?? this.isRetryable(category),
       metadata: options.metadata,
@@ -275,14 +275,14 @@ export class ErrorFactory {
  */
 export class ErrorHandler {
   private static errorHistory: StructuredError[] = [];
-  private static maxHistorySize = 100;
+  private static readonly maxHistorySize = 100;
 
   /**
    * Handle error with logging and potential recovery
    */
-  static async handleError(
-    error: Error | StructuredError,
-    context?: Record<string, any>
+  public static async handleError(
+    error: Readonly<Error | StructuredError>,
+    context?: Readonly<Record<string, unknown>>
   ): Promise<StructuredError> {
     const structuredError = this.ensureStructuredError(error, context);
 
@@ -306,8 +306,8 @@ export class ErrorHandler {
   /**
    * Create error response for APIs and tools
    */
-  static createErrorResponse(
-    error: Error | StructuredError,
+  public static createErrorResponse(
+    error: Readonly<Error | StructuredError>,
     requestId?: string,
     service?: string
   ): ErrorResponse {
@@ -325,11 +325,11 @@ export class ErrorHandler {
   /**
    * Create success response
    */
-  static createSuccessResponse<T>(
+  public static createSuccessResponse<T>(
     data: T,
     requestId?: string,
     service?: string,
-    metadata?: Record<string, any>
+    metadata?: Readonly<Record<string, unknown>>
   ): SuccessResponse<T> {
     return {
       success: true,
@@ -343,9 +343,9 @@ export class ErrorHandler {
   /**
    * Wrap function with error handling
    */
-  static wrapWithErrorHandling<T extends any[], R>(
+  public static wrapWithErrorHandling<T extends readonly unknown[], R>(
     fn: (...args: T) => Promise<R>,
-    context?: Record<string, any>
+    context?: Readonly<Record<string, unknown>>
   ): (...args: T) => Promise<ServiceResponse<R>> {
     return async (...args: T): Promise<ServiceResponse<R>> => {
       try {
@@ -361,13 +361,13 @@ export class ErrorHandler {
   /**
    * Retry function with exponential backoff
    */
-  static async retryWithBackoff<T>(
+  public static async retryWithBackoff<T>(
     fn: () => Promise<T>,
     maxRetries: number = 3,
     baseDelay: number = 1000,
-    context?: Record<string, any>
+    context?: Readonly<Record<string, unknown>>
   ): Promise<ServiceResponse<T>> {
-    let lastError: StructuredError | null = null;
+    let lastError: StructuredError | undefined = undefined;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -390,27 +390,38 @@ export class ErrorHandler {
       }
     }
 
-    return this.createErrorResponse(lastError!);
+    if (lastError) {
+      return this.createErrorResponse(lastError);
+    } else {
+      // Fallback error if lastError is somehow undefined
+      return this.createErrorResponse(
+        ErrorFactory.createError(
+          'Unknown error during retryWithBackoff',
+          ErrorCategory.SYSTEM,
+          ErrorSeverity.MEDIUM
+        )
+      );
+    }
   }
 
   /**
    * Get error statistics
    */
-  static getErrorStatistics(): {
+  public static getErrorStatistics(): {
     total: number;
     by_category: Record<ErrorCategory, number>;
     by_severity: Record<ErrorSeverity, number>;
     recent_errors: StructuredError[];
   } {
-    const byCategoryCount: Record<ErrorCategory, number> = {} as any;
-    const bySeverityCount: Record<ErrorSeverity, number> = {} as any;
+    const byCategoryCount: Record<ErrorCategory, number> = {} as Record<ErrorCategory, number>;
+    const bySeverityCount: Record<ErrorSeverity, number> = {} as Record<ErrorSeverity, number>;
 
     // Initialize counts
-    Object.values(ErrorCategory).forEach(cat => (byCategoryCount[cat] = 0));
-    Object.values(ErrorSeverity).forEach(sev => (bySeverityCount[sev] = 0));
+    (Object.values(ErrorCategory) as ErrorCategory[]).forEach(cat => (byCategoryCount[cat] = 0));
+    (Object.values(ErrorSeverity) as ErrorSeverity[]).forEach(sev => (bySeverityCount[sev] = 0));
 
     // Count errors
-    this.errorHistory.forEach(error => {
+    this.errorHistory.forEach((error: Readonly<StructuredError>) => {
       byCategoryCount[error.category]++;
       bySeverityCount[error.severity]++;
     });
@@ -426,29 +437,28 @@ export class ErrorHandler {
   /**
    * Clear error history
    */
-  static clearErrorHistory(): void {
+  public static clearErrorHistory(): void {
     this.errorHistory = [];
   }
 
   private static ensureStructuredError(
-    error: Error | StructuredError,
-    context?: Record<string, any>
+    error: Readonly<Error | StructuredError>,
+    context?: Readonly<Record<string, unknown>>
   ): StructuredError {
     if ('id' in error && 'category' in error) {
-      return error as StructuredError;
+      return error;
     }
 
-    const originalError = error as Error;
     return ErrorFactory.createError(
-      originalError.message || 'Unknown error',
+      error.message || 'Unknown error',
       ErrorCategory.SYSTEM,
       ErrorSeverity.MEDIUM,
       {
         context,
-        originalError,
+        originalError: error,
         metadata: {
-          error_name: originalError.name,
-          error_type: typeof originalError,
+          error_name: error.name,
+          error_type: typeof error,
         },
       }
     );
@@ -466,14 +476,15 @@ export class ErrorHandler {
 
     logger.error(
       `${color(`[${error.severity.toUpperCase()}]`)} ${error.category}: ${error.message}`,
-      {
-        errorId: error.id,
-        category: error.category,
-        severity: error.severity,
-        context: error.context,
-        stackTrace: error.stackTrace,
-        timestamp: error.timestamp,
-      }
+      // Cast metadata to unknown and then to Error to satisfy logger.error's expected parameter type
+      { meta: {
+          errorId: error.id,
+          category: error.category,
+          severity: error.severity,
+          context: error.context,
+          stackTrace: error.stackTrace,
+          timestamp: error.timestamp,
+        } } as unknown as Error
     );
 
     // Also log to console for immediate visibility
@@ -511,7 +522,7 @@ export class ErrorHandler {
           logger.debug(`No recovery mechanism for category: ${error.category}`);
       }
     } catch (recoveryError) {
-      logger.warn('Recovery attempt failed:', recoveryError);
+      logger.warn('Recovery attempt failed:', { error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError) });
     }
   }
 }
@@ -523,15 +534,15 @@ export class InputValidator {
   /**
    * Validate required string field
    */
-  static validateString(
-    value: any,
+  public static validateString(
+    value: unknown,
     fieldName: string,
-    options: {
+    options: Readonly<{
       minLength?: number;
       maxLength?: number;
       pattern?: RegExp;
       allowEmpty?: boolean;
-    } = {}
+    }> = {}
   ): ServiceResponse<string> {
     if (value === undefined || value === null) {
       return ErrorHandler.createErrorResponse(
@@ -595,7 +606,7 @@ export class InputValidator {
   /**
    * Validate and sanitize file path
    */
-  static validateFilePath(path: any): ServiceResponse<string> {
+  public static validateFilePath(path: unknown): ServiceResponse<string> {
     const stringResult = this.validateString(path, 'file path');
     if (!stringResult.success) return stringResult;
 
@@ -623,7 +634,7 @@ export class InputValidator {
   /**
    * Sanitize user input to prevent injection attacks
    */
-  static sanitizeInput(input: string): string {
+  public static sanitizeInput(input: string): string {
     if (!input || typeof input !== 'string') {
       return '';
     }
@@ -681,7 +692,7 @@ export class InputValidator {
       /<[^>]*on\w+[^>]*>/gi, // Any tag with event handlers
     ];
 
-    xssPatterns.forEach(pattern => {
+    xssPatterns.forEach((pattern: Readonly<RegExp>) => {
       sanitized = sanitized.replace(pattern, '');
     });
 

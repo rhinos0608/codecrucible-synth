@@ -14,6 +14,7 @@
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 import { agenticWorkflowDisplay } from '../workflow/agentic-workflow-display.js';
 import { streamingWorkflowIntegration } from '../workflow/streaming-workflow-integration.js';
 
@@ -298,7 +299,7 @@ export class WorkflowDisplayManager extends EventEmitter {
     } catch (error) {
       // Ensure streaming is stopped on error
       streamingWorkflowIntegration.stopStreaming(stepId);
-      logger.error(`❌ Streaming failed for ${operationType}:`, error);
+      logger.error(`❌ Streaming failed for ${operationType}:`, toErrorOrUndefined(error));
       this.emit('streaming:failed', { sessionId, stepId, operationType, error });
       throw error;
     }

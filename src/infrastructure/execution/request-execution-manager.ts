@@ -200,11 +200,11 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           await this.initializeRustBackend();
         }).catch((e) => {
           // If import fails, leave rustBackend null and continue
-          logger.warn('RequestExecutionManager: Rust backend not available at construction', e);
+          logger.warn('RequestExecutionManager: Rust backend not available at construction', { error: e instanceof Error ? e.message : String(e) });
           this._rustBackend = null;
         });
       } catch (e) {
-        logger.warn('RequestExecutionManager: Rust backend initialization error', e);
+        logger.warn('RequestExecutionManager: Rust backend initialization error', { error: e instanceof Error ? e.message : String(e) });
       }
     } else {
       // If an injected backend exists, we may optionally initialize/verify it
@@ -212,11 +212,11 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         if (typeof this._rustBackend.initialize === 'function') {
           // Fire-and-forget initialization
           this._rustBackend.initialize().catch((err: unknown) => {
-            logger.warn('Injected rustBackend failed to initialize', err);
+            logger.warn('Injected rustBackend failed to initialize', { error: err instanceof Error ? err.message : String(err) });
           });
         }
       } catch (err) {
-        logger.warn('Error while initializing injected rustBackend', err);
+        logger.warn('Error while initializing injected rustBackend', { error: err instanceof Error ? err.message : String(err) });
       }
     }
 
@@ -226,12 +226,12 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     // Handle shutdown gracefully
     process.once('SIGTERM', () => {
       this.shutdown().catch(err => {
-        logger.error('Shutdown error', err);
+        logger.error('Shutdown error', err instanceof Error ? err : new Error(String(err)));
       });
     });
     process.once('SIGINT', () => {
       this.shutdown().catch(err => {
-        logger.error('Shutdown error', err);
+        logger.error('Shutdown error', err instanceof Error ? err : new Error(String(err)));
       });
     });
   }
@@ -251,7 +251,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         );
       }
     } catch (error) {
-      logger.error('❌ RequestExecutionManager: Rust backend initialization failed', error);
+      logger.error('❌ RequestExecutionManager: Rust backend initialization failed', error instanceof Error ? error : new Error(String(error)));
     }
   }
 

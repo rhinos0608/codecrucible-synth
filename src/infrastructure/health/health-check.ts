@@ -7,14 +7,13 @@ import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 import * as os from 'os';
 import { promises as fs } from 'fs';
-import { HealthStatus, HealthCheck } from '../../domain/types/global.types.js';
+import { HealthCheck, HealthStatus } from '../../domain/types/global.types.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
-import { metrics, logging } from '../monitoring/observability.js';
-import config from '../config/production.config.js';
+import { logging, metrics } from '../monitoring/observability.js';
 
 export interface HealthCheckResult extends HealthCheck {
   duration: number;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export interface ReadinessProbe {
@@ -33,17 +32,16 @@ export interface LivenessProbe {
  * Health monitoring service
  */
 export class HealthMonitor extends EventEmitter {
-  private static instance: HealthMonitor;
-  private checks: Map<string, () => Promise<HealthCheckResult>> = new Map();
+  private static instance: HealthMonitor = new HealthMonitor();
+  private readonly checks: Map<string, () => Promise<HealthCheckResult>> = new Map();
   private lastHealthStatus: HealthStatus | null = null;
-  private startTime: Date;
+  private readonly startTime: Date;
   private checkInterval: NodeJS.Timeout | null = null;
 
   // Thresholds from Grimoire
   private readonly CPU_THRESHOLD = 80; // %
   private readonly MEMORY_THRESHOLD = 85; // %
   private readonly DISK_THRESHOLD = 90; // %
-  private readonly RESPONSE_TIME_THRESHOLD = 5000; // ms
 
   private constructor() {
     super();
@@ -51,10 +49,7 @@ export class HealthMonitor extends EventEmitter {
     this.registerDefaultChecks();
   }
 
-  static getInstance(): HealthMonitor {
-    if (!HealthMonitor.instance) {
-      HealthMonitor.instance = new HealthMonitor();
-    }
+  public static getInstance(): HealthMonitor {
     return HealthMonitor.instance;
   }
 
@@ -81,14 +76,14 @@ export class HealthMonitor extends EventEmitter {
   /**
    * Register a custom health check
    */
-  registerCheck(name: string, check: () => Promise<HealthCheckResult>): void {
+  public registerCheck(name: string, check: () => Promise<HealthCheckResult>): void {
     this.checks.set(name, check);
   }
 
   /**
    * Run all health checks
    */
-  async runHealthChecks(): Promise<HealthStatus> {
+  public async runHealthChecks(): Promise<HealthStatus> {
     const startTime = performance.now();
     const results: HealthCheckResult[] = [];
 
@@ -120,7 +115,7 @@ export class HealthMonitor extends EventEmitter {
       }
     }
 
-    const healthy = results.every(r => r.status !== 'unhealthy');
+    const healthy = results.every((r: Readonly<HealthCheckResult>) => r.status !== 'unhealthy');
     const duration = performance.now() - startTime;
 
     this.lastHealthStatus = {
@@ -141,24 +136,24 @@ export class HealthMonitor extends EventEmitter {
   /**
    * Get current health status
    */
-  async getHealth(): Promise<HealthStatus> {
+  public async getHealth(): Promise<HealthStatus> {
     if (!this.lastHealthStatus) {
-      return await this.runHealthChecks();
+      return this.runHealthChecks();
     }
 
     // If last check is older than 30 seconds, run new check
     const age = Date.now() - this.lastHealthStatus.timestamp.getTime();
     if (age > 30000) {
-      return await this.runHealthChecks();
+      return this.runHealthChecks();
     }
 
-    return this.lastHealthStatus;
+    return Promise.resolve(this.lastHealthStatus);
   }
 
   /**
    * Readiness probe - checks if service is ready to handle requests
    */
-  async getReadiness(): Promise<ReadinessProbe> {
+  public async getReadiness(): Promise<ReadinessProbe> {
     const criticalChecks = ['database', 'cache', 'mcp_servers', 'voice_system'];
     const results: HealthCheckResult[] = [];
 
@@ -179,7 +174,7 @@ export class HealthMonitor extends EventEmitter {
       }
     }
 
-    const ready = results.every(r => r.status !== 'unhealthy');
+    const ready = results.every((r: Readonly<HealthCheckResult>) => r.status !== 'unhealthy');
 
     return {
       ready,
@@ -191,12 +186,12 @@ export class HealthMonitor extends EventEmitter {
   /**
    * Liveness probe - checks if service is alive
    */
-  async getLiveness(): Promise<LivenessProbe> {
+  public getLiveness(): LivenessProbe {
     const uptime = Date.now() - this.startTime.getTime();
 
     try {
       // Simple check - can we allocate memory and respond?
-      const test = Buffer.alloc(1024);
+      Buffer.alloc(1024);
 
       return {
         alive: true,
@@ -215,17 +210,16 @@ export class HealthMonitor extends EventEmitter {
   /**
    * Start periodic health checks
    */
-  startPeriodicChecks(intervalMs: number = 60000): void {
+  public startPeriodicChecks(intervalMs: number = 60000): void {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
     }
 
-    this.checkInterval = setInterval(async () => {
-      try {
-        await this.runHealthChecks();
-      } catch (error) {
+    this.checkInterval = setInterval(() => {
+      // Do not return a Promise from setInterval callback
+      this.runHealthChecks().catch(error => {
         logging.error('Periodic health check failed', error as Error);
-      }
+      });
     }, intervalMs);
 
     logging.info(`Started periodic health checks every ${intervalMs}ms`);
@@ -234,7 +228,7 @@ export class HealthMonitor extends EventEmitter {
   /**
    * Stop periodic health checks
    */
-  stopPeriodicChecks(): void {
+  public stopPeriodicChecks(): void {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
@@ -382,7 +376,7 @@ export class HealthMonitor extends EventEmitter {
         metrics: {
           responseTime: duration,
           hitRate: await this.getCacheHitRate(),
-          memoryUsage: await this.getCacheMemoryUsage(),
+          memoryUsage: this.getCacheMemoryUsage(),
         },
       };
     } catch (error) {
@@ -405,8 +399,8 @@ export class HealthMonitor extends EventEmitter {
         packageManager: { enabled: false, autoInstall: false, securityScan: true },
       });
 
-      const health = await mcpManager.healthCheck();
-      const unhealthyServers = Object.values(health).filter((s: any) => s.status === 'error');
+      const health = await mcpManager.healthCheck() as unknown as Record<string, HealthCheckResult>;
+      const unhealthyServers = Object.values(health).filter((s: Readonly<HealthCheckResult>) => s.status === 'unhealthy');
 
       const status =
         unhealthyServers.length === 0
@@ -420,7 +414,7 @@ export class HealthMonitor extends EventEmitter {
         status,
         message: `MCP servers: ${Object.keys(health).length} total, ${unhealthyServers.length} unhealthy`,
         duration: 0,
-        details: health,
+        details: { ...health },
       };
     } catch (error) {
       return {
@@ -469,7 +463,7 @@ export class HealthMonitor extends EventEmitter {
 
     try {
       // Check if council engine can be instantiated
-      const { CouncilDecisionEngine } = await import(
+      const { CouncilDecisionEngine: _CouncilDecisionEngine } = await import(
         '../../voices/collaboration/council-decision-engine.js'
       );
 
@@ -560,8 +554,8 @@ export class HealthMonitor extends EventEmitter {
     try {
       // Try to get real cache hit rate from cache manager
       const cacheManager = await import('../cache/cache-manager.js');
-      const stats = await cacheManager.CacheManager.prototype.getStats?.();
-      if (stats && typeof stats.hitRate === 'number') {
+      const stats = cacheManager.CacheManager.prototype.getStats?.();
+      if (typeof stats?.hitRate === 'number') {
         return stats.hitRate;
       }
     } catch (error) {
@@ -569,12 +563,12 @@ export class HealthMonitor extends EventEmitter {
     }
 
     // Calculate estimated hit rate based on system load
-    const loadAverage = os.loadavg()[0];
+    const [loadAverage] = os.loadavg();
     const estimatedHitRate = Math.max(0.3, Math.min(0.98, 0.9 - loadAverage * 0.1));
     return Math.round(estimatedHitRate * 100) / 100;
   }
 
-  private async getCacheMemoryUsage(): Promise<number> {
+  private getCacheMemoryUsage(): number {
     try {
       // Get real memory usage in MB
       const memUsage = process.memoryUsage();
@@ -598,7 +592,7 @@ export class HealthMonitor extends EventEmitter {
   /**
    * Shutdown health monitor
    */
-  shutdown(): void {
+  public shutdown(): void {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
@@ -616,7 +610,7 @@ export class HealthMonitor extends EventEmitter {
   /**
    * Emergency cleanup of health monitor
    */
-  destroy(): void {
+  public destroy(): void {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;

@@ -4,6 +4,7 @@ import type { IMcpManager } from '../../../domain/interfaces/mcp-manager.js';
 import type { IToolExecutionRouter } from '../../../domain/interfaces/tool-execution-router.js';
 import { logger } from '../../../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../../../utils/error-utils.js';
+import { toErrorOrUndefined } from '../../../utils/type-guards.js';
 import { getGlobalEnhancedToolIntegration } from '../../../infrastructure/tools/enhanced-tool-integration.js';
 
 /**
@@ -81,7 +82,7 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
 
         toolResults.push({ id: toolCall.id || toolCall.function.name, result: toolResult });
       } catch (error) {
-        logger.error(`❌ Tool call ${toolCall.function.name} failed:`, error);
+        logger.error(`❌ Tool call ${toolCall.function.name} failed:`, toErrorOrUndefined(error));
         toolResults.push({
           id: toolCall.id || toolCall.function.name,
           result: null,

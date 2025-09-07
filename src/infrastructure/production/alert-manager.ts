@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { createLogger } from '../../logging/logger-adapter.js';
+import { createLogger } from '../logging/logger-adapter.js';
 
 export class AlertManager extends EventEmitter {
   private log = createLogger('AlertManager');

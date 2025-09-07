@@ -13,7 +13,7 @@ import {
   UnifiedServerSystem,
 } from '../domain/services/unified-server-system.js';
 import { UnifiedConfigurationManager } from '../domain/config/config-manager.js';
-import { EventBus } from '../infrastructure/messaging/event-bus.js';
+import { OptimizedEventBus as EventBus } from '../infrastructure/messaging/optimized-event-bus';
 import { UnifiedSecurityValidator } from '../domain/services/unified-security-validator.js';
 import { UnifiedPerformanceSystem } from '../domain/services/unified-performance-system.js';
 import { CLIContext } from '../application/cli/cli-types.js';

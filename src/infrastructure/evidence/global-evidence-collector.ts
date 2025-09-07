@@ -212,11 +212,10 @@ export class GlobalEvidenceCollector {
         logger.debug('Evidence collector: Calling collector callback');
         collector(evidence.result); // Maintain backward compatibility by passing raw result
       } catch (error) {
-        logger.error('Evidence collector callback failed', {
-          error,
-          evidenceTimestamp: evidence.timestamp,
-        });
-        logger.warn('Evidence collector callback failed:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error('Evidence collector callback failed', error instanceof Error ? error : new Error(errorMessage));
+        logger.info('Evidence collector callback failed with timestamp', { timestamp: evidence.timestamp });
+        logger.warn('Evidence collector callback failed:', { error: errorMessage });
       }
     });
   }

@@ -5,6 +5,7 @@ import {
 } from '../../../domain/interfaces/model-client.js';
 import { OllamaProvider } from '../../../providers/hybrid/ollama-provider.js';
 import { logger } from '../../../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined } from '../../../utils/type-guards.js';
 import { ProviderAdapter } from './provider-adapter.js';
 
 export class OllamaAdapter implements ProviderAdapter {
@@ -91,7 +92,7 @@ export class OllamaAdapter implements ProviderAdapter {
           : undefined,
       };
     } catch (error) {
-      logger.error('OllamaAdapter request failed:', error);
+      logger.error('OllamaAdapter request failed:', toErrorOrUndefined(error));
       throw new Error(
         `Ollama request failed: ${error instanceof Error ? error.message : String(error)}`
       );

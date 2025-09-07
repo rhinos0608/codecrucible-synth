@@ -12,6 +12,7 @@ import { readFile, stat } from 'fs/promises';
 import { extname, join, resolve } from 'path';
 import { glob } from 'glob';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface FileReference {
   original: string;
@@ -136,7 +137,7 @@ export class FileReferenceParser {
           break;
         }
       } catch (error) {
-        logger.warn(`❌ Failed to process reference ${originalRef}:`, error);
+        logger.warn(`❌ Failed to process reference ${originalRef}:`, toReadonlyRecord(error));
         references.push({
           original: originalRef,
           path: pathRef,

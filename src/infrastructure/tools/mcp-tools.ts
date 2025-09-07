@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { logger } from '../logging/logger.js';
-import axios from 'axios';
 import { ExaSearchTool } from '../../mcp-tools/exa-search-tool.js';
 
 // Shared Exa Search instance for real external search
@@ -48,18 +47,22 @@ async function basicWebSearch(
       AbstractURL?: string;
     }
 
-    // Use a basic search API or web scraping as fallback
-    const response = await axios.get(
+    // 2025 BEST PRACTICE: Use fetch with AbortSignal.timeout instead of axios
+    const response = await fetch(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
       {
-        timeout: 10000,
+        signal: AbortSignal.timeout(10000),
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; CodeCrucibleBot/1.0)',
         },
       }
     );
 
-    const data = response.data as DuckDuckGoResponse;
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as DuckDuckGoResponse;
 
     const results = data?.AbstractText
       ? [
@@ -80,6 +83,18 @@ async function basicWebSearch(
       source: 'duckduckgo-fallback',
     };
   } catch (error) {
+    // Enhanced 2025 error handling with timeout detection
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      logger.warn(`Basic web search timeout after 10s for query: ${query}`);
+      return {
+        success: false,
+        query,
+        error: 'Search request timed out - service may be slow',
+        results: [],
+        source: 'duckduckgo-fallback',
+      };
+    }
+    
     logger.warn('Basic web search fallback failed:', error);
     return {
       success: false,

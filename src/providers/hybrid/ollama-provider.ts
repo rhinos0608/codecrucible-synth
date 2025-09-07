@@ -853,7 +853,14 @@ export class OllamaProvider implements LLMProvider {
    */
   public async getAvailableModels(): Promise<string[]> {
     try {
-      const response = await fetch(`${this.endpoint}/api/tags`);
+      // 2025 BEST PRACTICE: Use AbortSignal.timeout() for simple timeout cases
+      const timeoutMs = this.parseEnvInt('OLLAMA_MODELS_TIMEOUT', 10000, 1000, 30000);
+      
+      const response = await fetch(`${this.endpoint}/api/tags`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+
       if (!response.ok) {
         throw new Error(`Failed to fetch models: ${response.statusText}`);
       }
@@ -861,7 +868,13 @@ export class OllamaProvider implements LLMProvider {
       const data = (await response.json()) as OllamaModelList;
       return data.models.map((model: Readonly<OllamaModel>) => model.name);
     } catch (error) {
-      logger.error('Failed to get available Ollama models:', error);
+      // Enhanced error handling with specific timeout detection
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        logger.warn(`Ollama models timeout after ${this.parseEnvInt('OLLAMA_MODELS_TIMEOUT', 10000, 1000, 30000)}ms - service may be slow or unavailable`);
+      } else {
+        logger.error('Failed to get available Ollama models:', error);
+      }
+      // Graceful degradation - return empty array instead of crashing
       return [];
     }
   }
@@ -960,12 +973,15 @@ export class OllamaProvider implements LLMProvider {
           payload: JSON.stringify(ollamaRequest, null, 2),
         });
 
+        // 2025 BEST PRACTICE: Use AbortSignal.timeout() for function calling requests
+        const timeoutMs = typedRequest.timeout ?? this.config.timeout;
         const response = await fetch(`${this.endpoint}/api/chat`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(ollamaRequest),
+          signal: AbortSignal.timeout(timeoutMs),
         });
 
         // CRITICAL DEBUG: Log response status and headers

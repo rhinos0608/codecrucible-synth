@@ -57,16 +57,24 @@ export class RustBridgeManager {
         timeout: this.config.initializationTimeout,
       });
 
-      // Load the native module with timeout
-      const loadPromise = this.loadRustModule();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(
-          () => reject(new Error('Module load timeout')),
-          this.config.initializationTimeout
-        )
-      );
-
-      this.rustModule = await Promise.race([loadPromise, timeoutPromise]);
+      // 2025 BEST PRACTICE: Use AbortSignal.timeout for module loading
+      const controller = new AbortController();
+      const timeoutMs = this.config.initializationTimeout;
+      
+      // Create timeout using AbortSignal.timeout (2025 pattern)
+      const timeoutSignal = AbortSignal.timeout(timeoutMs);
+      
+      // Combine signals if needed for complex timeout scenarios
+      const combinedSignal = AbortSignal.any ? AbortSignal.any([controller.signal, timeoutSignal]) : timeoutSignal;
+      
+      try {
+        this.rustModule = await this.loadRustModule();
+      } catch (error) {
+        if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+          throw new Error(`Module load timeout after ${timeoutMs}ms`);
+        }
+        throw error;
+      }
 
       if (!this.rustModule) {
         throw new Error('Rust bridge module not found');

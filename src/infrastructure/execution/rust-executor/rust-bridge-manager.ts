@@ -58,17 +58,10 @@ export class RustBridgeManager {
       });
 
       // 2025 BEST PRACTICE: Use AbortSignal.timeout for module loading
-      const controller = new AbortController();
       const timeoutMs = this.config.initializationTimeout;
       
-      // Create timeout using AbortSignal.timeout (2025 pattern)
-      const timeoutSignal = AbortSignal.timeout(timeoutMs);
-      
-      // Combine signals if needed for complex timeout scenarios
-      const combinedSignal = AbortSignal.any ? AbortSignal.any([controller.signal, timeoutSignal]) : timeoutSignal;
-      
       try {
-        this.rustModule = await this.loadRustModule();
+        this.rustModule = await this.loadRustModuleWithTimeout(timeoutMs);
       } catch (error) {
         if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
           throw new Error(`Module load timeout after ${timeoutMs}ms`);
@@ -180,15 +173,35 @@ export class RustBridgeManager {
 
   // Private methods
 
-  private async loadRustModule(): Promise<any> {
-    try {
-      // Try to load the compiled Rust module
-      const module = await import(this.config.modulePath);
-      return module;
-    } catch (error) {
-      logger.warn('Native Rust module not available, this is expected during development:', error);
-      return null;
-    }
+  private async loadRustModuleWithTimeout(timeoutMs: number): Promise<any> {
+    // 2025 BEST PRACTICE: Apply AbortSignal timeout to async operations
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    
+    return new Promise((resolve, reject) => {
+      // Handle timeout
+      const timeoutHandler = () => {
+        reject(new Error(`Module load timeout after ${timeoutMs}ms`));
+      };
+      
+      if (timeoutSignal.aborted) {
+        timeoutHandler();
+        return;
+      }
+      
+      timeoutSignal.addEventListener('abort', timeoutHandler);
+      
+      // Attempt to load the module
+      import(this.config.modulePath)
+        .then((module) => {
+          timeoutSignal.removeEventListener('abort', timeoutHandler);
+          resolve(module);
+        })
+        .catch((error) => {
+          timeoutSignal.removeEventListener('abort', timeoutHandler);
+          logger.warn('Native Rust module not available, this is expected during development:', error);
+          resolve(null);
+        });
+    });
   }
 
   private startHealthMonitoring(): void {

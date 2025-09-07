@@ -165,7 +165,7 @@ class SystemMonitoringUtils {
    */
   static getEventLoopUtilization(): number {
     try {
-      const { performance } = require('perf_hooks');
+      // Use the performance import from the top of the file (ESM pattern)
       if (typeof performance.eventLoopUtilization === 'function') {
         const util = performance.eventLoopUtilization();
         return Math.round((util.utilization || 0) * 100);

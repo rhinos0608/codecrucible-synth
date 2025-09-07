@@ -84,7 +84,7 @@ export async function initialize(
 
     // Use ServiceFactory for proper dependency injection and component wiring
     const { ServiceFactory } = await import('./application/services/service-factory.js');
-    const serviceFactory = new ServiceFactory({
+    const serviceFactory: import('./application/services/service-factory.js').ServiceFactory = new ServiceFactory({
       correlationId: `cli-${Date.now()}`,
       logLevel: cliOptions.verbose ? 'debug' : 'info',
     });
@@ -297,9 +297,10 @@ export async function initialize(
           return adapter;
         })()
       : undefined;
+    // Explicitly type orchestrator as IWorkflowOrchestrator
     const orchestrator = serviceFactory.createWorkflowOrchestrator(
       mcpManagerAdapter as unknown as import('./domain/interfaces/mcp-manager.js').IMcpManager
-    );
+    ) as import('./domain/interfaces/workflow-orchestrator.js').IWorkflowOrchestrator;
 
     // Cast to unknown to bridge minor shape differences at compile-time;
     // adapters delegate to the real instances at runtime so behavior is preserved.
@@ -398,7 +399,7 @@ async function runCLI(
       cleanedUp = true;
       logger.info('Application shutdown initiated');
       console.log('\n🔄 Shutting down gracefully...');
-      await cli.shutdown();
+      cli.shutdown();
       // Dispose ServiceFactory and all its managed resources
       await serviceFactory.dispose();
       // Avoid forced exit to let stdout flush naturally

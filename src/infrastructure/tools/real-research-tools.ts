@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { logger } from '../logging/logger.js';
-import axios from 'axios';
 
 interface SearchResult {
   title: string;
@@ -187,23 +186,27 @@ export class RefReadUrlTool extends BaseTool {
         logger.debug('MCP ref read not available, using fallback');
       }
 
-      // Fallback to basic HTTP fetch
+      // Fallback to basic HTTP fetch (2025 BEST PRACTICE: Use fetch with AbortSignal.timeout)
       try {
-        const response = await axios.get(params.url, {
-          timeout: 10000,
+        const response = await fetch(params.url, {
+          signal: AbortSignal.timeout(10000),
           headers: {
             'User-Agent': 'CodeCrucible-Research-Bot',
           },
         });
 
-        const content = typeof response.data === 'string' ? response.data : String(response.data);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const content = await response.text();
 
         return {
           success: true,
           url: params.url,
           content: content.substring(0, 5000), // Limit content
           status: response.status,
-          contentType: response.headers['content-type'] as string | undefined,
+          contentType: response.headers.get('content-type') || undefined,
           source: 'http_fetch',
         };
       } catch (fetchError) {

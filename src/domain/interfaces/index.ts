@@ -15,3 +15,5 @@ export * from './mcp-manager.js';
 export * from './tool-system.js';
 export * from './configuration.js';
 export * from './provider-capability-registry.js';
+export * from './streaming-manager.js';
+export * from './tool-execution-router.js';

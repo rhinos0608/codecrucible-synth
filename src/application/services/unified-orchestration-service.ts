@@ -118,7 +118,7 @@ export class UnifiedOrchestrationService {
     try {
       this.logger.info('Initializing Unified Orchestration Service...');
 
----/ Initialize configuration
+// Initialize configuration
       await this.configManager.initialize();
       this.config = this.configManager.getConfiguration();
 

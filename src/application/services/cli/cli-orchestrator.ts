@@ -83,6 +83,9 @@ export class CLIOrchestrator implements ICLIOrchestrator {
       }
 
       const resilientResult = await resilientWrapper.executeWithRecovery(
+
+        async () => useCaseRouter.executeOperation(request),
+
         async () => {
           // Adapt session format to match UseCaseRouter expectations
           const adaptedSession = request.session ? {
@@ -103,6 +106,7 @@ export class CLIOrchestrator implements ICLIOrchestrator {
           };
           return useCaseRouter.executeOperation(routerRequest);
         },
+
         {
           name: `CLI-${request.type}`,
           component: 'UnifiedCLICoordinator',

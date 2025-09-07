@@ -35,7 +35,7 @@ export { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 export { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 
 // Export domain services
-export { UnifiedAgentSystem } from './domain/services/unified-agent-system.js';
+export { UnifiedAgentSystem } from './domain/services/unified-agent/index.js';
 export { UnifiedConfigurationManager } from './domain/config/config-manager.js';
 export { UnifiedSecurityValidator } from './domain/services/unified-security-validator.js';
 export { UnifiedPerformanceSystem } from './domain/services/unified-performance-system.js';
@@ -84,10 +84,11 @@ export async function initialize(
 
     // Use ServiceFactory for proper dependency injection and component wiring
     const { ServiceFactory } = await import('./application/services/service-factory.js');
-    const serviceFactory: import('./application/services/service-factory.js').ServiceFactory = new ServiceFactory({
-      correlationId: `cli-${Date.now()}`,
-      logLevel: cliOptions.verbose ? 'debug' : 'info',
-    });
+    const serviceFactory: import('./application/services/service-factory.js').ServiceFactory =
+      new ServiceFactory({
+        correlationId: `cli-${Date.now()}`,
+        logLevel: cliOptions.verbose ? 'debug' : 'info',
+      });
 
     // Get properly wired runtime context with RustExecutionBackend
     const runtimeContext = serviceFactory.getRuntimeContext();

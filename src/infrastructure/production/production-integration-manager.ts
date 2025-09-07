@@ -30,7 +30,7 @@ export class ProductionIntegrationManager {
     );
   }
 
-  async deploy(): Promise<IntegratedSystemHealth> {
+  async executeWithProductionHardening(): Promise<IntegratedSystemHealth> {
     return this.orchestrator.deploy(this.config);
   }
 }

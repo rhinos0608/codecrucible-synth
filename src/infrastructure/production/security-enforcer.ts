@@ -14,7 +14,7 @@ export interface EnforcementContext {
 }
 
 export class SecurityEnforcer {
-  private readonly access = new AccessControlManager();
+  private readonly access: AccessControlManager;
   private readonly scanner = new VulnerabilityScanner();
   private readonly audit = new AuditLogger();
   private readonly compliance = new ComplianceChecker();
@@ -22,7 +22,12 @@ export class SecurityEnforcer {
   private readonly incident = new IncidentResponse();
   private readonly metrics = new SecurityMetrics();
 
-  public constructor(private readonly config: SecurityConfig) {}
+  public constructor(
+    private readonly config: SecurityConfig,
+    access?: AccessControlManager
+  ) {
+    this.access = access ?? new AccessControlManager();
+  }
 
   public async initialize(): Promise<void> {
     if (this.config.auditLogging.enabled) {
@@ -81,6 +86,10 @@ export class SecurityEnforcer {
 
   public async shutdown(): Promise<void> {
     // No resources to cleanup yet
+  }
+
+  public grantAccess(userId: string, permission: string): void {
+    this.access.grant(userId, permission);
   }
 
   public getMetrics(): SecurityMetrics {

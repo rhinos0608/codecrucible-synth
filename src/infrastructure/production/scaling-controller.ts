@@ -40,7 +40,7 @@ export class ScalingController {
     if (cpuAvg > this.cpuScaleUpThreshold || queueAvg > this.queueScaleUpThreshold) {
       return 'scale_up';
     }
-    if (cpuAvg < this.cpuScaleDownThreshold && queueAvg <= this.queueScaleUpThreshold) {
+    if (cpuAvg < this.cpuScaleDownThreshold && queueAvg === 0) {
       return 'scale_down';
     }
     return 'stable';

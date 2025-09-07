@@ -32,7 +32,7 @@ export class GitMCPServer extends BaseMCPServer {
   }
 
   private registerTools(): void {
-    this.tools['git-status'] = async () => {
+    this.tools['git_status'] = async () => {
       const cached = getCachedStatus(process.cwd());
       if (cached) return { success: true, data: cached };
       const current = await this.status.status();
@@ -40,32 +40,32 @@ export class GitMCPServer extends BaseMCPServer {
       return { success: true, data: current };
     };
 
-    this.tools['git-commit'] = async (args: { message: string; files?: string[] }) => {
+    this.tools['git_commit'] = async (args: { message: string; files?: string[] }) => {
       await this.commits.commit(args.message, args.files);
       return { success: true };
     };
 
-    this.tools['git-log'] = async () => {
+    this.tools['git_log'] = async () => {
       const entries = await this.commits.log();
       return { success: true, data: entries };
     };
 
-    this.tools['git-branch'] = async (args: { name: string; checkout?: boolean }) => {
+    this.tools['git_branch'] = async (args: { name: string; checkout?: boolean }) => {
       await this.branches.create(args.name, args.checkout);
       return { success: true };
     };
 
-    this.tools['git-checkout'] = async (args: { target: string; create?: boolean }) => {
+    this.tools['git_checkout'] = async (args: { target: string; create?: boolean }) => {
       await this.branches.checkout(args.target, args.create);
       return { success: true };
     };
 
-    this.tools['git-merge'] = async (args: { branch: string; noFF?: boolean }) => {
+    this.tools['git_merge'] = async (args: { branch: string; noFF?: boolean }) => {
       await this.branches.merge(args.branch, args.noFF);
       return { success: true };
     };
 
-    this.tools['git-diff'] = async (args: { files?: string[] }) => {
+    this.tools['git_diff'] = async (args: { files?: string[] }) => {
       const key = `${process.cwd()}::${(args.files ?? []).join(',')}`;
       const cached = getCachedDiff(key);
       if (cached) return { success: true, data: cached };
@@ -74,7 +74,12 @@ export class GitMCPServer extends BaseMCPServer {
       return { success: true, data: diff };
     };
 
-    this.tools['git-remote'] = async (args: { action: string; name?: string; url?: string }) => {
+    this.tools['git_remote'] = async (args: {
+      action: string;
+      name?: string;
+      url?: string;
+      branch?: string;
+    }) => {
       switch (args.action) {
         case 'add':
           if (args.name && args.url) {
@@ -89,10 +94,10 @@ export class GitMCPServer extends BaseMCPServer {
         case 'list':
           return { success: true, data: await this.remotes.list() };
         case 'push':
-          await this.remotes.push(args.name, args.url);
+          await this.remotes.push(args.name, args.branch);
           break;
         case 'pull':
-          await this.remotes.pull(args.name, args.url);
+          await this.remotes.pull(args.name, args.branch);
           break;
         default:
           logger.warn(`Unknown remote action: ${args.action}`);

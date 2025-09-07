@@ -60,7 +60,7 @@ export abstract class ExecutionBackend {
         return { safe: false, reason: 'Path traversal detected' };
       }
       const systemPaths = ['/etc', '/bin', '/usr', '/var', '/root', '/sys', '/proc'];
-      const windowsSystemPaths = ['C:\\\Windows', 'C:\\\Program Files', 'C:\\\Users\\\All Users'];
+      const windowsSystemPaths = ['C:\\Windows', 'C:\\Program Files', 'C:\\Users\\All Users'];
       for (const sysPath of [...systemPaths, ...windowsSystemPaths]) {
         if (resolvedPath.toLowerCase().startsWith(sysPath.toLowerCase())) {
           return { safe: false, reason: 'Access to system directory denied' };

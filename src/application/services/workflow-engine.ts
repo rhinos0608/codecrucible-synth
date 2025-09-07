@@ -29,7 +29,7 @@ export class WorkflowEngine {
       // Basic workflow orchestration logic
       const taskResults: Array<{ taskId: string; result: unknown }> = [];
       const payload = request.payload as { tasks?: unknown[] } | undefined;
-      const tasks = Array.isArray(payload?.tasks) ? payload!.tasks : [request.payload];
+      const tasks = Array.isArray(payload?.tasks) ? payload?.tasks : [request.payload];
 
       for (const rawTask of tasks) {
         const task = rawTask as {

@@ -99,10 +99,12 @@ export class ProductionResourceEnforcer extends EventEmitter {
       ctx.state = 'running';
       ctx.startTime = Date.now();
       this.activeOperations.set(ctx.operationId, ctx);
+      this.emit('operation-start', ctx.operationId);
     } else if (this.operationQueue.length < this.limits.concurrency.maxQueueSize) {
       ctx.state = 'pending';
       this.operationQueue.push(ctx);
     } else {
+      ctx.state = 'rejected';
       this.rejectedOperations += 1;
       const violation = this.quota.enforce(
         ResourceType.CONCURRENCY,
@@ -119,6 +121,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
     this.updateConcurrencyStats();
   }
 
+  /** Complete an operation and promote the next queued operation if available. */
   completeOperation(id: string): void {
     this.activeOperations.delete(id);
     if (this.operationQueue.length > 0) {
@@ -160,6 +163,19 @@ export class ProductionResourceEnforcer extends EventEmitter {
     return this.violations;
   }
 
+  /**
+   * Executes a function while enforcing resource constraints.
+   *
+   * The operation is registered and may be queued if concurrency limits are reached.
+   * Execution begins only when the operation is promoted to running. If the operation
+   * is rejected due to resource limits, an error is thrown and the callback is not executed.
+   *
+   * @param operationId Unique identifier for the operation.
+   * @param fn Callback to execute once resources are granted.
+   * @param options Optional execution parameters including resource requirements,
+   * priority, and timeout.
+   * @throws Error if the operation is rejected by the resource enforcer.
+   */
   async executeWithEnforcement<T>(
     operationId: string,
     fn: () => Promise<T> | T,
@@ -180,6 +196,23 @@ export class ProductionResourceEnforcer extends EventEmitter {
     };
 
     this.registerOperation(ctx);
+
+    if (ctx.state === 'rejected') {
+      throw new Error(`Operation ${operationId} rejected due to resource limits`);
+    }
+
+    if (ctx.state === 'pending') {
+      await new Promise<void>(resolve => {
+        const onStart = (id: string): void => {
+          if (id === operationId) {
+            this.off('operation-start', onStart);
+            resolve();
+          }
+        };
+        this.on('operation-start', onStart);
+      });
+    }
+
     try {
       const result = await fn();
       ctx.state = 'completed';
@@ -192,6 +225,25 @@ export class ProductionResourceEnforcer extends EventEmitter {
     }
   }
 
+  /**
+   * Triggers an emergency cleanup of all active and queued operations.
+   *
+   * This method should be called in critical situations where the system is in an unrecoverable state,
+   * such as severe resource violations, persistent instability, or when normal operation cannot continue safely.
+   *
+   * The cleanup process involves:
+   * - Clearing all active operations.
+   * - Emptying the operation queue.
+   * - Resetting the count of rejected operations.
+   * - Updating concurrency statistics.
+   * - Emitting an 'emergency-cleanup' event with the provided reason.
+   *
+   * Potential side effects:
+   * - Abrupt termination of all in-progress and queued operations, which may result in loss of work or inconsistent state.
+   * - Listeners to the 'emergency-cleanup' event should handle any necessary recovery or alerting.
+   *
+   * @param reason - A descriptive reason for triggering the emergency cleanup.
+   */
   async triggerEmergencyCleanup(reason: string): Promise<void> {
     this.activeOperations.clear();
     this.operationQueue = [];

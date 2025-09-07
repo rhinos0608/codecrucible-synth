@@ -20,8 +20,7 @@ export class TaskScheduler {
    * Execute a single task using allocated resources.
    * Currently a placeholder that simply resolves with task and resources.
    */
-  public async executeTask(task: unknown, resources: unknown): Promise<unknown> {
-    void resources;
+  public async executeTask(task: unknown, _resources: unknown): Promise<unknown> {
     return task;
   }
 }

@@ -220,7 +220,12 @@ export class UnifiedOrchestrationService {
           name: Readonly<string>,
           handler: (...args: ReadonlyArray<unknown>) => unknown
         ): void => {
+          // Register with command bus for execution
           this.commandRegistry?.register(name, handler, { plugin: 'plugin' });
+
+          // Also expose via dependency resolver so executePluginCommand works
+          this.registerPlugin(name, handler);
+
           this.eventBus.emit('plugin:command_registered', { name });
         },
       });

@@ -202,14 +202,21 @@ export class ProductionResourceEnforcer extends EventEmitter {
     }
 
     if (ctx.state === 'pending') {
-      await new Promise<void>(resolve => {
+      await new Promise<void>((resolve, reject) => {
         const onStart = (id: string): void => {
           if (id === operationId) {
+            clearTimeout(timeoutHandle);
             this.off('operation-start', onStart);
             resolve();
           }
         };
         this.on('operation-start', onStart);
+        const timeoutMs = ctx.timeout > 0 ? ctx.timeout : (this.limits?.concurrency?.operationTimeout ?? 60000);
+        const timeoutHandle = setTimeout(() => {
+          this.off('operation-start', onStart);
+          ctx.state = 'failed';
+          reject(new Error(`Operation ${operationId} timed out waiting for start event`));
+        }, timeoutMs);
       });
     }
 

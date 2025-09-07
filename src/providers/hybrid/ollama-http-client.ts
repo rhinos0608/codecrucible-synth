@@ -6,7 +6,14 @@ export class OllamaHttpClient {
 
   public constructor(baseUrl: string, maxConnections = 10) {
     this.baseUrl = baseUrl;
+
     this.agent = new Agent({ keepAliveTimeout: 60_000, connections: maxConnections });
+
+    this.agent = new Agent({
+      keepAliveTimeout: 60_000,
+      connections: maxConnections,
+    });
+
   }
 
   public async get<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -31,7 +38,12 @@ export class OllamaHttpClient {
         'Content-Type': 'application/json',
       },
       signal,
+
     })) as unknown as Response;
     return response;
+
+    });
+    return response as unknown as Response;
+
   }
 }

@@ -1,16 +1,16 @@
 import { logger } from '../../infrastructure/logging/logger.js';
 import {
-  LLMProvider,
   LLMCapabilities,
-  LLMStatus,
+  LLMProvider,
   LLMResponse,
+  LLMStatus,
 } from '../../domain/interfaces/llm-interfaces.js';
 import {
   OllamaConfig,
-  OllamaRequest,
-  OllamaStreamingMetadata,
   OllamaMessage,
+  OllamaRequest,
   OllamaResponse,
+  OllamaStreamingMetadata,
   ParsedToolCall,
   parseEnvInt,
 } from './ollama-config.js';
@@ -42,7 +42,7 @@ export class OllamaProvider implements LLMProvider {
   private readonly config: OllamaConfig;
   private readonly http: OllamaHttpClient;
 
-  private currentLoad = 0;
+  private readonly currentLoad = 0;
   private lastError?: string;
 
   public constructor(config: OllamaConfig) {
@@ -55,7 +55,9 @@ export class OllamaProvider implements LLMProvider {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(
-        () => controller.abort(),
+        () => {
+          controller.abort();
+        },
         parseEnvInt('OLLAMA_HEALTH_CHECK_TIMEOUT', 5000, 1000, 30000)
       );
       await this.http.get('/api/tags', controller.signal);
@@ -73,7 +75,7 @@ export class OllamaProvider implements LLMProvider {
   ): Promise<LLMResponse> {
     const model = options.model ?? this.config.defaultModel;
     const messages: OllamaMessage[] = [
-      { role: 'system', content: generateContextualSystemPrompt([]) },
+      { role: 'system', content: generateContextualSystemPrompt() },
       { role: 'user', content: prompt },
     ];
 
@@ -85,7 +87,9 @@ export class OllamaProvider implements LLMProvider {
     };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.config.timeout);
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, this.config.timeout);
 
     try {
       const response = await this.http.post('/api/chat', request, controller.signal);
@@ -98,10 +102,14 @@ export class OllamaProvider implements LLMProvider {
       let toolCalls: LLMToolCall[] = [];
 
       if (stream && options.onStreamingToken) {
-        const result = await handleStreaming(response, options.onStreamingToken);
-        text = result.text;
-        metadata = result.metadata;
-        toolCalls = extractToolCalls(result.toolCalls).map(toLLMToolCall);
+        const {
+          text: resultText,
+          metadata: resultMetadata,
+          toolCalls: resultToolCalls,
+        } = await handleStreaming(response, options.onStreamingToken);
+        text = resultText;
+        metadata = resultMetadata;
+        toolCalls = extractToolCalls(resultToolCalls).map(toLLMToolCall);
       } else {
         const json = await parseResponse(response);
         text = json.message?.content ?? json.response ?? '';

@@ -6,7 +6,13 @@ import { IAgent, AgentTask } from './agent-types.js';
  */
 export class ExpertiseMatcher {
   matchAgents(task: AgentTask, agents: IAgent[]): IAgent[] {
-    // TODO: implement real expertise matching using historical performance
-    return agents;
+    // Basic expertise matching: filter agents whose expertise matches the task's required domains.
+    if (!task.expertiseDomains || !Array.isArray(task.expertiseDomains)) {
+      throw new Error('Task does not specify required expertise domains. Expertise matching cannot be performed.');
+    }
+    return agents.filter(agent =>
+      Array.isArray(agent.expertiseDomains) &&
+      agent.expertiseDomains.some(domain => task.expertiseDomains.includes(domain))
+    );
   }
 }

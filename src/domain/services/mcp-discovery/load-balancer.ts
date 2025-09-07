@@ -9,6 +9,9 @@ export class LoadBalancer {
     _query: ServerDiscoveryQuery
   ): MCPServerProfile | undefined {
     // TODO: Implement load balancing strategy
-    return servers[0];
+    if (servers.length > 0) {
+      return servers[0];
+    }
+    return undefined;
   }
 }

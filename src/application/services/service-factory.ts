@@ -35,6 +35,11 @@ import { EventBus } from '../../infrastructure/messaging/event-bus.js';
 /* (removed duplicate import of RustExecutionBackend) */
 import { unifiedToolRegistry } from '../../infrastructure/tools/unified-tool-registry.js';
 import { setGlobalToolIntegrationRustBackend } from '../../infrastructure/tools/tool-integration.js';
+import { ConcreteWorkflowOrchestrator } from './concrete-workflow-orchestrator.js';
+import { StreamingManager } from './orchestrator/streaming-manager.js';
+import { ToolExecutionRouter } from './orchestrator/tool-execution-router.js';
+import { ProviderCapabilityRegistry } from './provider-capability-registry.js';
+import type { IMcpManager } from '../../domain/interfaces/mcp-manager.js';
 
 export interface ServiceFactoryConfig {
   correlationId?: string;
@@ -91,6 +96,22 @@ export class ServiceFactory {
 
     await service.initialize();
     return service;
+  }
+
+  /**
+   * Create a ConcreteWorkflowOrchestrator with injected dependencies
+   */
+  public createWorkflowOrchestrator(mcpManager?: IMcpManager): ConcreteWorkflowOrchestrator {
+    const streamingManager = new StreamingManager();
+    const capabilityRegistry = new ProviderCapabilityRegistry();
+    const toolExecutionRouter = new ToolExecutionRouter(
+      (mcpManager ?? ({ executeTool: async () => null } as unknown)) as IMcpManager
+    );
+    return new ConcreteWorkflowOrchestrator(
+      streamingManager,
+      toolExecutionRouter,
+      capabilityRegistry
+    );
   }
 
   /**
@@ -177,8 +198,8 @@ export class ServiceFactory {
       // Also expose the backend to the unified tool registry so tool handlers can use it
       try {
         unifiedToolRegistry.setRustBackend(rustBackend);
-  // Also set the backend on the global ToolIntegration if present
-  setGlobalToolIntegrationRustBackend(rustBackend);
+        // Also set the backend on the global ToolIntegration if present
+        setGlobalToolIntegrationRustBackend(rustBackend);
       } catch (e) {
         this.logger?.warn('Failed to set rustBackend on unifiedToolRegistry', e);
       }

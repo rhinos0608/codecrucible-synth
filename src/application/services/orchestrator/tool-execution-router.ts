@@ -1,6 +1,7 @@
-import { WorkflowRequest } from '../../../domain/interfaces/workflow-orchestrator.js';
-import { ModelRequest, ModelResponse } from '../../../domain/interfaces/model-client.js';
-import { IMcpManager } from '../../../domain/interfaces/mcp-manager.js';
+import type { WorkflowRequest } from '../../../domain/interfaces/workflow-orchestrator.js';
+import type { ModelRequest, ModelResponse } from '../../../domain/interfaces/model-client.js';
+import type { IMcpManager } from '../../../domain/interfaces/mcp-manager.js';
+import type { IToolExecutionRouter } from '../../../domain/interfaces/tool-execution-router.js';
 import { logger } from '../../../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../../../utils/error-utils.js';
 import { getGlobalEnhancedToolIntegration } from '../../../infrastructure/tools/enhanced-tool-integration.js';
@@ -8,7 +9,7 @@ import { getGlobalEnhancedToolIntegration } from '../../../infrastructure/tools/
 /**
  * Routes tool execution requests and handles follow-up model synthesis.
  */
-export class ToolExecutionRouter {
+export class ToolExecutionRouter implements IToolExecutionRouter {
   public constructor(private readonly mcpManager: IMcpManager) {}
 
   public async handleToolCalls(

@@ -1,4 +1,4 @@
-import {
+import type {
   IProviderCapabilityRegistry,
   ProviderCapability,
 } from '../../domain/interfaces/provider-capability-registry.js';

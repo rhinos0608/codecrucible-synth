@@ -32,7 +32,7 @@ export class UnifiedAgentSystem {
       coordination: {
         type: strategy,
         participants: agents.map(a => a.id),
-        coordination: 'peer-to-peer',
+        style: 'peer-to-peer',
         conflictResolution: 'user-choice',
       },
     });

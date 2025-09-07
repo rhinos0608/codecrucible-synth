@@ -1,5 +1,9 @@
 export interface OrchestrationRequest {
   id: string;
+  /**
+   * @deprecated Use 'command' instead. 'type' is kept for backward compatibility and will be removed in the future.
+   */
+  type?: string;
   command: string;
   payload?: unknown;
 }

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
+import { createLogger } from '../../infrastructure/logging/logger.js';
 import {
   IIntelligentRoutingCoordinator,
   RoutingContext,

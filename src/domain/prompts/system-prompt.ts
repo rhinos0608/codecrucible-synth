@@ -187,7 +187,7 @@ Remember: You are not just executing commands - you are a thinking partner who u
  * This allows the prompt to adapt based on available tools and user context
  */
 export function generateContextualSystemPrompt(
-  availableTools: readonly string[],
+  availableTools: readonly string[] = [],
   userContext?: string
 ): string {
   const basePrompt = generateSystemPrompt();

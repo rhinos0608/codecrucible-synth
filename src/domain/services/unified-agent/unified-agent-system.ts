@@ -23,12 +23,13 @@ export class UnifiedAgentSystem {
     strategy: 'sequential' | 'parallel' | 'hierarchical' | 'consensus'
   ): Promise<AgentResponse> {
     const agents = this.matcher.matchAgents(task, this.registry.listAgents());
-    this.coordinator.calculateTotalResources(agents);
+    const totalResources = this.coordinator.calculateTotalResources(agents);
     const collabResponse = await this.collaboration.collaborate(strategy, agents, {
       id: task.id,
       description: task.description,
       requirements: [],
       expectedOutput: '',
+      resources: totalResources,
       coordination: {
         type: strategy,
         participants: agents.map(a => a.id),

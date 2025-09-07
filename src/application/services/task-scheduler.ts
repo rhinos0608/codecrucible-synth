@@ -5,10 +5,14 @@ import type { OrchestrationRequest } from './orchestration-types.js';
  */
 export class TaskScheduler {
   /**
-   * Schedule a request for execution. Placeholder for priority queue logic.
+   * Internal queue to store scheduled orchestration requests.
    */
-  public async schedule(_request: OrchestrationRequest): Promise<void> {
-    // In a full implementation, this would manage priority queues
-    // and timing controls for requests.
+  private queue: OrchestrationRequest[] = [];
+
+  /**
+   * Schedule a request for execution by adding it to the internal queue.
+   */
+  public async schedule(request: OrchestrationRequest): Promise<void> {
+    this.queue.push(request);
   }
 }

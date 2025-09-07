@@ -43,7 +43,9 @@ export class MCPDiscoveryService {
     return {
       primaryServers: selected ? [selected] : [],
       fallbackServers: servers.filter(s => s !== selected),
-      selectionReason: 'stub',
+      selectionReason: selected
+        ? `Selected server "${selected.name ?? selected.id ?? 'unknown'}" based on load balancing for query type "${query.type ?? 'unknown'}".`
+        : `No suitable server found for query type "${query.type ?? 'unknown'}".`,
       estimatedPerformance: {
         expectedLatency: 0,
         expectedThroughput: 0,

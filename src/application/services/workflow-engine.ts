@@ -27,15 +27,27 @@ export class WorkflowEngine {
       this.deps.events.emitEvent('workflow.start', request);
 
       // Basic workflow orchestration logic
-      let taskResults: any[] = [];
-      const tasks = Array.isArray(request.payload?.tasks) ? request.payload.tasks : [request.payload];
-      for (const task of tasks) {
+      const taskResults: Array<{ taskId: string; result: unknown }> = [];
+      const payload = request.payload as { tasks?: unknown[] } | undefined;
+      const tasks = Array.isArray(payload?.tasks) ? payload!.tasks : [request.payload];
+
+      for (const rawTask of tasks) {
+        const task = rawTask as {
+          id: string;
+          resourceType?: string;
+          amount?: number;
+        };
         // Allocate resources for the task
-        const resources = await this.deps.resources.allocate(task);
+        const resources = this.deps.resources.allocate(
+          task.id,
+          task.resourceType ?? 'default',
+          task.amount ?? 1
+        );
         // Simulate task execution (could be replaced with actual logic)
         const result = await this.deps.scheduler.executeTask(task, resources);
         taskResults.push({ taskId: task.id, result });
       }
+
       const response: OrchestrationResponse = {
         id: request.id,
         success: true,

@@ -14,6 +14,8 @@ export class ResourceAllocator {
     resourceType: string,
     amount: number
   ): { success: boolean; allocated?: number; error?: string } {
+    void taskId;
+    void resourceType;
     // Placeholder for dynamic resource allocation logic
     // For now, just return a stub allocation result
     return {

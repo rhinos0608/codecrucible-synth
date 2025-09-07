@@ -24,17 +24,22 @@ export class AccessControlManager {
   public checkAccess(userId: string, permission: string): void {
     if (this.accessMap.size === 0) {
 
+      logger.warn(
+        `Access denied for user ${userId} attempting ${permission}: no permissions configured`
+      );
+
+
       return; // default allow when no permissions configured
 
       logger.warn(`Access denied for user ${userId} attempting ${permission}: no permissions configured`);
+
       throw new Error('Access denied: no permissions configured');
 
     }
     const perms = this.accessMap.get(userId);
-    if (perms?.has(permission)) {
-      return;
+    if (!perms?.has(permission)) {
+      logger.warn(`Access denied for user ${userId} attempting ${permission}`);
+      throw new Error('Access denied');
     }
-    logger.warn(`Access denied for user ${userId} attempting ${permission}`);
-    throw new Error('Access denied');
   }
 }

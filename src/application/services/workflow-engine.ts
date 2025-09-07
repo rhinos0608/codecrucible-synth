@@ -26,11 +26,20 @@ export class WorkflowEngine {
       await this.deps.scheduler.schedule(request);
       this.deps.events.emitEvent('workflow.start', request);
 
-      // Placeholder for actual workflow logic
+      // Basic workflow orchestration logic
+      let taskResults: any[] = [];
+      const tasks = Array.isArray(request.payload?.tasks) ? request.payload.tasks : [request.payload];
+      for (const task of tasks) {
+        // Allocate resources for the task
+        const resources = await this.deps.resources.allocate(task);
+        // Simulate task execution (could be replaced with actual logic)
+        const result = await this.deps.scheduler.executeTask(task, resources);
+        taskResults.push({ taskId: task.id, result });
+      }
       const response: OrchestrationResponse = {
         id: request.id,
         success: true,
-        result: request.payload,
+        result: taskResults,
       };
 
       this.deps.state.checkpoint(request, response);

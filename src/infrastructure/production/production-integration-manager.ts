@@ -673,8 +673,8 @@ export class ProductionIntegrationManager extends EventEmitter {
   private async initializeComponent(componentName: string): Promise<void> {
     switch (componentName) {
       case 'resourceEnforcer':
-        this.resourceEnforcer = ProductionResourceEnforcer.getInstance();
-        await this.resourceEnforcer.startEnforcement();
+        this.resourceEnforcer = new ProductionResourceEnforcer();
+        this.resourceEnforcer.start();
         break;
 
       case 'securityAuditLogger':
@@ -734,7 +734,7 @@ export class ProductionIntegrationManager extends EventEmitter {
     switch (componentName) {
       case 'resourceEnforcer':
         if (this.resourceEnforcer) {
-          await this.resourceEnforcer.shutdown();
+          await this.resourceEnforcer.stop();
         }
         break;
 

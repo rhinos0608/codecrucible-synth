@@ -71,6 +71,11 @@ export class OllamaProvider implements LLMProvider {
       model,
       messages,
       stream: !!onStreamingToken,
+      options: {
+        num_ctx: parseEnvInt('MODEL_MAX_CONTEXT_WINDOW', 131072, 1024, 131072),
+        temperature: typeof options.temperature === 'number' ? options.temperature : 0.7,
+        top_p: typeof options.top_p === 'number' ? options.top_p : 0.9,
+      },
     };
 
     const controller = new AbortController();

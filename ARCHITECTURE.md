@@ -34,3 +34,24 @@
   `src/application/services/cli/resilience-manager.ts`.
 - MCP server initialization centralized in
   `src/mcp-servers/mcp-bootstrap.ts` to avoid duplication.
+
+## Bootstrapping & CLI (Updated)
+
+- Entrypoint is intentionally minimal: `src/index.ts` only wires the CLI program.
+- Bootstrap lives in `src/application/bootstrap/initialize.ts`.
+- CLI program/commands configured in `src/application/cli/program.ts`.
+
+## Event Bus & Metrics (Updated)
+
+- Event bus creation centralized in `src/infrastructure/messaging/event-bus-factory.ts`.
+- Performance profiling integrates with existing MetricsCollector.
+- Plugin discovery paths resolved via `src/infrastructure/plugins/plugin-path-resolver.ts`.
+
+## Rust Execution Bridge & Health (Updated)
+
+- Native bridge management is encapsulated by `BridgeAdapter` wrapping `RustBridgeManager`.
+- `RustExecutionBackend` prefers the bridge (with seamless TS fallback) and reads bridge metrics when available.
+- Bridge health is exported as metrics via `src/infrastructure/observability/bridge-health-reporter.ts`:
+  - `crucible_bridge_health` (gauge 1/0.5/0)
+  - `crucible_bridge_response_time_ms` (gauge)
+  - `crucible_bridge_errors_total` (counter)

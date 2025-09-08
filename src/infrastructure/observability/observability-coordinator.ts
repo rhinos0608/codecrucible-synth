@@ -71,6 +71,10 @@ export class ObservabilityCoordinator extends EventEmitter {
     this.health = new HealthMonitor(config.health);
     this.alerts = new AlertManager(config.alerting);
     this.telemetry = new TelemetryExporter(config.telemetry);
+    // Register as global instance if not already set
+    if (!globalObservability) {
+      globalObservability = this;
+    }
   }
 
   public async initialize(): Promise<void> {
@@ -194,6 +198,20 @@ export class ObservabilityCoordinator extends EventEmitter {
       run().catch(() => {});
     }, this.config.health.checkInterval);
   }
+
+  // Expose metrics collector for internal integrations (e.g., bridge health reporter)
+  public getMetricsCollector(): MetricsCollector {
+    return this.metrics;
+  }
 }
 
 export type { MetricPoint, SystemHealth, Alert, MetricsStats, HealthStats, AlertStats };
+
+// Global accessors for cases where DI is not practical
+export let globalObservability: ObservabilityCoordinator | null = null;
+export function getGlobalObservability(): ObservabilityCoordinator | null {
+  return globalObservability;
+}
+export function setGlobalObservability(instance: ObservabilityCoordinator): void {
+  globalObservability = instance;
+}

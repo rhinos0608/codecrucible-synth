@@ -213,6 +213,12 @@ export class MCPServerLifecycle extends EventEmitter {
     const healthStatus = this.healthStatuses.get(serverId);
     if (!healthStatus) return;
 
+    // Skip if server is not available (disabled)
+    if (!mcpServerRegistry.isServerAvailable(serverId)) {
+      logger.debug(`⏭️ Skipping health check for disabled server: ${serverId}`);
+      return;
+    }
+
     // Skip if circuit breaker is open
     const circuitState = this.circuitBreakers.get(serverId);
     if (circuitState && circuitState.state === 'open') {

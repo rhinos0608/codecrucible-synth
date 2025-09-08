@@ -34,6 +34,9 @@ import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-us
 import { createEventBus } from '../../infrastructure/messaging/event-bus-factory.js';
 import { MetricsCollector } from '../../infrastructure/observability/metrics-collector.js';
 import { createUnifiedMetrics } from '../../infrastructure/observability/unified-metrics-adapter.js';
+import { BridgeAdapter } from '../../infrastructure/execution/rust-executor/bridge-adapter.js';
+import { startBridgeHealthReporter } from '../../infrastructure/observability/bridge-health-reporter.js';
+import { getGlobalObservability } from '../../infrastructure/observability/observability-coordinator.js';
 /* (removed duplicate import of RustExecutionBackend) */
 import { unifiedToolRegistry } from '../../infrastructure/tools/unified-tool-registry.js';
 import { setGlobalToolIntegrationRustBackend } from '../../infrastructure/tools/tool-integration.js';
@@ -62,6 +65,7 @@ export class ServiceFactory {
   private runtimeContext: RuntimeContext;
   private configManager?: UnifiedConfigurationManager;
   private resourceCoordinator?: ConfigurableResourceCoordinator;
+  private stopBridgeHealth?: () => void;
 
   public constructor(
     private config: ServiceFactoryConfig = {},
@@ -170,6 +174,10 @@ export class ServiceFactory {
    * Cleanup and dispose of all managed resources
    */
   async dispose(): Promise<void> {
+    if (this.stopBridgeHealth) {
+      try { this.stopBridgeHealth(); } catch {}
+      this.stopBridgeHealth = undefined;
+    }
     if (this.resourceCoordinator) {
       if (typeof this.resourceCoordinator.dispose === 'function') {
         await this.resourceCoordinator.dispose();
@@ -197,8 +205,10 @@ export class ServiceFactory {
 
   private async ensureRustBackend(): Promise<void> {
     try {
-      // Attempt to create and initialize the RustExecutionBackend
-      const rustBackend = new RustExecutionBackend();
+      // Create bridge and backend
+      const bridge = new BridgeAdapter();
+      await bridge.initialize();
+      const rustBackend = new RustExecutionBackend({}, undefined, bridge);
       if (typeof rustBackend.initialize === 'function') {
         await rustBackend.initialize();
       }
@@ -215,6 +225,21 @@ export class ServiceFactory {
       }
 
       this.logger?.info('RustExecutionBackend initialized and attached to RuntimeContext');
+
+      // Start health reporter using ObservabilityCoordinator's metrics if available
+      try {
+        const obs = getGlobalObservability();
+        if (obs) {
+          const metrics = obs.getMetricsCollector();
+          this.stopBridgeHealth = startBridgeHealthReporter(metrics, bridge, { service: 'rust_bridge', intervalMs: 30000 });
+        } else {
+          // Fallback to a local collector to avoid missing telemetry in dev
+          const metrics = new MetricsCollector({ enabled: true, retentionDays: 7, exportInterval: 0, exporters: [] });
+          this.stopBridgeHealth = startBridgeHealthReporter(metrics, bridge, { service: 'rust_bridge', intervalMs: 30000 });
+        }
+      } catch (err) {
+        this.logger?.warn('Failed to start bridge health reporter', err);
+      }
     } catch (err) {
       this.logger?.warn('Failed to create or initialize RustExecutionBackend', err);
       this.logger?.info('RustExecutionBackend not available; TypeScript fallback will be used');

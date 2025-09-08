@@ -2,7 +2,7 @@
  * BridgeAdapter wraps RustBridgeManager to expose a simple executor/metrics surface.
  * This keeps RustExecutionBackend free of NAPI/module-loading concerns.
  */
-import { RustBridgeManager } from './rust-bridge-manager.js';
+import { RustBridgeManager, type BridgeHealth } from './rust-bridge-manager.js';
 
 export interface BridgeResult {
   success: boolean;
@@ -23,6 +23,7 @@ export interface IRustExecutionBridge {
   resetPerformanceMetrics(): void;
   cleanup(): Promise<void>;
   getId(): string | undefined;
+  getHealth(): BridgeHealth;
 }
 
 type NativeExecutor = {
@@ -75,7 +76,7 @@ export class BridgeAdapter implements IRustExecutionBridge {
   resetPerformanceMetrics(): void { this.executor?.resetPerformanceMetrics(); }
   async cleanup(): Promise<void> { await this.manager.shutdown(); this.executor = null; this.available = false; }
   getId(): string | undefined { return this.executor?.id; }
+  getHealth(): BridgeHealth { return this.manager.getHealth(); }
 }
 
 export default BridgeAdapter;
-

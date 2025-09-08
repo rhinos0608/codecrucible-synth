@@ -117,7 +117,7 @@ export class OllamaAdapter implements ProviderAdapter {
               id: tc.id,
               type: tc.type as 'function',
               function: {
-                name: tc.name,
+                name: tc.name,  // LLMResponse has flattened structure
                 arguments: tc.arguments,
               },
             }))

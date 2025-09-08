@@ -385,10 +385,33 @@ export class IntelligentRequestBatcher {
     ) {
       try {
         // Import provider dynamically to avoid circular dependencies
-        const { createProvider } = await import(`../../providers/${requests[0].provider}.js`);
-        provider = createProvider({ model: requests[0].model });
+        const providerName = requests[0].provider;
+        let providerModule;
+        
+        // Try different import paths based on provider name
+        if (providerName === 'ollama') {
+          providerModule = await import('../../providers/hybrid/ollama-provider.js');
+          provider = new providerModule.OllamaProvider({ 
+            endpoint: 'http://localhost:11434', 
+            defaultModel: requests[0].model || 'llama3.1:8b',
+            timeout: 60000,
+            maxRetries: 2
+          });
+        } else if (providerName === 'lm-studio') {
+          providerModule = await import('../../providers/hybrid/lm-studio-provider.js');
+          provider = new providerModule.LMStudioProvider({ 
+            endpoint: 'ws://localhost:8080', 
+            defaultModel: requests[0].model || 'local-model',
+            timeout: 60000,
+            maxRetries: 2
+          });
+        } else {
+          // Fallback to old import pattern
+          const { createProvider } = await import(`../../providers/${providerName}.js`);
+          provider = createProvider({ model: requests[0].model });
+        }
       } catch (error) {
-        logger.warn('Failed to import provider, using mock', { provider: requests[0].provider });
+        logger.warn('Failed to import provider, using mock', { provider: requests[0].provider, error: error instanceof Error ? error.message : String(error) });
       }
     }
 

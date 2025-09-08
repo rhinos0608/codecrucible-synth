@@ -86,6 +86,11 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
   private async initializeTools(): Promise<void> {
     try {
       // Initialize filesystem tools with proper backend delegation
+      
+      // Always wire the MCP manager for fallback operations
+      this.filesystemTools.setMCPManager(this.mcpManager);
+      this.logger.info('MCP manager attached to filesystem tools');
+      
       // If an injected rustBackend exists, attach it to filesystem tools
       if (this.rustBackend) {
         try {

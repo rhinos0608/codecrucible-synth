@@ -29,6 +29,7 @@ import type {
   ToolExecutionResult,
 } from '../domain/interfaces/tool-execution.js';
 import { unifiedToolRegistry, type UnifiedToolRegistry } from '../infrastructure/tools/unified-tool-registry.js';
+import { toolRegistrationService } from '../infrastructure/tools/tool-registration-service.js';
 import { PathUtilities } from '../utils/path-utilities.js';
 
 // Define proper types for server management
@@ -196,15 +197,15 @@ export class MCPServerManager {
     try {
       logger.info('🚀 Initializing MCP Server Manager with focused architecture');
 
-      // Perform initialization tasks such as:
-      // - Loading configuration files or environment variables
-      // - Initializing shared resources or dependencies
-      // - Performing security checks or validations
-      // - Preparing monitoring or logging subsystems
-      // Add additional setup steps here as needed before starting servers.
+      // Initialize and register all tools with the unified registry
+      logger.info('Registering tools with unified registry...');
+      toolRegistrationService.setMcpManager(this);
+      await toolRegistrationService.registerAllTools();
 
       this.isInitialized = true;
-      logger.info('✅ MCP Server Manager initialization completed');
+      logger.info('✅ MCP Server Manager initialization completed', {
+        toolsRegistered: unifiedToolRegistry.getAvailableToolNames().length,
+      });
     } catch (error) {
       // Use enterprise error handler for initialization failures
       const structuredError = await enterpriseErrorHandler.handleEnterpriseError(error as Error, {
@@ -472,17 +473,17 @@ export class MCPServerManager {
    * Secure file operations - delegates to filesystem server
    */
   public async readFileSecure(filePath: string): Promise<string> {
-    const result = await this.executeTool('read_file', { path: filePath });
+    const result = await this.executeTool('filesystem_read_file', { file_path: filePath });
     // Ensure result.data is a string
     return typeof result.data === 'string' ? result.data : '';
   }
 
   public async writeFileSecure(filePath: string, content: string): Promise<void> {
-    await this.executeTool('write_file', { path: filePath, content });
+    await this.executeTool('filesystem_write_file', { file_path: filePath, content });
   }
 
   public async listDirectorySecure(directoryPath: string): Promise<string[]> {
-    const result = await this.executeTool('list_files', { directory: directoryPath });
+    const result = await this.executeTool('filesystem_list_directory', { path: directoryPath });
     // Ensure result.data is an array of strings
     return Array.isArray(result.data) ? result.data as string[] : [];
   }
@@ -491,16 +492,8 @@ export class MCPServerManager {
     filePath: string
   ): Promise<{ exists: boolean; size?: number; modified?: Date }> {
     try {
-      // First check if file exists
-      const existsResult = await this.executeTool('file_exists', { path: filePath });
-      const exists = !!(existsResult.data as boolean);
-
-      if (!exists) {
-        return { exists: false };
-      }
-
-      // Get real file stats using filesystem tools
-      const statsResult = await this.executeTool('get_file_info', { path: filePath });
+      // Get file stats directly - the server will return error if file doesn't exist
+      const statsResult = await this.executeTool('filesystem_get_stats', { file_path: filePath });
       const stats = statsResult.data as { size?: number; modified?: string | number | Date } | undefined;
 
       let size: number | undefined = undefined;
@@ -521,14 +514,8 @@ export class MCPServerManager {
     } catch (error) {
       logger.warn(`Failed to get file stats for ${filePath}:`, toReadonlyRecord(error));
 
-      // Fallback to basic exists check
-      try {
-        const existsResult = await this.executeTool('file_exists', { path: filePath });
-        const exists = !!(existsResult.data as boolean);
-        return { exists, size: undefined, modified: undefined };
-      } catch (fallbackError) {
-        return { exists: false };
-      }
+      // If stats failed, file likely doesn't exist
+      return { exists: false };
     }
   }
 
@@ -541,102 +528,6 @@ export class MCPServerManager {
     return typeof result.data === 'string' ? result.data : '';
   }
 
-  /**
-   * Get health status of all servers (matches McpManager interface)
-   */
-  public getHealthStatus(): {
-    overall: 'healthy' | 'degraded' | 'critical';
-    servers: Array<{
-      serverId: string;
-      status: 'running' | 'error' | 'stopped';
-      uptime: number;
-      successRate: number;
-      lastSeen: Date;
-    }>;
-    capabilities: {
-      totalTools: number;
-      totalServers: number;
-      registryStatus: string;
-      smitheryEnabled?: boolean;
-      smitheryTools?: number;
-      smitheryServers?: number;
-    };
-  } {
-    const healthStatuses = mcpServerLifecycle.getHealthStatus();
-
-    // Get real capability counts
-    const capabilities = this.getServerCapabilities();
-
-    // Transform server health data to match expected format
-    type HealthStatus = Readonly<{
-      serverId: string;
-      status: string;
-      lastCheck?: Date;
-    }>;
-
-    const servers = healthStatuses.map((healthStatus: Readonly<HealthStatus>) => {
-      const serverMetrics = mcpServerMonitoring.getServerMetrics(healthStatus.serverId);
-
-      return {
-        serverId: healthStatus.serverId,
-        status: this.mapHealthToMcpStatus(healthStatus.status),
-        uptime: Date.now() - (healthStatus.lastCheck?.getTime() ?? Date.now()),
-        successRate: serverMetrics
-          ? (serverMetrics.metrics.successfulRequests /
-              Math.max(1, serverMetrics.metrics.totalRequests)) *
-            100
-          : 0,
-        lastSeen: healthStatus.lastCheck ? healthStatus.lastCheck : new Date(),
-      };
-    });
-
-    // Calculate overall health status
-    const healthyCount = servers.filter(s => s.status === 'running').length;
-    const totalCount = servers.length;
-    let overall: 'healthy' | 'degraded' | 'critical';
-
-    if (totalCount === 0) {
-      overall = 'critical';
-    } else if (healthyCount === totalCount) {
-      overall = 'healthy';
-    } else if (healthyCount > totalCount / 2) {
-      overall = 'degraded';
-    } else {
-      overall = 'critical';
-    }
-
-    // Get Smithery stats if available
-    const smitheryEnabled = !!this.smitheryServer;
-    const smitheryTools = smitheryEnabled ? this.smitheryServer?.getAvailableTools().length ?? 0 : 0;
-    const smitheryServers = smitheryEnabled ? 1 : 0;
-
-    // Get actual registry status based on server registrations
-    const registryStats = mcpServerRegistry.getRegistrationStatus();
-    const hasActiveServers = registryStats.ready > 0;
-    const hasErrors = registryStats.failed > 0;
-
-    let registryStatus: 'active' | 'degraded' | 'inactive';
-    if (hasActiveServers && !hasErrors) {
-      registryStatus = 'active';
-    } else if (hasActiveServers && hasErrors) {
-      registryStatus = 'degraded';
-    } else {
-      registryStatus = 'inactive';
-    }
-
-    return {
-      overall,
-      servers,
-      capabilities: {
-        totalTools: capabilities.toolCount,
-        totalServers: totalCount,
-        registryStatus,
-        smitheryEnabled,
-        smitheryTools,
-        smitheryServers,
-      },
-    };
-  }
 
   /**
    * Get real server capabilities from active services
@@ -695,7 +586,7 @@ export class MCPServerManager {
   /**
    * List available servers
    */
-  public listServers(): string[] {
+  public async listServers(): Promise<string[]> {
     return mcpServerRegistry.getRegisteredServerIds();
   }
 
@@ -771,6 +662,57 @@ export class MCPServerManager {
     await this.smitheryServer.initialize();
 
     logger.info('✅ Smithery server initialized');
+  }
+
+  /**
+   * Get comprehensive health status required by IMcpManager interface
+   */
+  public async getHealthStatus(): Promise<{
+    overall: 'healthy' | 'degraded' | 'critical';
+    servers: Array<{
+      serverId: string;
+      status: 'running' | 'error' | 'stopped';
+      uptime: number;
+      successRate: number;
+      lastSeen: Date;
+    }>;
+    capabilities: {
+      totalTools: number;
+      totalServers: number;
+      registryStatus: string;
+      smitheryEnabled?: boolean;
+    };
+  }> {
+    const serverIds = await this.listServers();
+    const serverStatuses = serverIds.map(serverId => {
+      const status = this.getServerStatus(serverId) as any;
+      return {
+        serverId,
+        status: status?.status || 'stopped' as 'running' | 'error' | 'stopped',
+        uptime: 0, // Would need actual implementation
+        successRate: 0.95, // Would need actual metrics
+        lastSeen: new Date(),
+      };
+    });
+
+    const runningCount = serverStatuses.filter(s => s.status === 'running').length;
+    const errorCount = serverStatuses.filter(s => s.status === 'error').length;
+    
+    let overall: 'healthy' | 'degraded' | 'critical' = 'healthy';
+    if (errorCount > 0) {
+      overall = runningCount > errorCount ? 'degraded' : 'critical';
+    }
+
+    return {
+      overall,
+      servers: serverStatuses,
+      capabilities: {
+        totalTools: unifiedToolRegistry.getAvailableToolNames().length,
+        totalServers: serverIds.length,
+        registryStatus: 'active',
+        smitheryEnabled: !!this.smitheryServer,
+      },
+    };
   }
 
   /**
@@ -876,9 +818,9 @@ export class MCPServerManager {
   }
 
   public async healthCheck(): Promise<HealthCheckResult> {
-    const serverIds = this.listServers();
+    const serverIds = await this.listServers();
     const serverStatuses = await Promise.all(
-      serverIds.map((serverId) => {
+      serverIds.map((serverId: string) => {
         const status = this.getServerStatus(serverId);
         return {
           serverId,

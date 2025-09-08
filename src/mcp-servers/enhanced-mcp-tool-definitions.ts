@@ -70,9 +70,9 @@ export class EnhancedMCPToolDefinitions {
           description:
             'Absolute file path to read. MUST be absolute, not relative. Automatically normalized regardless of slash direction.',
           examples: [
-            'C:\\Users\\Admin\\Documents\\project\\src\\main.ts',
-            '/home/user/project/src/main.ts',
-            'C:/Projects/app/package.json',
+            'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src\\main.ts',
+            'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\package.json',
+            'C:/Users/Admin/Documents/RST/codecrucible-synth/config/default.yaml',
           ],
           pattern: '^[A-Za-z]:|^/',
           required: true,
@@ -98,19 +98,19 @@ export class EnhancedMCPToolDefinitions {
     examples: [
       {
         description: 'Read entire package.json file',
-        input: { path: '/project/package.json' },
+        input: { path: 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\package.json' },
         expectedOutput: 'File contents with line numbers in cat -n format',
         useCase: 'Understanding project configuration',
       },
       {
         description: 'Read last 20 lines of log file',
-        input: { path: '/var/log/app.log', offset: -20 },
+        input: { path: 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\logs\\app.log', offset: -20 },
         expectedOutput: 'Last 20 lines of log file',
         useCase: 'Debugging recent errors',
       },
       {
         description: 'Read specific section of large file',
-        input: { path: '/large-file.ts', offset: 100, length: 50 },
+        input: { path: 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src\\large-file.ts', offset: 100, length: 50 },
         expectedOutput: 'Lines 100-149 of the file',
         useCase: 'Examining specific code sections',
       },
@@ -152,8 +152,8 @@ export class EnhancedMCPToolDefinitions {
           description:
             'Absolute path where to write the file. Directories created automatically if needed.',
           examples: [
-            'C:\\Users\\Admin\\project\\src\\new-component.ts',
-            '/home/user/project/docs/readme.md',
+            'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src\\new-component.ts',
+            'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\docs\\readme.md',
           ],
           required: true,
         },
@@ -178,7 +178,7 @@ export class EnhancedMCPToolDefinitions {
       {
         description: 'Create new TypeScript component (first chunk)',
         input: {
-          path: '/project/src/UserCard.tsx',
+          path: 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src\\UserCard.tsx',
           content:
             'import React from "react";\n\nexport interface UserCardProps {\n  name: string;\n  email: string;\n}',
           mode: 'rewrite',
@@ -189,7 +189,7 @@ export class EnhancedMCPToolDefinitions {
       {
         description: 'Continue writing component (second chunk)',
         input: {
-          path: '/project/src/UserCard.tsx',
+          path: 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src\\UserCard.tsx',
           content:
             '\n\nexport const UserCard: React.FC<UserCardProps> = ({ name, email }) => {\n  return (\n    <div className="user-card">\n      <h3>{name}</h3>\n      <p>{email}</p>\n    </div>\n  );\n};',
           mode: 'append',
@@ -323,7 +323,7 @@ export class EnhancedMCPToolDefinitions {
         workingDirectory: {
           type: 'string',
           description: 'Working directory for command execution. Default: current directory.',
-          examples: ['/project/src', 'C:\\Projects\\App'],
+          examples: ['C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src', 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth'],
         },
       },
       required: ['command', 'description'],
@@ -402,7 +402,7 @@ export class EnhancedMCPToolDefinitions {
         directory: {
           type: 'string',
           description: 'Starting directory for search. Default: current working directory',
-          examples: ['/project/src', 'C:\\Projects\\App\\src'],
+          examples: ['C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src', 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\config'],
         },
         fileTypes: {
           type: 'array',
@@ -437,7 +437,7 @@ export class EnhancedMCPToolDefinitions {
           pattern: 'authenticate',
           searchType: 'content',
           fileTypes: ['ts', 'tsx'],
-          directory: '/project/src',
+          directory: 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src',
         },
         expectedOutput: 'List of files containing "authenticate" in TypeScript files',
         useCase: 'Finding authentication-related code',

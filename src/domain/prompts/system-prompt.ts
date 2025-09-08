@@ -205,7 +205,22 @@ export function generateContextualSystemPrompt(
   // Add user-specific context if provided
   const contextualInfo = userContext ? `\n\nCurrent Context: ${userContext}` : '';
 
-  return basePrompt + toolContext + contextualInfo;
+  // Add working directory context - critical for path operations
+  const workingDirectory = process.cwd();
+  const projectContext = `\n\n## PROJECT ENVIRONMENT
+Working Directory: ${workingDirectory}
+Platform: ${process.platform}
+
+CRITICAL PATH HANDLING RULES:
+- ALL file paths must be absolute and use the working directory: ${workingDirectory}
+- Examples of CORRECT paths:
+  - ${workingDirectory}\\src\\index.ts (for reading source files)  
+  - ${workingDirectory}\\package.json (for project config)
+  - ${workingDirectory}\\config\\default.yaml (for configuration)
+- NEVER use Linux-style paths like /home/user/ or /project/ 
+- ALWAYS use the actual working directory: ${workingDirectory}`;
+
+  return basePrompt + toolContext + contextualInfo + projectContext;
 }
 
 export default generateSystemPrompt;

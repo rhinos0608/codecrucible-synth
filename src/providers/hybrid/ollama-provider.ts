@@ -101,10 +101,10 @@ export class OllamaProvider implements LLMProvider {
     // If tools were provided by the adapter, include them in the chat request
     if (Array.isArray((options as any).tools) && (options as any).tools.length > 0) {
       (request as any).tools = (options as any).tools;
-      // Support tool_choice when present; default to 'auto' if adapter set it
-      if ((options as any).tool_choice) {
-        (request as any).tool_choice = (options as any).tool_choice;
-      }
+      // Note: Removed tool_choice as it's not documented by Ollama and may interfere
+      logger.debug('OllamaProvider: Added tools to request', { 
+        toolCount: (options as any).tools.length 
+      });
     }
 
     const controller = new AbortController();

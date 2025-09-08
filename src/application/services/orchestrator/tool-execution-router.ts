@@ -157,11 +157,14 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
         content: response.content || 'I need to use tools to help with this request.',
         tool_calls: response.toolCalls,
       },
-      {
+      // Create individual tool messages with matching IDs
+      ...toolResults.map(toolResult => ({
         role: 'tool' as const,
-        content: JSON.stringify(toolResults, null, 2),
-        tool_call_id: 'batch_results',
-      },
+        content: toolResult.error 
+          ? JSON.stringify({ error: toolResult.error }, null, 2)
+          : JSON.stringify(toolResult.result, null, 2),
+        tool_call_id: toolResult.id,
+      })),
     ];
 
     const followUpRequest: ModelRequest = {
@@ -312,7 +315,17 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
     }
     
     // Fallback to MCP manager
-    return await this.mcpManager.executeTool(toolName, args, request.context);
+    const mcpResult = await this.mcpManager.executeTool(toolName, args, request.context);
+    
+    // Check success flag and propagate errors properly
+    if (!mcpResult.success) {
+      const errorMessage = typeof mcpResult.error === 'string' 
+        ? mcpResult.error 
+        : (mcpResult.error as any)?.message || `Tool execution failed: ${toolName}`;
+      throw new Error(errorMessage);
+    }
+    
+    return mcpResult.data;
   }
 
   private createToolExecutionError(

@@ -15,6 +15,7 @@ import {
 } from '../../domain/interfaces/use-cases.js';
 import type { IWorkflowOrchestrator, WorkflowRequest } from '../../domain/interfaces/workflow-orchestrator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 
 export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
   public constructor(private readonly orchestrator: Readonly<IWorkflowOrchestrator>) {}
@@ -99,7 +100,7 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
       };
     } catch (error) {
       const duration = performance.now() - startTime;
-      logger.error('File analysis failed:', error);
+      logger.error('File analysis failed', toErrorOrUndefined(error));
 
       return {
         success: false,

@@ -1,6 +1,5 @@
-import { ProductionAlert } from './production-hardening-system.js';
-
-export { ProductionAlert };
+// Note: Keeping types decoupled from implementation details.
+// If a richer ProductionAlert type exists, replace string below accordingly.
 
 export interface ProductionIntegrationConfig {
   components: {
@@ -72,7 +71,7 @@ export interface IntegratedSystemHealth {
     active: number;
     critical: number;
     warnings: number;
-    lastAlert?: ProductionAlert;
+    lastAlert?: string;
   };
   recommendations: SystemRecommendation[];
 }

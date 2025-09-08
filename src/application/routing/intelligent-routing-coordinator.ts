@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 import { Model, ModelParameters } from '../../domain/entities/model.js';
 import { ModelName, ProviderType } from '../../domain/value-objects/voice-values.js';
 import {
@@ -81,7 +82,7 @@ export class IntelligentRoutingCoordinator
       this.emit('routingDecision', decision);
       return decision;
     } catch (error) {
-      logger.error('Routing decision failed, returning failsafe decision', error);
+      logger.error('Routing decision failed, returning failsafe decision', toErrorOrUndefined(error));
       // Create a proper fallback Model instance
       const fallbackParams: ModelParameters = {
         maxTokens: 4096,

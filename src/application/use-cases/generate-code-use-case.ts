@@ -18,7 +18,7 @@ import {
   WorkflowRequest,
 } from '../../domain/interfaces/workflow-orchestrator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
-import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 
 export class GenerateCodeUseCase implements IGenerateCodeUseCase {
   public constructor(private readonly orchestrator: IWorkflowOrchestrator) {}
@@ -107,7 +107,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
       };
     } catch (error) {
       const duration = performance.now() - startTime;
-      logger.error('Code generation failed:', error);
+      logger.error('Code generation failed', toErrorOrUndefined(error));
 
       return {
         success: false,

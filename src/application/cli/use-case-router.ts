@@ -12,6 +12,7 @@
  */
 
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { UseCaseDependencies, getDependencyContainer } from '../services/dependency-container.js';
 import { AnalysisRequest, GenerationRequest } from '../use-cases/index.js';
 import { FileReferenceParser } from './file-reference-parser.js';
@@ -131,7 +132,7 @@ export class UseCaseRouter {
         );
       }
     } catch (error) {
-      logger.warn('⚠️ Failed to load project configuration:', error);
+      logger.warn('⚠️ Failed to load project configuration:', toReadonlyRecord(error));
     }
 
     // Process @ syntax file references
@@ -148,7 +149,7 @@ export class UseCaseRouter {
           );
         }
       } catch (error) {
-        logger.warn('❌ Failed to process @ file references:', error);
+        logger.warn('❌ Failed to process @ file references:', toReadonlyRecord(error));
         // Continue with original input on parsing failure
       }
     }

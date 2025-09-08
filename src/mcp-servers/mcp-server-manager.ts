@@ -8,6 +8,7 @@
  */
 
 import { logger } from '../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../utils/type-guards.js';
 import { MCPServerDefinition, mcpServerRegistry } from './core/mcp-server-registry.js';
 import {
   EnterpriseErrorHandler,
@@ -487,7 +488,7 @@ export class MCPServerManager {
         modified: modified ?? new Date(),
       };
     } catch (error) {
-      logger.warn(`Failed to get file stats for ${filePath}:`, error);
+      logger.warn(`Failed to get file stats for ${filePath}:`, toReadonlyRecord(error));
 
       // Fallback to basic exists check
       try {
@@ -642,7 +643,7 @@ export class MCPServerManager {
         promptCount: totalPromptCount,
       });
     } catch (error) {
-      logger.warn('Error calculating server capabilities:', error);
+      logger.warn('Error calculating server capabilities:', toReadonlyRecord(error));
       // Fallback to 0 values if calculation fails
     }
 
@@ -702,7 +703,7 @@ export class MCPServerManager {
       try {
         await this.smitheryServer.shutdown();
       } catch (error) {
-        logger.error('Error shutting down Smithery server:', error);
+        logger.error('Error shutting down Smithery server:', toErrorOrUndefined(error));
       }
     }
 

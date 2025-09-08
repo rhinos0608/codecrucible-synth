@@ -9,6 +9,7 @@
  */
 
 import { logger } from '../logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { ProductionIntegrationManager } from './production-integration-manager.js';
 import { ProductionHardeningSystem } from './production-hardening-system.js';
 import {
@@ -151,7 +152,7 @@ export class ProductionHardeningSetup {
       // Log system initialization to audit trail
       await this.logSystemInitialization();
     } catch (error) {
-      logger.error('❌ Production Hardening Setup failed:', error);
+      logger.error('❌ Production Hardening Setup failed:', toErrorOrUndefined(error));
       await this.handleSetupFailure(error as Error);
       throw error;
     }
@@ -183,7 +184,7 @@ export class ProductionHardeningSetup {
         successCount++;
         logger.info(`✅ Test ${index + 1} passed`);
       } catch (error) {
-        logger.error(`❌ Test ${index + 1} failed:`, error);
+        logger.error(`❌ Test ${index + 1} failed:`, toErrorOrUndefined(error));
       }
     }
 
@@ -270,7 +271,7 @@ export class ProductionHardeningSetup {
 
       logger.info('✅ Production hardening system shutdown completed');
     } catch (error) {
-      logger.error('Error during production hardening shutdown:', error);
+      logger.error('Error during production hardening shutdown:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -371,7 +372,7 @@ export class ProductionHardeningSetup {
     });
 
     this.integrationManager.on('operation-failed', ({ context, error }) => {
-      logger.error('Operation failed:', { operationId: context.operationId, error: error.message });
+      logger.error('Operation failed:', error, { operationId: context.operationId });
     });
   }
 
@@ -402,7 +403,7 @@ export class ProductionHardeningSetup {
     });
 
     process.on('unhandledRejection', async (reason, promise) => {
-      logger.error('Unhandled rejection, triggering emergency mode:', reason);
+      logger.error('Unhandled rejection, triggering emergency mode:', toErrorOrUndefined(reason));
       await this.integrationManager.triggerEmergencyMode(
         `Unhandled rejection: ${reason}`,
         'process-rejection-handler'
@@ -441,7 +442,7 @@ export class ProductionHardeningSetup {
         await this.integrationManager.shutdownProductionSystem();
       }
     } catch (cleanupError) {
-      logger.error('Cleanup after setup failure also failed:', cleanupError);
+      logger.error('Cleanup after setup failure also failed:', toErrorOrUndefined(cleanupError));
     }
   }
 

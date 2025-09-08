@@ -8,6 +8,7 @@ import { existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { logger } from '../infrastructure/logging/unified-logger.js';
+import { toReadonlyRecord } from './type-guards.js';
 
 const require = createRequire(import.meta.url);
 
@@ -216,7 +217,7 @@ export function loadRustExecutor(baseDir?: string): RustExecutorModule {
     // FIXED: Reduce noise - use debug level instead of warn for expected fallback behavior
     logger.debug(
       'Prebuilt binary not available, falling back to local build:',
-      (prebuiltError as Error).message
+      toReadonlyRecord({ message: (prebuiltError as Error).message })
     );
 
     // Fallback to manual path resolution (for development)

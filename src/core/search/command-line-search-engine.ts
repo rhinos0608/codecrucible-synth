@@ -8,6 +8,7 @@
 import { performance } from 'perf_hooks';
 import type { RAGQuery, RAGResult } from './types.js';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 
 // Import all modular components
 import { type SanitizedQuery, SearchQuerySanitizer } from './search-query-sanitizer.js';
@@ -146,12 +147,7 @@ export class CommandLineSearchEngine {
 
     } catch (error) {
       metrics.totalTime = performance.now() - startTime;
-      logger.error('Search execution failed', { 
-        error, 
-        query: query.query.slice(0, 100),
-        workspace: this.workspace,
-        metrics,
-      });
+      logger.error('Search execution failed', toErrorOrUndefined(error));
 
       return this.createEmptyResult(metrics as SearchExecutionMetrics, error instanceof Error ? error : new Error(String(error)));
     }

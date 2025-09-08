@@ -22,7 +22,7 @@ const defaultHealth: IntegratedSystemHealth = {
 };
 
 export class HealthMonitoring {
-  async checkHealth(): Promise<IntegratedSystemHealth> {
+  public async checkHealth(): Promise<IntegratedSystemHealth> {
     return { ...defaultHealth, timestamp: Date.now() };
   }
 }

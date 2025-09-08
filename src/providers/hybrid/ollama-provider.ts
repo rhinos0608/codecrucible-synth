@@ -1,4 +1,5 @@
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 import {
   LLMCapabilities,
   LLMProvider,
@@ -132,7 +133,7 @@ export class OllamaProvider implements LLMProvider {
       };
     } catch (err) {
       this.lastError = err instanceof Error ? err.message : String(err);
-      logger.error('Ollama generateCode failed', { err: this.lastError });
+      logger.error('Ollama generateCode failed', toErrorOrUndefined(err));
       throw err;
     } finally {
       clearTimeout(timeout);

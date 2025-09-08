@@ -44,32 +44,33 @@ const warnDeprecated = (importPath: string) => {
 
 // Export legacy compatibility if needed
 export const LEGACY_IMPORT_WARNING = {
-  'core/types': () => warnDeprecated('src/core/types.ts'),
-  types: () => warnDeprecated('src/types.ts'),
-  'infrastructure/config/config-types': () =>
-    warnDeprecated('src/infrastructure/config/config-types.ts'),
+  'core/types': (): void => { warnDeprecated('src/core/types.ts'); },
+  types: (): void => { warnDeprecated('src/types.ts'); },
+  'infrastructure/config/config-types': (): void => {
+    warnDeprecated('src/infrastructure/config/config-types.ts');
+  },
 };
 
-// Type guards and utility functions
-export const isValidId = (id: any): id is string => {
+export const isValidId = (id: unknown): id is string => {
   return typeof id === 'string' && id.length > 0;
 };
 
-export const isValidEmail = (email: any): email is string => {
+export const isValidEmail = (email: unknown): email is string => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return typeof email === 'string' && emailRegex.test(email);
 };
 
-export const isValidUrl = (url: any): url is string => {
+export const isValidUrl = (url: unknown): url is string => {
+  if (typeof url !== 'string') return false;
   try {
-    new URL(url);
+    const _ = new URL(url);
     return true;
   } catch {
     return false;
   }
 };
 
-export const isValidSemver = (version: any): version is string => {
+export const isValidSemver = (version: unknown): version is string => {
   const semverRegex =
     /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
   return typeof version === 'string' && semverRegex.test(version);

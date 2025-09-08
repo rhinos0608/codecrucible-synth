@@ -5,6 +5,7 @@
 
 import { SmitheryRegistry } from '@smithery/registry';
 import { logger } from '../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../utils/type-guards.js';
 
 export interface SmitheryConfig {
   apiKey: string;
@@ -324,7 +325,7 @@ export class SmitheryRegistryIntegration {
         logger.info(`Found ${servers.length} servers in Smithery registry`);
         return servers;
       } catch (error) {
-        logger.error('Error searching Smithery registry:', error);
+        logger.error('Error searching Smithery registry:', toErrorOrUndefined(error));
         throw error;
       }
     }
@@ -382,7 +383,7 @@ export class SmitheryRegistryIntegration {
 
       return serverDetails;
     } catch (error) {
-      logger.error(`Error getting server details for ${qualifiedName}:`, error);
+      logger.error(`Error getting server details for ${qualifiedName}:`, toErrorOrUndefined(error));
       return null;
     }
   }
@@ -452,7 +453,7 @@ export class SmitheryRegistryIntegration {
         serversAvailable: count,
       };
     } catch (error) {
-      logger.error('Smithery registry health check failed:', error);
+      logger.error('Smithery registry health check failed:', toErrorOrUndefined(error));
       return {
         status: 'error',
         serversAvailable: 0,

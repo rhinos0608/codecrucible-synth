@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -121,7 +122,7 @@ export class EnterpriseConfigManager {
 
       logger.info('Enterprise configuration loaded successfully');
     } catch (error) {
-      logger.warn('Failed to load enterprise config, using defaults:', error);
+      logger.warn('Failed to load enterprise config, using defaults:', toReadonlyRecord(error));
     }
   }
 
@@ -170,7 +171,7 @@ export class EnterpriseConfigManager {
 
       logger.info('Enterprise configuration saved successfully');
     } catch (error) {
-      logger.error('Failed to save enterprise config:', error);
+      logger.error('Failed to save enterprise config:', toErrorOrUndefined(error));
       throw error;
     }
   }

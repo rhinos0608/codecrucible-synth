@@ -10,7 +10,7 @@ const NodeEnvSchema = z.object({
 
 const nodeEnvParsed = NodeEnvSchema.safeParse(process.env as Record<string, string | undefined>);
 if (!nodeEnvParsed.success) {
-  logger.error('Invalid NODE_ENV configuration', { error: toError(JSON.stringify(nodeEnvParsed.error.format())) });
+  logger.error('Invalid NODE_ENV configuration', toError(JSON.stringify(nodeEnvParsed.error.format())));
   process.exit(1);
 }
 
@@ -71,7 +71,7 @@ type Env = z.infer<typeof EnvSchema>;
 
 const parsed = EnvSchema.safeParse(process.env as Record<string, string | undefined>);
 if (!parsed.success) {
-  logger.error('Invalid environment configuration', { error: toError(JSON.stringify((parsed.error as z.ZodError).format())) });
+  logger.error('Invalid environment configuration', toError(JSON.stringify((parsed.error as z.ZodError).format())));
   process.exit(1);
 }
 

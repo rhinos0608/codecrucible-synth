@@ -7,6 +7,7 @@ import { LLMResponse } from '../../../domain/interfaces/llm-interfaces.js';
 import { LMStudioProvider } from '../../../providers/hybrid/lm-studio-provider.js';
 import { logger } from '../../../infrastructure/logging/unified-logger.js';
 import { ProviderAdapter } from './provider-adapter.js';
+import { toErrorOrUndefined } from '../../../utils/type-guards.js';
 
 export class LMStudioAdapter implements ProviderAdapter {
   readonly name = 'lm-studio';
@@ -79,7 +80,7 @@ export class LMStudioAdapter implements ProviderAdapter {
           : undefined,
       };
     } catch (error) {
-      logger.error('LMStudioAdapter request failed:', error);
+      logger.error('LMStudioAdapter request failed', toErrorOrUndefined(error));
 
       logger.warn('Falling back to generateCode method due to request failure');
       try {
@@ -113,7 +114,7 @@ export class LMStudioAdapter implements ProviderAdapter {
             : undefined,
         };
       } catch (fallbackError) {
-        logger.error('LMStudioAdapter fallback also failed:', fallbackError);
+        logger.error('LMStudioAdapter fallback also failed', toErrorOrUndefined(fallbackError));
         throw new Error(
           `LM Studio request failed: ${error instanceof Error ? error.message : String(error)}`
         );

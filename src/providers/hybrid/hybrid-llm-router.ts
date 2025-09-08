@@ -5,6 +5,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 
 export interface TaskComplexityMetrics {
   linesOfCode?: number;
@@ -115,7 +116,7 @@ export class HybridLLMRouter extends EventEmitter {
 
       return await Promise.resolve(loadAdjustedDecision);
     } catch (error) {
-      logger.error('Error in task routing:', error);
+      logger.error('Error in task routing', { error: toErrorOrUndefined(error) });
       return Promise.resolve(this.getFailsafeDecision());
     }
   }

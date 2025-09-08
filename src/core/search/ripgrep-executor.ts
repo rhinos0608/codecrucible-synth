@@ -8,6 +8,7 @@
 import { ChildProcess, spawn } from 'child_process';
 import { performance } from 'perf_hooks';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 
 export interface RipgrepExecutionOptions {
   workspace: string;
@@ -108,7 +109,7 @@ export class RipgrepExecutor {
 
       return result;
     } catch (error) {
-      logger.error('Ripgrep execution failed', { executionId, error });
+      logger.error('Ripgrep execution failed', toErrorOrUndefined(error));
       throw error;
     } finally {
       this.activeProcesses.delete(executionId);

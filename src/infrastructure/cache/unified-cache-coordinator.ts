@@ -17,6 +17,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { UnifiedCacheSystem, getUnifiedCache } from './unified-cache-system.js';
 
 export interface CacheCoordinationConfig {
@@ -260,7 +261,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
       this.updateGlobalMetrics('miss');
       return null;
     } catch (error) {
-      logger.error(`Cache coordination error for key ${key}:`, error);
+      logger.error(`Cache coordination error for key ${key}:`, toErrorOrUndefined(error));
       return null;
     }
   }
@@ -318,7 +319,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
       this.updateGlobalMetrics(success ? 'set' : 'set-error');
       return success;
     } catch (error) {
-      logger.error(`Cache coordination set error for key ${key}:`, error);
+      logger.error(`Cache coordination set error for key ${key}:`, toErrorOrUndefined(error));
       return false;
     }
   }
@@ -353,7 +354,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
 
       return success;
     } catch (error) {
-      logger.error(`Cache coordination delete error for key ${key}:`, error);
+      logger.error(`Cache coordination delete error for key ${key}:`, toErrorOrUndefined(error));
       return false;
     }
   }
@@ -371,7 +372,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
           logger.debug(`Cleared cache system: ${name}`);
         }
       } catch (error) {
-        logger.error(`Error clearing cache system ${name}:`, error);
+        logger.error(`Error clearing cache system ${name}:`, toErrorOrUndefined(error));
       }
     });
 
@@ -467,7 +468,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
         systems: this.registeredSystems.size,
       });
     } catch (error) {
-      logger.error('Cache coordination cycle error:', error);
+      logger.error('Cache coordination cycle error:', toErrorOrUndefined(error));
       this.emit('coordination-error', error);
     }
   }
@@ -497,7 +498,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
 
       return null;
     } catch (error) {
-      logger.debug(`Error getting from ${systemName}:`, error);
+      logger.debug(`Error getting from ${systemName}:`, toReadonlyRecord(error));
       return null;
     }
   }
@@ -526,7 +527,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
 
       return false;
     } catch (error) {
-      logger.debug(`Error setting in ${systemName}:`, error);
+      logger.debug(`Error setting in ${systemName}:`, toReadonlyRecord(error));
       return false;
     }
   }
@@ -544,7 +545,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
 
       return false;
     } catch (error) {
-      logger.debug(`Error deleting from ${systemName}:`, error);
+      logger.debug(`Error deleting from ${systemName}:`, toReadonlyRecord(error));
       return false;
     }
   }
@@ -565,7 +566,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
         await this.setInSystem(key, value, systemName, { ttl: 300000 }); // 5 minute TTL for propagated items
         this.keyMapping.get(key)?.add(systemName);
       } catch (error) {
-        logger.debug(`Error propagating to ${systemName}:`, error);
+        logger.debug(`Error propagating to ${systemName}:`, toReadonlyRecord(error));
       }
     }
   }
@@ -664,7 +665,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
           }
         }
       } catch (error) {
-        logger.debug(`Error updating metrics for ${name}:`, error);
+        logger.debug(`Error updating metrics for ${name}:`, toReadonlyRecord(error));
       }
     }
   }
@@ -694,7 +695,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
           await system.instance.cleanup();
         }
       } catch (error) {
-        logger.debug(`Cleanup error in ${name}:`, error);
+        logger.debug(`Cleanup error in ${name}:`, toReadonlyRecord(error));
       }
     });
 

@@ -17,7 +17,8 @@ function deepMerge<T extends Record<string, unknown>>(base: T, override: Partial
       !Array.isArray(baseVal) &&
       !Array.isArray(overrideVal)
     ) {
-      result[key] = deepMerge(baseVal, overrideVal);
+      // Cast to any for nested merge to avoid generic constraint complexity
+      result[key] = deepMerge(baseVal as any, overrideVal as any);
     } else if (overrideVal !== undefined) {
       result[key] = overrideVal;
     }
@@ -76,8 +77,6 @@ export class ProductionHardeningSystem extends EventEmitter {
     config: Partial<ProductionHardeningConfig> = {}
   ): ProductionHardeningSystem {
     if (!this.instance) {
-      this.instance = new ProductionHardeningSystem(deepMerge(defaultConfig, config));
-
       const merged: ProductionHardeningConfig = {
         security: {
           rateLimiting: {

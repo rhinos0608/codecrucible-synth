@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 
 import { logger } from '../logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { ProductionHardeningSystem } from './production-hardening-system.js';
 import { ProductionStats } from './hardening-types.js';
 import {
@@ -14,140 +15,30 @@ import {
   ResourceSnapshot,
 } from './production-resource-enforcer.js';
 import { ObservabilitySystem } from '../observability/observability-system.js';
+import { EnvironmentManager } from './environment-manager.js';
+import { HealthMonitoring } from './health-monitoring.js';
+import { DeploymentOrchestrator } from './deployment-orchestrator.js';
+import { ScalingCoordinator } from './scaling-coordinator.js';
+import { SecurityIntegration } from './security-integration.js';
+import { BackupCoordinator } from './backup-coordinator.js';
+import { MetricsCollector } from './metrics-collector.js';
+import { RollbackManager } from './rollback-manager.js';
 import {
   ProductionIntegrationConfig,
   IntegratedSystemHealth,
   ProductionOperationContext,
+  ComponentHealth,
+  SystemRecommendation,
 } from './production-types.js';
 
 // Production Integration Manager - Class implementation only
-export interface ProductionIntegrationConfig {
-  // Component Enablement
-  components: {
-    hardeningSystem: boolean;
-    securityAuditLogger: boolean;
-    resourceEnforcer: boolean;
-    observabilitySystem: boolean;
-    emergencyProcedures: boolean;
-  };
-
-  // Integration Settings
-  integration: {
-    startupSequence: string[]; // Order of component initialization
-    shutdownSequence: string[]; // Order of component shutdown
-    healthCheckInterval: number; // Interval for integrated health checks
-    emergencyResponseTime: number; // Max time for emergency response
-    coordinationEnabled: boolean; // Enable inter-component coordination
-  };
-
-  // Operational Thresholds
-  thresholds: {
-    systemHealthScore: number; // Minimum overall system health score
-    emergencyTriggerScore: number; // Score that triggers emergency mode
-    performanceBaseline: {
-      maxResponseTime: number; // Maximum acceptable response time
-      minThroughput: number; // Minimum operations per second
-      maxErrorRate: number; // Maximum error rate percentage
-    };
-  };
-
-  // Enterprise Features
-  enterprise: {
-    highAvailabilityMode: boolean; // Enable HA features
-    disasterRecoveryEnabled: boolean; // Enable DR procedures
-    complianceReportingEnabled: boolean; // Enable compliance features
-    auditTrailEnabled: boolean; // Enable comprehensive audit trails
-    performanceOptimizationEnabled: boolean; // Enable auto-optimization
-  };
-}
-
-// Integrated System Health Status
-export interface IntegratedSystemHealth {
-  timestamp: number;
-  overallStatus: 'healthy' | 'degraded' | 'critical' | 'emergency';
-  overallScore: number;
-
-  components: {
-    hardeningSystem: ComponentHealth;
-    securityAuditLogger: ComponentHealth;
-    resourceEnforcer: ComponentHealth;
-    observabilitySystem: ComponentHealth;
-  };
-
-  systemMetrics: {
-    uptime: number;
-    totalOperations: number;
-    successRate: number;
-    avgResponseTime: number;
-    currentThroughput: number;
-  };
-
-  alerts: {
-    active: number;
-    critical: number;
-    warnings: number;
-    lastAlert?: string;
-  };
-
-  recommendations: SystemRecommendation[];
-}
-
-interface ComponentHealth {
-  status: 'healthy' | 'degraded' | 'critical' | 'offline';
-  lastChecked: number;
-  uptime: number;
-  metrics: any;
-  issues: string[];
-}
-
-interface SystemRecommendation {
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  category: 'performance' | 'security' | 'reliability' | 'compliance';
-  description: string;
-  action: string;
-  estimatedImpact: string;
-}
-
-// Production Operation Context
-export interface ProductionOperationContext {
-  operationId: string;
-  startTime: number;
-  endTime?: number;
-  duration?: number;
-
-  // Component tracking
-  componentStates: {
-    hardeningApplied: boolean;
-    securityAudited: boolean;
-    resourcesEnforced: boolean;
-    observabilityTracked: boolean;
-  };
-
-  // Performance tracking
-  performance: {
-    responseTime: number;
-    memoryUsed: number;
-    cpuUsed: number;
-    resourceEfficiency: number;
-  };
-
-  // Security tracking
-  security: {
-    threatsDetected: number;
-    securityViolations: string[];
-    auditTrailId?: string;
-  };
-
-  status: 'initializing' | 'running' | 'completed' | 'failed';
-  metadata: Record<string, unknown>;
-}
 
 
 export class ProductionIntegrationManager extends EventEmitter {
   private static instance?: ProductionIntegrationManager;
   private readonly orchestrator: DeploymentOrchestrator;
-  private readonly env: unknown; // TODO: Implement EnvironmentManager
-  private readonly health: unknown; // TODO: Implement HealthMonitoring
+  private readonly env: EnvironmentManager;
+  private readonly health: HealthMonitoring;
   
   // Component instances
   private hardeningSystem?: ProductionHardeningSystem;
@@ -179,39 +70,19 @@ export class ProductionIntegrationManager extends EventEmitter {
 
   private constructor(private readonly config: ProductionIntegrationConfig) {
     super();
-    
-    // Create placeholder implementations for missing dependencies
-    this.env = { 
-      initialize: async () => {},
-      shutdown: async () => {},
-    } as any;
-    
-    this.health = {
-      checkHealth: async (): Promise<IntegratedSystemHealth> => ({
-        timestamp: Date.now(),
-        overallStatus: 'healthy',
-        overallScore: 1.0,
-        components: {
-          hardeningSystem: this.createOfflineHealth('hardeningSystem'),
-          securityAuditLogger: this.createOfflineHealth('securityAuditLogger'),
-          resourceEnforcer: this.createOfflineHealth('resourceEnforcer'),
-          observabilitySystem: this.createOfflineHealth('observabilitySystem'),
-        },
-        systemMetrics: {
-          uptime: Date.now() - this.systemStartTime,
-          totalOperations: this.integrationStats.totalOperations,
-          successRate: this.integrationStats.successRate,
-          avgResponseTime: this.integrationStats.avgResponseTime,
-          currentThroughput: this.integrationStats.currentThroughput,
-        },
-        alerts: { active: 0, critical: 0, warnings: 0 },
-        recommendations: [],
-      }),
-    } as any;
-    
-    this.orchestrator = {
-      deploy: async (config: any): Promise<IntegratedSystemHealth> => this.health.checkHealth(),
-    } as any;
+    // Initialize real dependencies
+    this.env = new EnvironmentManager(config);
+    this.health = new HealthMonitoring();
+
+    this.orchestrator = new DeploymentOrchestrator(
+      this.env,
+      this.health,
+      new ScalingCoordinator(),
+      new SecurityIntegration(),
+      new BackupCoordinator(),
+      new MetricsCollector(),
+      new RollbackManager()
+    );
   }
 
   static getInstance(config: ProductionIntegrationConfig): ProductionIntegrationManager {
@@ -253,7 +124,7 @@ export class ProductionIntegrationManager extends EventEmitter {
           await this.initializeComponent(componentName);
           logger.info(`✅ ${componentName} initialized successfully`);
         } catch (error) {
-          logger.error(`❌ Failed to initialize ${componentName}:`, error);
+          logger.error(`❌ Failed to initialize ${componentName}:`, toErrorOrUndefined(error));
           throw error;
         }
       }
@@ -400,7 +271,7 @@ export class ProductionIntegrationManager extends EventEmitter {
       try {
         await this.performIntegratedHealthCheck();
       } catch (error) {
-        logger.error('Integrated health check failed:', error);
+        logger.error('Integrated health check failed:', toErrorOrUndefined(error));
       }
     }, this.config.integration.healthCheckInterval);
 
@@ -505,7 +376,7 @@ export class ProductionIntegrationManager extends EventEmitter {
     }
 
     // Security audit - post-execution
-    if (this.config.components.securityAuditLogger && context.security.auditTrailId) {
+    if (this.securityAuditLogger && this.config.components.securityAuditLogger && context.security.auditTrailId) {
       await this.securityAuditLogger.logSecurityEvent({
         eventType: success ? SecurityEventType.SYSTEM_START : SecurityEventType.SECURITY_ALERT,
         severity: success ? SecuritySeverity.INFO : SecuritySeverity.MEDIUM,
@@ -534,8 +405,7 @@ export class ProductionIntegrationManager extends EventEmitter {
     await this.recordOperationCompletion(context, false);
 
     // Log failure details
-    logger.error(`Operation failed: ${context.operationId}`, {
-      error: error.message,
+    logger.error(`Operation failed: ${context.operationId}`, error, {
       duration: context.duration,
       componentStates: context.componentStates,
     });
@@ -552,38 +422,48 @@ export class ProductionIntegrationManager extends EventEmitter {
     this.emit('initialization:failed', { error });
   }
 
-  async executeWithProductionHardening(): Promise<IntegratedSystemHealth> {
+  async executeWithProductionHardening<T>(
+    operationId: string,
+    operation: () => Promise<T>,
+    options: any = {}
+  ): Promise<T> {
+    const context = this.createOperationContext(operationId, options ?? {});
+    this.activeOperations.set(operationId, context);
+    context.status = 'running';
+
+    const run = async () => {
+      if (this.hardeningSystem) {
+        return this.hardeningSystem.executeWithHardening(operationId, operation, options);
+      }
+      return operation();
+    };
+
     try {
-      return await this.orchestrator.deploy(this.config);
+      let result: T;
+      if (this.resourceEnforcer) {
+        result = await this.resourceEnforcer.executeWithEnforcement(operationId, run, {
+          resourceRequirements: options?.resourceRequirements,
+          priority: options?.priority,
+          timeout: options?.timeout,
+        });
+      } else {
+        result = await run();
+      }
+
+      context.endTime = Date.now();
+      context.duration = context.endTime - context.startTime;
+      context.status = 'completed';
+      await this.recordOperationCompletion(context, true);
+      return result;
     } catch (error) {
-      logger.error('Production hardening execution failed:', error);
-      
-      return {
-        timestamp: Date.now(),
-        overallStatus: 'critical',
-        overallScore: 0.1,
-        components: {
-          hardeningSystem: {
-            status: 'critical',
-            lastChecked: Date.now(),
-            uptime: 0,
-            metrics: {},
-            issues: [`Health check failed: ${(error as Error).message}`],
-          },
-          securityAuditLogger: this.createOfflineHealth('securityAuditLogger'),
-          resourceEnforcer: this.createOfflineHealth('resourceEnforcer'),
-          observabilitySystem: this.createOfflineHealth('observabilitySystem'),
-        },
-        systemMetrics: {
-          uptime: Date.now() - this.systemStartTime,
-          totalOperations: this.integrationStats.totalOperations,
-          successRate: this.integrationStats.successRate,
-          avgResponseTime: this.integrationStats.avgResponseTime,
-          currentThroughput: this.integrationStats.currentThroughput,
-        },
-        alerts: { active: 1, critical: 1, warnings: 0, lastAlert: 'Production hardening failed' },
-        recommendations: [],
-      };
+      context.endTime = Date.now();
+      context.duration = context.endTime - context.startTime;
+      context.status = 'failed';
+      await this.handleOperationFailure(context, error as Error);
+      await this.recordOperationCompletion(context, false);
+      throw error;
+    } finally {
+      this.activeOperations.delete(operationId);
     }
   }
 
@@ -895,7 +775,7 @@ export class ProductionIntegrationManager extends EventEmitter {
 
   // === Missing Methods ===
 
-  private async triggerEmergencyMode(reason: string, source: string): Promise<void> {
+  public async triggerEmergencyMode(reason: string, source: string): Promise<void> {
     this.emergencyMode = true;
     logger.error(`Emergency mode activated: ${reason} (source: ${source})`);
     
@@ -909,7 +789,7 @@ export class ProductionIntegrationManager extends EventEmitter {
     try {
       await this.performEmergencyStabilization();
     } catch (error) {
-      logger.error('Emergency stabilization failed:', error);
+      logger.error('Emergency stabilization failed:', toErrorOrUndefined(error));
     }
   }
 
@@ -927,7 +807,7 @@ export class ProductionIntegrationManager extends EventEmitter {
       try {
         await this.resourceEnforcer.performEmergencyCleanup();
       } catch (error) {
-        logger.warn('Resource enforcer emergency cleanup failed:', error);
+        logger.warn('Resource enforcer emergency cleanup failed:', toReadonlyRecord(error));
       }
     }
   }

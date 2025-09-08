@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool';
 import { logger } from '../logging/logger';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { ExaSearchTool } from '../../mcp-tools/exa-search-tool';
 
 // Schema definitions
@@ -122,7 +123,7 @@ async function basicWebSearch(
       };
     }
     
-    logger.warn('Basic web search fallback failed:', error);
+    logger.warn('Basic web search fallback failed:', toReadonlyRecord(error));
     return {
       success: false,
       query,
@@ -170,7 +171,7 @@ export class RefDocumentationTool extends BaseTool<typeof RefDocumentationSchema
         source: 'mcp-ref-fallback',
       };
     } catch (error) {
-      logger.error('MCP Ref Documentation Search failed:', error);
+      logger.error('MCP Ref Documentation Search failed:', toErrorOrUndefined(error));
       return {
         error: `Documentation search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         query: params.query,
@@ -242,7 +243,7 @@ export class ExaWebSearchTool extends BaseTool<typeof ExaWebSearchSchema.shape> 
             source: 'exa-ai',
           };
         } catch (exaError) {
-          logger.warn('Exa search failed, trying fallback:', exaError);
+          logger.warn('Exa search failed, trying fallback:', toReadonlyRecord(exaError));
         }
       }
 
@@ -250,7 +251,7 @@ export class ExaWebSearchTool extends BaseTool<typeof ExaWebSearchSchema.shape> 
       const fallbackResult = await basicWebSearch(params.query, params.numResults);
       return fallbackResult;
     } catch (error) {
-      logger.error('MCP Exa Web Search failed:', error);
+      logger.error('MCP Exa Web Search failed:', toErrorOrUndefined(error));
       return {
         error: `Web search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         query: params.query,
@@ -386,7 +387,7 @@ export class ExaDeepResearchTool extends BaseTool<typeof ExaDeepResearchSchema.s
             source: 'exa-deep-research',
           };
         } catch (exaError) {
-          logger.warn('Exa deep research failed, using basic approach:', exaError);
+          logger.warn('Exa deep research failed, using basic approach:', toReadonlyRecord(exaError));
         }
       }
 
@@ -426,7 +427,7 @@ export class ExaDeepResearchTool extends BaseTool<typeof ExaDeepResearchSchema.s
         };
       }
     } catch (error) {
-      logger.error('MCP Deep Research failed:', error);
+      logger.error('MCP Deep Research failed:', toErrorOrUndefined(error));
       return {
         error: `Deep research failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         topic: params.topic,
@@ -610,7 +611,7 @@ export class ExaCompanyResearchTool extends BaseTool<typeof ExaCompanyResearchSc
             source: 'exa-company-research',
           };
         } catch (exaError) {
-          logger.warn('Exa company research failed, using basic approach:', exaError);
+          logger.warn('Exa company research failed, using basic approach:', toReadonlyRecord(exaError));
         }
       }
 
@@ -664,7 +665,7 @@ export class ExaCompanyResearchTool extends BaseTool<typeof ExaCompanyResearchSc
         };
       }
     } catch (error) {
-      logger.error('MCP Company Research failed:', error);
+      logger.error('MCP Company Research failed:', toErrorOrUndefined(error));
       return {
         error: `Company research failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         company: params.company,
@@ -766,7 +767,7 @@ export class MCPServerTool extends BaseTool<typeof MCPServerSchema.shape> {
           };
       }
     } catch (error) {
-      logger.error('MCP Server operation failed:', error);
+      logger.error('MCP Server operation failed:', toErrorOrUndefined(error));
       return {
         error: `MCP operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         action: params.action,

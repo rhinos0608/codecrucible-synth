@@ -1,6 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from '../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../utils/type-guards.js';
 import { SmitheryConfig, SmitheryRegistryIntegration } from './smithery-registry-integration.js';
 
 export interface SmitheryMCPConfig {
@@ -94,7 +95,7 @@ export class SmitheryMCPServer {
 
       logger.info('Smithery MCP server initialized successfully');
     } catch (error) {
-      logger.error('Error initializing Smithery MCP server:', error);
+      logger.error('Error initializing Smithery MCP server:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -157,7 +158,7 @@ export class SmitheryMCPServer {
 
       logger.info(`Discovered ${servers.length} servers with ${this.availableTools.size} tools`);
     } catch (error) {
-      logger.error('Error discovering Smithery servers:', error);
+      logger.error('Error discovering Smithery servers:', toErrorOrUndefined(error));
       // Continue with empty tools if discovery fails
     }
   }
@@ -181,7 +182,7 @@ export class SmitheryMCPServer {
         ],
       };
     } catch (error: unknown) {
-      logger.error(`Tool execution error for ${name}:`, error);
+      logger.error(`Tool execution error for ${name}:`, toErrorOrUndefined(error));
       const message = error instanceof Error ? error.message : 'Unknown error';
       return {
         content: [

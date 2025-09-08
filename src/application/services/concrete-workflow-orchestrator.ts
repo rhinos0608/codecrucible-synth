@@ -26,6 +26,7 @@ import {
 } from '../../domain/interfaces/model-client.js';
 import { IMcpManager } from '../../domain/interfaces/mcp-manager.js';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { randomUUID } from 'crypto';
 import { RequestExecutionManager } from '../../infrastructure/execution/request-execution-manager.js';
 import { ToolRegistry } from './orchestrator/tool-registry.js';
@@ -173,7 +174,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       logger.info('ConcreteWorkflowOrchestrator: Shutdown complete.');
       this.eventBus?.emit('orchestrator:shutdown', { timestamp: Date.now() });
     } catch (err) {
-      logger.error('Error during orchestrator shutdown:', err);
+      logger.error('Error during orchestrator shutdown', toErrorOrUndefined(err));
       throw err;
     }
   }
@@ -779,7 +780,7 @@ User Request: ${userPrompt}`;
           }
         } catch (err) {
           // If MCP tool failed, allow fallback to local fs below
-          logger.debug('MCP stats tool failed, falling back to fs.stat:', err);
+          logger.debug('MCP stats tool failed, falling back to fs.stat', { error: toReadonlyRecord(err) });
           usedMcp = false;
         }
       }
@@ -819,7 +820,7 @@ User Request: ${userPrompt}`;
             fileContent = undefined;
           }
         } catch (err) {
-          logger.debug('MCP read tool threw, falling back to fs.readFile:', err);
+          logger.debug('MCP read tool threw, falling back to fs.readFile', { error: toReadonlyRecord(err) });
           fileContent = undefined;
         }
       }
@@ -876,7 +877,7 @@ User Request: ${userPrompt}`;
         try {
           modelResponse = await this.processToolCalls(modelResponse, request, modelRequest);
         } catch (err) {
-          logger.warn('Processing tool calls during analysis failed:', err);
+          logger.warn('Processing tool calls during analysis failed', { error: toReadonlyRecord(err) });
         }
 
         // Try to parse model text into JSON result if the model returned plain text
@@ -967,10 +968,7 @@ User Request: ${userPrompt}`;
       this.eventBus.emit('workflow:analysis_completed', { id: request.id, path: resolvedPath });
       return result;
     } catch (err: unknown) {
-      logger.error('Analysis request failed', {
-        path: typeof resolvedPath !== 'undefined' ? resolvedPath : '',
-        error: toError(err),
-      });
+      logger.error('Analysis request failed', toErrorOrUndefined(err));
       this.eventBus.emit('workflow:analysis_failed', {
         id: request?.id,
         path: typeof resolvedPath !== 'undefined' ? resolvedPath : '',

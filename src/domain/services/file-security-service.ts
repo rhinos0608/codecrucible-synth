@@ -96,9 +96,9 @@ export enum FileOperation {
  * Handles all file security validation and policy enforcement
  */
 export class FileSecurityService {
-  private defaultPolicy: FileSecurityPolicy;
+  private readonly defaultPolicy: FileSecurityPolicy;
 
-  constructor(policy?: Partial<FileSecurityPolicy>) {
+  public constructor(policy?: Readonly<Partial<FileSecurityPolicy>>) {
     this.defaultPolicy = {
       allowedExtensions: [
         '.txt',
@@ -128,7 +128,7 @@ export class FileSecurityService {
   /**
    * Validate file path for security violations
    */
-  validatePath(path: string, policy?: Partial<FileSecurityPolicy>): PathValidationResult {
+  public validatePath(path: string, policy?: Readonly<Partial<FileSecurityPolicy>>): PathValidationResult {
     const effectivePolicy = { ...this.defaultPolicy, ...policy };
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
@@ -222,10 +222,10 @@ export class FileSecurityService {
   /**
    * Validate file extension and content type
    */
-  validateFile(
+  public validateFile(
     filePath: string,
     fileSize?: number,
-    policy?: Partial<FileSecurityPolicy>
+    policy?: Readonly<Partial<FileSecurityPolicy>>
   ): FileValidationResult {
     const effectivePolicy = { ...this.defaultPolicy, ...policy };
     const violations: SecurityViolation[] = [];
@@ -297,9 +297,9 @@ export class FileSecurityService {
   /**
    * Validate file access request based on user permissions
    */
-  validateFileAccess(
-    request: FileAccessRequest,
-    policy?: Partial<FileSecurityPolicy>
+  public validateFileAccess(
+    request: Readonly<FileAccessRequest>,
+    policy?: Readonly<Partial<FileSecurityPolicy>>
   ): FileValidationResult {
     const pathValidation = this.validatePath(request.path, policy);
     const fileValidation = this.validateFile(request.path, undefined, policy);
@@ -329,7 +329,7 @@ export class FileSecurityService {
   /**
    * Sanitize file path using centralized PathUtilities
    */
-  sanitizePath(path: string): string {
+  public sanitizePath(path: string): string {
     // Use centralized path normalization for consistency
     return PathUtilities.normalizeAIPath(path, {
       allowAbsolute: true,
@@ -342,7 +342,7 @@ export class FileSecurityService {
   /**
    * Generate secure filename with random suffix
    */
-  generateSecureFilename(originalName: string, includeTimestamp: boolean = true): string {
+  public generateSecureFilename(originalName: string, includeTimestamp: boolean = true): string {
     const sanitizedBase = this.sanitizeFilename(originalName);
     const extension = this.extractExtension(sanitizedBase);
     const baseName = sanitizedBase.replace(extension, '');
@@ -364,13 +364,21 @@ export class FileSecurityService {
   /**
    * Check if file content appears malicious (basic heuristics)
    */
-  scanFileContent(content: string | Buffer, filename: string): FileValidationResult {
+  public scanFileContent(content: Readonly<string> | Readonly<Buffer>, filename: Readonly<string>): FileValidationResult {
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
 
-    const stringContent = Buffer.isBuffer(content)
-      ? content.toString('utf8', 0, Math.min(content.length, 10000))
-      : content;
+    let stringContent: string;
+    if (typeof content === 'string') {
+      // content is a string here
+      stringContent = content;
+    } else if (Buffer.isBuffer(content)) {
+      // Buffer.isBuffer is a type guard and narrows `content` to Buffer
+      stringContent = content.toString('utf8', 0, Math.min(content.length, 10000));
+    } else {
+      // Fallback coercion for other possible read-only buffer-like types
+      stringContent = String(content);
+    }
 
     // Check for script injection patterns
     const scriptPatterns = [
@@ -457,7 +465,7 @@ export class FileSecurityService {
   /**
    * Create a security policy for specific use case
    */
-  createPolicy(useCase: PolicyUseCase): FileSecurityPolicy {
+  public createPolicy(useCase: PolicyUseCase): FileSecurityPolicy {
     switch (useCase) {
       case PolicyUseCase.CODE_FILES:
         return {
@@ -553,16 +561,20 @@ export class FileSecurityService {
   }
 
   private findInvalidCharacters(path: string): string[] {
-    const invalidChars = /[<>:"|?*\x00-\x1f\x7f]/g;
+    // Use a RegExp constructed from a string with escaped hex ranges to avoid
+    // embedding raw control characters in the source file.
+    const invalidChars = new RegExp('[<>:"|?*\\x00-\\x1f\\x7f]', 'g');
     const matches = path.match(invalidChars);
     return matches ? [...new Set(matches)] : [];
   }
 
   private removeInvalidCharacters(path: string): string {
-    return path.replace(/[<>:"|?*\x00-\x1f\x7f]/g, '');
+    // Use the same RegExp construction for replacement to avoid control characters
+    // in the literal regex.
+    return path.replace(new RegExp('[<>:"|?*\\x00-\\x1f\\x7f]', 'g'), '');
   }
 
-  private findForbiddenDirectory(path: string, forbiddenDirs: string[]): string | null {
+  private findForbiddenDirectory(path: string, forbiddenDirs: ReadonlyArray<string>): string | null {
     const normalizedPath = path.toLowerCase().replace(/\\/g, '/');
 
     for (const forbiddenDir of forbiddenDirs) {
@@ -602,7 +614,7 @@ export class FileSecurityService {
 
   private sanitizeFilename(filename: string): string {
     // Remove path components
-    let sanitized = filename.replace(/^.*[\\\/]/, '');
+    let sanitized = filename.replace(/^.*[\\/]/, '');
 
     // Remove invalid characters
     sanitized = this.removeInvalidCharacters(sanitized);
@@ -657,7 +669,7 @@ export class FileSecurityService {
     }
   }
 
-  private validateOperation(request: FileAccessRequest): {
+  private validateOperation(_request: Readonly<FileAccessRequest>): {
     violations: SecurityViolation[];
     recommendations: string[];
   } {

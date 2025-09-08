@@ -9,6 +9,7 @@ import Redis from 'redis';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { logger } from '../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../utils/type-guards.js';
 import { performance } from 'perf_hooks';
 
 export interface ProductionDatabaseConfig {
@@ -110,7 +111,7 @@ export class ProductionDatabaseManager {
         redis: !!this.redisClient,
       });
     } catch (error) {
-      logger.error('Failed to initialize database:', error);
+      logger.error('Failed to initialize database:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -185,7 +186,7 @@ export class ProductionDatabaseManager {
         this.replicaPools.push(replicaPool);
         logger.info(`Read replica connected: ${replica.host}`);
       } catch (error) {
-        logger.error(`Failed to connect to read replica ${replica.host}:`, error);
+        logger.error(`Failed to connect to read replica ${replica.host}:`, toErrorOrUndefined(error));
       }
     }
   }
@@ -211,7 +212,7 @@ export class ProductionDatabaseManager {
 
       logger.info('Redis cache connected');
     } catch (error) {
-      logger.error('Redis connection failed:', error);
+      logger.error('Redis connection failed:', toErrorOrUndefined(error));
       this.redisClient = undefined;
     }
   }
@@ -232,7 +233,7 @@ export class ProductionDatabaseManager {
         logger.info('Database is up to date');
       }
     } catch (error) {
-      logger.error('Migration failed:', error);
+      logger.error('Migration failed:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -291,11 +292,7 @@ export class ProductionDatabaseManager {
       }
     } catch (error: any) {
       this.trackQueryMetrics(queryId, performance.now() - startTime, false, true);
-      logger.error('Query execution failed:', {
-        sql: sql.substring(0, 100),
-        error: error.message,
-        duration: performance.now() - startTime,
-      });
+      logger.error('Query execution failed:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -517,7 +514,7 @@ export class ProductionDatabaseManager {
         health.master = true;
       }
     } catch (error) {
-      logger.error('Master database health check failed:', error);
+      logger.error('Master database health check failed:', toErrorOrUndefined(error));
     }
 
     // Check replica connections
@@ -529,7 +526,7 @@ export class ProductionDatabaseManager {
         health.replicas.push(true);
       } catch (error) {
         health.replicas.push(false);
-        logger.error('Replica health check failed:', error);
+        logger.error('Replica health check failed:', toErrorOrUndefined(error));
       }
     }
 
@@ -540,7 +537,7 @@ export class ProductionDatabaseManager {
         health.redis = true;
       }
     } catch (error) {
-      logger.error('Redis health check failed:', error);
+      logger.error('Redis health check failed:', toErrorOrUndefined(error));
     }
 
     return health;
@@ -586,7 +583,7 @@ export class ProductionDatabaseManager {
       const cached = await this.redisClient.get(key);
       return cached ? JSON.parse(cached as string) : null;
     } catch (error) {
-      logger.warn('Cache get failed:', error);
+      logger.warn('Cache get failed:', toReadonlyRecord(error));
       return null;
     }
   }
@@ -603,7 +600,7 @@ export class ProductionDatabaseManager {
       const key = `query:${queryId}:${JSON.stringify(params)}`;
       await this.redisClient.setEx(key, ttl, JSON.stringify(result));
     } catch (error) {
-      logger.warn('Cache set failed:', error);
+      logger.warn('Cache set failed:', toReadonlyRecord(error));
     }
   }
 

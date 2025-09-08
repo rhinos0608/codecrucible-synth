@@ -1,4 +1,5 @@
 import { logger } from '../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../utils/type-guards.js';
 
 export interface HuggingFaceConfig {
   enabled: boolean;
@@ -135,7 +136,7 @@ export class HuggingFaceTool {
         ? response.map((model) => this.processModelInfo(model))
         : [];
     } catch (error) {
-      logger.error('Hugging Face model search failed:', error);
+      logger.error('Hugging Face model search failed', toErrorOrUndefined(error));
       this.handleError(error);
       throw error;
     }
@@ -167,7 +168,7 @@ export class HuggingFaceTool {
 
       return this.processModelInfo(response);
     } catch (error) {
-      logger.error('Failed to get model info:', error);
+      logger.error('Failed to get model info', toErrorOrUndefined(error));
       this.handleError(error);
       throw error;
     }
@@ -222,7 +223,7 @@ export class HuggingFaceTool {
         ? response.map((dataset) => this.processDatasetInfo(dataset))
         : [];
     } catch (error) {
-      logger.error('Hugging Face dataset search failed:', error);
+      logger.error('Hugging Face dataset search failed', toErrorOrUndefined(error));
       this.handleError(error);
       throw error;
     }
@@ -269,7 +270,7 @@ export class HuggingFaceTool {
         ? response.map((space) => this.processSpaceInfo(space))
         : [];
     } catch (error) {
-      logger.error('Hugging Face spaces search failed:', error);
+      logger.error('Hugging Face spaces search failed', toErrorOrUndefined(error));
       this.handleError(error);
       throw error;
     }
@@ -867,7 +868,7 @@ export class HuggingFaceTool {
       await this.searchModels('test', { limit: 1 });
       return true;
     } catch (error) {
-      logger.warn('Hugging Face connection test failed:', error);
+      logger.warn('Hugging Face connection test failed', { error: toReadonlyRecord(error) });
       return false;
     }
   }

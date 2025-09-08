@@ -5,6 +5,7 @@
 
 import { VoiceArchetypeSystem } from './voice-archetype-system.js';
 import { logger } from '../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../utils/type-guards.js';
 import { CouncilMode } from './collaboration/council-decision-engine.js';
 import { type IModelClient } from '../domain/interfaces/model-client.js';
 
@@ -126,7 +127,7 @@ export class VoiceSystemIntegration2025 {
       this.initialized = true;
       logger.info('Voice System Integration 2025 initialized successfully');
     } catch (error) {
-      logger.error('Failed to initialize Voice System Integration 2025:', error);
+      logger.error('Failed to initialize Voice System Integration 2025:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -146,7 +147,7 @@ export class VoiceSystemIntegration2025 {
       // Convert SynthesisResult to Record<string, unknown>
       return result as unknown as Record<string, unknown>;
     } catch (error) {
-      logger.error('Voice synthesis failed:', error);
+      logger.error('Voice synthesis failed:', toErrorOrUndefined(error));
 
       if (this.config.fallbackToLegacy) {
         logger.info('Falling back to legacy voice processing');
@@ -385,7 +386,7 @@ export class VoiceSystemIntegration2025 {
         const voiceResult = await this.synthesizeSingleVoice(voice, request, options);
         results.push(voiceResult);
       } catch (error) {
-        logger.error(`Failed to synthesize voice ${voice}:`, error);
+        logger.error(`Failed to synthesize voice ${voice}:`, toErrorOrUndefined(error));
         // Continue with other voices
       }
     }

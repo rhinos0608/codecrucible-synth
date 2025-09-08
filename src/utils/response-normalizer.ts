@@ -1,5 +1,6 @@
 import { logger } from '../infrastructure/logging/logger.js';
 import { ModelResponse } from '../domain/interfaces/model-client.js';
+import { toErrorOrUndefined } from './type-guards.js';
 
 /**
  * ResponseNormalizer - Unified utility for ensuring all responses are properly formatted
@@ -158,12 +159,7 @@ export class ResponseNormalizer {
     const isValid = typeof normalized === 'string' && normalized.length > 0;
 
     if (!isValid) {
-      logger.error('ResponseNormalizer: Normalization validation failed', {
-        inputType: typeof input,
-        normalizedType: typeof normalized,
-        normalizedLength: normalized.length || 0,
-        inputPreview: String(input).substring(0, 100),
-      });
+      logger.error('ResponseNormalizer: Normalization validation failed');
     }
 
     return isValid;

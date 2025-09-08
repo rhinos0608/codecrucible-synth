@@ -327,10 +327,10 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
       };
 
       const response = await agent.process(request);
-      contributions.set(agent.id, response.result);
+      contributions.set(agent.id, response.result as ExecutionResult);
 
       // Chain results
-      result.content += `\n${agent.name}: ${response.result.content}`;
+      result.content += `\n${agent.name}: ${(response.result as ExecutionResult).content}`;
     }
 
     return {
@@ -396,7 +396,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
     };
 
     const plan = await leader.process(planRequest);
-    contributions.set(`${leader.id}-plan`, plan.result);
+    contributions.set(`${leader.id}-plan`, plan.result as ExecutionResult);
 
     // Followers execute based on plan
     const executionResults = await Promise.all(
@@ -404,14 +404,14 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
         const request: AgentRequest = {
           id: `${task.id}-${agent.id}`,
           type: 'collaborate',
-          input: `${task.description}\nPlan: ${plan.result.content}`,
+          input: `${task.description}\nPlan: ${(plan.result as ExecutionResult).content}`,
           priority: 'high',
           context: this.context,
         };
 
         const result = await agent.process(request);
-        contributions.set(agent.id, result.result);
-        return result.result;
+        contributions.set(agent.id, result.result as ExecutionResult);
+        return result.result as ExecutionResult;
       })
     );
 
@@ -429,7 +429,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
     return {
       taskId: task.id,
       participants: agents.map(a => a.id),
-      result: synthesis.result,
+      result: synthesis.result as ExecutionResult,
       contributions,
       consensus: true,
       conflictsResolved: 0,
@@ -454,8 +454,8 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
         };
 
         const result = await agent.process(request);
-        contributions.set(agent.id, result.result);
-        return result.result;
+        contributions.set(agent.id, result.result as ExecutionResult);
+        return result.result as ExecutionResult;
       })
     );
 
@@ -480,8 +480,8 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
       content: results.map(r => r.content).join('\n\n--- MERGED RESULT ---\n\n'),
       metadata: {
         model: 'collaborative',
-        tokens: results.reduce((sum, r) => sum + (r.metadata?.tokens || 0), 0),
-        latency: Math.max(...results.map(r => r.metadata?.latency || 0)),
+        tokens: results.reduce((sum, r) => sum + (typeof r.metadata?.tokens === 'number' ? r.metadata.tokens : 0), 0),
+        latency: Math.max(...results.map(r => typeof r.metadata?.latency === 'number' ? r.metadata.latency : 0)),
       },
       executionTime: results.reduce((sum, r) => sum + r.executionTime, 0),
       resourcesUsed: [...new Set(results.flatMap(r => r.resourcesUsed))],
@@ -626,7 +626,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
       success: result.success,
       result,
       timestamp: new Date(),
-      executionTime: result.metadata?.latency || 0,
+      executionTime: typeof result.metadata?.latency === 'number' ? result.metadata.latency : 0,
     };
   }
 }

@@ -16,19 +16,22 @@ import { IVoiceRepository } from '../repositories/voice-repository.js';
  * Voice Orchestration Service Interface
  */
 export interface IVoiceOrchestrationService {
-  selectVoicesForRequest(
-    request: ProcessingRequest,
-    preferences?: VoiceSelectionPreferences
-  ): Promise<VoiceSelection>;
+  selectVoicesForRequest: (
+    request: Readonly<ProcessingRequest>,
+    preferences?: Readonly<VoiceSelectionPreferences>
+  ) => Promise<VoiceSelection>;
 
-  synthesizeVoiceResponses(
-    responses: VoiceResponse[],
+  synthesizeVoiceResponses: (
+    responses: ReadonlyArray<VoiceResponse>,
     synthesisMode: SynthesisMode
-  ): VoiceSynthesisResult;
+  ) => VoiceSynthesisResult;
 
-  detectVoiceConflicts(responses: VoiceResponse[]): VoiceConflict[];
+  detectVoiceConflicts: (responses: ReadonlyArray<VoiceResponse>) => VoiceConflict[];
 
-  resolveVoiceConflicts(conflicts: VoiceConflict[], voices: Voice[]): ConflictResolution[];
+  resolveVoiceConflicts: (
+    conflicts: ReadonlyArray<VoiceConflict>,
+    voices: ReadonlyArray<Voice>
+  ) => ConflictResolution[];
 }
 
 /**
@@ -43,8 +46,8 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
    * Business rule: Balance expertise, diversity, and constraints
    */
   async selectVoicesForRequest(
-    request: ProcessingRequest,
-    preferences?: VoiceSelectionPreferences
+    request: Readonly<ProcessingRequest>,
+    preferences?: Readonly<VoiceSelectionPreferences>
   ): Promise<VoiceSelection> {
     const availableVoices = await this.voiceRepository.findEnabledVoices();
 
@@ -102,7 +105,7 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
    * Business rule: Combine voices based on confidence and expertise
    */
   synthesizeVoiceResponses(
-    responses: VoiceResponse[],
+    responses: ReadonlyArray<VoiceResponse>,
     synthesisMode: SynthesisMode
   ): VoiceSynthesisResult {
     if (responses.length === 0) {
@@ -137,7 +140,7 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
    * Detect conflicts between voice responses
    * Business rule: Identify contradictory recommendations
    */
-  detectVoiceConflicts(responses: VoiceResponse[]): VoiceConflict[] {
+  detectVoiceConflicts(responses: ReadonlyArray<VoiceResponse>): VoiceConflict[] {
     const conflicts: VoiceConflict[] = [];
 
     for (let i = 0; i < responses.length; i++) {
@@ -156,7 +159,7 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
    * Resolve conflicts between voices
    * Business rule: Use expertise, confidence, and reasoning quality
    */
-  resolveVoiceConflicts(conflicts: VoiceConflict[], voices: Voice[]): ConflictResolution[] {
+  resolveVoiceConflicts(conflicts: ReadonlyArray<VoiceConflict>, voices: ReadonlyArray<Voice>): ConflictResolution[] {
     return conflicts.map(conflict => {
       const voice1 = voices.find(v => v.id === conflict.voice1Id);
       const voice2 = voices.find(v => v.id === conflict.voice2Id);
@@ -207,7 +210,7 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
 
   // Private helper methods
 
-  private determineTaskType(request: ProcessingRequest): 'creative' | 'analytical' | 'balanced' {
+  private determineTaskType(request: Readonly<ProcessingRequest>): 'creative' | 'analytical' | 'balanced' {
     switch (request.type) {
       case 'code-generation':
         return 'creative';
@@ -309,7 +312,7 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
     return reasons.join('\n');
   }
 
-  private synthesizeCompetitive(responses: VoiceResponse[]): VoiceSynthesisResult {
+  private synthesizeCompetitive(responses: ReadonlyArray<VoiceResponse>): VoiceSynthesisResult {
     // Pick the response with highest confidence
     const bestResponse = responses.reduce((best, current) =>
       current.confidence > best.confidence ? current : best
@@ -324,9 +327,9 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
     };
   }
 
-  private synthesizeCollaborative(responses: VoiceResponse[]): VoiceSynthesisResult {
+  private synthesizeCollaborative(responses: ReadonlyArray<VoiceResponse>): VoiceSynthesisResult {
     // Combine responses based on expertise and confidence
-    const combinedContent = responses
+    const combinedContent = [...responses]
       .sort((a, b) => b.confidence - a.confidence)
       .map(r => r.content)
       .join('\n\n');
@@ -343,7 +346,7 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
     };
   }
 
-  private synthesizeConsensus(responses: VoiceResponse[]): VoiceSynthesisResult {
+  private synthesizeConsensus(responses: ReadonlyArray<VoiceResponse>): VoiceSynthesisResult {
     // Find common elements across responses
     const consensusElements = this.findConsensusElements(responses);
     const consensusLevel = this.calculateConsensusLevel(responses);
@@ -360,7 +363,7 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
     };
   }
 
-  private synthesizeWeighted(responses: VoiceResponse[]): VoiceSynthesisResult {
+  private synthesizeWeighted(responses: ReadonlyArray<VoiceResponse>): VoiceSynthesisResult {
     // Weight responses by confidence and voice expertise
     const weightedContent = responses
       .map(r => ({
@@ -421,7 +424,7 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
     return null;
   }
 
-  private calculateConsensusLevel(responses: VoiceResponse[]): number {
+  private calculateConsensusLevel(responses: ReadonlyArray<VoiceResponse>): number {
     if (responses.length <= 1) return 1.0;
 
     // Simple consensus calculation based on content similarity
@@ -453,7 +456,7 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
     return union.length > 0 ? intersection.length / union.length : 0;
   }
 
-  private findConsensusElements(responses: VoiceResponse[]): string[] {
+  private findConsensusElements(responses: ReadonlyArray<VoiceResponse>): string[] {
     // Find common sentences or concepts across responses
     const sentences = responses.map(r =>
       r.content
@@ -507,7 +510,7 @@ export interface VoiceResponse {
 export interface VoiceSynthesisResult {
   finalResponse: string;
   synthesisMethod: string;
-  voiceContributions: VoiceResponse[];
+  voiceContributions: ReadonlyArray<VoiceResponse>;
   confidenceScore: number;
   consensusLevel: number;
 }

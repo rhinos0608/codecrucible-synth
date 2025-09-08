@@ -360,10 +360,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       this.activeStreams.delete(sessionId);
       this.destroySession(sessionId);
 
-      logger.error('Modern stream session failed', {
-        streamSessionId: sessionId,
-        error: toErrorOrUndefined(error),
-      });
+      logger.error('Modern stream session failed', toErrorOrUndefined(error));
 
       throw error;
     }
@@ -546,10 +543,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       this.activeStreams.delete(sessionId);
       this.destroySession(sessionId);
 
-      logger.error('Stream session failed', {
-        sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error('Stream session failed', toErrorOrUndefined(error));
 
       throw error;
     }

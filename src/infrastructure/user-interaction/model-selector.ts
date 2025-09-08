@@ -157,7 +157,7 @@ export class ModelSelector {
           case '\u001b[A': { // Up arrow
             this.selectedIndex = Math.max(0, this.selectedIndex - 1);
             this.renderModelList();
-            break;
+            
           }
           case '\u001b[B': { // Down arrow
             this.selectedIndex = Math.min(this.models.length - 1, this.selectedIndex + 1);
@@ -184,7 +184,7 @@ export class ModelSelector {
             rl.close();
             console.log('\n\n👋 Goodbye!');
             process.exit(0);
-            break;
+            return;
           }
           case 'q':
           case 'Q': {

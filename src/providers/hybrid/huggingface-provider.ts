@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 import {
   LLMCapabilities,
   LLMProvider,
@@ -221,7 +222,6 @@ export class HuggingFaceProvider implements LLMProvider {
       this.lastError = error instanceof Error ? error.message : String(error);
 
       logger.error('HuggingFace code generation failed', {
-        error: this.lastError,
         responseTime,
         model: options.model || this.config.defaultModel,
       });

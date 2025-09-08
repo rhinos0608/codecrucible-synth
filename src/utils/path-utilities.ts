@@ -10,6 +10,7 @@ import * as path from 'path';
 import { promises as fs } from 'fs';
 import * as fsSync from 'fs';
 import { logger } from '../infrastructure/logging/unified-logger.js';
+import { toReadonlyRecord } from './type-guards.js';
 
 export interface PathValidationResult {
   isValid: boolean;
@@ -233,7 +234,7 @@ export class PathUtilities {
       const normalizedTo = this.normalizeAIPath(to);
       return path.relative(normalizedFrom, normalizedTo);
     } catch (error) {
-      logger.warn(`Error calculating relative path from ${from} to ${to}:`, error);
+      logger.warn(`Error calculating relative path from ${from} to ${to}`, { error: toReadonlyRecord(error) });
       return to; // Fallback to original path
     }
   }
@@ -317,7 +318,7 @@ export class PathUtilities {
         return isSubdirectory;
       });
     } catch (error) {
-      logger.warn(`Error checking path boundaries for ${filePath}:`, error);
+      logger.warn(`Error checking path boundaries for ${filePath}`, { error: toReadonlyRecord(error) });
       return false;
     }
   }
@@ -330,7 +331,7 @@ export class PathUtilities {
       const normalized = this.normalizeAIPath(filePath);
       return path.dirname(normalized);
     } catch (error) {
-      logger.warn(`Error getting dirname for ${filePath}:`, error);
+      logger.warn(`Error getting dirname for ${filePath}`, { error: toReadonlyRecord(error) });
       return '.';
     }
   }
@@ -346,7 +347,7 @@ export class PathUtilities {
 
       return path.join(...normalizedSegments);
     } catch (error) {
-      logger.warn(`Error joining paths [${pathSegments.join(', ')}]:`, error);
+      logger.warn(`Error joining paths [${pathSegments.join(', ')}]`, { error: toReadonlyRecord(error) });
       return pathSegments[pathSegments.length - 1] || '.';
     }
   }
@@ -380,7 +381,7 @@ export class PathUtilities {
 
       return null;
     } catch (error) {
-      logger.warn(`Error resolving case-insensitive path for ${targetDir}:`, error);
+      logger.warn(`Error resolving case-insensitive path for ${targetDir}`, { error: toReadonlyRecord(error) });
       return null;
     }
   }

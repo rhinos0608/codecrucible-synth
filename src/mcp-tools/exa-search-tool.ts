@@ -1,4 +1,5 @@
 import { logger } from '../infrastructure/logging/logger.js';
+import { toError, toErrorOrUndefined } from '../utils/type-guards.js';
 import axios, { AxiosError } from 'axios';
 
 export interface ExaSearchConfig {
@@ -119,9 +120,9 @@ export class ExaSearchTool {
       };
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        logger.error('Exa search failed:', error.message);
+        logger.error('Exa search failed:', toError(error.message));
       } else {
-        logger.error('Exa search failed:', error);
+        logger.error('Exa search failed:', toErrorOrUndefined(error));
       }
 
       if (axios.isAxiosError(error) && error.response?.status === 401) {
@@ -259,10 +260,10 @@ export class ExaSearchTool {
       };
     } catch (error: unknown) {
       if (error instanceof Error) {
-        logger.error('Exa findSimilar failed:', error.message);
+        logger.error('Exa findSimilar failed', toError(error.message));
         throw new Error(`Exa findSimilar failed: ${error.message}`);
       } else {
-        logger.error('Exa findSimilar failed:', error);
+        logger.error('Exa findSimilar failed', toErrorOrUndefined(error));
         throw new Error('Exa findSimilar failed: Unknown error');
       }
     }
@@ -306,10 +307,10 @@ export class ExaSearchTool {
       return response.data as Record<string, unknown>;
     } catch (error: unknown) {
       if (error instanceof Error) {
-        logger.error('Exa getContent failed:', error.message);
+        logger.error('Exa getContent failed', toError(error.message));
         throw new Error(`Exa getContent failed: ${error.message}`);
       } else {
-        logger.error('Exa getContent failed:', error);
+        logger.error('Exa getContent failed', toErrorOrUndefined(error));
         throw new Error('Exa getContent failed: Unknown error');
       }
     }
@@ -438,7 +439,7 @@ export class ExaSearchTool {
       await this.search('test query', { numResults: 1 });
       return true;
     } catch (error) {
-      logger.warn('Exa Search connection test failed:', error);
+      logger.warn('Exa Search connection test failed', { error: toErrorOrUndefined(error) });
       return false;
     }
   }

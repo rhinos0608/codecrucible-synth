@@ -110,7 +110,8 @@ export class CLIUserInteraction implements IUserInteraction {
       }
     };
 
-    const answers = await inquirer.prompt<{ answer: string }>([inquirerOptions]);
+    // Cast to any to avoid strict Inquirer generic typing issues across versions
+    const answers = await (inquirer as any).prompt([{ ...(inquirerOptions as any) }]);
     return answers.answer;
   }
 

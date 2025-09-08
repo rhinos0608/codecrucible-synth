@@ -6,6 +6,7 @@
  */
 
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 import type { Document } from './types.js';
 
 export interface ParsedSearchResult {
@@ -134,7 +135,7 @@ export class SearchResultParser {
 
       return result;
     } catch (error) {
-      logger.error('Search result parsing failed', { error, outputLength: output.length });
+      logger.error('Search result parsing failed', toErrorOrUndefined(error));
       
       // Return empty result with error info
       return {

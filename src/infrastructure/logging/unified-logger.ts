@@ -8,6 +8,7 @@
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export enum LogLevel {
   DEBUG = 0,
@@ -85,34 +86,48 @@ export class UnifiedLogger extends EventEmitter {
     }
   }
 
-  public debug(message: string, metadata?: Record<string, unknown>): void {
-    this.log(LogLevel.DEBUG, message, metadata);
+  public debug(message: string, metadata?: unknown): void {
+    this.log(LogLevel.DEBUG, message, this.toMetadata(metadata));
   }
 
-  public trace(message: string, metadata?: Record<string, unknown>): void {
-    this.log(LogLevel.DEBUG, message, metadata);
+  public trace(message: string, metadata?: unknown): void {
+    this.log(LogLevel.DEBUG, message, this.toMetadata(metadata));
   }
 
-  public info(message: string, metadata?: Record<string, unknown>): void {
-    this.log(LogLevel.INFO, message, metadata);
+  public info(message: string, metadata?: unknown): void {
+    this.log(LogLevel.INFO, message, this.toMetadata(metadata));
   }
 
-  public warn(message: string, metadata?: Readonly<Record<string, unknown>>): void {
-    this.log(LogLevel.WARN, message, metadata);
+  public warn(message: string, metadata?: unknown): void {
+    this.log(LogLevel.WARN, message, this.toMetadata(metadata));
   }
 
-  public error(message: string, error?: Error, metadata?: Readonly<Record<string, unknown>>): void {
-    if (error instanceof Error) {
-      this.log(LogLevel.ERROR, message, { ...metadata, error: error.message, stack: error.stack });
-    } else {
-      this.log(LogLevel.ERROR, message, { ...metadata, error });
+  public error(message: string, errorOrMetadata?: unknown, metadata?: unknown): void {
+    const err = toErrorOrUndefined(errorOrMetadata);
+    if (err) {
+      this.log(LogLevel.ERROR, message, {
+        ...this.toMetadata(metadata),
+        error: err.message,
+        stack: err.stack,
+      });
+      return;
     }
+    // Treat first arg as metadata when not an Error
+    this.log(LogLevel.ERROR, message, {
+      ...this.toMetadata(errorOrMetadata),
+      ...this.toMetadata(metadata),
+    });
   }
 
-  public fatal(message: string, error?: Error, metadata?: Readonly<Record<string, unknown>>): void {
-    this.log(LogLevel.FATAL, message, { ...metadata, error });
+  public fatal(message: string, errorOrMetadata?: unknown, metadata?: unknown): void {
+    const err = toErrorOrUndefined(errorOrMetadata);
+    this.log(LogLevel.FATAL, message, {
+      ...this.toMetadata(err ? metadata : errorOrMetadata),
+      ...this.toMetadata(err ? metadata : undefined),
+      error: err,
+    });
     // Fatal errors might trigger system shutdown
-    this.emit('fatal', { message, error, metadata });
+    this.emit('fatal', { message, error: err, metadata: this.toMetadata(metadata) });
   }
 
   public audit(action: string, result: 'success' | 'failure', metadata?: Readonly<Record<string, unknown>>): void {
@@ -216,6 +231,15 @@ export class UnifiedLogger extends EventEmitter {
       // Send all non-error system logs to stderr to keep stdout clean for user responses
       process.stderr.write(`${color}${formatted}${resetColor}\n`);
     }
+  }
+
+  private toMetadata(meta: unknown): Readonly<Record<string, unknown>> | undefined {
+    if (meta === undefined || meta === null) return undefined;
+    if (typeof meta === 'object' && !Array.isArray(meta)) {
+      return meta as Readonly<Record<string, unknown>>;
+    }
+    // Box primitives/arrays for safe logging
+    return toReadonlyRecord(meta);
   }
 
   private getContext(): string {

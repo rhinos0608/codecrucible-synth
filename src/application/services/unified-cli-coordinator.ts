@@ -11,6 +11,7 @@ import { IWorkflowOrchestrator } from '../../domain/interfaces/workflow-orchestr
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 import { EnterpriseSecurityFramework } from '../../infrastructure/security/enterprise-security-framework.js';
 
 // Import all modular components
@@ -246,7 +247,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
       });
       logger.info('UnifiedCLICoordinator initialized with modular architecture');
     } catch (error) {
-      logger.error('Failed to initialize UnifiedCLICoordinator:', error);
+      logger.error('Failed to initialize UnifiedCLICoordinator:', toErrorOrUndefined(error));
       throw error;
     }
   }

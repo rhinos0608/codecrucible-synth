@@ -128,11 +128,7 @@ export class BasicResponseHandler implements ResponseHandler {
         });
         content = ''; // Explicitly set to empty string for tool-only responses
       } else {
-        logger.error('ResponseHandler could not extract content from response', {
-          responseType: typeof raw,
-          responseKeys: raw && typeof raw === 'object' ? Object.keys(raw) : 'N/A',
-          providerName: provider,
-        });
+        logger.error('ResponseHandler could not extract content from response');
         throw new Error(
           `${provider} returned no usable content. Check service availability and model configuration.`
         );
@@ -165,7 +161,7 @@ export class BasicResponseHandler implements ResponseHandler {
       throw error;
     }
     const errorMessage = String(error);
-    logger.error('ResponseHandler unknown error', { error: toError(errorMessage) });
+    logger.error('ResponseHandler unknown error', toError(errorMessage));
     throw new Error(errorMessage);
   }
 }

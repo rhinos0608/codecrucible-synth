@@ -13,6 +13,7 @@
 import { EventEmitter } from 'events';
 import { CacheConfig, CacheEntry, CacheManager } from './cache-manager.js';
 import { logger } from '../logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { createHash } from 'crypto';
 
 // Unified cache interfaces
@@ -96,7 +97,7 @@ export class UnifiedCacheSystem extends EventEmitter {
           return this.getStandard<T>(key);
       }
     } catch (error) {
-      logger.error('Unified cache get error:', { key, strategy: strategy.name, error });
+      logger.error('Unified cache get error:', toErrorOrUndefined(error), { key, strategy: strategy.name });
       return null;
     }
   }
@@ -317,7 +318,7 @@ export class UnifiedCacheSystem extends EventEmitter {
       });
       return true;
     } catch (error) {
-      logger.error('Cache set error:', error);
+      logger.error('Cache set error:', toErrorOrUndefined(error));
       return false;
     }
   }
@@ -346,7 +347,7 @@ export class UnifiedCacheSystem extends EventEmitter {
       });
       return true;
     } catch (error) {
-      logger.error('Secure cache set error:', error);
+      logger.error('Secure cache set error:', toErrorOrUndefined(error));
       return false;
     }
   }
@@ -375,7 +376,7 @@ export class UnifiedCacheSystem extends EventEmitter {
       });
       return true;
     } catch (error) {
-      logger.error('Performance cache set error:', error);
+      logger.error('Performance cache set error:', toErrorOrUndefined(error));
       return false;
     }
   }
@@ -482,7 +483,7 @@ export class UnifiedCacheSystem extends EventEmitter {
       }
       return embedding;
     } catch (error) {
-      logger.error('Embedding provider error:', error);
+      logger.error('Embedding provider error:', toErrorOrUndefined(error));
     }
 
     // Fallback to zero vector on error

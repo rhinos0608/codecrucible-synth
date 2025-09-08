@@ -176,11 +176,7 @@ export class LMStudioProvider {
 
       return response.content;
     } catch (error) {
-      logger.error('LMStudioProvider generateText failed', {
-        error: getErrorMessage(error),
-        model: this.model,
-        endpoint: this.config.endpoint,
-      });
+      logger.error('LMStudioProvider generateText failed', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -220,10 +216,7 @@ export class LMStudioProvider {
         }
       }());
     } catch (error) {
-      logger.error('LMStudioProvider generateTextStreaming failed', {
-        model: this.model,
-        error: toErrorOrUndefined(error),
-      });
+      logger.error('LMStudioProvider generateTextStreaming failed', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -266,10 +259,7 @@ export class LMStudioProvider {
 
       return response.content;
     } catch (error) {
-      logger.error('LMStudioProvider chat failed', {
-        model: this.model,
-        error: toErrorOrUndefined(error),
-      });
+      logger.error('LMStudioProvider chat failed', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -323,10 +313,7 @@ export class LMStudioProvider {
         metadata: { model: modelToUse, task },
       };
     } catch (error) {
-      logger.error('LMStudioProvider act failed', {
-        model: this.model,
-        error: toErrorOrUndefined(error),
-      });
+      logger.error('LMStudioProvider act failed', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -376,9 +363,7 @@ export class LMStudioProvider {
 
       throw new Error('No available models found. Please load a model in LM Studio first.');
     } catch (error) {
-      logger.error('LMStudioProvider model detection failed', {
-        error: toErrorOrUndefined(error),
-      });
+      logger.error('LMStudioProvider model detection failed', toErrorOrUndefined(error));
       throw error;
     }
   }

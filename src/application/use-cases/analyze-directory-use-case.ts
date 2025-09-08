@@ -18,6 +18,7 @@ import {
   WorkflowRequest,
 } from '../../domain/interfaces/workflow-orchestrator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 interface FileInfo {
   path: string;
@@ -114,7 +115,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
       };
     } catch (error) {
       const duration = performance.now() - startTime;
-      logger.error('Directory analysis failed:', error);
+      logger.error('Directory analysis failed', toErrorOrUndefined(error));
 
       return {
         success: false,
@@ -168,7 +169,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
           }
         }
       } catch (error) {
-        logger.warn(`Failed to scan directory ${currentPath}:`, error);
+        logger.warn(`Failed to scan directory ${currentPath}`, { error: toReadonlyRecord(error) });
       }
     };
 

@@ -13,7 +13,7 @@ import {
   UnifiedServerSystem,
 } from '../domain/services/unified-server-system.js';
 import { UnifiedConfigurationManager } from '../domain/config/config-manager.js';
-import { OptimizedEventBus as EventBus } from '../infrastructure/messaging/optimized-event-bus';
+import { createEventBus } from '../infrastructure/messaging/event-bus-factory.js';
 import { UnifiedSecurityValidator } from '../domain/services/unified-security-validator.js';
 import { UnifiedPerformanceSystem } from '../domain/services/unified-performance-system.js';
 import { CLIContext } from '../application/cli/cli-types.js';
@@ -69,7 +69,7 @@ export class ServerMode implements ServerModeInterface {
       await configManager.initialize();
       const unifiedConfig = configManager.getConfiguration();
 
-      const eventBus = new EventBus();
+      const eventBus = createEventBus({ enableProfiling: true });
       const securityLogger = createLogger('UnifiedSecurityValidator');
       const performanceLogger = createLogger('UnifiedPerformanceSystem');
 

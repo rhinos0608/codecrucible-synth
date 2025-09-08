@@ -1,0 +1,180 @@
+  public async readFile(path: Readonly<string>): Promise<string> {
+    // Try Rust streaming first for true performance
+    if (rustStreamingClient.isRustAvailable()) {
+      try {
+        logger.info(`🦀 Using Rust streaming for file read: ${path}`);
+
+        let fileContent = '';
+        let totalChunks = 0;
+        let totalBytes = 0;
+
+        // Create stream processor to accumulate chunks
+        const processor: StreamProcessor = {
+          async processChunk(chunk: Readonly<StreamChunk>): Promise<void> {
+            totalChunks++;
+            totalBytes += chunk.size;
+
+            // Accumulate data (for small files this is fine)
+            if (chunk.contentType === 'file_content' && chunk.data) {
+              if (typeof chunk.data === 'string') {
+                fileContent += chunk.data;
+              } else if (chunk.data instanceof Buffer) {
+                fileContent += chunk.data.toString('utf8');
+              } else if (chunk.data instanceof Uint8Array) {
+                fileContent += Buffer.from(chunk.data).toString('utf8');
+              } else {
+                fileContent += String(chunk.data);
+              }
+            }
+
+            // Log progress for large files
+            if (chunk.metadata.progress !== undefined) {
+              logger.debug(
+                `File read progress: ${chunk.metadata.progress.toFixed(1)}% (${chunk.sequence + 1} chunks)`
+              );
+            }
+
+            return Promise.resolve();
+          },
+
+          async onCompleted(session: Readonly<StreamSession>): Promise<void> {
+            await Promise.resolve(); // Dummy await to suppress no-await warning
+            const duration =
+              typeof session.stats.endTime === 'number' && typeof session.stats.startTime === 'number'
+                ? `${session.stats.endTime - session.stats.startTime}ms`
+                : 'unknown';
+            logger.info(`✅ File read completed via Rust streaming: ${path}`, {
+              chunks: totalChunks,
+              bytes: totalBytes,
+              duration,
+            });
+          },
+
+          async onError(error: string, _session: Readonly<StreamSession>): Promise<void> {
+            await Promise.resolve(); // Dummy await to suppress no-await warning
+            logger.error(`❌ Rust streaming error for ${path}: ${error}`);
+          },
+
+          async onBackpressure(streamId: string): Promise<void> {
+            await Promise.resolve(); // Dummy await to suppress no-await warning
+            logger.debug(`🚦 Backpressure applied for stream ${streamId}`);
+          },
+        };
+
+        // Start streaming
+        const sessionId = await rustStreamingClient.streamFile(path, processor, {
+          contextType: 'fileAnalysis',
+        });
+
+        // Wait for completion with timeout and event-based approach
+        const completionPromise = new Promise<void>((resolve, reject) => {
+          let resolved = false;
+
+          // Event-based completion detection
+          const checkCompletion = () => {
+            if (resolved) return;
+
+            const activeSession = rustStreamingClient
+              .getActiveSessionStats()
+              .find(s => s.sessionId === sessionId);
+
+            if (!activeSession) {
+              resolved = true;
+              resolve();
+            }
+          };
+
+          // Set up periodic polling with reasonable interval
+          const pollInterval = setInterval(checkCompletion, 100); // 100ms instead of 10ms
+
+          // Timeout mechanism to prevent indefinite hangs
+          const timeout = setTimeout(() => {
+            if (!resolved) {
+              resolved = true;
+              clearInterval(pollInterval);
+              logger.warn(`⏰ File read timeout for ${path} after 30 seconds`);
+              void rustStreamingClient.cancelStream(sessionId).finally(() => {
+                reject(
+                  new Error(`File read timeout: ${path} - operation took longer than 30 seconds`)
+                );
+              });
+            }
+          }, 30000); // 30 second timeout
+
+          // Clean up on completion
+          const cleanup = (): void => {
+            clearInterval(pollInterval);
+            clearTimeout(timeout);
+          };
+
+          // Override resolve/reject to include cleanup
+          const originalResolve = resolve;
+          const originalReject = reject;
+          resolve = (): void => {
+            cleanup();
+            originalResolve();
+          };
+          reject = (): void => {
+            cleanup();
+            originalReject();
+          };
+        });
+
+        await completionPromise;
+
+        if (fileContent.length > 0) {
+          return fileContent;
+        } else {
+          throw new Error('No content received from Rust streaming');
+        }
+      } catch (error) {
+        logger.warn('Rust streaming read failed, falling back to MCP', { path, error });
+      }
+    }
+
+    // Try Rust executor (non-streaming) next
+    if (this.rustBackend?.isAvailable()) {
+      try {
+        const request: ToolExecutionRequest = {
+          toolId: 'filesystem',
+          arguments: { operation: 'read', path },
+          context: {
+            sessionId: 'file-read',
+            workingDirectory: process.cwd(),
+            permissions: [{ type: 'read' as const, resource: path, scope: 'file' as const }],
+            environment: {},
+            securityLevel: 'medium',
+          },
+        };
+
+        const result = await this.rustBackend.execute(request);
+        if (result.success && result.result) {
+          return typeof result.result === 'string' ? result.result : String(result.result);
+        }
+
+        logger.warn('Rust filesystem read failed, falling back to MCP', {
+          path,
+          error: result.error,
+        });
+      } catch (error) {
+        logger.warn('Rust filesystem read error, falling back to MCP', { path, error });
+      }
+    }
+
+    // Final fallback to MCP manager
+    if (!this.mcpManager) {
+      logger.error('No filesystem backend available');
+      throw new Error('Filesystem operations not available - no backend initialized');
+    }
+
+    try {
+      return await this.mcpManager.readFileSecure(path);
+    } catch (error) {
+      logger.error(
+        `All filesystem read methods failed for path: ${path}`,
+        error instanceof Error ? error : new Error(String(error))
+      );
+      throw error;
+    }
+  }
+

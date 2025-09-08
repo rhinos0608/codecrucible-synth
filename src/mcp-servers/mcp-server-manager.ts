@@ -29,7 +29,7 @@ import {
   ToolExecutionContext,
   ToolExecutionOptions,
   ToolExecutionResult,
-} from '../infrastructure/types/tool-execution-types.js';
+} from '../domain/interfaces/tool-execution.js';
 
 // Define proper types for server management
 export interface ServerStatus {

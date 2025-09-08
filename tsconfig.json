@@ -3,7 +3,7 @@
     // 2025 Best Practices - Modern Target & Modules
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "node", // Keep as "node" for compatibility during migration
+    "moduleResolution": "node", // Temporarily reverted for compatibility during migration
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "allowJs": false,

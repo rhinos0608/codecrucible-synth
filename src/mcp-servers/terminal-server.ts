@@ -8,7 +8,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { ChildProcess, spawn } from 'child_process';
 import * as path from 'path';
 import { logger } from '../infrastructure/logging/logger.js';
-import { ToolExecutionArgs } from '../infrastructure/types/tool-execution-types.js';
+import { ToolExecutionArgs } from '../domain/interfaces/tool-execution.js';
 import { ToolCallResponse } from './smithery-mcp-server.js';
 
 // Secure command execution using spawn instead of exec to prevent shell injection

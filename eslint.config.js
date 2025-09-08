@@ -2,6 +2,7 @@
 import eslint from '@eslint/js';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
+import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 
 export default [
@@ -64,6 +65,7 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tseslint,
+      'import': importPlugin,
     },
     rules: {
       ...eslint.configs.recommended.rules,
@@ -217,6 +219,27 @@ export default [
       // Import/Export Rules
       'no-duplicate-imports': 'error',
       'no-useless-rename': 'error',
+      
+      // Enforce .js extensions for relative imports (ESM compliance)
+      'import/extensions': [
+        'error',
+        'ignorePackages',
+        {
+          'js': 'always',
+          'ts': 'never'
+        }
+      ],
+      'import/no-unresolved': 'off', // TypeScript handles this
+      'import/no-relative-parent-imports': 'off', // Allow relative imports
+      
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        {
+          prefer: 'type-imports',
+          disallowTypeAnnotations: false,
+        },
+      ],
+      
       'sort-imports': [
         'error',
         {

@@ -4,7 +4,9 @@ import {
   ModelResponse,
   StreamToken,
 } from '../../../domain/interfaces/model-client.js';
-import { logger } from '../../../infrastructure/logging/logger.js';
+import { createLogger } from '../../../infrastructure/logging/logger-adapter.js';
+
+const logger = createLogger('StreamingHandler');
 
 /**
  * Execute a model request using streaming and provide real-time token output.
@@ -13,49 +15,47 @@ export async function executeWithStreaming(
   modelClient: IModelClient,
   modelRequest: ModelRequest
 ): Promise<ModelResponse> {
-  let displayedContent = '';
+  let accumulatedContent = '';
   let tokenCount = 0;
+  const startTime = Date.now();
 
-  const response = await modelClient.streamRequest(modelRequest, (token: StreamToken) => {
-    tokenCount++;
-    logger.debug(`📝 Token ${tokenCount}: "${token.content}" (complete: ${token.isComplete})`);
-    // Display all tokens with content, including the final one
-    if (token.content) {
-      process.stdout.write(token.content);
-      displayedContent += token.content;
-    }
-  });
-
-  if (displayedContent) {
-    process.stdout.write('\n');
-  }
-
-  // CRITICAL DEBUG: Log the complete response structure to understand tool calls preservation
-  logger.info('🔍 DEBUGGING: Streaming handler received response:', {
-    responseKeys: Object.keys(response || {}),
-    hasToolCalls: !!response.toolCalls,
-    toolCallsLength: response.toolCalls?.length || 0,
-    responseContent: response.content || 'NO CONTENT',
-    responseContentLength: (response.content || '').length,
-    displayedContentLength: displayedContent.length,
-  });
-
-  if (response.toolCalls && response.toolCalls.length > 0) {
-    logger.info('🔧 DEBUGGING: Tool calls detected in streaming response:', {
-      toolCalls: response.toolCalls.map(tc => ({ id: tc.id, functionName: tc.function?.name })),
+  try {
+    const response = await modelClient.streamRequest(modelRequest, (token: StreamToken) => {
+      tokenCount++;
+      
+      if (token.content) {
+        process.stdout.write(token.content);
+        accumulatedContent += token.content;
+      }
     });
+
+    if (accumulatedContent) {
+      process.stdout.write('\n');
+    }
+
+    // Ensure response content is properly populated
+    if (!response.content && accumulatedContent) {
+      response.content = accumulatedContent;
+    }
+
+    const duration = Date.now() - startTime;
+    logger.debug('Streaming completed', {
+      tokenCount,
+      contentLength: accumulatedContent.length,
+      duration,
+      hasToolCalls: !!response.toolCalls?.length
+    });
+
+    return response;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    logger.error('Streaming failed', {
+      error: error instanceof Error ? error.message : String(error),
+      tokenCount,
+      duration
+    });
+    throw error;
   }
-
-  logger.info(
-    `✅ Streaming response completed: ${tokenCount} tokens, ${displayedContent.length} chars total, final content length: ${response.content?.length || 0}`
-  );
-
-  if (!response.content && displayedContent) {
-    logger.info('🔧 Fixing response content from displayed content');
-    response.content = displayedContent;
-  }
-
-  return response;
 }
 
 export default executeWithStreaming;

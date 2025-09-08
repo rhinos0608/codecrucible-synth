@@ -323,7 +323,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
     this.config = { ...this.config, ...config };
 
     // Update streaming manager config too
-    if ((config.chunkSize ?? config.bufferSize ?? config.timeout) !== undefined) {
+    if ((('chunkSize' in config) || ('bufferSize' in config) || ('timeout' in config))) {
       this.streamingManager.updateConfig(config);
     }
   }

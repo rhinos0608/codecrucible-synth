@@ -1,5 +1,7 @@
 
 import { EventEmitter } from 'events';
+import { fileURLToPath } from 'url';
+import * as path from 'path';
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 import type { RuntimeContext } from '../runtime/runtime-context.js';
 import { EventCoordinator } from './event-coordinator.js';
@@ -94,6 +96,12 @@ export class UnifiedOrchestrationService extends EventEmitter {
   private readonly activeRequests = new Map<string, OrchestrationRequest>();
   private readonly cleanupHandlers: (() => void | Promise<void>)[] = [];
   private readonly startTime = Date.now();
+  
+  // Real metrics tracking
+  private totalProcessedRequests = 0;
+  private totalFailedRequests = 0;
+  private responseTimeSum = 0;
+  private responseTimes: number[] = [];
   
   // Service dependencies
   private configManager!: UnifiedConfigurationManager;
@@ -253,13 +261,11 @@ export class UnifiedOrchestrationService extends EventEmitter {
       });
 
       // Use project root resolution to avoid deep relative paths
-      const projectRoot = new URL('../../..', import.meta.url).pathname;
-      const pluginDirs = [
-        // runtime compiled plugins
-        `${projectRoot}/dist/plugins`,
-        // source plugins for dev mode
-        `${projectRoot}/src/plugins`,
-      ];
+      const { resolvePluginDirectories } = await import('../../infrastructure/plugins/plugin-path-resolver.js');
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = path.dirname(__filename);
+      const projectRoot = path.resolve(__dirname, '../../..');
+      const pluginDirs = resolvePluginDirectories({ cwd: projectRoot });
       const factories = await discoverPlugins(pluginDirs);
       await this.pluginManager.loadFromFactories(factories);
       await this.pluginManager.initializeAll();
@@ -335,6 +341,12 @@ export class UnifiedOrchestrationService extends EventEmitter {
       };
 
       this.emit('request-completed', { request, response });
+      
+      // Track successful request metrics
+      this.totalProcessedRequests++;
+      this.responseTimeSum += processingTime;
+      this.responseTimes.push(processingTime);
+      
       return response;
     } catch (error) {
       const processingTime = Date.now() - startTime;
@@ -353,6 +365,12 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
       this.emit('request-failed', { request, response, error });
       this.logger.error(`Orchestration request failed: ${request.id}`, error);
+      
+      // Track failed request metrics
+      this.totalProcessedRequests++;
+      this.totalFailedRequests++;
+      this.responseTimeSum += processingTime;
+      this.responseTimes.push(processingTime);
 
       return response;
     } finally {
@@ -805,18 +823,19 @@ export class UnifiedOrchestrationService extends EventEmitter {
   // === Helper Methods for Performance Stats ===
   
   private getTotalProcessedRequests(): number {
-    // Simple counter - in a real implementation this would be persisted
-    return 0; // TODO: Implement request counter
+    return this.totalProcessedRequests;
   }
   
   private getAverageResponseTime(): number {
-    // Simple average - in a real implementation this would track response times
-    return 0; // TODO: Implement response time tracking
+    if (this.responseTimes.length === 0) return 0;
+    return this.responseTimeSum / this.responseTimes.length;
   }
   
   private getSuccessRate(): number {
-    // Simple success rate - in a real implementation this would track success/failure
-    return 1.0; // TODO: Implement success rate tracking
+    const total = this.totalProcessedRequests;
+    if (total === 0) return 1.0;
+    const successful = total - this.totalFailedRequests;
+    return successful / total;
   }
   
   private getUptime(): number {

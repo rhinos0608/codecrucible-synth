@@ -51,7 +51,7 @@ export class GlobalEvidenceCollector {
   }
 
   public addToolResult(toolResult: Readonly<ToolResult>): void {
-    console.log('🚨 DEBUG: addToolResult called! Collectors:', this.evidenceCollectors.size);
+    logger.debug('addToolResult called', { collectors: this.evidenceCollectors.size });
     logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool result captured', {
       hasResult: !!toolResult,
       success: toolResult.success,
@@ -64,17 +64,17 @@ export class GlobalEvidenceCollector {
     // Notify all registered evidence collectors
     this.evidenceCollectors.forEach(collector => {
       try {
-        console.log('🚨 DEBUG: Calling collector callback');
+        logger.debug('Calling collector callback');
         collector(toolResult);
       } catch (error) {
-        console.error('🚨 ERROR: Evidence collector callback failed:', error);
+        logger.error('Evidence collector callback failed', { error });
         logger.warn('Evidence collector callback failed:', toReadonlyRecord(error));
       }
     });
   }
 
   public registerEvidenceCollector(callback: (toolResult: Readonly<ToolResult>) => void): void {
-    console.log('🚨 DEBUG: registerEvidenceCollector called!');
+    logger.debug('registerEvidenceCollector called');
     this.evidenceCollectors.add(callback);
     logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Evidence collector registered', {
       totalCollectors: this.evidenceCollectors.size,
@@ -982,6 +982,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
 
   /**
    * Get execution statistics
+   */
   getExecutionStats(): any {
     return {
       activeRequests: this.activeRequests.size,

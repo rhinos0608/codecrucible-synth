@@ -309,6 +309,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
     task: CollaborativeTask,
     contributions: Map<string, ExecutionResult>
   ): Promise<CollaborativeResponse> {
+    const startTime = Date.now();
     const result = {
       success: true,
       content: '',
@@ -340,7 +341,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
       contributions,
       consensus: true,
       conflictsResolved: 0,
-      executionTime: Date.now() - Date.now(),
+      executionTime: Date.now() - startTime,
     };
   }
 
@@ -349,6 +350,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
     task: CollaborativeTask,
     contributions: Map<string, ExecutionResult>
   ): Promise<CollaborativeResponse> {
+    const startTime = Date.now();
     const requests = agents.map(agent => ({
       id: `${task.id}-${agent.id}`,
       type: 'collaborate' as const,
@@ -373,7 +375,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
       contributions,
       consensus: true,
       conflictsResolved: 0,
-      executionTime: Date.now() - Date.now(),
+      executionTime: Date.now() - startTime,
     };
   }
 
@@ -382,6 +384,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
     task: CollaborativeTask,
     contributions: Map<string, ExecutionResult>
   ): Promise<CollaborativeResponse> {
+    const startTime = Date.now();
     // Leader-follower model
     const leader = agents[0];
     const followers = agents.slice(1);
@@ -433,7 +436,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
       contributions,
       consensus: true,
       conflictsResolved: 0,
-      executionTime: Date.now() - Date.now(),
+      executionTime: Date.now() - startTime,
     };
   }
 
@@ -442,6 +445,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
     task: CollaborativeTask,
     contributions: Map<string, ExecutionResult>
   ): Promise<CollaborativeResponse> {
+    const startTime = Date.now();
     // All agents contribute independently
     const responses = await Promise.all(
       agents.map(async agent => {
@@ -469,7 +473,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
       contributions,
       consensus: consensus.achieved,
       conflictsResolved: consensus.conflictsResolved,
-      executionTime: Date.now() - Date.now(),
+      executionTime: Date.now() - startTime,
     };
   }
 

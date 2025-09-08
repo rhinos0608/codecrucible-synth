@@ -23,6 +23,7 @@ export class UnifiedAgentSystem {
     task: AgentTask,
     strategy: 'sequential' | 'parallel' | 'hierarchical' | 'consensus'
   ): Promise<AgentResponse> {
+    const startTime = Date.now();
     const agents = this.matcher.matchAgents(task, this.registry.listAgents());
     const totalResources = this.coordinator.calculateTotalResources(agents);
     const collabResponse = await this.collaboration.collaborate(strategy, agents, {
@@ -41,7 +42,7 @@ export class UnifiedAgentSystem {
       taskId: task.id,
       output: collabResponse.result.output,
       success: collabResponse.result.success,
-      duration: Date.now() - Date.now(), // TODO: Implement proper duration tracking
+      duration: Date.now() - startTime,
     };
   }
 

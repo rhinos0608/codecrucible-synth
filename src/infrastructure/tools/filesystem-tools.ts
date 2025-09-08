@@ -354,7 +354,10 @@ export class FilesystemTools {
     name: string;
     description: string;
     inputSchema: object;
-    execute: (args: Readonly<Record<string, unknown>>, context: Readonly<{ startTime?: number }>) => Promise<{ success: boolean; data: unknown; metadata: { executionTime: number } }>;
+    execute: (
+      args: Readonly<Record<string, unknown>>,
+      context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
+    ) => Promise<{ success: boolean; data: unknown; metadata: { executionTime: number } }>;
   }> {
     return [
       {
@@ -373,9 +376,9 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          context: Readonly<{ startTime?: number }>
+          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
         ): Promise<{ success: boolean; data: string; metadata: { executionTime: number } }> => {
-          const startTime = context.startTime ?? Date.now();
+          const startTime = Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
           const content = await this.readFile(filePath);
           return {
@@ -405,9 +408,9 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          context: Readonly<{ startTime?: number }>
+          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
         ): Promise<{ success: boolean; data: string; metadata: { executionTime: number } }> => {
-          const startTime = context.startTime ?? Date.now();
+          const startTime = Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
           const content = typeof args.content === 'string' ? args.content : '';
           await this.writeFile(filePath, content);
@@ -434,9 +437,9 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          context: Readonly<{ startTime?: number }>
+          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
         ): Promise<{ success: boolean; data: string[]; metadata: { executionTime: number } }> => {
-          const startTime = context.startTime ?? Date.now();
+          const startTime = Date.now();
           const dirPath = typeof args.path === 'string' ? args.path : '';
           const files = await this.listFiles(dirPath);
           return {
@@ -462,9 +465,9 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          context: Readonly<{ startTime?: number }>
+          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
         ): Promise<{ success: boolean; data: { exists: boolean; path: string }; metadata: { executionTime: number } }> => {
-          const startTime = context.startTime ?? Date.now();
+          const startTime = Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
           const exists = await this.exists(filePath);
           return {

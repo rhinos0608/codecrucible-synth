@@ -12,7 +12,7 @@
 import { EventEmitter } from 'events';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { PerformanceProfiler } from '../performance/profiler.js';
-import { logger } from '../logging/logger.js';
+import { createLogger } from '../logging/logger-adapter.js';
 
 export interface EventBusConfig {
   batching: {
@@ -80,6 +80,7 @@ export interface EventBusStats {
 export class OptimizedEventBus extends EventEmitter implements IEventBus {
   private readonly performanceProfiler?: PerformanceProfiler;
   private config: EventBusConfig;
+  private logger = createLogger('OptimizedEventBus');
 
   // Performance profiling
   private readonly eventSessions = new Map<string, string>();
@@ -166,7 +167,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     this.setupBatchProcessing();
     this.setupDeduplicationCleanup();
 
-    logger.info('OptimizedEventBus initialized', {
+    this.logger.info('OptimizedEventBus initialized', {
       batchingEnabled: this.config.batching.enabled,
       priorityQueueEnabled: this.config.priorityQueue.enabled,
       deduplicationEnabled: this.config.deduplication.enabled,
@@ -349,7 +350,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
 
     const batchStartTime = Date.now();
     if (!this.currentBatchId) {
-      logger.error('No current batch ID when processing batch');
+      this.logger.error('No current batch ID when processing batch');
       return;
     }
     const batchId = this.currentBatchId;
@@ -400,7 +401,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
           return result;
         } catch (error) {
           errorCount++;
-          logger.error('Batch event processing error', { eventId: queuedEvent.id, error });
+          this.logger.error('Batch event processing error', { eventId: queuedEvent.id, error });
           return false;
         }
       });
@@ -425,7 +426,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
         this.performanceProfiler.endSession(profilingSessionId);
       }
 
-      logger.debug('Batch processing completed', {
+      this.logger.debug('Batch processing completed', {
         batchId,
         eventCount: batch.length,
         successCount,
@@ -438,7 +439,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
         this.performanceProfiler.endSession(profilingSessionId);
       }
 
-      logger.error('Batch processing failed', { batchId, error });
+      this.logger.error('Batch processing failed', { batchId, error });
       throw error;
     }
   }
@@ -456,7 +457,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
       try {
         this.emitDirect(queuedEvent);
       } catch (error) {
-        logger.error('Priority queue processing error', {
+        this.logger.error('Priority queue processing error', {
           eventId: queuedEvent.id,
           priority: queuedEvent.priority,
           error,
@@ -629,7 +630,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
       droppedEvents,
     });
 
-    logger.warn('Priority queue overflow', { droppedEvents });
+    this.logger.warn('Priority queue overflow', { droppedEvents });
   }
 
   /**
@@ -715,7 +716,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
       profiling: { ...this.config.profiling, ...updates.profiling },
     };
 
-    logger.info('EventBus configuration updated', { updates });
+    this.logger.info('EventBus configuration updated', { updates });
   }
 
   /**
@@ -743,7 +744,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     this.eventSessions.clear();
     this.handlerTimings.clear();
 
-    logger.info('OptimizedEventBus destroyed', {
+    this.logger.info('OptimizedEventBus destroyed', {
       finalStats: this.getEventBusStats(),
     });
   }

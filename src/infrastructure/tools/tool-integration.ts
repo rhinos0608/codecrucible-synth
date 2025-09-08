@@ -6,6 +6,7 @@
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { FilesystemTools } from './filesystem-tools.js';
 import type { RustExecutionBackend as RealRustExecutionBackend } from '../execution/rust-executor/rust-execution-backend.js';
+import { ToolExecutionContext, ToolExecutionResult } from '../../domain/interfaces/tool-execution.js';
 
 export interface LLMFunction {
   type: 'function';
@@ -31,22 +32,6 @@ export interface ToolCall {
 // Use the real RustExecutionBackend type for type safety
 export type RustExecutionBackend = Readonly<RealRustExecutionBackend>;
 
-// Define types for tool arguments and execution results
-export interface ToolExecutionContext {
-  startTime: number;
-  userId: string;
-  requestId: string;
-  environment: string;
-}
-
-export interface ToolExecutionResult {
-  success: boolean;
-  metadata?: {
-    executionTime?: number;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
 
 export interface ToolDefinition<TArgs = Record<string, unknown>, TResult = ToolExecutionResult> {
   id: string;
@@ -95,18 +80,13 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
 /* Duplicate constructor removed; logic merged into the main constructor above */
 
   private async initializeTools(): Promise<void> {
-    await Promise.resolve();
     try {
       // Initialize filesystem tools with proper backend delegation
       // If an injected rustBackend exists, attach it to filesystem tools
-      if (this.rustBackend !== null) {
+      if (this.rustBackend) {
         try {
-          if (this.rustBackend) {
-            this.filesystemTools.setRustBackend(this.rustBackend as RealRustExecutionBackend);
-            this.logger.info('Injected Rust execution backend attached to filesystem tools');
-          } else {
-            this.logger.warn('Provided rustBackend is null or undefined');
-          }
+          this.filesystemTools.setRustBackend(this.rustBackend as RealRustExecutionBackend);
+          this.logger.info('Injected Rust execution backend attached to filesystem tools');
         } catch (error) {
           this.logger.warn('Failed to attach injected Rust backend to filesystem tools', error);
         }
@@ -133,8 +113,7 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
       );
     } catch (error) {
       this.logger.error('Failed to initialize tools:', error);
-      // Don't throw - allow system to continue without tools
-      this.isInitialized = true; // Mark as initialized to prevent retry loops
+      throw new Error(`Tool initialization failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   /**
@@ -212,10 +191,12 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
       }
 
       const context: ToolExecutionContext = {
-        startTime: Date.now(),
         userId: 'system',
+        sessionId: `session_${Date.now()}`,
         requestId: `tool_${Date.now()}`,
-        environment: 'development',
+        environment: { NODE_ENV: 'development' },
+        toolName: functionName,
+        executionMode: 'sync',
       };
 
       const result: ToolExecutionResult = await tool.execute(args, context);
@@ -289,4 +270,3 @@ export function setGlobalToolIntegrationRustBackend(backend: RustExecutionBacken
     }
   }
 }
-

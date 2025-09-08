@@ -7,7 +7,7 @@
  * Implements the "Registry Pattern" from the Coding Grimoire
  */
 
-import { logger } from '../logging/unified-logger.js';
+import { createLogger } from '../logging/logger-adapter.js';
 import { outputConfig } from '../../utils/output-config.js';
 
 export interface ToolDefinition {
@@ -62,6 +62,7 @@ export class UnifiedToolRegistry {
   private metrics: Map<string, ToolMetrics> = new Map();
   // Optional runtime-provided execution backend (injected by application layer)
   private rustBackend?: unknown;
+  private logger = createLogger('UnifiedToolRegistry');
 
   /**
    * Allow application layer to attach a concrete execution backend (e.g. Rust).
@@ -97,7 +98,7 @@ export class UnifiedToolRegistry {
     // Generate intelligent aliases based on naming conventions
     this.generateIntelligentAliases(tool);
 
-    logger.info(`Registered tool: ${tool.id} (${tool.aliases.length + this.getGeneratedAliases(tool).length} aliases)`);
+    this.logger.info(`Registered tool: ${tool.id} (${tool.aliases.length + this.getGeneratedAliases(tool).length} aliases)`);
   }
 
   /**
@@ -223,7 +224,7 @@ export class UnifiedToolRegistry {
     
     if (!toolId) {
       const availableTools = this.getAvailableToolNames();
-      logger.warn(`Unknown tool requested: ${toolName}. Available: ${availableTools.slice(0, 10).join(', ')}...`);
+      this.logger.warn(`Unknown tool requested: ${toolName}. Available: ${availableTools.slice(0, 10).join(', ')}...`);
       return {
         success: false,
         error: `Unknown tool: ${toolName}. Did you mean one of: ${this.getSuggestedTools(toolName).join(', ')}?`,
@@ -239,7 +240,7 @@ export class UnifiedToolRegistry {
     const metrics = this.metrics.get(toolId);
 
     if (!tool || !metrics) {
-      logger.error(`Tool or metrics not found for toolId: ${toolId}`);
+      this.logger.error(`Tool or metrics not found for toolId: ${toolId}`);
       return {
         success: false,
         error: `Tool or metrics not found for toolId: ${toolId}`,
@@ -272,7 +273,7 @@ export class UnifiedToolRegistry {
       const executionTime = Date.now() - startTime;
       metrics.recordSuccess(executionTime);
       
-      logger.info(`Tool executed successfully: ${toolId} (${executionTime}ms)`);
+      this.logger.info(`Tool executed successfully: ${toolId} (${executionTime}ms)`);
       
       return {
         success: true,
@@ -288,7 +289,7 @@ export class UnifiedToolRegistry {
       const executionTime = Date.now() - startTime;
       metrics.recordFailure(executionTime, error);
       
-      logger.error(`Tool execution failed: ${toolId}`, { error, args, executionTime });
+      this.logger.error(`Tool execution failed: ${toolId}`, { error, args, executionTime });
       
       return {
         success: false,
@@ -338,7 +339,7 @@ export class UnifiedToolRegistry {
   ): void {
     // Integration point with existing approval system
     // For now, allow all but log for audit
-    logger.info(`Approval requested for ${tool.id}`, { args, context, riskLevel: tool.security.riskLevel });
+    this.logger.info(`Approval requested for ${tool.id}`, { args, context, riskLevel: tool.security.riskLevel });
   }
 
   private getDefaultTimeout(tool: ToolDefinition): number {

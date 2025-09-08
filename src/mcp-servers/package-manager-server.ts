@@ -10,7 +10,7 @@ import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { logger } from '../infrastructure/logging/logger.js';
-import { ToolExecutionArgs } from '../infrastructure/types/tool-execution-types.js';
+import { ToolExecutionArgs } from '../domain/interfaces/tool-execution.js';
 import { ToolCallResponse } from './smithery-mcp-server.js';
 
 const execAsync = promisify(exec);

@@ -31,7 +31,9 @@ import {
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 import type { ILogger } from '../../domain/interfaces/logger.js';
 import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-user-interaction.js';
-import { OptimizedEventBus as EventBus } from '../../infrastructure/messaging/optimized-event-bus';
+import { createEventBus } from '../../infrastructure/messaging/event-bus-factory.js';
+import { MetricsCollector } from '../../infrastructure/observability/metrics-collector.js';
+import { createUnifiedMetrics } from '../../infrastructure/observability/unified-metrics-adapter.js';
 /* (removed duplicate import of RustExecutionBackend) */
 import { unifiedToolRegistry } from '../../infrastructure/tools/unified-tool-registry.js';
 import { setGlobalToolIntegrationRustBackend } from '../../infrastructure/tools/tool-integration.js';
@@ -65,9 +67,16 @@ export class ServiceFactory {
     private config: ServiceFactoryConfig = {},
     private logger: ILogger = createLogger('ServiceFactory')
   ) {
+    // Observability primitives
+    const metrics = new MetricsCollector({ enabled: true, retentionDays: 7, exportInterval: 0, exporters: [] });
+    const eventBus = createEventBus({ enableProfiling: true, metrics });
+
     this.runtimeContext = createRuntimeContext({
-      eventBus: new EventBus(),
+      eventBus,
     }) as RuntimeContext;
+    // Optionally expose unified metrics on the context in the future
+    // (kept local for now to minimize API changes)
+    void createUnifiedMetrics(metrics);
     // Initialize Rust execution backend asynchronously and attach to runtime context
     this.ensureRustBackend().catch(err => {
       this.logger.warn('Error initializing RustExecutionBackend in constructor', err);
@@ -81,6 +90,7 @@ export class ServiceFactory {
     // Ensure dependencies are created
     await this.ensureConfigManager();
     this.ensureResourceCoordinator();
+    await this.ensureRustBackend();
 
     const userInteraction = new CLIUserInteraction();
 

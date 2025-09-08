@@ -24,7 +24,7 @@ import {
 import {
   ToolExecutionResult as BaseToolExecutionResult,
   ToolExecutionArgs,
-} from '../infrastructure/types/tool-execution-types.js';
+} from '../domain/interfaces/tool-execution.js';
 
 // Application layer interfaces
 export interface MCPServerConnection {

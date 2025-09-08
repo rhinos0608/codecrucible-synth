@@ -6,7 +6,7 @@
  * Provides rich, structured formatting with metadata extraction
  */
 
-import { ToolExecutionResult } from '../types/tool-execution-types.js';
+import { ToolExecutionResult } from '../../domain/interfaces/tool-execution.js';
 
 export interface FormattingOptions {
   includeMetadata?: boolean;

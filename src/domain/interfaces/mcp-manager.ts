@@ -10,7 +10,7 @@ import {
   ToolExecutionContext,
   ToolExecutionOptions,
   ToolExecutionResult,
-} from '../../infrastructure/types/tool-execution-types.js';
+} from './tool-execution.js';
 
 export interface IMcpManager {
   // Core Lifecycle Methods

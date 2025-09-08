@@ -22,8 +22,6 @@ export class OllamaAdapter implements ProviderAdapter {
     const cfg = (this.provider as any).config;
 
     try {
-      // Extract prompt from messages
-      const prompt = req.messages?.map(msg => `${msg.role}: ${msg.content}`).join('\n') || '';
       // Map tools (if any) to provider format (OpenAI/Ollama style)
       const mappedTools = Array.isArray(req.tools)
         ? req.tools.map((t: Readonly<ModelTool>) => ({
@@ -35,19 +33,30 @@ export class OllamaAdapter implements ProviderAdapter {
             },
           }))
         : [];
+
+      // Use structured messages if available, otherwise fall back to prompt
+      let messages;
+      if (req.messages && req.messages.length > 0) {
+        messages = req.messages;
+      } else if (req.prompt) {
+        messages = [{ role: 'user', content: req.prompt }];
+      } else {
+        messages = [{ role: 'user', content: 'How can I help you?' }];
+      }
       
-      logger.info('🔧 OllamaAdapter: Tools being sent to model', { 
-        toolCount: mappedTools.length, 
+      logger.info('🔧 OllamaAdapter: Using structured messages for Llama 3.1', {
+        messageCount: messages.length,
+        toolCount: mappedTools.length,
         toolNames: mappedTools.map(t => t.function.name),
-        hasPrompt: prompt.length > 0,
-        promptStart: prompt.substring(0, 100)
+        firstMessage: messages[0]?.content?.substring(0, 100)
       });
 
-      const providerResponse = await this.provider.generateCode(prompt, {
+      // Call provider with structured messages instead of flattened prompt
+      const providerResponse = await this.provider.generateCode('', {
         model: req.model || cfg.defaultModel,
-        // Encourage tool use when tools are available
-        tool_choice: mappedTools.length > 0 ? 'auto' : undefined,
+        messages: messages, // Pass structured messages to provider
         tools: mappedTools,
+        // Remove tool_choice as it's not documented by Ollama
         availableTools: mappedTools.map(t => t.function.name),
         onStreamingToken: req.stream ? (token: any) => {
           // Handle streaming if needed

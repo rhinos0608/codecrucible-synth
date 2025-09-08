@@ -58,10 +58,31 @@ export class OllamaProvider implements LLMProvider {
       ? options.userContext
       : undefined;
 
-    const messages: import('./ollama-config.js').OllamaMessage[] = [
-      { role: 'system', content: generateContextualSystemPrompt(availableTools, userContext) },
-      { role: 'user', content: prompt },
-    ];
+    // Use structured messages if provided, otherwise fall back to prompt-based approach
+    let messages: import('./ollama-config.js').OllamaMessage[];
+    if (Array.isArray((options as any).messages) && (options as any).messages.length > 0) {
+      // Use structured messages from adapter
+      messages = (options as any).messages;
+      // Add system message if not already present
+      if (!messages.some(msg => msg.role === 'system')) {
+        messages.unshift({ 
+          role: 'system', 
+          content: generateContextualSystemPrompt(availableTools, userContext) 
+        });
+      }
+    } else {
+      // Fallback to old prompt-based approach
+      messages = [
+        { role: 'system', content: generateContextualSystemPrompt(availableTools, userContext) },
+        { role: 'user', content: prompt },
+      ];
+    }
+    
+    logger.debug('OllamaProvider: Using messages', { 
+      messageCount: messages.length, 
+      hasTools: Array.isArray((options as any).tools),
+      roles: messages.map(m => m.role)
+    });
 
     const onStreamingToken = typeof options.onStreamingToken === 'function'
       ? options.onStreamingToken as (token: string, metadata?: unknown) => void

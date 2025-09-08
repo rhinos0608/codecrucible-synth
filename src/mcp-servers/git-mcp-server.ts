@@ -1,6 +1,6 @@
 import { ApprovalManager } from '../domain/approval/approval-manager.js';
 import { logger } from '../infrastructure/logging/logger.js';
-import { toErrorOrUndefined, toReadonlyRecord } from '../utils/type-guards.js';
+import { toErrorOrUndefined } from '../utils/type-guards.js';
 import type { ToolHandler, ToolRequest, ToolResponse } from './git-types.js';
 import { RepositoryManager } from './git-operations/repository-manager.js';
 import { BranchManager } from './git-operations/branch-manager.js';

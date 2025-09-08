@@ -77,6 +77,14 @@ export class OllamaProvider implements LLMProvider {
         top_p: typeof options.top_p === 'number' ? options.top_p : 0.9,
       },
     };
+    // If tools were provided by the adapter, include them in the chat request
+    if (Array.isArray((options as any).tools) && (options as any).tools.length > 0) {
+      (request as any).tools = (options as any).tools;
+      // Support tool_choice when present; default to 'auto' if adapter set it
+      if ((options as any).tool_choice) {
+        (request as any).tool_choice = (options as any).tool_choice;
+      }
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => { controller.abort(); }, this.config.timeout);

@@ -74,7 +74,7 @@ export class EnhancedMCPClientManager extends EventEmitter {
     this.healthCheckInterval = setInterval(() => {
       // Move the void expression to its own statement and ensure proper typing
       this.performHealthChecks().catch(error => {
-        logger.error('Health check error:', error);
+        logger.error('Health check error:', error instanceof Error ? error : new Error(String(error)));
       });
     }, this.config?.healthCheckInterval ?? 60000);
   }

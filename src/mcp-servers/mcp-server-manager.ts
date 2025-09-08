@@ -9,7 +9,9 @@
 
 import { logger } from '../infrastructure/logging/unified-logger.js';
 import { toErrorOrUndefined, toReadonlyRecord } from '../utils/type-guards.js';
-import { MCPServerDefinition, mcpServerRegistry } from './core/mcp-server-registry.js';
+import { type MCPServerDefinition, mcpServerRegistry } from './core/mcp-server-registry.js';
+import { mcpServerLifecycle } from './core/mcp-server-lifecycle.js';
+import { mcpServerMonitoring } from './core/mcp-server-monitoring.js';
 import {
   EnterpriseErrorHandler,
   enterpriseErrorHandler,
@@ -18,18 +20,16 @@ import {
   ErrorCategory,
   ErrorSeverity,
 } from '../infrastructure/error-handling/structured-error-system.js';
-import { mcpServerLifecycle } from './core/mcp-server-lifecycle.js';
-import { SecurityContext, mcpServerSecurity } from './core/mcp-server-security.js';
-import { mcpServerMonitoring } from './core/mcp-server-monitoring.js';
-import { unifiedToolRegistry } from '../infrastructure/tools/unified-tool-registry.js';
-import { SmitheryMCPConfig, SmitheryMCPServer } from './smithery-mcp-server.js';
-import { PathUtilities } from '../utils/path-utilities.js';
-import {
+import { type SecurityContext, mcpServerSecurity } from './core/mcp-server-security.js';
+import { type SmitheryMCPConfig, SmitheryMCPServer } from './smithery-mcp-server.js';
+import type {
   ToolExecutionArgs,
   ToolExecutionContext,
   ToolExecutionOptions,
   ToolExecutionResult,
 } from '../domain/interfaces/tool-execution.js';
+import { unifiedToolRegistry, type UnifiedToolRegistry } from '../infrastructure/tools/unified-tool-registry.js';
+import { PathUtilities } from '../utils/path-utilities.js';
 
 // Define proper types for server management
 export interface ServerStatus {
@@ -362,32 +362,61 @@ export class MCPServerManager {
     // Execute through unified tool registry
     const startTime = Date.now();
     try {
-      const result = await unifiedToolRegistry.executeTool(toolName, sanitizedArgs, context);
+      // Type guard to ensure unifiedToolRegistry is a UnifiedToolRegistry
+      if (
+        typeof unifiedToolRegistry === 'object' &&
+        unifiedToolRegistry !== null &&
+        'executeTool' in unifiedToolRegistry &&
+        typeof (unifiedToolRegistry as UnifiedToolRegistry).executeTool === 'function'
+      ) {
+        const registry = unifiedToolRegistry as UnifiedToolRegistry;
+        const result = await registry.executeTool(toolName, sanitizedArgs, context);
 
-      // Record successful operation
-      const serverId = this.getServerIdForTool(toolName);
-      if (serverId) {
-        mcpServerMonitoring.recordOperation(serverId, toolName, Date.now() - startTime, true);
+        // Record successful operation
+        const serverId = this.getServerIdForTool(toolName);
+        if (serverId) {
+          mcpServerMonitoring.recordOperation(serverId, toolName, Date.now() - startTime, true);
+        }
+
+        // Return properly structured ToolExecutionResult
+        const executionResult: ToolExecutionResult = {
+          success: true,
+          data: result,
+          output: {
+            content: typeof result === 'string' ? result : JSON.stringify(result),
+            format: typeof result === 'string' ? 'text' : 'json',
+          },
+          metadata: {
+            executionTime: Date.now() - startTime,
+            toolName,
+            requestId: context.requestId,
+            resourcesAccessed: normalizedPath ? [normalizedPath] : undefined,
+            warnings: securityResult?.reason ? [securityResult.reason] : undefined,
+          },
+        };
+
+        return executionResult;
+      } else {
+        // If unifiedToolRegistry is not valid, return an error result
+        return {
+          success: false,
+          error: {
+            code: 'RegistryUnavailable',
+            message: 'Unified tool registry is not available.',
+            details: {
+              toolName,
+              args: JSON.stringify(args),
+              context: JSON.stringify(context),
+            },
+          },
+          metadata: {
+            executionTime: Date.now() - startTime,
+            toolName,
+            requestId: context.requestId,
+            warnings: securityResult?.reason ? [securityResult.reason] : undefined,
+          },
+        };
       }
-
-      // Return properly structured ToolExecutionResult
-      const executionResult: ToolExecutionResult = {
-        success: true,
-        data: result.data || result,
-        output: {
-          content: typeof result === 'string' ? result : JSON.stringify(result.data || result),
-          format: typeof result === 'string' ? 'text' : 'json',
-        },
-        metadata: {
-          executionTime: Date.now() - startTime,
-          toolName,
-          requestId: context.requestId,
-          resourcesAccessed: normalizedPath ? [normalizedPath] : undefined,
-          warnings: securityResult?.reason ? [securityResult.reason] : undefined,
-        },
-      };
-
-      return executionResult;
     } catch (error) {
       // Use enterprise error handler for tool execution failures
       await enterpriseErrorHandler.handleEnterpriseError(error as Error, {
@@ -429,12 +458,14 @@ export class MCPServerManager {
           executionTime: Date.now() - startTime,
           toolName,
           requestId: context.requestId,
-          warnings: securityResult?.reason ? [securityResult.reason] : undefined,
+          warnings: [securityResult?.reason].filter((w): w is string => typeof w === 'string'),
         },
       };
 
       return errorResult;
     }
+
+    // No fallback return needed; all code paths above return a value.
   }
 
   /**
@@ -621,8 +652,15 @@ export class MCPServerManager {
 
     try {
       // Get tool count from unified tool registry
-      const toolRegistryStatus = unifiedToolRegistry.getRegistryStatus();
-      totalToolCount += toolRegistryStatus.totalTools;
+      if (
+        typeof unifiedToolRegistry === 'object' &&
+        unifiedToolRegistry !== null &&
+        'getRegistryStatus' in unifiedToolRegistry &&
+        typeof (unifiedToolRegistry as UnifiedToolRegistry).getRegistryStatus === 'function'
+      ) {
+        const toolRegistryStatus = (unifiedToolRegistry as UnifiedToolRegistry).getRegistryStatus();
+        totalToolCount += toolRegistryStatus.totalTools;
+      }
 
       // Get additional tools from Smithery if available
       if (this.smitheryServer) {
@@ -701,7 +739,7 @@ export class MCPServerManager {
     // Shutdown Smithery server
     if (this.smitheryServer) {
       try {
-        await this.smitheryServer.shutdown();
+        this.smitheryServer.shutdown();
       } catch (error) {
         logger.error('Error shutting down Smithery server:', toErrorOrUndefined(error));
       }

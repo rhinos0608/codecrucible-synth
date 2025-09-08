@@ -35,6 +35,10 @@ export type RustExecutionBackend = Readonly<RealRustExecutionBackend>;
 
 export interface ToolDefinition<TArgs = Record<string, unknown>, TResult = ToolExecutionResult> {
   id: string;
+  // Some tool providers also expose a human/callable name distinct from id (e.g., filesystem_read_file)
+  // We keep it optional to avoid breaking existing implementers.
+  // When present, we will expose this as the LLM-facing function name and also register it for lookup.
+  name?: string;
   description: string;
   inputSchema: {
     properties: Record<string, unknown>;
@@ -94,16 +98,24 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
       const fsTools = this.filesystemTools.getTools();
       for (const tool of fsTools) {
         if (tool?.id) {
-          // Ensure inputSchema has 'properties' (and optionally 'required')
+          // Normalize input schema
           const inputSchema = tool.inputSchema as { properties: Record<string, unknown>; required?: string[] } | undefined;
-          const safeTool = {
-            ...tool,
+          const safeTool: ToolDefinition = {
+            id: tool.id,
+            // Preserve a callable name when provided by the underlying tool (e.g., filesystem_read_file)
+            name: (tool as unknown as { name?: string })?.name,
+            description: tool.description,
             inputSchema: {
               properties: inputSchema?.properties ?? {},
               required: inputSchema?.required ?? [],
             },
+            execute: tool.execute as ToolDefinition['execute'],
           };
-          this.availableTools.set(tool.id, safeTool);
+          // Register under both id and name to align LLM function names and executor lookup
+          this.availableTools.set(safeTool.id, safeTool);
+          if (safeTool.name && safeTool.name !== safeTool.id) {
+            this.availableTools.set(safeTool.name, safeTool);
+          }
         }
       }
 
@@ -122,13 +134,18 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
   public async getLLMFunctions(): Promise<LLMFunction[]> {
     await this.ensureInitialized();
 
+    const seen = new Set<string>();
     const functions: LLMFunction[] = [];
 
     for (const tool of this.availableTools.values()) {
+      // Prefer the callable name when available (e.g., filesystem_read_file); fallback to id
+      const callable = (tool as { name?: string }).name || tool.id;
+      if (seen.has(callable)) continue;
+      seen.add(callable);
       functions.push({
         type: 'function',
         function: {
-          name: tool.id,
+          name: callable,
           description: tool.description,
           parameters: {
             type: 'object',
@@ -178,15 +195,37 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
 
     try {
       const functionName = toolCall.function.name;
-      const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+      // Parse args robustly
+      const rawArgs = toolCall.function.arguments;
+      let args: Record<string, unknown> = {};
+      if (typeof rawArgs === 'string') {
+        try { args = rawArgs ? JSON.parse(rawArgs) : {}; } catch { args = { $raw: rawArgs }; }
+      } else if (rawArgs && typeof rawArgs === 'object') {
+        args = rawArgs as Record<string, unknown>;
+      }
 
       this.logger.info(`Executing tool: ${functionName} with args:`, args);
 
-      const tool = this.availableTools.get(functionName);
+      // Lookup by callable name first, then by id fallback
+      let tool = this.availableTools.get(functionName);
+      if (!tool) {
+        // Heuristic fallback: try common id variants
+        const variants = [
+          functionName,
+          functionName.toLowerCase(),
+          functionName.replace(/_file$/, ''),
+          functionName.replace(/^mcp_/, ''),
+        ];
+        for (const v of variants) {
+          tool = this.availableTools.get(v);
+          if (tool) break;
+        }
+      }
+
       if (!tool) {
         const availableTools = Array.from(this.availableTools.keys());
         throw new Error(
-          `Unknown tool: ${functionName}. Available tools: ${availableTools.join(', ')}`
+          `Unknown tool: ${functionName}. Available tools: ${availableTools.slice(0, 20).join(', ')}...`
         );
       }
 
@@ -197,7 +236,7 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
         environment: { NODE_ENV: 'development' },
         toolName: functionName,
         executionMode: 'sync',
-      };
+      } as unknown as ToolExecutionContext;
 
       const result: ToolExecutionResult = await tool.execute(args, context);
 
@@ -218,7 +257,11 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
    */
   public async getAvailableToolNames(): Promise<string[]> {
     await this.ensureInitialized();
-    return Array.from(this.availableTools.keys());
+    const names = new Set<string>();
+    for (const t of this.availableTools.values()) {
+      names.add(((t as unknown as { name?: string }).name) || t.id);
+    }
+    return Array.from(names);
   }
 
   /**
@@ -228,7 +271,11 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
     if (!this.isInitialized) {
       return [];
     }
-    return Array.from(this.availableTools.keys());
+    const names = new Set<string>();
+    for (const t of this.availableTools.values()) {
+      names.add(((t as unknown as { name?: string }).name) || t.id);
+    }
+    return Array.from(names);
   }
 
   /**

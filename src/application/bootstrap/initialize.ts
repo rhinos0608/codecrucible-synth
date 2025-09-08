@@ -141,7 +141,7 @@ export async function initialize(
     const streamingManager = new StreamingManager();
     const capabilityRegistry = new ProviderCapabilityRegistry();
     const toolExecutionRouter = new ToolExecutionRouter(
-      ({} as unknown) as import('../../domain/interfaces/mcp-manager.js').IMcpManager
+      (mcpServerManager as unknown) as import('../../domain/interfaces/mcp-manager.js').IMcpManager
     );
     const orchestrator = new ConcreteWorkflowOrchestrator(
       streamingManager,
@@ -153,7 +153,7 @@ export async function initialize(
       userInteraction: (userInteraction as unknown) as import('../../domain/interfaces/user-interaction.js').IUserInteraction,
       eventBus,
       modelClient,
-      mcpManager: undefined,
+      mcpManager: (mcpServerManager as unknown) as import('../../domain/interfaces/mcp-manager.js').IMcpManager,
       runtimeContext,
     });
 

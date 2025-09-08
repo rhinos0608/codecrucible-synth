@@ -1,6 +1,6 @@
 import { MCPServerManager } from './mcp-server-manager.js';
 import { logger } from '../infrastructure/logging/logger.js';
-import { toErrorOrUndefined, toReadonlyRecord } from '../utils/type-guards.js';
+import { toReadonlyRecord } from '../utils/type-guards.js';
 
 export function createMcpServerManager(): MCPServerManager {
   const mcpConfig = {

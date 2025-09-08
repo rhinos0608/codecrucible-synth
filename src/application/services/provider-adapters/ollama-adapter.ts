@@ -2,6 +2,7 @@ import {
   ModelRequest,
   ModelResponse,
   StreamToken,
+  ModelTool,
 } from '../../../domain/interfaces/model-client.js';
 import { OllamaProvider } from '../../../providers/hybrid/ollama-provider.js';
 import { logger } from '../../../infrastructure/logging/unified-logger.js';
@@ -23,9 +24,24 @@ export class OllamaAdapter implements ProviderAdapter {
     try {
       // Extract prompt from messages
       const prompt = req.messages?.map(msg => `${msg.role}: ${msg.content}`).join('\n') || '';
-      
+      // Map tools (if any) to provider format (OpenAI/Ollama style)
+      const mappedTools = Array.isArray(req.tools)
+        ? req.tools.map((t: Readonly<ModelTool>) => ({
+            type: 'function' as const,
+            function: {
+              name: t.function.name,
+              description: t.function.description,
+              parameters: t.function.parameters,
+            },
+          }))
+        : [];
+
       const providerResponse = await this.provider.generateCode(prompt, {
         model: req.model || cfg.defaultModel,
+        // Encourage tool use when tools are available
+        tool_choice: mappedTools.length > 0 ? 'auto' : undefined,
+        tools: mappedTools,
+        availableTools: mappedTools.map(t => t.function.name),
         onStreamingToken: req.stream ? (token: any) => {
           // Handle streaming if needed
         } : undefined,

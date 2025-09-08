@@ -18,7 +18,7 @@ export class OllamaAdapter implements ProviderAdapter {
   }
 
   async request(req: ModelRequest): Promise<ModelResponse> {
-    logger.debug('OllamaAdapter.request', { model: req.model });
+    logger.debug('OllamaAdapter.request', { model: req.model, hasTools: !!req.tools?.length });
     const cfg = (this.provider as any).config;
 
     try {
@@ -35,6 +35,13 @@ export class OllamaAdapter implements ProviderAdapter {
             },
           }))
         : [];
+      
+      logger.info('🔧 OllamaAdapter: Tools being sent to model', { 
+        toolCount: mappedTools.length, 
+        toolNames: mappedTools.map(t => t.function.name),
+        hasPrompt: prompt.length > 0,
+        promptStart: prompt.substring(0, 100)
+      });
 
       const providerResponse = await this.provider.generateCode(prompt, {
         model: req.model || cfg.defaultModel,

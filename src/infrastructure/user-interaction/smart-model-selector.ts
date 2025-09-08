@@ -261,37 +261,58 @@ export class SmartModelSelector {
           }
         }
 
-        // Model family bonuses (based on known performance)
+        // Model family bonuses (based on actual benchmark performance)
         const modelNameLower = model.name.toLowerCase();
         if (modelNameLower.includes('llama3.1')) {
-          score += 12; // Excellent function calling
-          reasons.push('llama3.1-excellent');
-        } else if (modelNameLower.includes('llama3.2')) {
-          score += 8; // Good function calling
-          reasons.push('llama3.2-good');
+          // Llama 3.1 is EXCELLENT at function calling: 89.06% BFCL accuracy (8B), 90.76% (70B)
+          score += 18; // Highest score for proven excellent function calling
+          reasons.push('llama3.1-excellent-functions');
+        } else if (modelNameLower.includes('qwen2.5-coder:7b') || modelNameLower.includes('qwen2.5-coder:14b') || modelNameLower.includes('qwen2.5-coder:32b')) {
+          score += 15; // Excellent function calling and coding (7B+ models)
+          reasons.push('qwen2.5-coder-7b+-excellent');
+        } else if (modelNameLower.includes('qwen2.5-coder:3b')) {
+          score += 10; // Good but 3B is at transition point for function calling
+          reasons.push('qwen2.5-coder-3b-good');
         } else if (modelNameLower.includes('deepseek-coder')) {
-          score += 10; // Great for coding
-          reasons.push('deepseek-coder');
+          score += 12; // Great for coding with function calling
+          reasons.push('deepseek-coder-excellent');
+        } else if (modelNameLower.includes('mistral') || modelNameLower.includes('mixtral')) {
+          score += 14; // Native function calling support
+          reasons.push('mistral-native-functions');
+        } else if (modelNameLower.includes('llama3.2')) {
+          score += 8; // Good but not as proven as 3.1
+          reasons.push('llama3.2-good');
         } else if (modelNameLower.includes('coder')) {
-          score += 6; // Coding models
+          score += 8; // Coding models
           reasons.push('coding-model');
         } else if (modelNameLower.includes('instruct')) {
-          score += 7; // Instruction-tuned
+          score += 5; // Instruction-tuned
           reasons.push('instruction-tuned');
         }
 
-        // Size considerations (larger models tend to be better at complex tasks)
+        // Size considerations (larger models significantly better for function calling)
         if (model.size) {
           const size = model.size.toLowerCase();
-          if (size.includes('13b') || size.includes('14b')) {
-            score += 5;
+          if (size.includes('70b') || size.includes('32b') || size.includes('27b') || size.includes('20b')) {
+            score += 8; // Very large models excel at function calling
+            if (requireFunctionCalling) score += 4; // Extra bonus for function calling
+            reasons.push('very-large-model');
+          } else if (size.includes('13b') || size.includes('14b')) {
+            score += 6;
+            if (requireFunctionCalling) score += 2;
             reasons.push('large-model');
           } else if (size.includes('7b') || size.includes('8b')) {
-            score += 3;
+            score += 4;
+            if (requireFunctionCalling) score += 1;
             reasons.push('medium-model');
-          } else if (size.includes('3b') || size.includes('2b')) {
-            score += 1; // Small but still usable
-            reasons.push('small-model');
+          } else if (size.includes('3b')) {
+            score += 2; // 3B is transition point - usable but not ideal for function calling
+            if (requireFunctionCalling) score -= 1; // Small penalty for function calling
+            reasons.push('small-model-transition');
+          } else if (size.includes('1b') || size.includes('2b')) {
+            score += 0; // Too small for reliable function calling
+            if (requireFunctionCalling) score -= 3; // Significant penalty
+            reasons.push('very-small-model');
           }
         }
 

@@ -463,30 +463,13 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       return userPrompt;
     }
 
-    const systemInstructions = `SYSTEM INSTRUCTIONS: You have access to powerful tools for file system operations, code analysis, and project management. You MUST use these tools when:
+    // Add concise, direct instructions for tool usage
+    // This works with the system prompt from OllamaProvider
+    const enhancedPrompt = `${userPrompt}
 
-1. **Reading/analyzing files**: Use filesystem_read_file to read actual file contents instead of guessing
-2. **Listing directories**: Use filesystem_list_directory to see what files exist instead of assuming
-3. **Writing/modifying files**: Use filesystem_write_file to make actual changes instead of showing example code
-4. **Getting file information**: Use filesystem_get_stats to check if files exist and get metadata
-5. **Code analysis**: Read the actual files first, then provide analysis based on real content
-6. **Making changes**: Always read existing files first, then make informed modifications
+IMPORTANT: You have access to tools for filesystem operations, git, and system commands. Use these tools proactively to complete the user's request. Don't just describe what you would do - actually use the tools to examine files, run commands, and provide real results based on what you find.`;
 
-DO NOT:
-- Generate responses based on assumptions about file contents
-- Provide generic code examples without checking actual project structure
-- Make recommendations without examining the actual codebase first
-- Describe files or code without actually reading them
-
-ALWAYS:
-- Use tools to examine the actual state of the project before responding
-- Base your responses on real file contents, not knowledge or assumptions
-- Read configuration files, source code, and project structure when relevant
-- Verify file existence before making recommendations
-
-User Request: ${userPrompt}`;
-
-    return systemInstructions;
+    return enhancedPrompt;
   }
 
   private async handlePromptRequest(request: WorkflowRequest): Promise<any> {

@@ -9,7 +9,7 @@ export interface SecurityValidation {
   riskLevel?: 'low' | 'medium' | 'high';
 }
 
-export interface SecurityError extends Error {
+export interface ISecurityError extends Error {
   code: string;
   risk: string;
 }
@@ -18,7 +18,7 @@ export class SecurityError extends Error {
   public code: string;
   public risk: string;
 
-  constructor(message: string, code: string = 'SECURITY_ERROR', risk: string = 'medium') {
+  public constructor(message: string, code: string = 'SECURITY_ERROR', risk: string = 'medium') {
     super(message);
     this.name = 'SecurityError';
     this.code = code;
@@ -27,23 +27,23 @@ export class SecurityError extends Error {
 }
 
 // CLI Error Types
-export interface CLIError extends Error {
+export interface ICLIError extends Error {
   code: string;
   exitCode: number;
 }
 
-export class CLIError extends Error {
+export class CLIError extends Error implements ICLIError {
   public code: string;
   public exitCode: number;
 
-  constructor(message: string, exitCode: number, code: string = 'CLI_ERROR') {
+  public constructor(message: string, exitCode: number, code: string = 'CLI_ERROR') {
     super(message);
     this.name = 'CLIError';
     this.code = code;
     this.exitCode = exitCode;
   }
 
-  static timeout(operation: string): CLIError {
+  public static timeout(operation: string): CLIError {
     return new CLIError(
       `Timeout occurred during ${operation}`,
       CLIExitCode.NETWORK_ERROR,
@@ -51,7 +51,7 @@ export class CLIError extends Error {
     );
   }
 
-  static networkError(message: string): CLIError {
+  public static networkError(message: string): CLIError {
     return new CLIError(`Network error: ${message}`, CLIExitCode.NETWORK_ERROR, 'NETWORK_ERROR');
   }
 }

@@ -18,11 +18,11 @@ const GenerateCodeSchema = z.object({
 });
 
 export class CodeGeneratorTool extends BaseTool<typeof GenerateCodeSchema.shape> {
-  private modelClient: UnifiedModelClient;
+  private readonly modelClient: UnifiedModelClient;
 
-  constructor(
-    private agentContext: { workingDirectory: string },
-    modelClient: UnifiedModelClient
+  public constructor(
+    private readonly agentContext: Readonly<{ workingDirectory: string }>,
+    modelClient: Readonly<UnifiedModelClient>
   ) {
     super({
       name: 'generateCode',
@@ -30,10 +30,10 @@ export class CodeGeneratorTool extends BaseTool<typeof GenerateCodeSchema.shape>
       category: 'Code Generation',
       parameters: GenerateCodeSchema,
     });
-    this.modelClient = modelClient;
+    this.modelClient = modelClient as UnifiedModelClient;
   }
 
-  async execute(args: z.infer<typeof GenerateCodeSchema>): Promise<string> {
+  public async execute(args: Readonly<z.infer<typeof GenerateCodeSchema>>): Promise<string> {
     try {
       const { specification, language, codeType, fileName, context } = args;
 
@@ -651,8 +651,9 @@ export class RefactoringTool extends BaseTool<typeof RefactorCodeSchema.shape> {
     };
 
     const instruction =
-      refactorInstructions[refactorType as keyof typeof refactorInstructions] ||
-      `Perform ${refactorType} refactoring`;
+      refactorType in refactorInstructions
+        ? refactorInstructions[refactorType as keyof typeof refactorInstructions]
+        : `Perform ${refactorType} refactoring`;
 
     return `You are an expert code refactoring specialist. Perform the following refactoring on the provided code.
 

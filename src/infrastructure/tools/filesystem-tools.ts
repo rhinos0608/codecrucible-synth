@@ -123,15 +123,16 @@ export class FilesystemTools {
               resolved = true;
               clearInterval(pollInterval);
               logger.warn(`⏰ File read timeout for ${path} after 30 seconds`);
-              void rustStreamingClient.cancelStream(sessionId);
-              reject(
-                new Error(`File read timeout: ${path} - operation took longer than 30 seconds`)
-              );
+              void rustStreamingClient.cancelStream(sessionId).finally(() => {
+                reject(
+                  new Error(`File read timeout: ${path} - operation took longer than 30 seconds`)
+                );
+              });
             }
           }, 30000); // 30 second timeout
 
           // Clean up on completion
-          const cleanup = () => {
+          const cleanup = (): void => {
             clearInterval(pollInterval);
             clearTimeout(timeout);
           };
@@ -199,7 +200,10 @@ export class FilesystemTools {
     try {
       return await this.mcpManager.readFileSecure(path);
     } catch (error) {
-      logger.error(`All filesystem read methods failed for path: ${path}`, error);
+      logger.error(
+        `All filesystem read methods failed for path: ${path}`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -243,7 +247,10 @@ export class FilesystemTools {
     try {
       await this.mcpManager.writeFileSecure(path, content);
     } catch (error) {
-      logger.error(`FilesystemTools.writeFile failed for path: ${path}`, error);
+      logger.error(
+        `FilesystemTools.writeFile failed for path: ${path}`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -290,7 +297,10 @@ export class FilesystemTools {
     try {
       return await this.mcpManager.listDirectorySecure(directory);
     } catch (error) {
-      logger.error(`FilesystemTools.listFiles failed for directory: ${directory}`, error);
+      logger.error(
+        `FilesystemTools.listFiles failed for directory: ${directory}`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -344,7 +354,7 @@ export class FilesystemTools {
     name: string;
     description: string;
     inputSchema: object;
-    execute: (args: Record<string, unknown>, context: { startTime?: number }) => Promise<{ success: boolean; data: unknown; metadata: { executionTime: number } }>;
+    execute: (args: Readonly<Record<string, unknown>>, context: Readonly<{ startTime?: number }>) => Promise<{ success: boolean; data: unknown; metadata: { executionTime: number } }>;
   }> {
     return [
       {
@@ -362,10 +372,10 @@ export class FilesystemTools {
           required: ['file_path'],
         },
         execute: async (
-          args: Record<string, unknown>,
-          context: { startTime?: number }
+          args: Readonly<Record<string, unknown>>,
+          context: Readonly<{ startTime?: number }>
         ): Promise<{ success: boolean; data: string; metadata: { executionTime: number } }> => {
-          const startTime = context?.startTime ?? Date.now();
+          const startTime = context.startTime ?? Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
           const content = await this.readFile(filePath);
           return {
@@ -394,10 +404,10 @@ export class FilesystemTools {
           required: ['file_path', 'content'],
         },
         execute: async (
-          args: Record<string, unknown>,
-          context: { startTime?: number }
+          args: Readonly<Record<string, unknown>>,
+          context: Readonly<{ startTime?: number }>
         ): Promise<{ success: boolean; data: string; metadata: { executionTime: number } }> => {
-          const startTime = context?.startTime ?? Date.now();
+          const startTime = context.startTime ?? Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
           const content = typeof args.content === 'string' ? args.content : '';
           await this.writeFile(filePath, content);
@@ -423,10 +433,10 @@ export class FilesystemTools {
           required: ['path'],
         },
         execute: async (
-          args: Record<string, unknown>,
-          context: { startTime?: number }
+          args: Readonly<Record<string, unknown>>,
+          context: Readonly<{ startTime?: number }>
         ): Promise<{ success: boolean; data: string[]; metadata: { executionTime: number } }> => {
-          const startTime = context?.startTime ?? Date.now();
+          const startTime = context.startTime ?? Date.now();
           const dirPath = typeof args.path === 'string' ? args.path : '';
           const files = await this.listFiles(dirPath);
           return {
@@ -451,10 +461,10 @@ export class FilesystemTools {
           required: ['file_path'],
         },
         execute: async (
-          args: Record<string, unknown>,
-          context: { startTime?: number }
+          args: Readonly<Record<string, unknown>>,
+          context: Readonly<{ startTime?: number }>
         ): Promise<{ success: boolean; data: { exists: boolean; path: string }; metadata: { executionTime: number } }> => {
-          const startTime = context?.startTime ?? Date.now();
+          const startTime = context.startTime ?? Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
           const exists = await this.exists(filePath);
           return {

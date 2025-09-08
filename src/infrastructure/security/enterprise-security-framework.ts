@@ -5,7 +5,7 @@
 
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { ModernInputSanitizer } from '../../infrastructure/security/modern-input-sanitizer.js';
-import { logger } from '../logging/logger.js';
+import { createConsoleLogger } from '../../domain/interfaces/logger.js';
 
 export interface SecurityPolicy {
   maxConcurrentOperations: number;
@@ -67,7 +67,7 @@ export class EnterpriseSecurityFramework {
   private defaultPolicy: SecurityPolicy;
 
   constructor() {
-    this.securityValidator = new UnifiedSecurityValidator(logger);
+    this.securityValidator = new UnifiedSecurityValidator(createConsoleLogger('security'));
     this.inputSanitizer = new ModernInputSanitizer();
     this.defaultPolicy = {
       maxConcurrentOperations: 10,

@@ -528,12 +528,12 @@ export class ContextualToolFilter {
    * Build human-readable reasoning for the filtering decision
    */
   private buildReasoning(
-    analysis: {
+    analysis: Readonly<{
       categories: string[];
       categoryScores: Map<string, number>;
       detectedKeywords: string[];
       confidence: number;
-    },
+    }>,
     selectedCount: number,
     totalCount: number
   ): string {

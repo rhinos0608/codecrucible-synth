@@ -95,7 +95,7 @@ export interface StreamOptions {
   includeMetrics: boolean;
 
   /** Custom metadata to include in chunks */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface StreamSession {
@@ -146,7 +146,7 @@ export interface StreamEvent {
   type: StreamEventType;
   streamId: string;
   timestamp: number;
-  data?: any;
+  data?: unknown;
   error?: string;
 }
 
@@ -155,16 +155,16 @@ export interface StreamEvent {
  */
 export interface StreamProcessor {
   /** Process a single chunk */
-  processChunk(chunk: StreamChunk): Promise<void>;
+  processChunk: (chunk: Readonly<StreamChunk>) => Promise<void>;
 
   /** Handle stream completion */
-  onCompleted(session: StreamSession): Promise<void>;
+  onCompleted: (session: Readonly<StreamSession>) => Promise<void>;
 
   /** Handle stream error */
-  onError(error: string, session: StreamSession): Promise<void>;
+  onError: (error: string, session: Readonly<StreamSession>) => Promise<void>;
 
   /** Handle backpressure events */
-  onBackpressure(streamId: string): Promise<void>;
+  onBackpressure: (streamId: string) => Promise<void>;
 }
 
 /**
@@ -194,25 +194,25 @@ export class StreamChunkUtils {
   /**
    * Combine multiple chunks into a single result (for small streams)
    */
-  static combineChunks(chunks: StreamChunk[]): string {
-    return chunks
-      .sort((a, b) => a.sequence - b.sequence)
-      .map(chunk => chunk.data.toString())
+  public static combineChunks(chunks: readonly StreamChunk[]): string {
+    return [...chunks]
+      .sort((a: Readonly<StreamChunk>, b: Readonly<StreamChunk>) => a.sequence - b.sequence)
+      .map((chunk: Readonly<StreamChunk>) => chunk.data.toString())
       .join('');
   }
 
   /**
    * Calculate total size from chunks
    */
-  static calculateTotalSize(chunks: StreamChunk[]): number {
-    return chunks.reduce((total, chunk) => total + chunk.size, 0);
+  public static calculateTotalSize(chunks: readonly StreamChunk[]): number {
+    return chunks.reduce((total: number, chunk: Readonly<StreamChunk>) => total + chunk.size, 0);
   }
 
   /**
    * Find missing sequences in chunk array
    */
-  static findMissingSequences(chunks: StreamChunk[]): number[] {
-    const sequences = chunks.map(c => c.sequence).sort((a, b) => a - b);
+  public static findMissingSequences(chunks: readonly StreamChunk[]): number[] {
+    const sequences = [...chunks].map((c: Readonly<StreamChunk>) => c.sequence).sort((a: number, b: number) => a - b);
     const missing: number[] = [];
 
     for (let i = 0; i < sequences.length - 1; i++) {
@@ -230,22 +230,21 @@ export class StreamChunkUtils {
   /**
    * Validate chunk integrity
    */
-  static validateChunk(chunk: StreamChunk): boolean {
+  public static validateChunk(chunk: Readonly<StreamChunk>): boolean {
     return (
-      chunk.streamId?.length > 0 &&
+      chunk.streamId.length > 0 &&
       chunk.sequence >= 0 &&
-      chunk.data !== undefined &&
       chunk.size > 0 &&
-      chunk.metadata?.source?.length > 0
+      chunk.metadata.source.length > 0
     );
   }
 
   /**
    * Create stream options with adaptive defaults
    */
-  static createStreamOptions(
+  public static createStreamOptions(
     contextType: StreamOptions['contextType'],
-    overrides?: Partial<StreamOptions>
+    overrides?: Readonly<Partial<StreamOptions>>
   ): StreamOptions {
     const baseOptions: StreamOptions = {
       chunkSize: 16 * 1024, // 16KB default
@@ -268,6 +267,11 @@ export class StreamChunkUtils {
         break;
       case 'codeGeneration':
         baseOptions.compression = false; // Disable compression for code
+        break;
+      case 'searchResults':
+      case 'default':
+      default:
+        // No additional changes for these cases
         break;
     }
 

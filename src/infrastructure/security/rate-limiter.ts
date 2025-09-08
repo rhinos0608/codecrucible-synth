@@ -549,7 +549,7 @@ export interface KeyGenRequest {
 /**
  * Create key generator for specific field
  */
-export function createKeyGenerator(field: KeyGeneratorField | (string & {})): (req: KeyGenRequest) => string {
+export function createKeyGenerator(field: string): (req: KeyGenRequest) => string {
   return (req: KeyGenRequest) => {
     switch (field) {
       case 'ip':
@@ -559,7 +559,7 @@ export function createKeyGenerator(field: KeyGeneratorField | (string & {})): (r
       case 'sessionId':
         return `rate_limit:session:${req.sessionId ?? 'no-session'}`;
       default:
-        return `rate_limit:${field}:${req[field] ?? 'unknown'}`;
+        return `rate_limit:${field}:${String((req as Record<string, unknown>)[field])}`;
     }
   };
 }

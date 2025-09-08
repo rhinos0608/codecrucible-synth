@@ -8,6 +8,7 @@
 import { logger } from '../logging/unified-logger.js';
 import { ModelInfo, ModelSelectionResult, ModelSelector } from './model-selector.js';
 import { modelCapabilityService } from '../discovery/model-capability-service.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface SmartSelectionOptions {
   preferredModel?: string;
@@ -130,7 +131,7 @@ export class SmartModelSelector {
       } catch (error) {
         logger.warn(
           `⚠️ Could not verify function calling for preferred model ${preferredModel.name}:`,
-          error
+          toReadonlyRecord(error)
         );
         logger.info(
           `✅ Using preferred model anyway: ${preferredModel.name} (function calling verification failed)`
@@ -253,7 +254,7 @@ export class SmartModelSelector {
               reasons.push('json-mode');
             }
           } catch (error) {
-            logger.debug(`Could not check capabilities for ${model.name}:`, error);
+            logger.debug(`Could not check capabilities for ${model.name}:`, toReadonlyRecord(error));
             // Give moderate score for unknown capabilities
             score += 3;
             reasons.push('unknown-capabilities');
@@ -317,11 +318,11 @@ export class SmartModelSelector {
     if (scoredModels.length > 1) {
       logger.debug(
         'Top 3 model candidates:',
-        scoredModels.slice(0, 3).map(m => ({
+        toReadonlyRecord(scoredModels.slice(0, 3).map(m => ({
           name: m.model.name,
           score: m.score,
           provider: m.model.provider,
-        }))
+        })))
       );
     }
 

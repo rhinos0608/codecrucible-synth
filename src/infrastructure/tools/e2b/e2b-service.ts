@@ -101,7 +101,7 @@ export class E2BService {
   /**
    * Initialize the E2B service
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     try {
       if (!this.config.apiKey) {
         throw new Error('E2B API key is required');
@@ -116,7 +116,10 @@ export class E2BService {
       // Start cleanup timer for expired sessions
       this.startCleanupTimer();
     } catch (error) {
-      logger.error('❌ Failed to initialize E2B service:', error);
+      logger.error(
+        '❌ Failed to initialize E2B service:',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -190,7 +193,7 @@ export class E2BService {
 
       return e2bSandbox;
     } catch (error) {
-      logger.error(`❌ Failed to create sandbox for session ${sessionId}:`, error);
+      logger.error(`❌ Failed to create sandbox for session ${sessionId}:`, error as Error);
       throw new Error(
         `Failed to create E2B sandbox: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -267,7 +270,7 @@ export class E2BService {
       return executionResult;
     } catch (error) {
       const executionTime = Date.now() - startTime;
-      logger.error(`❌ Code execution failed for session ${sessionId}:`, error);
+      logger.error(`❌ Code execution failed for session ${sessionId}:`, error instanceof Error ? error : new Error(String(error)));
 
       return {
         success: false,
@@ -386,7 +389,7 @@ except subprocess.TimeoutExpired:
   /**
    * Upload file to sandbox
    */
-  async uploadFile(sessionId: string, filePath: string, content: string): Promise<void> {
+  public async uploadFile(sessionId: string, filePath: string, content: string): Promise<void> {
     try {
       const e2bSandbox = await this.getOrCreateSandbox(sessionId);
 
@@ -400,7 +403,10 @@ print(f"File written to {${JSON.stringify(filePath)}}")
       await e2bSandbox.sandbox.runCode(writeCode);
       logger.info(`📄 File uploaded to sandbox ${sessionId}: ${filePath}`);
     } catch (error) {
-      logger.error(`❌ Failed to upload file to session ${sessionId}:`, error);
+      logger.error(
+        `❌ Failed to upload file to session ${sessionId}:`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -436,7 +442,10 @@ except Exception as e:
       logger.info(`📥 File downloaded from sandbox ${sessionId}: ${filePath}`);
       return result.text ?? '';
     } catch (error) {
-      logger.error(`❌ Failed to download file from session ${sessionId}:`, error);
+      logger.error(
+        `❌ Failed to download file from session ${sessionId}:`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -451,12 +460,13 @@ except Exception as e:
       if (e2bSandbox) {
         // Note: E2B sandboxes auto-cleanup, just remove from pool
         this.sandboxPool.delete(sessionId);
-        logger.info(`🗑️ Sandbox destroyed for session: ${sessionId}`);
+        logger.info(`🗑️ Sandbox destroyed for session ${sessionId}`);
       }
     } catch (error) {
-      logger.error(`❌ Failed to destroy sandbox for session ${sessionId}:`, error);
-      // Still remove from pool even if cleanup failed
-      this.sandboxPool.delete(sessionId);
+      logger.error(
+        `❌ Failed to destroy sandbox for session ${sessionId}:`,
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }
 
@@ -490,7 +500,7 @@ except Exception as e:
       this.cleanupExpiredSessions();
     }, 300000); // Clean up every 5 minutes
   }
-  shutdown(): void {
+  public shutdown(): void {
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;
@@ -508,10 +518,9 @@ except Exception as e:
   }
 
   /**
-  /**
    * Clean up expired sessions
    */
-  cleanupExpiredSessions(): void {
+  public cleanupExpiredSessions(): void {
     const now = Date.now();
     const expiredSessions: string[] = [];
 
@@ -533,7 +542,7 @@ except Exception as e:
   /**
    * Install package in a sandbox
    */
-  async installPackage(
+  public async installPackage(
     sessionId: string,
     packageName: string,
     language: 'python' | 'javascript' = 'python'
@@ -590,12 +599,15 @@ except Exception as e:
 
       return {
         success: !result.error,
-        output: result.text || '',
+        output: result.text ?? '',
         error: result.error?.name,
         executionTime: 0, // Not tracking this for package installation
       };
     } catch (error) {
-      logger.error(`❌ Failed to install package ${packageName} in session ${sessionId}:`, error);
+      logger.error(
+        `❌ Failed to install package ${packageName} in session ${sessionId}:`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown package installation error',
@@ -607,7 +619,7 @@ except Exception as e:
   /**
    * Get list of active session IDs
    */
-  getActiveSessions(): string[] {
+  public getActiveSessions(): string[] {
     return Array.from(this.sandboxPool.keys());
   }
 
@@ -620,7 +632,7 @@ except Exception as e:
     const averageSessionAge =
       this.sandboxPool.size > 0
         ? Array.from(this.sandboxPool.values()).reduce(
-            (sum, sandbox) => sum + (now - sandbox.createdAt.getTime()),
+            (sum: number, sandbox: Readonly<E2BSandbox>) => sum + (now - sandbox.createdAt.getTime()),
             0
           ) / this.sandboxPool.size
         : 0;

@@ -6,6 +6,7 @@
  */
 
 import { logger } from '../../logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../../utils/type-guards.js';
 
 export interface BridgeConfiguration {
   modulePath: string;
@@ -79,7 +80,7 @@ export class RustBridgeManager {
       logger.info('Rust bridge initialized successfully');
       return true;
     } catch (error) {
-      logger.error('Failed to initialize Rust bridge:', error);
+      logger.error('Failed to initialize Rust bridge:', toErrorOrUndefined(error));
       this.health.status = 'failed';
       this.health.errorCount++;
       throw error;
@@ -137,7 +138,7 @@ export class RustBridgeManager {
         return false;
       }
     } catch (error) {
-      logger.error('Rust bridge health check failed:', error);
+      logger.error('Rust bridge health check failed:', toErrorOrUndefined(error));
       this.health.status = 'failed';
       this.health.errorCount++;
       this.health.lastCheck = new Date();
@@ -167,7 +168,7 @@ export class RustBridgeManager {
 
       logger.info('Rust bridge shut down successfully');
     } catch (error) {
-      logger.error('Error during Rust bridge shutdown:', error);
+      logger.error('Error during Rust bridge shutdown:', toErrorOrUndefined(error));
     }
   }
 

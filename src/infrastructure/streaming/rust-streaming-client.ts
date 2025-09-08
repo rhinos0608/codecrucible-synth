@@ -8,6 +8,7 @@
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import {
   loadRustExecutorSafely,
 } from '../../utils/rust-module-loader.js';
@@ -142,7 +143,7 @@ export class RustStreamingClient extends EventEmitter {
       logger.info(`✅ Rust stream started: ${rustStreamId} for session ${sessionId}`);
       return sessionId;
     } catch (error) {
-      logger.error('❌ Rust file streaming failed:', error);
+      logger.error('❌ Rust file streaming failed:', toErrorOrUndefined(error));
       session.state = 'error';
       session.error = error instanceof Error ? error.message : String(error);
       await processor.onError(session.error, session);
@@ -191,9 +192,8 @@ export class RustStreamingClient extends EventEmitter {
 
     try {
       // Create callback for chunk processing
-      const chunkCallback = (chunk: unknown): undefined => {
+      const chunkCallback = (chunk: unknown): void => {
         void this.handleChunk(sessionId, chunk);
-        return undefined;
       };
 
       // Start streaming from Rust
@@ -212,10 +212,10 @@ export class RustStreamingClient extends EventEmitter {
       logger.info(`✅ Rust command stream started: ${rustStreamId} for session ${sessionId}`);
       return sessionId;
     } catch (error) {
-      logger.error('❌ Rust command streaming failed:', error);
+      logger.error('❌ Rust command streaming failed:', toErrorOrUndefined(error));
       session.state = 'error';
       session.error = error instanceof Error ? error.message : String(error);
-      await processor.onError(session.error, session);
+      await processor.onError(session.error ?? 'Unknown error', session);
       throw error;
     }
   }
@@ -249,7 +249,7 @@ export class RustStreamingClient extends EventEmitter {
         try {
           this.rustExecutor.terminateStream(sessionId);
         } catch (error) {
-          logger.debug(`Failed to terminate orphaned stream ${sessionId}:`, error);
+          logger.debug(`Failed to terminate orphaned stream ${sessionId}:`, { error });
         }
       }
       return;
@@ -347,7 +347,7 @@ export class RustStreamingClient extends EventEmitter {
         this.cleanupSession(sessionId);
       }
     } catch (error) {
-      logger.error(`Error processing chunk for session ${sessionId}:`, error);
+      logger.error(`Error processing chunk for session ${sessionId}:`, toErrorOrUndefined(error));
       session.state = 'error';
       session.error = error instanceof Error ? error.message : String(error);
       await processor.onError(session.error, session);
@@ -408,7 +408,7 @@ export class RustStreamingClient extends EventEmitter {
           processor.onError(session.error, session).catch(error => {
             logger.error(
               `Error calling processor onError for timed out session ${sessionId}:`,
-              error
+              error instanceof Error ? error : new Error(String(error))
             );
           });
         }
@@ -456,7 +456,7 @@ export class RustStreamingClient extends EventEmitter {
           this.rustExecutor.terminateStream(sessionId);
         }
       } catch (error) {
-        logger.warn(`Failed to terminate Rust stream ${sessionId}:`, error);
+        logger.warn(`Failed to terminate Rust stream ${sessionId}:`, { error: error instanceof Error ? error.message : String(error) });
       }
     }
 

@@ -8,6 +8,7 @@
 import { logger } from '../../logging/logger.js';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../../utils/type-guards.js';
 import type {
   ToolExecutionRequest,
   ToolExecutionResult,
@@ -206,7 +207,7 @@ export class RustExecutionBackend {
       this.initialized = false;
       return false;
     } catch (error) {
-      logger.error('RustExecutionBackend initialization error:', error);
+      logger.error('RustExecutionBackend initialization error:', toErrorOrUndefined(error));
       this.initialized = false;
       return false;
     }
@@ -252,14 +253,14 @@ export class RustExecutionBackend {
           averageExecutionTime: metrics.average_execution_time_ms ?? 0,
         };
       } catch (err) {
-        logger.warn('Failed to parse Rust executor global performance metrics', err);
+        logger.warn('Failed to parse Rust executor global performance metrics', toReadonlyRecord(err));
       }
 
       if (result.performance_metrics) {
         try {
           parsedMetrics = JSON.parse(result.performance_metrics);
         } catch (err) {
-          logger.warn('Failed to parse Rust execution performance_metrics', err);
+          logger.warn('Failed to parse Rust execution performance_metrics', toReadonlyRecord(err));
           parsedMetrics = result.performance_metrics;
         }
       } else {
@@ -290,7 +291,7 @@ export class RustExecutionBackend {
       };
     } catch (error) {
       this.performanceStats.failedRequests++;
-      logger.error('Rust execution failed:', error);
+      logger.error('Rust execution failed:', toErrorOrUndefined(error));
 
       return {
         success: false,
@@ -335,7 +336,7 @@ export class RustExecutionBackend {
         this.initialized = false;
         logger.info('RustExecutionBackend cleaned up');
       } catch (error) {
-        logger.error('Error cleaning up Rust executor:', error);
+        logger.error('Error cleaning up Rust executor:', toErrorOrUndefined(error));
       }
     }
   }
@@ -514,7 +515,7 @@ export class RustExecutionBackend {
           averageExecutionTime: metrics.average_execution_time_ms ?? 0,
         };
       } catch (err) {
-        logger.warn('Failed to fetch Rust performance metrics', err);
+        logger.warn('Failed to fetch Rust performance metrics', toReadonlyRecord(err));
       }
     }
     return {

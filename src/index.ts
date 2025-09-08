@@ -16,6 +16,7 @@ import { createAdaptersFromProviders } from './application/services/adapter-fact
 // getGlobalEventBus intentionally not imported anymore – event bus is injected via RuntimeContext.
 import { getErrorMessage } from './utils/error-utils.js';
 import { logger } from './infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from './utils/type-guards.js';
 import { enterpriseErrorHandler } from './infrastructure/error-handling/enterprise-error-handler.js';
 import { ErrorSeverity } from './infrastructure/error-handling/structured-error-system.js';
 
@@ -144,7 +145,7 @@ export async function initialize(
         const modelSelector = new ModelSelector();
         selectedModelInfo = await modelSelector.selectModel();
       } catch (error) {
-        logger.warn('Interactive model selection failed, using quick select:', error);
+        logger.warn('Interactive model selection failed, using quick select:', toReadonlyRecord(error));
         selectedModelInfo = await quickSelectModel();
       }
     } else {
@@ -343,7 +344,7 @@ export async function initialize(
 
     return { cli, serviceFactory };
   } catch (error) {
-    logger.error('❌ Failed to initialize system:', error);
+    logger.error('❌ Failed to initialize system:', toErrorOrUndefined(error));
     throw error;
   }
 }

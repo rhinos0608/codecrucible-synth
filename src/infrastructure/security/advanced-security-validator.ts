@@ -7,6 +7,7 @@ import { UnifiedSecurityValidator } from '../../domain/services/unified-security
 import { ModernInputSanitizer } from './modern-input-sanitizer.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 import type { ILogger } from '../../domain/interfaces/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface SecurityValidationOptions {
   enableStrictMode: boolean;
@@ -200,7 +201,7 @@ export class AdvancedSecurityValidator {
 
       return result;
     } catch (error) {
-      logger.error('Advanced security validation failed:', error);
+      logger.error('Advanced security validation failed:', toErrorOrUndefined(error));
 
       return {
         isValid: false,
@@ -365,7 +366,7 @@ export class AdvancedSecurityValidator {
     logger[level](message);
 
     if (result.errors.length > 0) {
-      logger.warn('Validation errors:', result.errors);
+      logger.warn('Validation errors:', toReadonlyRecord({ errors: result.errors }));
     }
   }
 }

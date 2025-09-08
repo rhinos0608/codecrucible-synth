@@ -1,5 +1,4 @@
-import { Logger } from '../logging/logger.js';
-import { ILogger } from '../../domain/interfaces/logger.js';
+import { ILogger, createConsoleLogger } from '../../domain/interfaces/logger.js';
 
 export interface AlertRule {
   id: string;
@@ -97,7 +96,7 @@ export class AlertManager {
   private rules: Map<string, AlertRule> = new Map();
   private readonly active: Map<string, Alert> = new Map();
   private history: Alert[] = [];
-  private logger: ILogger = new Logger('AlertManager');
+  private logger: ILogger = createConsoleLogger('AlertManager');
 
   constructor(private config: AlertConfig) {}
 

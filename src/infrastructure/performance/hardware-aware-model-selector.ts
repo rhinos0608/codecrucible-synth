@@ -10,6 +10,7 @@ import {
   OptimalConfiguration,
 } from './intelligent-model-detector.js';
 import { EventEmitter } from 'events';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import * as os from 'os';
 import { resourceManager } from './resource-cleanup-manager.js';
 
@@ -425,7 +426,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
 
       this.logger.info(`Successfully switched to ${nextModel.name} (${nextModel.size})`);
     } catch (error) {
-      this.logger.error('Failed to switch model:', error);
+      this.logger.error('Failed to switch model:', toErrorOrUndefined(error));
     } finally {
       this.switchingInProgress = false;
     }

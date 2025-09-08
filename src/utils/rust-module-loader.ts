@@ -319,7 +319,7 @@ export function loadRustExecutorSafely(baseDir?: string): {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     // FIXED: Reduce noise - use debug level for expected missing binaries in development
-    logger.debug('Rust executor not available:', errorMessage);
+    logger.debug('Rust executor not available:', toReadonlyRecord({ message: errorMessage }));
 
     return {
       module: null,

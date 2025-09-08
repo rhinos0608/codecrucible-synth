@@ -7,6 +7,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../logging/unified-logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import {
   ResourceAlert,
   ResourceAllocation,
@@ -237,7 +238,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
       try {
         this.startCoordination(config.monitoringInterval);
       } catch (err) {
-        logger.error('Failed to start resource coordination:', err);
+        logger.error('Failed to start resource coordination:', toErrorOrUndefined(err));
       }
     }
 
@@ -273,7 +274,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
       try {
         this.performResourceCoordination();
       } catch (error) {
-        logger.error('Error during scheduled resource coordination:', error);
+        logger.error('Error during scheduled resource coordination:', toErrorOrUndefined(error));
       }
     }, intervalMs);
 
@@ -363,7 +364,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
     try {
       this.processQueuedOperations();
     } catch (err) {
-      logger.error('Error processing queued operations:', err);
+      logger.error('Error processing queued operations:', toErrorOrUndefined(err));
     }
 
     return operationId;
@@ -451,7 +452,7 @@ export class ConfigurableResourceCoordinator extends EventEmitter {
         queueSize: this.operationQueue.length,
       });
     } catch (error) {
-      logger.error('Resource coordination cycle error:', error);
+      logger.error('Resource coordination cycle error:', toErrorOrUndefined(error));
       this.emit('coordination-error', { coordinatorId: this.coordinatorId, error });
     }
   }

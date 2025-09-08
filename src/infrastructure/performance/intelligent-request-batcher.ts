@@ -9,6 +9,7 @@
 import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 import { responseCache } from './response-cache-manager.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import * as crypto from 'crypto';
 
 interface BatchableRequest {
@@ -354,7 +355,7 @@ export class IntelligentRequestBatcher {
         efficiency: `${((results.filter(r => r.success).length / group.requests.length) * 100).toFixed(1)}%`,
       });
     } catch (error) {
-      logger.error(`❌ Batch processing failed: ${batchKey}`, error);
+      logger.error(`❌ Batch processing failed: ${batchKey}`, toErrorOrUndefined(error));
 
       // Fallback: process requests individually
       for (const request of group.requests) {

@@ -7,6 +7,7 @@
 
 import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 interface MemoryConfig {
   maxHeapSize: number; // Max heap size in MB
@@ -206,7 +207,7 @@ export class MemoryUsageOptimizer {
         logger.debug('Garbage collection not available (run with --expose-gc)');
       }
     } catch (error) {
-      logger.error('Error during garbage collection:', error);
+      logger.error('Error during garbage collection:', toErrorOrUndefined(error));
     }
   }
 
@@ -488,7 +489,7 @@ export class MemoryUsageOptimizer {
    */
   updateConfig(newConfig: Partial<MemoryConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    logger.info('Memory optimizer configuration updated', this.config);
+    logger.info('Memory optimizer configuration updated', toReadonlyRecord(this.config));
   }
 
   /**

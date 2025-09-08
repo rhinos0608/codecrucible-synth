@@ -7,6 +7,7 @@
 
 import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 interface TimeoutConfig {
   defaultTimeout: number;
@@ -197,7 +198,7 @@ export class RequestTimeoutOptimizer {
     try {
       requestData.abortController.abort();
     } catch (error) {
-      logger.error('Error aborting timed out request', error);
+      logger.error('Error aborting timed out request', toErrorOrUndefined(error));
     }
 
     // Record timeout in history
@@ -405,7 +406,7 @@ export class RequestTimeoutOptimizer {
    */
   updateTimeoutConfig(newConfig: Partial<TimeoutConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    logger.info('Timeout configuration updated', this.config);
+    logger.info('Timeout configuration updated', toReadonlyRecord(this.config));
   }
 
   /**

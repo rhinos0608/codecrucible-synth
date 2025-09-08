@@ -1,5 +1,6 @@
 import { ApprovalManager } from '../domain/approval/approval-manager.js';
 import { logger } from '../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../utils/type-guards.js';
 import type { ToolHandler, ToolRequest, ToolResponse } from './git-types.js';
 import { RepositoryManager } from './git-operations/repository-manager.js';
 import { BranchManager } from './git-operations/branch-manager.js';
@@ -114,7 +115,7 @@ export class GitMCPServer extends BaseMCPServer {
     try {
       return (await handler(args)) as ToolResponse<TRes>;
     } catch (error) {
-      logger.error('Git operation failed:', error);
+      logger.error('Git operation failed:', toErrorOrUndefined(error));
       return { success: false, error: 'Git operation failed' };
     }
   }

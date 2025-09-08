@@ -844,7 +844,7 @@ export class BackupManager {
         }));
       }
     } catch (error) {
-      logger.warn('Failed to load backup history:', error);
+      logger.warn('Failed to load backup history:', toReadonlyRecord(error));
       this.backupHistory = [];
     }
   }
@@ -881,7 +881,7 @@ export class BackupManager {
 
         logger.info(`Cleaned up old backup: ${backup.id}`);
       } catch (error) {
-        logger.warn(`Failed to cleanup backup ${backup.id}:`, error);
+        logger.warn(`Failed to cleanup backup ${backup.id}:`, toReadonlyRecord(error));
       }
     }
 

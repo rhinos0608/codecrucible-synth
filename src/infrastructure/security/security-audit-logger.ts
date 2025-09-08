@@ -229,10 +229,10 @@ export class SecurityAuditLogger {
     this.flushAuditEvents();
   }
 
-  private async sendToCentralAudit(event: AuditEvent): Promise<void> {
+  private async sendToCentralAudit(event: Readonly<AuditEvent>): Promise<void> {
     try {
       await mkdir(dirname(this.auditFilePath), { recursive: true });
-      await appendFile(this.auditFilePath, JSON.stringify(event) + '\n');
+      await appendFile(this.auditFilePath, `${JSON.stringify(event)}\n`);
     } catch (error) {
       logger.warn('Failed to write audit event', { error });
     }

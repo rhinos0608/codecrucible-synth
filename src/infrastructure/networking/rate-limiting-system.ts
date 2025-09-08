@@ -14,6 +14,7 @@ import {
   ErrorResponse,
   ErrorHandler,
 } from '../error-handling/structured-error-system.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 // Rate limiting configuration
 export interface RateLimitConfig {
@@ -488,7 +489,7 @@ export class APICallQueue {
         try {
           await this.executeRequest(request);
         } catch (error) {
-          logger.error(`Failed to execute request ${request.id}`, error);
+          logger.error(`Failed to execute request ${request.id}`, toErrorOrUndefined(error));
         }
       }
     } finally {

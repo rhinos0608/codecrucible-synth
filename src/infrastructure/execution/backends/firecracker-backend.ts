@@ -12,6 +12,7 @@ import {
 } from '../../error-handling/structured-error-system.js';
 import type { BackendConfig, ExecutionOptions, ExecutionResult } from '../execution-types.js';
 import { ExecutionBackend } from '../base-execution-backend.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../../utils/type-guards.js';
 
 const execAsync = promisify(exec);
 
@@ -208,7 +209,7 @@ export class FirecrackerBackend extends ExecutionBackend {
         );
         await unlink(socketPath);
       } catch (error) {
-        logger.warn(`Failed to cleanup VM ${vmId}:`, error);
+        logger.warn(`Failed to cleanup VM ${vmId}:`, toReadonlyRecord(error));
       }
     }
     this.activeVMs.clear();

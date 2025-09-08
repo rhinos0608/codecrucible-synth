@@ -7,6 +7,7 @@
 
 import { createInterface } from 'readline';
 import { logger } from '../logging/unified-logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface ModelInfo {
   id: string;
@@ -45,7 +46,7 @@ export class ModelSelector {
       const ollamaModels = await this.discoverOllamaModels();
       discoveredModels.push(...ollamaModels);
     } catch (error) {
-      logger.debug('Ollama models discovery failed:', error);
+      logger.debug('Ollama models discovery failed:', toReadonlyRecord(error));
     }
 
     // Discover LM Studio models (if running)
@@ -53,7 +54,7 @@ export class ModelSelector {
       const lmStudioModels = await this.discoverLMStudioModels();
       discoveredModels.push(...lmStudioModels);
     } catch (error) {
-      logger.debug('LM Studio models discovery failed:', error);
+      logger.debug('LM Studio models discovery failed:', toReadonlyRecord(error));
     }
 
     // Add cloud providers (if API keys are available)
@@ -154,16 +155,14 @@ export class ModelSelector {
         const key = data.toString();
 
         switch (key) {
-          case '\u001b[A': { // Up arrow
+          case '\u001b[A': // Up arrow
             this.selectedIndex = Math.max(0, this.selectedIndex - 1);
             this.renderModelList();
-            
-          }
-          case '\u001b[B': { // Down arrow
+            break;
+          case '\u001b[B': // Down arrow
             this.selectedIndex = Math.min(this.models.length - 1, this.selectedIndex + 1);
             this.renderModelList();
             break;
-          }
           case '\r': // Enter
           case '\n': {
             const selectedModel = this.models[this.selectedIndex];
@@ -184,7 +183,6 @@ export class ModelSelector {
             rl.close();
             console.log('\n\n👋 Goodbye!');
             process.exit(0);
-            return;
           }
           case 'q':
           case 'Q': {

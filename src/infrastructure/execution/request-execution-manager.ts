@@ -13,6 +13,7 @@
 import { EventEmitter } from 'events';
 import { logger } from '../logging/logger.js';
 import { getErrorMessage, toError } from '../../utils/error-utils.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { ModelRequest, ModelResponse } from '../../domain/interfaces/model-client.js';
 import { ProjectContext, ProviderType } from '../../domain/types/unified-types.js';
 import {
@@ -67,7 +68,7 @@ export class GlobalEvidenceCollector {
         collector(toolResult);
       } catch (error) {
         console.error('🚨 ERROR: Evidence collector callback failed:', error);
-        logger.warn('Evidence collector callback failed:', error);
+        logger.warn('Evidence collector callback failed:', toReadonlyRecord(error));
       }
     });
   }
@@ -320,7 +321,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
       } catch (error) {
         logger.warn(
           `Batching failed for ${requestId}, falling back to individual processing:`,
-          error
+          toReadonlyRecord(error)
         );
         // Fall through to normal processing
       }
@@ -365,7 +366,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
 
       logger.error(
         `❌ Request ${requestId} failed after ${responseTime}ms:`,
-        getErrorMessage(error)
+        toReadonlyRecord({ message: getErrorMessage(error) })
       );
       throw toError(error);
     }
@@ -435,9 +436,13 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           const allTools = await toolIntegration.getLLMFunctions();
 
           // Use domain orchestrator to select relevant tools only
+          const mappedTools = allTools.map(tool => ({
+            name: tool.function.name,
+            function: { name: tool.function.name }
+          }));
           const { tools: selectedTools, analysis, reasoning } = this.domainOrchestrator.getToolsForPrompt(
             request.prompt || '',
-            allTools
+            mappedTools
           );
 
           tools = (selectedTools ?? []) as Tool[];
@@ -719,7 +724,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
       strategy.timeout = Math.max(strategy.timeout, this.config.complexityTimeouts.complex);
     }
 
-    logger.debug('Execution strategy determined:', strategy);
+    logger.debug('Execution strategy determined:', toReadonlyRecord(strategy));
     return strategy;
   }
 

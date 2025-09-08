@@ -5,6 +5,7 @@
 
 import { logger } from '../logging/logger.js';
 import { EventEmitter } from 'events';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface PerformanceMetrics {
   cpuUsage: number;
@@ -130,7 +131,7 @@ export class AdaptivePerformanceTuner extends EventEmitter {
 
       this.emit('metricsCollected', this.metrics);
     } catch (error) {
-      logger.error('Failed to collect performance metrics:', error);
+      logger.error('Failed to collect performance metrics:', toErrorOrUndefined(error));
     }
   }
 

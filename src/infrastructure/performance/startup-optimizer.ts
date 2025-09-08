@@ -7,6 +7,7 @@
 
 import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 interface InitializationTask {
   name: string;
@@ -175,7 +176,7 @@ export class StartupOptimizer {
         // No tasks can run - there might be circular dependencies or missing tasks
         logger.warn(
           'No ready tasks found, remaining tasks may have unmet dependencies:',
-          remainingTasks.map(t => t.name)
+          toReadonlyRecord({ tasks: remainingTasks.map(t => t.name) })
         );
         break;
       }

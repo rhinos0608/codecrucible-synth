@@ -10,6 +10,7 @@ import {
   LLMResponse,
   LLMStatus,
 } from '../../domain/interfaces/llm-interfaces.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface LMStudioConfig {
   endpoint: string;
@@ -145,7 +146,7 @@ export class LMStudioProvider implements LLMProvider {
       clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {
-      logger.debug('LM Studio availability check failed:', error);
+      logger.debug('LM Studio availability check failed:', toReadonlyRecord(error));
       return false;
     }
   }

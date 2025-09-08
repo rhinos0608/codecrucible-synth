@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool';
 import { logger } from '../logging/logger';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 // Schema definitions
 const GoogleWebSearchSchema = z.object({
@@ -100,7 +101,7 @@ export class GoogleWebSearchTool extends BaseTool<typeof GoogleWebSearchSchema.s
         source: 'fallback_search',
       };
     } catch (error) {
-      logger.error('Google Web Search failed:', error);
+      logger.error('Google Web Search failed:', toErrorOrUndefined(error));
       return {
         success: false,
         error: `Google Web Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -155,7 +156,7 @@ export class RefDocumentationTool extends BaseTool<typeof RefDocumentationSearch
         source: 'fallback_documentation',
       };
     } catch (error) {
-      logger.error('Ref Documentation Search failed:', error);
+      logger.error('Ref Documentation Search failed:', toErrorOrUndefined(error));
       return {
         success: false,
         error: `Ref Documentation Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -227,7 +228,7 @@ export class RefReadUrlTool extends BaseTool<typeof RefReadUrlSchema.shape> {
         };
       }
     } catch (error) {
-      logger.error('Ref Read URL failed:', error);
+      logger.error('Ref Read URL failed:', toErrorOrUndefined(error));
       return {
         success: false,
         error: `Ref Read URL failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -286,7 +287,7 @@ export class ExaWebSearchTool extends BaseTool<typeof ExaWebSearchSchema.shape> 
         source: 'fallback_exa_search',
       };
     } catch (error) {
-      logger.error('Exa Web Search failed:', error);
+      logger.error('Exa Web Search failed:', toErrorOrUndefined(error));
       return {
         success: false,
         error: `Exa Web Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,

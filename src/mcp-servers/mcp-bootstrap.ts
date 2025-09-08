@@ -1,5 +1,6 @@
 import { MCPServerManager } from './mcp-server-manager.js';
 import { logger } from '../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../utils/type-guards.js';
 
 export function createMcpServerManager(): MCPServerManager {
   const mcpConfig = {
@@ -53,7 +54,7 @@ export async function bootstrapMcpServers(): Promise<MCPServerManager | null> {
   } catch (error) {
     logger.warn(
       '⚠️ MCP servers initialization had issues, continuing with degraded capabilities:',
-      error
+      toReadonlyRecord(error)
     );
     return null;
   }

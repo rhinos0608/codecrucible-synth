@@ -1,7 +1,6 @@
 import { BaseTool } from './base-tool';
 import { E2BService, ExecutionResult } from './e2b/e2b-service';
 import { createLogger } from '../logging/logger-adapter';
-import { SecurityError } from '../security/security-types';
 import { z } from 'zod';
 
 // Define the schema at the top level so we can reference it in the class generic
@@ -33,12 +32,15 @@ const E2BExecuteCodeSchema = z.object({
  * Replaces unsafe direct code execution with secure E2B sandboxes
  */
 export class E2BCodeExecutionTool extends BaseTool<typeof E2BExecuteCodeSchema.shape> {
-  private e2bService: E2BService;
-  private sessionId: string;
+  private readonly e2bService: E2BService;
+  private readonly sessionId: string;
 
   private readonly logger = createLogger('E2BTool');
 
-  constructor(agentContext: { workingDirectory: string }, e2bService?: E2BService) {
+  public constructor(
+    agentContext: Readonly<{ workingDirectory: string }>,
+    e2bService?: Readonly<E2BService>
+  ) {
     super({
       name: 'e2bExecuteCode',
       description:
@@ -52,18 +54,20 @@ export class E2BCodeExecutionTool extends BaseTool<typeof E2BExecuteCodeSchema.s
       ],
     });
 
-    this.e2bService = e2bService || new E2BService();
+    this.e2bService = (e2bService ?? new E2BService()) as E2BService;
     this.sessionId = agentContext.workingDirectory.replace(/[^a-zA-Z0-9]/g, '_');
   }
 
-  async execute(args: any): Promise<ExecutionResult & { sandbox: string; security: string }> {
+  public async execute(
+    args: z.infer<typeof E2BExecuteCodeSchema> & { user?: unknown }
+  ): Promise<ExecutionResult & { sandbox: string; security: string }> {
     try {
       // ✅ SECURITY: Check authentication requirement from centralized security policies
       const { SecurityPolicyLoader } = await import('../security/security-policy-loader');
       const policyLoader = SecurityPolicyLoader.getInstance();
       const authConfig = await policyLoader.getAuthConfig();
 
-      if (authConfig.e2b.requireAuthentication && !args.user) {
+      if (authConfig.e2b.requireAuthentication && !('user' in args && args.user)) {
         this.logger.error(
           '🚨 E2B code execution blocked: Authentication required by security policy'
         );
@@ -77,8 +81,15 @@ export class E2BCodeExecutionTool extends BaseTool<typeof E2BExecuteCodeSchema.s
         };
       }
 
-      const { code, language = 'python', sessionId, installPackages, files } = args;
-      const actualSessionId = sessionId || this.sessionId;
+      const {
+        code,
+        language = 'python',
+        sessionId,
+        installPackages,
+        files,
+      }: z.infer<typeof E2BExecuteCodeSchema> = args;
+
+      const actualSessionId: string = sessionId ?? this.sessionId;
 
       this.logger.info(`🔒 Executing ${language} code in secure E2B sandbox: ${actualSessionId}`);
 
@@ -113,15 +124,19 @@ export class E2BCodeExecutionTool extends BaseTool<typeof E2BExecuteCodeSchema.s
       }
 
       // Upload files if specified
-      if (files && files.length > 0) {
+      if (files && Array.isArray(files) && files.length > 0) {
         for (const file of files) {
-          await this.e2bService.uploadFile(actualSessionId, file.path, file.content);
+          await this.e2bService.uploadFile(
+            actualSessionId,
+            file.path,
+            file.content
+          );
           this.logger.info(`📁 Uploaded file to sandbox: ${file.path}`);
         }
       }
 
       // Install packages if specified
-      if (installPackages && installPackages.length > 0) {
+      if (installPackages && Array.isArray(installPackages) && installPackages.length > 0) {
         for (const pkg of installPackages) {
           this.logger.info(`📦 Installing package: ${pkg}`);
           const installResult = await this.e2bService.installPackage(
@@ -164,7 +179,7 @@ export class E2BCodeExecutionTool extends BaseTool<typeof E2BExecuteCodeSchema.s
         output: '',
         error: `E2B execution failed: ${errorMessage}`,
         executionTime: 0,
-        sandbox: args.sessionId || this.sessionId,
+        sandbox: (args as { sessionId?: string }).sessionId ?? this.sessionId,
         security: 'error',
       };
     }
@@ -221,7 +236,7 @@ export class E2BCodeExecutionTool extends BaseTool<typeof E2BExecuteCodeSchema.s
   /**
    * Get sandbox status for the current session
    */
-  async getSandboxStatus(): Promise<{ active: boolean; sessions: string[] }> {
+  public getSandboxStatus(): { active: boolean; sessions: string[] } {
     return {
       active: this.e2bService.getStats().isInitialized,
       sessions: this.e2bService.getActiveSessions(),
@@ -231,9 +246,9 @@ export class E2BCodeExecutionTool extends BaseTool<typeof E2BExecuteCodeSchema.s
   /**
    * Clean up sandbox for session
    */
-  async cleanupSandbox(sessionId?: string): Promise<void> {
-    const actualSessionId = sessionId || this.sessionId;
-    await this.e2bService.destroySandbox(actualSessionId);
+  public cleanupSandbox(sessionId?: string): void {
+    const actualSessionId = sessionId ?? this.sessionId;
+    this.e2bService.destroySandbox(actualSessionId);
     this.logger.info(`🧹 Cleaned up sandbox: ${actualSessionId}`);
   }
 }

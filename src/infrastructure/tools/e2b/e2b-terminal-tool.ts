@@ -456,15 +456,17 @@ export class E2BTerminalTool {
     };
   }
 
-  public getActiveSessions(): TerminalSession[] {
-    return Array.from(this.sessions.values()).filter((session: Readonly<TerminalSession>) => session.isActive);
+  public getActiveSessions(): ReadonlyArray<TerminalSession> {
+    return Array.from(this.sessions.values()).filter((session: TerminalSession) => session.isActive);
   }
 
   public async cleanup(): Promise<void> {
     this.logger.info('Cleaning up E2B terminal sessions...');
 
     const activeSessions = this.getActiveSessions();
-    const cleanupPromises = activeSessions.map(async (session: Readonly<TerminalSession>) => await this.closeSession(session.id));
+    const cleanupPromises = activeSessions.map(async (session: TerminalSession) => {
+      await this.closeSession(session.id);
+    });
 
     await Promise.allSettled(cleanupPromises);
 
@@ -481,16 +483,16 @@ export class E2BTerminalTool {
     const activeSessions = this.getActiveSessions();
     const now = Date.now();
     const staleThreshold = 30 * 60 * 1000; // 30 minutes
-
-    // Check for stale sessions
     const staleSessions = activeSessions.filter(
-      (session: Readonly<TerminalSession>) => now - session.lastActivity > staleThreshold
+      (session: TerminalSession) => now - session.lastActivity > staleThreshold
     );
 
     // Clean up stale sessions
     if (staleSessions.length > 0) {
       this.logger.info(`Cleaning up ${staleSessions.length} stale sessions`);
-      await Promise.allSettled(staleSessions.map(async (session: Readonly<TerminalSession>) => await this.closeSession(session.id)));
+      await Promise.allSettled(staleSessions.map(async (session: TerminalSession) => {
+        await this.closeSession(session.id);
+      }));
     }
 
     return {

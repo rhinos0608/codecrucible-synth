@@ -13,6 +13,7 @@ import { outputConfig } from '../../utils/output-config.js';
 import * as path from 'path';
 import { promises as fs } from 'fs';
 import { PathUtilities } from '../../utils/path-utilities.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface SecurityConfig {
   maxFileSize: number; // Maximum file size for read operations
@@ -427,7 +428,7 @@ export class MCPServerSecurity {
 
     // High-risk operations require approval (not implemented yet)
     if (riskLevel === 'high') {
-      logger.warn('High-risk operation detected - manual approval required', context);
+      logger.warn('High-risk operation detected - manual approval required', toReadonlyRecord(context));
       return false; // Conservative default
     }
 

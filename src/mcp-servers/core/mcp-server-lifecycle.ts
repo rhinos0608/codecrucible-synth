@@ -11,6 +11,7 @@
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { mcpServerRegistry } from './mcp-server-registry.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 /**
  * Lightweight interface describing MCP servers managed by the lifecycle.
@@ -100,7 +101,7 @@ export class MCPServerLifecycle extends EventEmitter {
       // Begin health monitoring
       this.startHealthMonitoring();
     } catch (error) {
-      logger.error('❌ MCP lifecycle startup failed:', error);
+      logger.error('❌ MCP lifecycle startup failed:', toErrorOrUndefined(error));
       this.emit('startupFailed', error);
       throw error;
     }
@@ -397,7 +398,7 @@ export class MCPServerLifecycle extends EventEmitter {
       logger.info('✅ MCP server lifecycle shutdown completed');
       this.emit('shutdownComplete');
     } catch (error) {
-      logger.error('❌ Error during shutdown:', error);
+      logger.error('❌ Error during shutdown:', toErrorOrUndefined(error));
       this.emit('shutdownError', error);
     } finally {
       this.cleanup();
@@ -417,7 +418,7 @@ export class MCPServerLifecycle extends EventEmitter {
         }
         logger.info(`✅ Server ${serverId} shutdown completed`);
       } catch (error) {
-        logger.error(`❌ Error shutting down server ${serverId}:`, error);
+        logger.error(`❌ Error shutting down server ${serverId}:`, toErrorOrUndefined(error));
       }
     });
     await Promise.allSettled(shutdownPromises);

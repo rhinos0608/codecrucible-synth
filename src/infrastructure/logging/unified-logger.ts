@@ -86,48 +86,52 @@ export class UnifiedLogger extends EventEmitter {
     }
   }
 
-  public debug(message: string, metadata?: unknown): void {
-    this.log(LogLevel.DEBUG, message, this.toMetadata(metadata));
+  public debug(message: string, metadata?: Readonly<Record<string, unknown>>): void {
+    this.log(LogLevel.DEBUG, message, metadata);
   }
 
-  public trace(message: string, metadata?: unknown): void {
-    this.log(LogLevel.DEBUG, message, this.toMetadata(metadata));
+  public trace(message: string, metadata?: Readonly<Record<string, unknown>>): void {
+    this.log(LogLevel.DEBUG, message, metadata);
   }
 
-  public info(message: string, metadata?: unknown): void {
-    this.log(LogLevel.INFO, message, this.toMetadata(metadata));
+  public info(message: string, metadata?: Readonly<Record<string, unknown>>): void {
+    this.log(LogLevel.INFO, message, metadata);
   }
 
-  public warn(message: string, metadata?: unknown): void {
-    this.log(LogLevel.WARN, message, this.toMetadata(metadata));
+  public warn(message: string, metadata?: Readonly<Record<string, unknown>>): void {
+    this.log(LogLevel.WARN, message, metadata);
   }
 
-  public error(message: string, errorOrMetadata?: unknown, metadata?: unknown): void {
-    const err = toErrorOrUndefined(errorOrMetadata);
-    if (err) {
+  public error(message: string, error?: Error, metadata?: Readonly<Record<string, unknown>>): void;
+  public error(message: string, metadata?: Readonly<Record<string, unknown>>): void;
+  public error(message: string, errorOrMetadata?: Error | Readonly<Record<string, unknown>>, metadata?: Readonly<Record<string, unknown>>): void {
+    if (errorOrMetadata instanceof Error) {
       this.log(LogLevel.ERROR, message, {
-        ...this.toMetadata(metadata),
-        error: err.message,
-        stack: err.stack,
+        ...metadata,
+        error: errorOrMetadata.message,
+        stack: errorOrMetadata.stack,
       });
       return;
     }
     // Treat first arg as metadata when not an Error
     this.log(LogLevel.ERROR, message, {
-      ...this.toMetadata(errorOrMetadata),
-      ...this.toMetadata(metadata),
+      ...errorOrMetadata,
+      ...metadata,
     });
   }
 
-  public fatal(message: string, errorOrMetadata?: unknown, metadata?: unknown): void {
-    const err = toErrorOrUndefined(errorOrMetadata);
+  public fatal(message: string, error?: Error, metadata?: Readonly<Record<string, unknown>>): void;
+  public fatal(message: string, metadata?: Readonly<Record<string, unknown>>): void;
+  public fatal(message: string, errorOrMetadata?: Error | Readonly<Record<string, unknown>>, metadata?: Readonly<Record<string, unknown>>): void {
+    const err = errorOrMetadata instanceof Error ? errorOrMetadata : undefined;
+    const meta = err ? metadata : errorOrMetadata;
     this.log(LogLevel.FATAL, message, {
-      ...this.toMetadata(err ? metadata : errorOrMetadata),
-      ...this.toMetadata(err ? metadata : undefined),
-      error: err,
+      ...meta,
+      error: err?.message,
+      stack: err?.stack,
     });
     // Fatal errors might trigger system shutdown
-    this.emit('fatal', { message, error: err, metadata: this.toMetadata(metadata) });
+    this.emit('fatal', { message, error: err, metadata: meta });
   }
 
   public audit(action: string, result: 'success' | 'failure', metadata?: Readonly<Record<string, unknown>>): void {
@@ -141,7 +145,7 @@ export class UnifiedLogger extends EventEmitter {
     this.writeAudit(entry);
   }
 
-  public log(level: LogLevel, message: string, metadata?: Record<string, unknown>): void {
+  public log(level: LogLevel, message: string, metadata?: Readonly<Record<string, unknown>>): void {
     if (level < this.config.level) return;
 
     const entry: LogEntry = {
@@ -233,14 +237,6 @@ export class UnifiedLogger extends EventEmitter {
     }
   }
 
-  private toMetadata(meta: unknown): Readonly<Record<string, unknown>> | undefined {
-    if (meta === undefined || meta === null) return undefined;
-    if (typeof meta === 'object' && !Array.isArray(meta)) {
-      return meta as Readonly<Record<string, unknown>>;
-    }
-    // Box primitives/arrays for safe logging
-    return toReadonlyRecord(meta);
-  }
 
   private getContext(): string {
     // Get calling context from stack trace

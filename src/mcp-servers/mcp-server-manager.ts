@@ -213,7 +213,7 @@ export class MCPServerManager {
         context: { serverCount: 0, phase: 'startup' },
       });
 
-      logger.error('❌ MCP Server Manager initialization failed:', structuredError.message);
+      logger.error('❌ MCP Server Manager initialization failed:', toReadonlyRecord({ message: structuredError.message }));
 
       // Provide recovery suggestions
       if (structuredError.recoverable) {
@@ -242,7 +242,7 @@ export class MCPServerManager {
       await mcpServerLifecycle.startAll();
       logger.info('MCP servers started successfully via lifecycle manager');
     } catch (error) {
-      logger.error('Failed to start MCP servers:', error);
+      logger.error('Failed to start MCP servers:', toErrorOrUndefined(error));
       // Continue with partial startup - some servers may have started successfully
     }
 
@@ -250,14 +250,14 @@ export class MCPServerManager {
     try {
       this.registerServersWithMonitoring();
     } catch (error) {
-      logger.error('Failed to register servers with monitoring:', error);
+      logger.error('Failed to register servers with monitoring:', toErrorOrUndefined(error));
     }
 
     // Start monitoring after servers are running and registered
     try {
       mcpServerMonitoring.startMonitoring();
     } catch (error) {
-      logger.error('Failed to start monitoring:', error);
+      logger.error('Failed to start monitoring:', toErrorOrUndefined(error));
     }
 
     // Initialize Smithery if enabled
@@ -266,7 +266,7 @@ export class MCPServerManager {
         await this.initializeSmitheryServer();
         logger.info('Smithery server initialized successfully');
       } catch (error) {
-        logger.error('Failed to initialize Smithery server:', error);
+        logger.error('Failed to initialize Smithery server:', toErrorOrUndefined(error));
         // Continue without Smithery - not critical for core functionality
       }
     }

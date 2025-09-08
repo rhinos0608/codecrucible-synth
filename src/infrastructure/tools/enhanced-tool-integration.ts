@@ -129,8 +129,15 @@ export class EnhancedToolIntegration extends EventEmitter {
       if (this.config.enableIntelligentRouting && context.domain) {
         // Use the orchestrator to analyze the domain and then execute with base integration
         const toolPrompt = `${toolCall.function.name}: ${toolCall.function.arguments}`;
-        const availableTools: LLMFunction[] = [];
-        const domainAnalysis = this.orchestrator.getToolsForPrompt(toolPrompt, availableTools);
+        // Map LLMFunction[] to expected tool shape
+        const availableTools = (await this.baseToolIntegration.getLLMFunctions()).map(fn => ({
+          name: fn.function.name,
+          function: { name: fn.function.name }
+        }));
+        const domainAnalysis = this.orchestrator.getToolsForPrompt(
+          toolPrompt,
+          availableTools
+        );
         // Log domain analysis for debugging
         console.log('Domain analysis:', domainAnalysis);
         result = await this.executeWithRetry(toolCall, context);
@@ -145,9 +152,12 @@ export class EnhancedToolIntegration extends EventEmitter {
 
       this.recordMetrics(toolCall.function.name, startTime, true, false);
       return result;
-    } catch (error) {
-      this.recordMetrics(toolCall.function.name, startTime, false);
-      logger.error(`Enhanced tool execution failed for ${toolCall.function.name}:`, error);
+    } catch (error: any) {
+      this.recordMetrics(toolCall.function.name, startTime, false, false);
+      logger.error(
+        `Enhanced tool execution failed for ${toolCall.function.name}:`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     } finally {
       this.activeExecutions.delete(executionId);
@@ -158,17 +168,23 @@ export class EnhancedToolIntegration extends EventEmitter {
     const baseFunctions: LLMFunction[] = await this.baseToolIntegration.getLLMFunctions();
 
     if (domain && this.config.enableIntelligentRouting) {
-      // Use getToolsForPrompt instead since getToolsForDomain is private
+      // Map LLMFunction[] to expected tool shape
+      const availableTools = baseFunctions.map(fn => ({
+        name: fn.function.name,
+        function: { name: fn.function.name }
+      }));
       const domainPrompt = `Tools needed for ${domain} domain`;
-      const domainTools = this.orchestrator.getToolsForPrompt(domainPrompt, baseFunctions);
-      return domainTools.tools as LLMFunction[];
+      const domainTools = this.orchestrator.getToolsForPrompt(domainPrompt, availableTools);
+      // Convert back to LLMFunction[] by matching names
+      const selectedNames = new Set(domainTools.tools.map(t => t.function?.name ?? t.name));
+      return baseFunctions.filter(fn => selectedNames.has(fn.function.name));
     }
 
     return baseFunctions;
   }
 
   public async batchExecuteTools(
-    toolCalls: readonly ToolCall[],
+    toolCalls: ReadonlyArray<ToolCall>,
     context: Readonly<ToolExecutionContext> = { priority: 'medium' }
   ): Promise<unknown[]> {
     // Execute tools in batches respecting concurrency limits

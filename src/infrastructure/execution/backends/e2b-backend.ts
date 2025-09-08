@@ -9,6 +9,7 @@ import {
 } from '../../error-handling/structured-error-system.js';
 import type { BackendConfig, ExecutionOptions, ExecutionResult } from '../execution-types.js';
 import { ExecutionBackend } from '../base-execution-backend.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../../utils/type-guards.js';
 
 export class E2BBackend extends ExecutionBackend {
   private readonly sandboxes = new Map<string, unknown>();
@@ -161,7 +162,7 @@ export class E2BBackend extends ExecutionBackend {
       try {
         await (sandbox as { close: () => Promise<void> }).close();
       } catch (error) {
-        logger.warn(`Failed to close sandbox ${id}:`, error);
+        logger.warn(`Failed to close sandbox ${id}:`, toReadonlyRecord(error));
       }
     }
     this.sandboxes.clear();

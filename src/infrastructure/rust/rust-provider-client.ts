@@ -7,6 +7,7 @@
 
 import { logger } from '../../infrastructure/logging/logger.js';
 import { RustBridgeManager } from '../execution/rust-executor/rust-bridge-manager.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface RustProviderConfig {
   name: string;
@@ -96,7 +97,7 @@ export class RustProviderClient {
         throw new Error('Failed to initialize Rust bridge');
       }
     } catch (error) {
-      logger.error('Error initializing Rust provider client:', error);
+      logger.error('Error initializing Rust provider client:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -135,7 +136,7 @@ export class RustProviderClient {
       this.updateStats(false, responseTime);
       this.stats.lastError = error instanceof Error ? error : new Error(String(error));
 
-      logger.error('Rust provider execution failed:', error);
+      logger.error('Rust provider execution failed:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -162,7 +163,7 @@ export class RustProviderClient {
       await this.bridgeManager.shutdown();
       logger.info('Rust provider client shut down successfully');
     } catch (error) {
-      logger.error('Error during Rust provider shutdown:', error);
+      logger.error('Error during Rust provider shutdown:', toErrorOrUndefined(error));
     }
   }
 

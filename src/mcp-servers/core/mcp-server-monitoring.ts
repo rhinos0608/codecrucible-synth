@@ -13,6 +13,7 @@ import { cpus, loadavg } from 'os';
 import { PerformanceObserver, performance } from 'perf_hooks';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { loadRustExecutorSafely } from '../../utils/rust-module-loader.js';
 
 export interface MetricsConfig {
@@ -211,7 +212,7 @@ class SystemMonitoringUtils {
 
       this.performanceObserver.observe({ entryTypes: ['measure'] });
     } catch (error) {
-      logger.warn('Performance observer setup failed:', error);
+      logger.warn('Performance observer setup failed:', toReadonlyRecord(error));
     }
   }
 
@@ -272,7 +273,7 @@ export class MCPServerMonitoring extends EventEmitter {
       this.rustMetrics = { available, module };
       if (available) logger.info('Rust metrics module available for MCP monitoring');
     } catch (err) {
-      logger.warn('Rust metrics module not available:', err);
+      logger.warn('Rust metrics module not available:', toReadonlyRecord(err));
     }
   }
 
@@ -547,7 +548,7 @@ export class MCPServerMonitoring extends EventEmitter {
 
       this.emit('metricsCollected', serverId, serverMetric.metrics);
     } catch (error) {
-      logger.error(`Failed to collect metrics for server ${serverId}:`, error);
+      logger.error(`Failed to collect metrics for server ${serverId}:`, toErrorOrUndefined(error));
     }
   }
 
@@ -845,7 +846,7 @@ export class MCPServerMonitoring extends EventEmitter {
           }
         }
       } catch (error) {
-        logger.warn('Rust CPU metrics failed, falling back:', error);
+        logger.warn('Rust CPU metrics failed, falling back:', toReadonlyRecord(error));
       }
     }
 

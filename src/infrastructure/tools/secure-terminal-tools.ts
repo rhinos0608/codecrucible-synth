@@ -114,12 +114,12 @@ export class SecureTerminalExecuteTool extends BaseTool<typeof SecureTerminalExe
 
       // Log security warnings if any
       if (result.securityWarnings && result.securityWarnings.length > 0) {
-        logger.warn('🚨 Security warnings during execution:', result.securityWarnings);
+        logger.warn('🚨 Security warnings during execution:', { securityWarnings: result.securityWarnings });
       }
 
       return {
         success: result.success,
-        command: args.command as string,
+        command: args.command,
         exitCode: result.exitCode,
         stdout: result.stdout ?? '',
         stderr: result.stderr ?? '',
@@ -135,11 +135,14 @@ export class SecureTerminalExecuteTool extends BaseTool<typeof SecureTerminalExe
       };
     } catch (error) {
       const executionTime = Date.now() - startTime;
-      logger.error('❌ Secure terminal execution failed:', error);
+      logger.error(
+        '❌ Secure terminal execution failed:',
+        error instanceof Error ? error : undefined
+      );
 
       return {
         success: false,
-        command: args.command as string,
+        command: args.command,
         exitCode: 1,
         stdout: '',
         stderr: `Secure execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -149,7 +152,11 @@ export class SecureTerminalExecuteTool extends BaseTool<typeof SecureTerminalExe
         sandboxed: true,
         workingDirectory: '/tmp',
         message: 'Secure execution failed',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: typeof error === 'object' && error !== null && 'message' in error
+          ? String((error as { message?: unknown }).message)
+          : typeof error === 'string'
+          ? error
+          : 'Unknown error',
       };
     }
   }
@@ -239,10 +246,10 @@ export class SecureProcessManagementTool extends BaseTool<typeof SecureProcessMa
           };
       }
     } catch (error) {
-      logger.error('❌ Secure process management failed:', error);
+      logger.error('❌ Secure process management failed:', error instanceof Error ? error : undefined);
       return {
         success: false,
-        error: `Process management failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error: `Process management failed: ${error && typeof error === 'object' && 'message' in error ? (error as { message?: string }).message : error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }
@@ -277,7 +284,7 @@ export class SecureProcessManagementTool extends BaseTool<typeof SecureProcessMa
 
       return {
         success: true,
-        sandboxStats: stats.e2bService as Record<string, unknown>,
+        sandboxStats: stats.e2bService as unknown as Record<string, unknown>,
         securityConfig: {
           enforceE2BOnly: stats.config.enforceE2BOnly,
           auditLog: stats.config.auditLog,
@@ -374,10 +381,10 @@ export class SecureShellEnvironmentTool extends BaseTool<typeof SecureShellEnvir
         error: result.stderr ?? '',
         sandboxed: true,
         message: `Environment query executed in secure sandbox`,
-        sessionId: result.sessionId ?? '',
+        sessionId: result.sessionId,
       };
     } catch (error) {
-      logger.error('❌ Secure environment query failed:', error);
+      logger.error('❌ Secure environment query failed:', error instanceof Error ? error : undefined);
       return {
         success: false,
         error: `Environment query failed: ${error instanceof Error ? error.message : 'Unknown error'}`,

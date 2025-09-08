@@ -6,6 +6,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 interface ManagedResource {
   id: string;
@@ -149,7 +150,7 @@ export class ResourceCleanupManager extends EventEmitter {
       logger.debug(`Cleaned up resource ${resourceId}`);
       return true;
     } catch (error) {
-      logger.error(`Error cleaning up resource ${resourceId}:`, error);
+      logger.error(`Error cleaning up resource ${resourceId}:`, toErrorOrUndefined(error));
       return false;
     }
   }
@@ -274,7 +275,7 @@ export class ResourceCleanupManager extends EventEmitter {
           cleanedCount++;
         }
       } catch (error) {
-        logger.error(`Error during shutdown cleanup of ${resourceId}:`, error);
+        logger.error(`Error during shutdown cleanup of ${resourceId}:`, toErrorOrUndefined(error));
       }
     }
 

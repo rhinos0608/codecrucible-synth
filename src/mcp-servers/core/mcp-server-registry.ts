@@ -9,6 +9,7 @@
 
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { EventEmitter } from 'events';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface MCPServerDefinition {
   id: string;
@@ -171,7 +172,7 @@ export class MCPServerRegistry extends EventEmitter {
       registration.status = 'error';
       registration.lastError = error instanceof Error ? error : new Error(String(error));
 
-      logger.error(`❌ Server ${serverId} initialization failed:`, error);
+      logger.error(`❌ Server ${serverId} initialization failed:`, toErrorOrUndefined(error));
       this.emit('serverError', serverId, error);
 
       throw error;

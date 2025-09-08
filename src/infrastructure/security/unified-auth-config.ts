@@ -6,6 +6,8 @@
 
 import { SecurityPolicyLoader } from './security-policy-loader.js';
 import { logger } from '../logging/logger.js';
+import crypto from 'crypto';
+import yaml from 'js-yaml';
 
 export interface UnifiedAuthConfig {
   // JWT Configuration
@@ -82,7 +84,7 @@ export class UnifiedAuthConfigManager {
   private static lastLoadTime: number = 0;
   private static readonly CACHE_TTL = 300000; // 5 minutes
 
-  private policyLoader: SecurityPolicyLoader;
+  private readonly policyLoader: SecurityPolicyLoader;
 
   private constructor() {
     this.policyLoader = SecurityPolicyLoader.getInstance();
@@ -91,8 +93,8 @@ export class UnifiedAuthConfigManager {
   /**
    * Get singleton instance
    */
-  static getInstance(): UnifiedAuthConfigManager {
-    if (!UnifiedAuthConfigManager.instance) {
+  public static getInstance(): UnifiedAuthConfigManager {
+    if (UnifiedAuthConfigManager.instance === undefined) {
       UnifiedAuthConfigManager.instance = new UnifiedAuthConfigManager();
     }
     return UnifiedAuthConfigManager.instance;
@@ -101,7 +103,7 @@ export class UnifiedAuthConfigManager {
   /**
    * Load unified authentication configuration
    */
-  async loadConfig(environment: string = 'production'): Promise<UnifiedAuthConfig> {
+  public async loadConfig(environment: string = 'production'): Promise<UnifiedAuthConfig> {
     const now = Date.now();
 
     // Return cached config if still valid
@@ -119,7 +121,7 @@ export class UnifiedAuthConfigManager {
       // Build unified configuration
       UnifiedAuthConfigManager.config = {
         jwt: {
-          secret: process.env.JWT_SECRET || this.generateSecretKey(),
+          secret: process.env.JWT_SECRET ?? this.generateSecretKey(),
           expiresIn: policies.authentication.api.jwtExpiresIn,
           refreshExpiresIn: policies.authentication.api.refreshTokenExpiresIn,
           issuer: 'codecrucible-synth',
@@ -185,7 +187,7 @@ export class UnifiedAuthConfigManager {
 
       return UnifiedAuthConfigManager.config;
     } catch (error) {
-      logger.error(`❌ Failed to load unified auth config: ${error}`);
+      logger.error(`❌ Failed to load unified auth config: ${(error as Error).message}`);
       return this.getFallbackConfig();
     }
   }
@@ -193,7 +195,7 @@ export class UnifiedAuthConfigManager {
   /**
    * Get JWT configuration
    */
-  async getJwtConfig(): Promise<UnifiedAuthConfig['jwt']> {
+  public async getJwtConfig(): Promise<UnifiedAuthConfig['jwt']> {
     const config = await this.loadConfig();
     return config.jwt;
   }
@@ -201,7 +203,7 @@ export class UnifiedAuthConfigManager {
   /**
    * Get session configuration
    */
-  async getSessionConfig(): Promise<UnifiedAuthConfig['session']> {
+  public async getSessionConfig(): Promise<UnifiedAuthConfig['session']> {
     const config = await this.loadConfig();
     return config.session;
   }
@@ -209,7 +211,7 @@ export class UnifiedAuthConfigManager {
   /**
    * Get password policy
    */
-  async getPasswordPolicy(): Promise<UnifiedAuthConfig['password']> {
+  public async getPasswordPolicy(): Promise<UnifiedAuthConfig['password']> {
     const config = await this.loadConfig();
     return config.password;
   }
@@ -217,7 +219,7 @@ export class UnifiedAuthConfigManager {
   /**
    * Get MFA configuration
    */
-  async getMfaConfig(): Promise<UnifiedAuthConfig['mfa']> {
+  public async getMfaConfig(): Promise<UnifiedAuthConfig['mfa']> {
     const config = await this.loadConfig();
     return config.mfa;
   }
@@ -225,7 +227,7 @@ export class UnifiedAuthConfigManager {
   /**
    * Get rate limiting configuration
    */
-  async getRateLimitConfig(): Promise<UnifiedAuthConfig['rateLimiting']> {
+  public async getRateLimitConfig(): Promise<UnifiedAuthConfig['rateLimiting']> {
     const config = await this.loadConfig();
     return config.rateLimiting;
   }
@@ -233,7 +235,14 @@ export class UnifiedAuthConfigManager {
   /**
    * Get service-specific authentication settings
    */
-  async getServiceConfig(service: keyof UnifiedAuthConfig['services']): Promise<any> {
+  public async getServiceConfig(
+    service: keyof UnifiedAuthConfig['services']
+  ): Promise<
+    UnifiedAuthConfig['services']['e2b'] |
+    UnifiedAuthConfig['services']['api'] |
+    UnifiedAuthConfig['services']['cli'] |
+    UnifiedAuthConfig['services']['mcp']
+  > {
     const config = await this.loadConfig();
     return config.services[service];
   }
@@ -241,22 +250,33 @@ export class UnifiedAuthConfigManager {
   /**
    * Check if authentication is required for a specific service
    */
-  async isAuthRequired(service: keyof UnifiedAuthConfig['services']): Promise<boolean> {
+  public async isAuthRequired(service: keyof UnifiedAuthConfig['services']): Promise<boolean> {
     const serviceConfig = await this.getServiceConfig(service);
-    return serviceConfig.requireAuth || serviceConfig.requireAuthentication || false;
+
+    // Type guard for requireAuth/requireAuthentication
+    if ('requireAuth' in serviceConfig && typeof serviceConfig.requireAuth === 'boolean') {
+      return serviceConfig.requireAuth;
+    }
+    if (
+      'requireAuthentication' in serviceConfig &&
+      typeof (serviceConfig as Record<string, unknown>).requireAuthentication === 'boolean'
+    ) {
+      return (serviceConfig as { requireAuthentication: boolean }).requireAuthentication;
+    }
+    return false;
   }
 
   /**
    * Get environment-specific overrides
    */
-  async getConfigForEnvironment(environment: string): Promise<UnifiedAuthConfig> {
+  public async getConfigForEnvironment(environment: string): Promise<UnifiedAuthConfig> {
     return this.loadConfig(environment);
   }
 
   /**
    * Force reload configuration (for testing or manual refresh)
    */
-  async forceReload(environment: string = 'production'): Promise<UnifiedAuthConfig> {
+  public async forceReload(environment: string = 'production'): Promise<UnifiedAuthConfig> {
     UnifiedAuthConfigManager.config = null;
     UnifiedAuthConfigManager.lastLoadTime = 0;
     return this.loadConfig(environment);
@@ -265,7 +285,7 @@ export class UnifiedAuthConfigManager {
   /**
    * Validate current authentication configuration
    */
-  async validateConfig(): Promise<{ isValid: boolean; issues: string[] }> {
+  public async validateConfig(): Promise<{ isValid: boolean; issues: string[] }> {
     const config = await this.loadConfig();
     const issues: string[] = [];
 
@@ -294,19 +314,16 @@ export class UnifiedAuthConfigManager {
       issues,
     };
   }
-
   /**
    * Generate a secure secret key if none provided
    */
   private generateSecretKey(): string {
-    const crypto = require('crypto');
-    const key = crypto.randomBytes(64).toString('hex');
+    const key: string = crypto.randomBytes(64).toString('hex');
     logger.warn(
       '🔑 Generated new JWT secret key. Consider setting JWT_SECRET environment variable.'
     );
     return key;
   }
-
   /**
    * Get fallback configuration if loading fails
    */
@@ -371,15 +388,13 @@ export class UnifiedAuthConfigManager {
       },
     };
   }
-
   /**
    * Export configuration for external systems
    */
-  async exportConfig(format: 'json' | 'yaml' = 'json'): Promise<string> {
+  public async exportConfig(format: 'json' | 'yaml' = 'json'): Promise<string> {
     const config = await this.loadConfig();
 
     if (format === 'yaml') {
-      const yaml = require('js-yaml');
       return yaml.dump(config, { indent: 2 });
     }
 

@@ -20,31 +20,14 @@ import type {
   StreamSession,
 } from './stream-chunk-protocol.js';
 
-// Define the expected Rust module shape for type safety
-interface RustModule {
-  RustExecutor: new () => {
-    initialize: () => void;
-    streamFile: (
-      filePath: string,
-      chunkSize: number,
-      contextType: string,
-      chunkCallback: (chunk: unknown) => void
-    ) => string;
-    streamCommand: (
-      command: string,
-      args: readonly string[],
-      chunkSize: number,
-      chunkCallback: (chunk: unknown) => void
-    ) => string;
-    terminateStream?: (sessionId: string) => void;
-  };
-}
+// Import the complete interface from rust-module-loader
+import type { RustExecutorModule } from '../../utils/rust-module-loader.js';
 
 // Load the Rust executor with cross-platform support
 const rustModuleResult = loadRustExecutorSafely();
 const RustExecutor =
   rustModuleResult.available && rustModuleResult.module
-    ? (rustModuleResult.module as RustModule).RustExecutor
+    ? rustModuleResult.module.RustExecutor
     : null;
 
 if (rustModuleResult.available) {
@@ -57,7 +40,7 @@ if (rustModuleResult.available) {
  * High-performance streaming client backed by Rust
  */
 export class RustStreamingClient extends EventEmitter {
-  private readonly rustExecutor: InstanceType<RustModule['RustExecutor']> | null = null;
+  private readonly rustExecutor: InstanceType<RustExecutorModule['RustExecutor']> | null = null;
   private readonly activeSessions: Map<string, StreamSession> = new Map();
   private readonly processors: Map<string, StreamProcessor> = new Map();
   private readonly sessionTimeouts: Map<string, NodeJS.Timeout> = new Map();
@@ -70,11 +53,46 @@ export class RustStreamingClient extends EventEmitter {
 
     if (RustExecutor) {
       this.rustExecutor = new RustExecutor();
-      this.rustExecutor.initialize();
-      this.isInitialized = true;
-      logger.info('🦀 Rust streaming client initialized');
+      // Initialize asynchronously in background
+      this.initializeRustExecutor();
     } else {
       logger.warn('🔄 Rust executor unavailable - streaming will use TypeScript fallback');
+    }
+  }
+
+  private async initializeRustExecutor(): Promise<void> {
+    if (!this.rustExecutor) return;
+    
+    try {
+      const initSuccess = await this.rustExecutor.initialize();
+      this.isInitialized = initSuccess;
+      
+      // Check if runtime is available
+      if (typeof this.rustExecutor.is_runtime_available === 'function') {
+        const runtimeAvailable = this.rustExecutor.is_runtime_available();
+        logger.info('🦀 Rust streaming client initialized', { 
+          initSuccess,
+          runtimeAvailable,
+          hasRuntimeStats: typeof this.rustExecutor.get_runtime_stats === 'function'
+        });
+        
+        if (typeof this.rustExecutor.get_runtime_stats === 'function') {
+          try {
+            const stats = this.rustExecutor.get_runtime_stats();
+            logger.debug('Rust runtime stats:', JSON.parse(stats));
+          } catch (e) {
+            const errorInfo = toErrorOrUndefined(e);
+            logger.warn('Failed to get runtime stats:', 
+              errorInfo ? { message: errorInfo.message, name: errorInfo.name } : { error: String(e) }
+            );
+          }
+        }
+      } else {
+        logger.info('🦀 Rust streaming client initialized (legacy runtime)');
+      }
+    } catch (error) {
+      logger.error('Failed to initialize Rust executor:', toErrorOrUndefined(error));
+      this.isInitialized = false;
     }
   }
 
@@ -130,7 +148,7 @@ export class RustStreamingClient extends EventEmitter {
       // Start streaming from Rust
       let rustStreamId = '';
       if (this.rustExecutor) {
-        rustStreamId = this.rustExecutor.streamFile(
+        rustStreamId = this.rustExecutor.stream_file(
           filePath,
           streamOptions.chunkSize,
           streamOptions.contextType,
@@ -199,9 +217,9 @@ export class RustStreamingClient extends EventEmitter {
       // Start streaming from Rust
       let rustStreamId = '';
       if (this.rustExecutor) {
-        rustStreamId = this.rustExecutor.streamCommand(
+        rustStreamId = this.rustExecutor.stream_command(
           command,
-          args,
+          [...args],
           streamOptions.chunkSize,
           chunkCallback
         );

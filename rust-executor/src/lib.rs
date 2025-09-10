@@ -2,10 +2,9 @@ use napi::{threadsafe_function::ThreadsafeFunction, JsFunction, Result};
 use napi_derive::napi;
 use serde_json;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio::runtime::Runtime;
+use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, info};
+use tracing::{info, error};
 use uuid::Uuid;
 
 // Module declarations - keeping full complexity
@@ -21,7 +20,7 @@ use crate::protocol::communication::CommunicationHandler;
 use crate::protocol::messages::{
     ExecutionContext, ExecutionRequest, ResourceLimitConfig, SecurityLevel as ProtocolSecurityLevel,
 };
-use crate::streaming::{StreamChunk, StreamOptions, StreamingEngine};
+use crate::streaming::{StreamingEngine, StreamChunk, StreamOptions};
 
 /// Main Rust Executor class exposed to Node.js via NAPI
 #[napi]
@@ -31,9 +30,11 @@ pub struct RustExecutor {
     streaming_engine: Arc<StreamingEngine>,
     initialized: bool,
     performance_metrics: Arc<RwLock<PerformanceMetrics>>,
-    // Shared Tokio runtime for all async operations
-    runtime: Arc<Mutex<Runtime>>,
 }
+
+// Explicitly implement Send and Sync since all fields are thread-safe
+unsafe impl Send for RustExecutor {}
+unsafe impl Sync for RustExecutor {}
 
 #[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct PerformanceMetrics {
@@ -105,11 +106,6 @@ impl RustExecutor {
         let streaming_engine =
             Arc::new(StreamingEngine::new().expect("Failed to create streaming engine"));
 
-        // Create a single Tokio runtime for all async operations
-        let runtime = Arc::new(Mutex::new(
-            Runtime::new().expect("Failed to create Tokio runtime"),
-        ));
-
         info!("RustExecutor created with ID: {}", id);
 
         Self {
@@ -118,7 +114,6 @@ impl RustExecutor {
             streaming_engine,
             initialized: false,
             performance_metrics: Arc::new(RwLock::new(PerformanceMetrics::default())),
-            runtime,
         }
     }
 
@@ -130,34 +125,23 @@ impl RustExecutor {
 
     /// Initialize the executor with default settings
     #[napi]
-    pub fn initialize(&mut self) -> bool {
+    pub async unsafe fn initialize(&mut self) -> bool {
         if self.initialized {
             return true;
         }
 
-        // Initialize communication handler with executors using shared runtime
-        let runtime = self.runtime.lock().expect("Failed to acquire runtime lock");
-        match runtime.block_on(async {
-            // Initialize communication handler
-            match self.communication_handler.initialize().await {
-                Ok(_) => {
-                    // Initialize metrics aggregation with the runtime context
-                    self.initialize_metrics_aggregation().await;
-                    Ok(())
-                }
-                Err(e) => {
-                    error!("Communication handler initialization failed: {:?}", e);
-                    Err(e)
-                }
-            }
-        }) {
+        // NAPI-RS automatically provides Tokio runtime, no manual setup needed
+        match self.communication_handler.initialize().await {
             Ok(_) => {
+                // Initialize metrics aggregation
+                self.initialize_metrics_aggregation().await;
+                
                 self.initialized = true;
                 info!("RustExecutor initialized successfully: {}", self.id);
                 true
             }
             Err(e) => {
-                error!("RustExecutor initialization failed: {:?}", e);
+                error!("Communication handler initialization failed: {:?}", e);
                 false
             }
         }
@@ -216,9 +200,8 @@ impl RustExecutor {
                 .unwrap_or(false),
         };
 
-        // Execute request through communication handler and update performance metrics using shared runtime
-        let runtime = self.runtime.lock().expect("Failed to acquire runtime lock");
-        let response = runtime.block_on(async {
+        // Execute request through communication handler - NAPI-RS handles async automatically
+        let response = tokio::runtime::Handle::current().block_on(async {
             let response = self.communication_handler.execute_request(request).await;
             self._update_performance_metrics(response.success, response.execution_time_ms)
                 .await;
@@ -306,22 +289,177 @@ impl RustExecutor {
         self.execute("command".to_string(), arguments_json, options)
     }
 
+    /// Fast file read using spawn_blocking with std::fs (optimal performance)
+    /// This method uses Tokio's spawn_blocking to offload file I/O to a thread pool,
+    /// preventing blocking of the async runtime while maintaining optimal performance.
+    #[napi]
+    pub async fn read_file_fast(&self, file_path: String) -> Result<String> {
+        let start_time = std::time::Instant::now();
+        
+        // Validate file path before processing
+        if file_path.is_empty() {
+            return Err(napi::Error::new(
+                napi::Status::InvalidArg,
+                "File path cannot be empty",
+            ));
+        }
+
+        // Log the operation start
+        info!("Starting fast file read for: {}", file_path);
+
+        // Clone path for use in closure (necessary for move semantics)
+        let path_for_closure = file_path.clone();
+
+        // Use spawn_blocking to avoid blocking the async runtime
+        // This is the optimal approach for file I/O operations
+        let result = tokio::task::spawn_blocking(move || {
+            // Use std::fs for maximum performance - no async overhead
+            let path = std::path::Path::new(&path_for_closure);
+            
+            // Check if file exists first
+            if !path.exists() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("File not found: {}", path_for_closure),
+                ));
+            }
+
+            // Check if it's a file (not a directory)
+            if !path.is_file() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("Path is not a file: {}", path_for_closure),
+                ));
+            }
+
+            // Get file metadata for logging
+            let metadata = std::fs::metadata(&path);
+            let file_size = metadata.map(|m| m.len()).unwrap_or(0);
+            
+            if file_size > 0 {
+                info!("Reading file: {} ({} bytes)", path_for_closure, file_size);
+            }
+
+            // Perform the actual read operation
+            std::fs::read_to_string(&path)
+        })
+        .await;
+
+        // Handle the join result first
+        let io_result = result.map_err(|join_err| {
+            error!("Task join error during file read: {:?}", join_err);
+            napi::Error::new(
+                napi::Status::GenericFailure,
+                format!("Background task failed: {}", join_err),
+            )
+        })?;
+
+        // Handle the I/O result
+        match io_result {
+            Ok(content) => {
+                let elapsed = start_time.elapsed();
+                let content_size = content.len();
+                
+                info!(
+                    "✅ Fast file read completed: {} ({} chars, {} bytes) in {:.2}ms",
+                    file_path,
+                    content_size,
+                    content.as_bytes().len(),
+                    elapsed.as_secs_f64() * 1000.0
+                );
+                
+                // Update performance metrics if available
+                if let Ok(mut metrics) = self.performance_metrics.try_write() {
+                    metrics.total_requests += 1;
+                    metrics.successful_requests += 1;
+                    let elapsed_ms = elapsed.as_millis() as u64;
+                    metrics.total_execution_time_ms += elapsed_ms;
+                    metrics.average_execution_time_ms = 
+                        metrics.total_execution_time_ms as f64 / metrics.total_requests as f64;
+                }
+                
+                Ok(content)
+            }
+            Err(io_err) => {
+                let elapsed = start_time.elapsed();
+                
+                error!(
+                    "❌ Fast file read failed: {} after {:.2}ms - {}",
+                    file_path,
+                    elapsed.as_secs_f64() * 1000.0,
+                    io_err
+                );
+
+                // Update failure metrics
+                if let Ok(mut metrics) = self.performance_metrics.try_write() {
+                    metrics.total_requests += 1;
+                    metrics.failed_requests += 1;
+                    let elapsed_ms = elapsed.as_millis() as u64;
+                    metrics.total_execution_time_ms += elapsed_ms;
+                    metrics.average_execution_time_ms = 
+                        metrics.total_execution_time_ms as f64 / metrics.total_requests as f64;
+                }
+
+                // Map I/O errors to appropriate NAPI errors
+                let napi_status = match io_err.kind() {
+                    std::io::ErrorKind::NotFound => napi::Status::InvalidArg,
+                    std::io::ErrorKind::PermissionDenied => napi::Status::InvalidArg,
+                    std::io::ErrorKind::InvalidInput => napi::Status::InvalidArg,
+                    std::io::ErrorKind::InvalidData => napi::Status::InvalidArg,
+                    _ => napi::Status::GenericFailure,
+                };
+
+                Err(napi::Error::new(
+                    napi_status,
+                    format!("Failed to read file '{}': {}", file_path, io_err),
+                ))
+            }
+        }
+    }
+
+    /// Check if Tokio runtime is available
+    #[napi]
+    pub fn is_runtime_available(&self) -> bool {
+        tokio::runtime::Handle::try_current().is_ok()
+    }
+
+    /// Ensure Tokio runtime is available for metrics aggregation
+    #[napi]
+    pub fn ensure_tokio_runtime(&self) -> bool {
+        self.is_runtime_available()
+    }
+
+    /// Get runtime statistics
+    #[napi]
+    pub fn get_runtime_stats(&self) -> String {
+        if self.is_runtime_available() {
+            serde_json::json!({
+                "runtime_available": true,
+                "metrics_enabled": true,
+                "thread_id": format!("{:?}", std::thread::current().id()),
+                "tokio_handle": "available"
+            }).to_string()
+        } else {
+            serde_json::json!({
+                "runtime_available": false,
+                "metrics_enabled": false,
+                "error": "Tokio runtime not available"
+            }).to_string()
+        }
+    }
+
     /// Get performance metrics as JSON string
     #[napi]
-    pub fn get_performance_metrics(&self) -> String {
-        let runtime = self.runtime.lock().expect("Failed to acquire runtime lock");
-        let metrics = runtime.block_on(async { self.performance_metrics.read().await.clone() });
+    pub async fn get_performance_metrics(&self) -> String {
+        let metrics = self.performance_metrics.read().await.clone();
         serde_json::to_string(&metrics).unwrap_or_else(|_| "{}".to_string())
     }
 
     /// Reset performance metrics
     #[napi]
-    pub fn reset_performance_metrics(&self) {
-        let runtime = self.runtime.lock().expect("Failed to acquire runtime lock");
-        runtime.block_on(async {
-            let mut metrics = self.performance_metrics.write().await;
-            *metrics = PerformanceMetrics::default();
-        });
+    pub async fn reset_performance_metrics(&self) {
+        let mut metrics = self.performance_metrics.write().await;
+        *metrics = PerformanceMetrics::default();
     }
 
     /// Check if the executor is healthy
@@ -402,13 +540,8 @@ impl RustExecutor {
     pub fn cleanup(&self) {
         info!("Cleaning up RustExecutor {}", self.id);
 
-        // Gracefully shutdown the runtime if possible
-        if let Ok(_runtime) = self.runtime.lock() {
-            // Note: We don't call shutdown() here because it would consume the runtime
-            // and we can't move it out of the Arc<Mutex<>>. The runtime will be
-            // automatically dropped when the RustExecutor is dropped.
-            info!("Runtime cleanup scheduled for RustExecutor {}", self.id);
-        }
+        // Runtime is managed by NAPI-RS, no manual cleanup needed
+        info!("RustExecutor cleaned up: {}", self.id);
     }
 
     // Private helper methods
@@ -570,15 +703,11 @@ impl RustExecutor {
             include_metrics: true,
         };
 
-        // Execute streaming in the runtime
-        let runtime = self.runtime.lock().map_err(|_| {
-            napi::Error::new(
-                napi::Status::GenericFailure,
-                "Failed to acquire runtime lock",
-            )
-        })?;
+        // NAPI-RS provides Tokio runtime automatically
+        let handle = tokio::runtime::Handle::current();
 
-        match runtime.block_on(streaming_engine.stream_file_content(&file_path, options, callback))
+        // Use the runtime handle to spawn async work
+        match handle.block_on(streaming_engine.stream_file_content(&file_path, options, callback))
         {
             Ok(stream_id) => Ok(stream_id),
             Err(stream_error) => {
@@ -799,15 +928,10 @@ impl RustExecutor {
             include_metrics: true,
         };
 
-        // Execute streaming in the runtime
-        let runtime = self.runtime.lock().map_err(|_| {
-            napi::Error::new(
-                napi::Status::GenericFailure,
-                "Failed to acquire runtime lock",
-            )
-        })?;
+        // NAPI-RS provides Tokio runtime automatically
+        let handle = tokio::runtime::Handle::current();
 
-        match runtime
+        match handle
             .block_on(streaming_engine.stream_command_output(&command, args, options, callback))
         {
             Ok(stream_id) => Ok(stream_id),
@@ -1016,9 +1140,14 @@ pub fn init_logging(level: Option<String>) {
 
 /// Benchmark function for performance testing
 #[napi]
-pub fn benchmark_execution(iterations: u32) -> String {
+pub async fn benchmark_execution(iterations: u32) -> Result<String> {
     let mut executor = RustExecutor::new();
-    executor.initialize();
+    if !unsafe { executor.initialize().await } {
+        return Err(napi::Error::new(
+            napi::Status::GenericFailure,
+            "Failed to initialize executor for benchmark",
+        ));
+    }
 
     let start_time = std::time::Instant::now();
     let mut successful = 0u32;
@@ -1043,5 +1172,5 @@ pub fn benchmark_execution(iterations: u32) -> String {
         "operations_per_second": (iterations as f64 / total_time.as_secs_f64()).round()
     });
 
-    benchmark_result.to_string()
+    Ok(benchmark_result.to_string())
 }

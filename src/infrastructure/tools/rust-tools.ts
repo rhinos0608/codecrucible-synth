@@ -159,8 +159,8 @@ export class RustTools {
       logger.debug('Filesystem operation completed', {
         operation,
         path,
-        success: result.success,
-        executionTime: result.execution_time_ms
+        success: (result as any).success,
+        executionTime: (result as any).executionTimeMs ?? (result as any).execution_time_ms
       });
 
       return result;
@@ -202,8 +202,8 @@ export class RustTools {
       logger.debug('Command executed', {
         command,
         args,
-        success: result.success,
-        executionTime: result.execution_time_ms
+        success: (result as any).success,
+        executionTime: (result as any).executionTimeMs ?? (result as any).execution_time_ms
       });
 
       return result;
@@ -245,8 +245,8 @@ export class RustTools {
       
       logger.debug('Tool executed', {
         toolId,
-        success: result.success,
-        executionTime: result.execution_time_ms
+        success: (result as any).success,
+        executionTime: (result as any).executionTimeMs ?? (result as any).execution_time_ms
       });
 
       return result;

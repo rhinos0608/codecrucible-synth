@@ -8,7 +8,9 @@ export interface BridgeResult {
   success: boolean;
   result?: unknown;
   error?: string;
-  execution_time_ms: number;
+  // Support both camelCase (NAPI) and snake_case (older typings)
+  executionTimeMs?: number;
+  execution_time_ms?: number;
   performance_metrics?: string;
 }
 

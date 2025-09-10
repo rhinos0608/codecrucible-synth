@@ -8,6 +8,7 @@ import { OllamaProvider } from '../../../providers/hybrid/ollama-provider.js';
 import { logger } from '../../../infrastructure/logging/unified-logger.js';
 import { toErrorOrUndefined } from '../../../utils/type-guards.js';
 import { ProviderAdapter } from './provider-adapter.js';
+import { ProviderResponseNormalizer } from '../../../utils/provider-response-normalizer.js';
 
 export class OllamaAdapter implements ProviderAdapter {
   readonly name = 'ollama';
@@ -63,65 +64,48 @@ export class OllamaAdapter implements ProviderAdapter {
         } : undefined,
       }) as any;  // Provider response type varies
 
-      let content = '';
-      if (typeof providerResponse === 'string') {
-        content = providerResponse;
-      } else if (providerResponse && typeof providerResponse === 'object') {
-        // Ensure we only assign string values to content
-        const extractContent = (resp: any): string => {
-          if (typeof resp.content === 'string') return resp.content;
-          if (typeof resp.response === 'string') return resp.response;
-          if (typeof resp.message === 'string') return resp.message;
-          if (typeof resp.output === 'string') return resp.output;
-          if (typeof resp.text === 'string') return resp.text;
-          return '';
-        };
-        content = extractContent(providerResponse);
-      }
+      // Use the standardized response normalizer
+      const normalized = ProviderResponseNormalizer.normalize(
+        providerResponse,
+        req.model || cfg.defaultModel,
+        this.name
+      );
 
-      if (!content) {
-        logger.warn('OllamaAdapter received empty content from provider', {
+      // Validate response - ensure we have either content or tool calls
+      if (!normalized.content && (!normalized.toolCalls || normalized.toolCalls.length === 0)) {
+        logger.warn('OllamaAdapter received empty response from provider', {
           responseType: typeof providerResponse,
-          responseKeys:
-            providerResponse && typeof providerResponse === 'object'
-              ? Object.keys(providerResponse)
-              : [],
-          hasToolCalls: !!providerResponse?.toolCalls?.length,
+          responseKeys: normalized.metadata.originalKeys,
+          normalizedContent: normalized.content,
+          hasToolCalls: !!normalized.toolCalls?.length,
         });
 
-        if (!providerResponse?.toolCalls?.length) {
-          logger.error('No content and no tool calls in Ollama response');
-          throw new Error(
-            'Ollama returned empty response with no content and no tool calls. This indicates a provider failure.'
-          );
-        }
+        logger.error('No content and no tool calls in Ollama response');
+        throw new Error(
+          'Ollama returned empty response with no content and no tool calls. This indicates a provider failure.'
+        );
+      }
 
+      if (!normalized.content && normalized.toolCalls?.length) {
         logger.debug('Empty content but tool calls present - proceeding');
       }
 
       return {
-        id: providerResponse?.id || `ollama_${Date.now()}`,
-        content: content,
-        model: providerResponse?.model || req.model || cfg.defaultModel,
+        id: normalized.id || `ollama_${Date.now()}`,
+        content: normalized.content,
+        model: normalized.model || req.model || cfg.defaultModel,
         provider: this.name,
-        usage: providerResponse?.usage || {
-          promptTokens: providerResponse?.prompt_eval_count || 0,
-          completionTokens: providerResponse?.eval_count || 0,
-          totalTokens:
-            (providerResponse?.prompt_eval_count || 0) + (providerResponse?.eval_count || 0),
-        },
-        responseTime: providerResponse?.total_duration || undefined,
-        finishReason: providerResponse?.done ? 'stop' : undefined,
-        toolCalls: providerResponse?.toolCalls
-          ? providerResponse.toolCalls.map((tc: any) => ({
-              id: tc.id,
-              type: tc.type as 'function',
-              function: {
-                name: tc.name,  // LLMResponse has flattened structure
-                arguments: tc.arguments,
-              },
-            }))
-          : undefined,
+        usage: normalized.usage,
+        responseTime: normalized.responseTime,
+        finishReason: normalized.finishReason,
+        toolCalls: normalized.toolCalls?.map((tc) => ({
+          id: tc.id,
+          type: tc.type,
+          function: {
+            name: tc.function.name,
+            arguments: tc.function.arguments, // Already normalized to string
+          },
+        })),
       };
     } catch (error) {
       logger.error('OllamaAdapter request failed:', toErrorOrUndefined(error));

@@ -4,7 +4,9 @@ export interface RustExecutionResult {
   success: boolean;
   result?: any;
   error?: string;
-  execution_time_ms: number;
+  // NAPI exports use camelCase; keep snake_case optional for backwards compat
+  executionTimeMs?: number;
+  execution_time_ms?: number;
   performance_metrics?: string;
 }
 
@@ -18,18 +20,19 @@ export interface RustExecutorOptions {
 
 export class RustExecutor {
   static create(): RustExecutor;
-  initialize(): Promise<boolean>;
-  executeFilesystem(operation: string, path: string, content?: string, options?: RustExecutorOptions): Promise<RustExecutionResult>;
-  executeCommand(command: string, args: string[], options?: RustExecutorOptions): Promise<RustExecutionResult>;
-  execute(toolId: string, args: string, options?: RustExecutorOptions): Promise<RustExecutionResult>;
+  // Actual NAPI methods are synchronous; awaiting them is still safe in JS
+  initialize(): boolean;
+  executeFilesystem(operation: string, path: string, content?: string, options?: RustExecutorOptions): RustExecutionResult;
+  executeCommand(command: string, args: string[], options?: RustExecutorOptions): RustExecutionResult;
+  execute(toolId: string, args: string, options?: RustExecutorOptions): RustExecutionResult;
   getPerformanceMetrics(): string;
   resetPerformanceMetrics(): void;
-  healthCheck(): Promise<string>;
+  healthCheck(): string;
   getSupportedTools(): string[];
   getFilesystemOperations(): string[];
   getSupportedCommands(): string[];
-  cleanup(): Promise<void>;
-  id(): string;
+  cleanup(): void;
+  id: string;
 }
 
 export function createRustExecutor(): RustExecutor;

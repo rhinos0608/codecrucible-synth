@@ -142,9 +142,16 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
     // Log aggregated error summary if there were failures
     if (errors.length > 0) {
       this.logErrorSummary(errors, request.id);
+
+      // Strict failure mode: abort when any tool fails (default on)
+      const strict = (process.env.STRICT_TOOL_FAILURES ?? 'true').toLowerCase() !== 'false';
+      if (strict) {
+        const summary = errors.map(e => `${e.toolName}: ${e.message}`).join('; ');
+        throw new Error(`Tool execution failed: ${summary}`);
+      }
     }
 
-    // Always proceed with synthesis even if some tools failed
+    // Proceed with synthesis only if we have results and no strict abort above
     if (toolResults.length === 0) {
       logger.warn('No tool results to synthesize', { requestId: request.id });
       return response;
@@ -155,7 +162,24 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
       {
         role: 'assistant' as const,
         content: response.content || 'I need to use tools to help with this request.',
-        tool_calls: response.toolCalls,
+        tool_calls: response.toolCalls?.map(tc => ({
+          id: tc.id,
+          type: tc.type,
+          function: {
+            name: tc.function.name,
+            // Parse arguments back to object for Ollama - it expects objects, not strings
+            arguments: typeof tc.function.arguments === 'string' 
+              ? (() => {
+                  try {
+                    return JSON.parse(tc.function.arguments);
+                  } catch {
+                    // If parsing fails, create a simple object
+                    return { raw_arguments: tc.function.arguments };
+                  }
+                })()
+              : tc.function.arguments,
+          },
+        })),
       },
       // Create individual tool messages with matching IDs
       ...toolResults.map(toolResult => ({

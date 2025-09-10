@@ -21,8 +21,9 @@ async function main() {
       if (!Array.isArray(body.tools) || body.tools.length === 0) {
         throw new Error('tools not forwarded to provider');
       }
-      if (body.tool_choice !== 'auto') {
-        throw new Error('tool_choice not set to auto');
+      // Accept either explicit tool_choice or omission (provider now infers auto)
+      if (body.tool_choice && body.tool_choice !== 'auto') {
+        throw new Error('tool_choice must be auto when provided');
       }
 
       // Return a fake non-streamed response containing a tool call
@@ -82,4 +83,3 @@ main().catch(err => {
   console.error('SMOKE TEST FAILED:', err);
   process.exit(1);
 });
-

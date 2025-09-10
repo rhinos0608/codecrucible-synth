@@ -202,11 +202,31 @@ export function findNAPIBinary(searchPaths: string[], baseName: string): string 
  * Uses napi-rs prebuild approach with fallback to local binary
  */
 export interface RustExecutorModule {
-  RustExecutor: new (...args: unknown[]) => unknown;
-  createRustExecutor?: (...args: readonly unknown[]) => unknown;
-  initLogging?: (...args: readonly unknown[]) => void;
+  RustExecutor: new (...args: unknown[]) => {
+    id: () => string;
+    initialize: () => Promise<boolean>;
+    execute: (toolId: string, args: string, options?: unknown) => unknown;
+    executeFilesystem: (operation: string, path: string, content?: string, options?: unknown) => unknown;
+    executeCommand: (command: string, args: string[], options?: unknown) => unknown;
+    read_file_fast: (path: string) => Promise<string>;
+    is_runtime_available: () => boolean;
+    get_runtime_stats: () => string;
+    ensure_tokio_runtime: () => boolean;
+    get_performance_metrics: () => Promise<string>;
+    reset_performance_metrics: () => Promise<void>;
+    health_check: () => string;
+    get_supported_tools: () => string[];
+    get_filesystem_operations: () => string[];
+    get_supported_commands: () => string[];
+    cleanup: () => void;
+    stream_file: (filePath: string, chunkSize?: number, contextType?: string, callback?: unknown) => string;
+    stream_command: (command: string, args: string[], chunkSize?: number, callback?: unknown) => string;
+    terminateStream?: (sessionId: string) => void;
+  };
+  createRustExecutor?: () => unknown;
+  initLogging?: (level?: string) => void;
   getVersion?: () => string;
-  benchmarkExecution?: (...args: readonly unknown[]) => unknown;
+  benchmarkExecution?: (iterations: number) => Promise<string>;
 }
 
 export function loadRustExecutor(baseDir?: string): RustExecutorModule {
@@ -334,92 +354,52 @@ export function loadRustExecutorSafely(baseDir?: string): {
  * Create fallback Rust executor for when binary is not available
  */
 export function createFallbackRustExecutor(error: string): RustExecutorModule {
-  return {
-    RustExecutor: class RustExecutor {
-      public constructor() {
-        throw new Error(`Rust module not available: ${error}`);
-      }
-
-      public static create(): never {
-        throw new Error(`Rust module not available: ${error}`);
-      }
-
-      public initialize(): never {
-        throw new Error(`Rust module not available: ${error}`);
-      }
-
-      public id(): never {
-        throw new Error(`Rust module not available: ${error}`);
-      }
-
-      public get_supported_tools(): never {
-        throw new Error(`Rust module not available: ${error}`);
-      }
-
-      public getFilesystemOperations(): never {
-        throw new Error(`Rust module not available: ${error}`);
-      }
-
-      public getSupportedCommands(): never {
-        throw new Error(`Rust module not available: ${error}`);
-      }
-
-      public execute(_toolId: string, _args: string, _options?: unknown): never {
-        throw new Error(`Rust module not available: ${error}`);
-      }
-
-      public executeFilesystem(_operation: string, _path: string, _content?: string, _options?: unknown): never {
-        throw new Error(`Rust module not available: ${error}`);
-      }
-
-      public executeCommand(_command: string, _args: readonly string[], _options?: unknown): never {
-        throw new Error(`Rust module not available: ${error}`);
-      }
-
-      public get_performance_metrics(): string {
-        return JSON.stringify({
-          total_requests: 0,
-          successful_requests: 0,
-          failed_requests: 0,
-          average_execution_time_ms: 0,
-          error: 'Rust module not available',
-        });
-      }
-
-      public reset_performance_metrics(): void {
-        logger.warn('Rust performance metrics not available - module failed to load');
-      }
-
-      public async healthCheck(): Promise<string> {
-        return Promise.resolve(`unhealthy: ${error}`);
-      }
-
-      public async cleanup(): Promise<void> {
-        return Promise.resolve();
-      }
-
-      public streamFile(): never {
-        throw new Error(`Rust streaming not available: ${error}`);
-      }
-
-      public streamCommand(): never {
-        throw new Error(`Rust streaming not available: ${error}`);
-      }
+  const fallbackExecutor = {
+    id: (): never => { throw new Error(`Rust module not available: ${error}`); },
+    initialize: async (): Promise<never> => { throw new Error(`Rust module not available: ${error}`); },
+    execute: (): never => { throw new Error(`Rust module not available: ${error}`); },
+    executeFilesystem: (): never => { throw new Error(`Rust module not available: ${error}`); },
+    executeCommand: (): never => { throw new Error(`Rust module not available: ${error}`); },
+    read_file_fast: async (): Promise<never> => { throw new Error(`Rust file operations not available: ${error}`); },
+    is_runtime_available: (): boolean => false,
+    get_runtime_stats: (): string => JSON.stringify({ runtime_available: false, error }),
+    ensure_tokio_runtime: (): boolean => false,
+    get_performance_metrics: async (): Promise<string> => Promise.resolve(JSON.stringify({
+      total_requests: 0,
+      successful_requests: 0,
+      failed_requests: 0,
+      average_execution_time_ms: 0,
+      error: 'Rust module not available',
+    })),
+    reset_performance_metrics: async (): Promise<void> => {
+      logger.warn('Rust performance metrics not available - module failed to load');
+      return Promise.resolve();
     },
+    health_check: (): string => JSON.stringify({ status: 'unhealthy', reason: error }),
+    get_supported_tools: (): string[] => [],
+    get_filesystem_operations: (): string[] => [],
+    get_supported_commands: (): string[] => [],
+    cleanup: (): void => { /* no-op */ },
+    stream_file: (): never => { throw new Error(`Rust streaming not available: ${error}`); },
+    stream_command: (): never => { throw new Error(`Rust streaming not available: ${error}`); },
+  };
 
-    createRustExecutor(): never {
+  return {
+    RustExecutor: function RustExecutor() {
+      return fallbackExecutor;
+    } as unknown as new (...args: unknown[]) => InstanceType<RustExecutorModule['RustExecutor']>,
+
+    createRustExecutor: (): never => {
       throw new Error(`Rust module not available: ${error}`);
     },
 
-    initLogging(): void {
+    initLogging: (): void => {
       logger.warn('Rust logging not available - module failed to load');
     },
 
-    getVersion(): string {
-      return 'unavailable';
-    },
+    getVersion: (): string => 'unavailable',
 
-    benchmarkExecution(): never {
+    benchmarkExecution: async (): Promise<never> => {
       throw new Error(`Rust benchmarks not available: ${error}`);
     },
   };

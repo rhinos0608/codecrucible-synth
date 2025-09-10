@@ -271,9 +271,10 @@ export class RustExecutionBackend {
       } else {
         parsedMetrics = undefined;
       }
+      const execMs = (result as any).executionTimeMs ?? (result as any).execution_time_ms ?? 0;
       logger.debug('✅ Rust execution completed', {
         toolId: request.toolId,
-        executionTime: result.execution_time_ms,
+        executionTime: execMs,
         success: result.success,
       });
 
@@ -287,12 +288,12 @@ export class RustExecutionBackend {
             }
           : undefined,
         metadata: {
-          executionTimeMs: result.execution_time_ms,
+          executionTimeMs: execMs,
           executor: 'rust',
           performanceMetrics: parsedMetrics,
           ...request.metadata,
         },
-        executionTimeMs: result.execution_time_ms,
+        executionTimeMs: execMs,
       };
     } catch (error) {
       this.performanceStats.failedRequests++;
@@ -320,7 +321,11 @@ export class RustExecutionBackend {
    * Check if Rust backend is available
    */
   isAvailable(): boolean {
-    return this.initialized && this.rustExecutor !== null;
+    // Check both direct executor and bridge paths
+    return this.initialized && (
+      this.rustExecutor !== null || 
+      (this.bridge?.isAvailable() === true)
+    );
   }
 
   /**

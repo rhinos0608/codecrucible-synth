@@ -26,7 +26,7 @@ import { DomainAwareToolOrchestrator } from '../tools/domain-aware-tool-orchestr
 import { requestBatcher } from '../performance/intelligent-request-batcher.js';
 import { adaptiveTuner } from '../performance/adaptive-performance-tuner.js';
 import { requestTimeoutOptimizer } from '../performance/request-timeout-optimizer.js';
-import { RustExecutionBackend } from './rust-executor/index.js';
+import { RustExecutionBackend } from './rust/index.js';
 
 // Define a type for tool results to avoid 'any' and unsafe property access
 export interface ToolResult {
@@ -203,14 +203,15 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     // If no injected backend, lazily create one
     if (!this._rustBackend) {
       try {
-        import('./rust-executor/index.js')
-          .then(async ({ RustExecutionBackend }) => {
-            this._rustBackend = new RustExecutionBackend({
+        import('./rust/index.js')
+          .then(async ({ getRustExecutor, initializeRustExecutor }) => {
+            await initializeRustExecutor({
               enableProfiling: true,
               maxConcurrency: 4,
               timeoutMs: config.defaultTimeout,
               logLevel: 'info',
             });
+            this._rustBackend = getRustExecutor();
             // Initialize asynchronously
             // Fire-and-forget async initialization of Rust backend
             await this.initializeRustBackend();

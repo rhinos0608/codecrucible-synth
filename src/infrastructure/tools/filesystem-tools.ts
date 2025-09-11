@@ -5,7 +5,7 @@
  * Eliminates memory accumulation through Rust-backed chunked processing
  */
 
-import { RustExecutionBackend } from '../execution/rust-executor/rust-execution-backend.js';
+import { RustExecutionBackend } from '../execution/rust/rust-execution-backend.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { rustStreamingClient } from '../streaming/rust-streaming-client.js';
 import { logger } from '../logging/unified-logger.js';

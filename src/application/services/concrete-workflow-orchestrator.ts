@@ -300,15 +300,19 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
         };
 
         // Inject the Rust backend from the runtime context to avoid duplicate initialization
-        const injectedRustBackend = (dependencies.runtimeContext as unknown as {
-          rustBackend?: unknown;
-        })?.rustBackend as unknown;
+        const injectedRustBackend = (
+          dependencies.runtimeContext as unknown as {
+            rustBackend?: unknown;
+          }
+        )?.rustBackend as unknown;
 
         this.requestExecutionManager = new RequestExecutionManager(
           config,
           processManager,
           providerRepository,
-          (injectedRustBackend as unknown) as import('../../infrastructure/execution/rust-executor/index.js').RustExecutionBackend | null
+          injectedRustBackend as unknown as
+            | import('../../infrastructure/execution/rust/index.js').RustExecutionBackend
+            | null
         );
         logger.info(
           '  - requestExecutionManager: ✅ Initialized with advanced execution strategies'

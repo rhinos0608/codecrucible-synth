@@ -7,7 +7,7 @@
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const { RustExecutor } = require('./rust-executor/index.node');
+const { RustExecutor } = require('./rust/index.node');
 
 async function testRealCommandExecution() {
   console.log('🧪 Testing Real Rust Command Execution Implementation\n');

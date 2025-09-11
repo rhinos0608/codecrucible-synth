@@ -3,7 +3,7 @@
  * Integrates with RustExecutionBackend and security validation for real code execution
  */
 
-import { RustExecutionBackend } from '../../execution/rust-executor/rust-execution-backend.js';
+import { RustExecutionBackend } from '../../execution/rust/rust-execution-backend.js';
 import { SecurityValidator } from './security-validator.js';
 import { createLogger } from '../../logging/logger-adapter.js';
 import { TerminalMCPServer } from '@/mcp-servers/terminal-server.js';

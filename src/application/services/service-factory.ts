@@ -11,7 +11,11 @@ import {
   setConfigManager,
 } from '../runtime/runtime-context.js';
 
-import { RustExecutionBackend } from '../../infrastructure/execution/rust-executor/index.js';
+import {
+  RustExecutionBackend,
+  initializeRustExecutor,
+  getRustExecutor,
+} from '../../infrastructure/execution/rust/index.js';
 
 interface RuntimeContext extends BaseRuntimeContext {
   rustBackend?: RustExecutionBackend;
@@ -34,7 +38,7 @@ import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-us
 import { createEventBus } from '../../infrastructure/messaging/event-bus-factory.js';
 import { MetricsCollector } from '../../infrastructure/observability/metrics-collector.js';
 import { createUnifiedMetrics } from '../../infrastructure/observability/unified-metrics-adapter.js';
-import { BridgeAdapter } from '../../infrastructure/execution/rust-executor/bridge-adapter.js';
+import { BridgeAdapter } from '../../infrastructure/execution/rust/bridge-adapter.js';
 import { startBridgeHealthReporter } from '../../infrastructure/observability/bridge-health-reporter.js';
 import { getGlobalObservability } from '../../infrastructure/observability/observability-coordinator.js';
 /* (removed duplicate import of RustExecutionBackend) */
@@ -215,10 +219,8 @@ export class ServiceFactory {
       // Create bridge and backend
       const bridge = new BridgeAdapter();
       await bridge.initialize();
-      const rustBackend = new RustExecutionBackend({}, undefined, bridge);
-      if (typeof rustBackend.initialize === 'function') {
-        await rustBackend.initialize();
-      }
+      await initializeRustExecutor({}, undefined, bridge);
+      const rustBackend = getRustExecutor();
 
       this.runtimeContext.rustBackend = rustBackend;
 

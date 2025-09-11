@@ -15,11 +15,14 @@ import { ToolCallResponse } from './smithery-mcp-server.js';
 
 interface TerminalConfig {
   workingDirectory?: string;
-  allowedCommands?: string[];
-  blockedCommands?: string[];
   timeout?: number;
   maxOutputSize?: number;
   environment?: Record<string, string>;
+}
+
+export interface CommandPolicy {
+  allowedCommands?: string[];
+  blockedCommands?: string[];
 }
 
 interface TerminalResult {
@@ -34,15 +37,15 @@ interface TerminalResult {
 export class TerminalMCPServer {
   private readonly server: Server;
   private readonly config: TerminalConfig;
+  private readonly policy: CommandPolicy;
   private initialized: boolean = false;
   private readonly activeProcesses: Map<string, ChildProcess> = new Map();
 
-  public constructor(config: TerminalConfig = {}) {
+  public constructor(config: TerminalConfig = {}, policy: CommandPolicy = {}) {
     const isWin = process.platform === 'win32';
-    this.config = {
-      workingDirectory: config.workingDirectory ?? process.cwd(),
+    this.policy = {
       allowedCommands:
-        config.allowedCommands ??
+        policy.allowedCommands ??
         (isWin
           ? [
               'cmd',
@@ -102,7 +105,7 @@ export class TerminalMCPServer {
               'rustc',
               'go',
             ]),
-      blockedCommands: config.blockedCommands ?? [
+      blockedCommands: policy.blockedCommands ?? [
         'rm',
         'del',
         'sudo',
@@ -120,6 +123,12 @@ export class TerminalMCPServer {
         'mkfs',
         'mount',
       ],
+    };
+
+    this.config = {
+      workingDirectory: config.workingDirectory ?? process.cwd(),
+      allowedCommands: this.policy.allowedCommands,
+      blockedCommands: this.policy.blockedCommands,
       timeout: config.timeout ?? 30000, // 30 seconds default
       maxOutputSize: config.maxOutputSize ?? 1000000, // 1MB default
       environment: config.environment ?? {},

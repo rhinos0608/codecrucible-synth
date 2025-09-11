@@ -96,6 +96,13 @@ export class RustExecutionBackend {
   }
 
   /**
+   * Update executor options after instantiation.
+   */
+  setOptions(options: Partial<RustExecutorOptions>): void {
+    this.options = { ...this.options, ...options };
+  }
+
+  /**
    * Inject TypeScript tool orchestrator for fallback execution
    */
   setTypescriptOrchestrator(orchestrator: IToolExecutor): void {

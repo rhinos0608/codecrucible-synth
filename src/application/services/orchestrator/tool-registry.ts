@@ -1,6 +1,6 @@
 import { ModelTool } from '../../../domain/interfaces/model-client.js';
 import { IMcpManager } from '../../../domain/interfaces/mcp-manager.js';
-import { createDefaultToolRegistry } from '../../../infrastructure/tools/default-tool-registry.js';
+import { createCentralToolRegistry } from '../../../infrastructure/tools/central-tool-registry.js';
 import { logger } from '../../../infrastructure/logging/logger.js';
 import { toReadonlyRecord } from '../../../utils/type-guards.js';
 
@@ -14,7 +14,7 @@ export class ToolRegistry {
 
   private initializeRegistry(): Map<string, ModelTool> {
     if (!this.registryCache) {
-      this.registryCache = createDefaultToolRegistry({ mcpManager: this.mcpManager });
+      this.registryCache = createCentralToolRegistry({ mcpManager: this.mcpManager });
     }
     return this.registryCache;
   }

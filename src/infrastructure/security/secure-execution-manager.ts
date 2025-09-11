@@ -125,7 +125,10 @@ export class SecureExecutionManager {
         logger.info('✅ All code execution will be sandboxed via E2B');
       }
     } catch (error) {
-      logger.error('❌ Failed to initialize Secure Execution Manager:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        '❌ Failed to initialize Secure Execution Manager:',
+        error instanceof Error ? error : new Error(String(error))
+      );
 
       if (this.config.enforceE2BOnly) {
         throw new Error(
@@ -182,7 +185,10 @@ export class SecureExecutionManager {
         request.sessionId
       );
     } catch (error) {
-      logger.error('❌ Secure execution failed:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        '❌ Secure execution failed:',
+        error instanceof Error ? error : new Error(String(error))
+      );
 
       return {
         success: false,
@@ -229,7 +235,10 @@ export class SecureExecutionManager {
         backend: 'e2b',
       };
     } catch (error) {
-      logger.error('❌ E2B execution failed:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        '❌ E2B execution failed:',
+        error instanceof Error ? error : new Error(String(error))
+      );
 
       return {
         success: false,
@@ -310,7 +319,10 @@ export class SecureExecutionManager {
 
       return { isValid: true };
     } catch (error) {
-      logger.error('Security validation error:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Security validation error:',
+        error instanceof Error ? error : new Error(String(error))
+      );
       return {
         isValid: false,
         reason: 'Security validation system error',

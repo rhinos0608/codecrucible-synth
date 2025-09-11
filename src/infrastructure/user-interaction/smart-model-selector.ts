@@ -254,7 +254,10 @@ export class SmartModelSelector {
               reasons.push('json-mode');
             }
           } catch (error) {
-            logger.debug(`Could not check capabilities for ${model.name}:`, toReadonlyRecord(error));
+            logger.debug(
+              `Could not check capabilities for ${model.name}:`,
+              toReadonlyRecord(error)
+            );
             // Give moderate score for unknown capabilities
             score += 3;
             reasons.push('unknown-capabilities');
@@ -267,7 +270,11 @@ export class SmartModelSelector {
           // Llama 3.1 is EXCELLENT at function calling: 89.06% BFCL accuracy (8B), 90.76% (70B)
           score += 18; // Highest score for proven excellent function calling
           reasons.push('llama3.1-excellent-functions');
-        } else if (modelNameLower.includes('qwen2.5-coder:7b') || modelNameLower.includes('qwen2.5-coder:14b') || modelNameLower.includes('qwen2.5-coder:32b')) {
+        } else if (
+          modelNameLower.includes('qwen2.5-coder:7b') ||
+          modelNameLower.includes('qwen2.5-coder:14b') ||
+          modelNameLower.includes('qwen2.5-coder:32b')
+        ) {
           score += 15; // Excellent function calling and coding (7B+ models)
           reasons.push('qwen2.5-coder-7b+-excellent');
         } else if (modelNameLower.includes('qwen2.5-coder:3b')) {
@@ -293,7 +300,12 @@ export class SmartModelSelector {
         // Size considerations (larger models significantly better for function calling)
         if (model.size) {
           const size = model.size.toLowerCase();
-          if (size.includes('70b') || size.includes('32b') || size.includes('27b') || size.includes('20b')) {
+          if (
+            size.includes('70b') ||
+            size.includes('32b') ||
+            size.includes('27b') ||
+            size.includes('20b')
+          ) {
             score += 8; // Very large models excel at function calling
             if (requireFunctionCalling) score += 4; // Extra bonus for function calling
             reasons.push('very-large-model');
@@ -339,11 +351,13 @@ export class SmartModelSelector {
     if (scoredModels.length > 1) {
       logger.debug(
         'Top 3 model candidates:',
-        toReadonlyRecord(scoredModels.slice(0, 3).map(m => ({
-          name: m.model.name,
-          score: m.score,
-          provider: m.model.provider,
-        })))
+        toReadonlyRecord(
+          scoredModels.slice(0, 3).map(m => ({
+            name: m.model.name,
+            score: m.score,
+            provider: m.model.provider,
+          }))
+        )
       );
     }
 

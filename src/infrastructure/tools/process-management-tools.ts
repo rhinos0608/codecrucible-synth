@@ -21,11 +21,46 @@ const execAsync = promisify(exec);
 type ProcessManagerArgs = z.infer<typeof AdvancedProcessSchema>;
 type ProcessManagerResult =
   | { error: string }
-  | { success: boolean; sessionId?: string | null; command?: string; pid?: number; initialOutput?: string; isRunning?: boolean; interactive?: boolean; message?: string }
-  | { sessionId: string; command: string; isRunning: boolean; output: string; totalLines: number; lastActivity: string; uptime: number }
+  | {
+      success: boolean;
+      sessionId?: string | null;
+      command?: string;
+      pid?: number;
+      initialOutput?: string;
+      isRunning?: boolean;
+      interactive?: boolean;
+      message?: string;
+    }
+  | {
+      sessionId: string;
+      command: string;
+      isRunning: boolean;
+      output: string;
+      totalLines: number;
+      lastActivity: string;
+      uptime: number;
+    }
   | { totalSessions: number; runningSessions: number; sessions: ProcessSessionSummary[] }
-  | { sessionId: string; command: string; pid: number; isRunning: boolean; startTime: string; lastActivity: string; uptime: number; outputLines: number; recentOutput: string; isInteractive: boolean }
-  | { success: boolean; sessionId: string; input: string; output: string; newLines: number; totalLines: number };
+  | {
+      sessionId: string;
+      command: string;
+      pid: number;
+      isRunning: boolean;
+      startTime: string;
+      lastActivity: string;
+      uptime: number;
+      outputLines: number;
+      recentOutput: string;
+      isInteractive: boolean;
+    }
+  | {
+      success: boolean;
+      sessionId: string;
+      input: string;
+      output: string;
+      newLines: number;
+      totalLines: number;
+    };
 
 interface ProcessSession {
   id: string;
@@ -255,7 +290,9 @@ export class AdvancedProcessTool extends BaseTool<typeof AdvancedProcessSchema.s
     });
   }
 
-  public async interactWithProcess(args: Readonly<ProcessManagerArgs>): Promise<ProcessManagerResult> {
+  public async interactWithProcess(
+    args: Readonly<ProcessManagerArgs>
+  ): Promise<ProcessManagerResult> {
     if (!args.sessionId) {
       return { error: 'Session ID is required.' };
     }
@@ -484,7 +521,9 @@ export class CodeExecutionTool extends BaseTool<typeof codeExecutionParameters.s
     });
   }
 
-  public async execute(args: Readonly<CodeExecutionArgs>): Promise<CodeExecutionResult | { error: string }> {
+  public async execute(
+    args: Readonly<CodeExecutionArgs>
+  ): Promise<CodeExecutionResult | { error: string }> {
     try {
       switch (args.language) {
         case 'python':

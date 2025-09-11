@@ -6,10 +6,7 @@ export interface RequestProcessor {
 
 export class BasicRequestProcessor implements RequestProcessor {
   public process(request: Readonly<ModelRequest>): ModelRequest {
-    if (
-      !request.prompt &&
-      (!Array.isArray(request.messages) || request.messages.length === 0)
-    ) {
+    if (!request.prompt && (!Array.isArray(request.messages) || request.messages.length === 0)) {
       throw new Error('ModelRequest requires a prompt or messages');
     }
     const processed: ModelRequest = {

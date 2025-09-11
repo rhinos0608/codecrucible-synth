@@ -238,11 +238,7 @@
     "directories": {
       "output": "build/desktop"
     },
-    "files": [
-      "dist/**/*",
-      "config/**/*",
-      "node_modules/**/*"
-    ],
+    "files": ["dist/**/*", "config/**/*", "node_modules/**/*"],
     "mac": {
       "category": "public.app-category.developer-tools"
     },

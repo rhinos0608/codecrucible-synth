@@ -73,9 +73,7 @@ export class SecureTerminalExecuteTool extends BaseTool<typeof SecureTerminalExe
     this.secureExecutionManager = new SecureExecutionManager();
   }
 
-  public async execute(
-    args: Readonly<z.infer<typeof this.definition.parameters>>
-  ): Promise<{
+  public async execute(args: Readonly<z.infer<typeof this.definition.parameters>>): Promise<{
     success: boolean;
     command: string;
     exitCode: number;
@@ -106,15 +104,21 @@ export class SecureTerminalExecuteTool extends BaseTool<typeof SecureTerminalExe
       // Execute securely via E2B sandbox
       const result = await this.secureExecutionManager.executeSecurely({
         command: commandStr,
-        language: args.language === 'bash' || args.language === 'shell' ? 'bash' : (args.language as 'bash' | 'python'),
-        workingDirectory: typeof args.workingDirectory === 'string' ? args.workingDirectory : '/tmp',
+        language:
+          args.language === 'bash' || args.language === 'shell'
+            ? 'bash'
+            : (args.language as 'bash' | 'python'),
+        workingDirectory:
+          typeof args.workingDirectory === 'string' ? args.workingDirectory : '/tmp',
         timeout: Math.min(typeof args.timeout === 'number' ? args.timeout : 30000, 30000), // Max 30 seconds
         sessionId: typeof args.sessionId === 'string' ? args.sessionId : undefined,
       });
 
       // Log security warnings if any
       if (result.securityWarnings && result.securityWarnings.length > 0) {
-        logger.warn('🚨 Security warnings during execution:', { securityWarnings: result.securityWarnings });
+        logger.warn('🚨 Security warnings during execution:', {
+          securityWarnings: result.securityWarnings,
+        });
       }
 
       return {
@@ -152,11 +156,12 @@ export class SecureTerminalExecuteTool extends BaseTool<typeof SecureTerminalExe
         sandboxed: true,
         workingDirectory: '/tmp',
         message: 'Secure execution failed',
-        error: typeof error === 'object' && error !== null && 'message' in error
-          ? String((error as { message?: unknown }).message)
-          : typeof error === 'string'
-          ? error
-          : 'Unknown error',
+        error:
+          typeof error === 'object' && error !== null && 'message' in error
+            ? String((error as { message?: unknown }).message)
+            : typeof error === 'string'
+              ? error
+              : 'Unknown error',
       };
     }
   }
@@ -206,7 +211,9 @@ interface _SandboxStatusResult {
   error?: string;
 }
 
-export class SecureProcessManagementTool extends BaseTool<typeof SecureProcessManagementSchema.shape> {
+export class SecureProcessManagementTool extends BaseTool<
+  typeof SecureProcessManagementSchema.shape
+> {
   private readonly secureExecutionManager: SecureExecutionManager;
 
   public constructor() {
@@ -222,7 +229,9 @@ export class SecureProcessManagementTool extends BaseTool<typeof SecureProcessMa
     this.secureExecutionManager = new SecureExecutionManager();
   }
 
-  public async execute(args: Readonly<z.infer<typeof this.definition.parameters>>): Promise<ProcessManagementResult> {
+  public async execute(
+    args: Readonly<z.infer<typeof this.definition.parameters>>
+  ): Promise<ProcessManagementResult> {
     try {
       // Initialize secure execution manager if needed
       if (!this.secureExecutionManager.getStats().isInitialized) {
@@ -246,7 +255,10 @@ export class SecureProcessManagementTool extends BaseTool<typeof SecureProcessMa
           };
       }
     } catch (error) {
-      logger.error('❌ Secure process management failed:', error instanceof Error ? error : undefined);
+      logger.error(
+        '❌ Secure process management failed:',
+        error instanceof Error ? error : undefined
+      );
       return {
         success: false,
         error: `Process management failed: ${error && typeof error === 'object' && 'message' in error ? (error as { message?: string }).message : error instanceof Error ? error.message : 'Unknown error'}`,
@@ -308,7 +320,9 @@ export class SecureProcessManagementTool extends BaseTool<typeof SecureProcessMa
  * Provides safe environment information from sandbox only.
  * No access to host environment variables or system information.
  */
-export class SecureShellEnvironmentTool extends BaseTool<typeof SecureShellEnvironmentSchema.shape> {
+export class SecureShellEnvironmentTool extends BaseTool<
+  typeof SecureShellEnvironmentSchema.shape
+> {
   private readonly secureExecutionManager: SecureExecutionManager;
 
   public constructor(private readonly _agentContext: Readonly<{ workingDirectory: string }>) {
@@ -324,17 +338,18 @@ export class SecureShellEnvironmentTool extends BaseTool<typeof SecureShellEnvir
     this.secureExecutionManager = new SecureExecutionManager();
   }
 
-  public async execute(
-    args: Readonly<z.infer<typeof this.definition.parameters>>
-  ): Promise<{
-    success: boolean;
-    action: 'pwd' | 'whoami' | 'which' | 'env';
-    output: string;
-    error: string;
-    sandboxed: boolean;
-    message: string;
-    sessionId: string;
-  } | { success: false; error: string }> {
+  public async execute(args: Readonly<z.infer<typeof this.definition.parameters>>): Promise<
+    | {
+        success: boolean;
+        action: 'pwd' | 'whoami' | 'which' | 'env';
+        output: string;
+        error: string;
+        sandboxed: boolean;
+        message: string;
+        sessionId: string;
+      }
+    | { success: false; error: string }
+  > {
     try {
       // Initialize secure execution manager if needed
       if (!this.secureExecutionManager.getStats().isInitialized) {
@@ -384,7 +399,10 @@ export class SecureShellEnvironmentTool extends BaseTool<typeof SecureShellEnvir
         sessionId: result.sessionId,
       };
     } catch (error) {
-      logger.error('❌ Secure environment query failed:', error instanceof Error ? error : undefined);
+      logger.error(
+        '❌ Secure environment query failed:',
+        error instanceof Error ? error : undefined
+      );
       return {
         success: false,
         error: `Environment query failed: ${error instanceof Error ? error.message : 'Unknown error'}`,

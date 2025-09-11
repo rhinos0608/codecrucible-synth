@@ -295,4 +295,3 @@ export class ToolRegistry {
 }
 
 export default ToolRegistry;
-

@@ -60,7 +60,7 @@ export class UnifiedAgentSystem {
     if (this.initialized) {
       return;
     }
-    
+
     // Initialize internal components
     await Promise.all([
       this.registry.initialize?.() || Promise.resolve(),
@@ -70,7 +70,7 @@ export class UnifiedAgentSystem {
       this.contextAnalyzer.initialize?.() || Promise.resolve(),
       this.collaboration.initialize?.() || Promise.resolve(),
     ]);
-    
+
     this.initialized = true;
   }
 
@@ -78,7 +78,7 @@ export class UnifiedAgentSystem {
     if (!this.initialized) {
       return;
     }
-    
+
     // Shutdown internal components
     await Promise.all([
       this.registry.shutdown?.() || Promise.resolve(),
@@ -88,7 +88,7 @@ export class UnifiedAgentSystem {
       this.contextAnalyzer.shutdown?.() || Promise.resolve(),
       this.collaboration.shutdown?.() || Promise.resolve(),
     ]);
-    
+
     this.initialized = false;
   }
 
@@ -98,7 +98,13 @@ export class UnifiedAgentSystem {
     input: string;
     priority: string;
     constraints?: { maxExecutionTime?: number; securityLevel: string };
-    preferences?: { mode: string; outputFormat: string; includeReasoning: boolean; verboseLogging: boolean; interactiveMode: boolean };
+    preferences?: {
+      mode: string;
+      outputFormat: string;
+      includeReasoning: boolean;
+      verboseLogging: boolean;
+      interactiveMode: boolean;
+    };
     context?: unknown;
   }): Promise<{ result: unknown }> {
     const task: AgentTask = {
@@ -110,7 +116,7 @@ export class UnifiedAgentSystem {
 
     const strategy = this.determineStrategy(request.preferences?.mode || 'balanced');
     const response = await this.executeTask(task, strategy);
-    
+
     return {
       result: {
         output: response.output,
@@ -131,7 +137,7 @@ export class UnifiedAgentSystem {
     averageResponseTime: number;
   } {
     const agents = this.registry.listAgents();
-    
+
     return {
       totalAgents: agents.length,
       activeAgents: agents.filter(agent => agent.isActive ?? true).length,
@@ -141,7 +147,7 @@ export class UnifiedAgentSystem {
   }
 
   // Helper methods
-  
+
   private mapPriority(priority: string): 'low' | 'medium' | 'high' | 'critical' {
     const mapping: Record<string, 'low' | 'medium' | 'high' | 'critical'> = {
       low: 'low',
@@ -152,8 +158,13 @@ export class UnifiedAgentSystem {
     return mapping[priority] || 'medium';
   }
 
-  private determineStrategy(mode: string): 'sequential' | 'parallel' | 'hierarchical' | 'consensus' {
-    const strategyMapping: Record<string, 'sequential' | 'parallel' | 'hierarchical' | 'consensus'> = {
+  private determineStrategy(
+    mode: string
+  ): 'sequential' | 'parallel' | 'hierarchical' | 'consensus' {
+    const strategyMapping: Record<
+      string,
+      'sequential' | 'parallel' | 'hierarchical' | 'consensus'
+    > = {
       fast: 'parallel',
       balanced: 'sequential',
       thorough: 'consensus',

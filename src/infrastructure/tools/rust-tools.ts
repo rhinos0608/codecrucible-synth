@@ -1,6 +1,6 @@
 /**
  * Unified Rust Tools Module
- * 
+ *
  * Consolidates all Rust-related tool functionality into a single, coherent module
  * Eliminates duplication between rust-bridge and rust-execution-backend
  */
@@ -33,8 +33,17 @@ export interface RustToolExecutionResult extends ToolExecutionResult {
 // Native Rust executor interface (unified from both implementations)
 interface NativeRustExecutor {
   initialize(): boolean;
-  executeFilesystem(operation: string, path: string, content?: string, options?: unknown): Promise<RustToolExecutionResult>;
-  executeCommand(command: string, args: string[], options?: unknown): Promise<RustToolExecutionResult>;
+  executeFilesystem(
+    operation: string,
+    path: string,
+    content?: string,
+    options?: unknown
+  ): Promise<RustToolExecutionResult>;
+  executeCommand(
+    command: string,
+    args: string[],
+    options?: unknown
+  ): Promise<RustToolExecutionResult>;
   execute(toolId: string, args: string, options?: unknown): Promise<RustToolExecutionResult>;
   getPerformanceMetrics(): string;
   resetPerformanceMetrics(): void;
@@ -114,7 +123,7 @@ export class RustTools {
       logger.info('Rust tools module initialized successfully', {
         supportedTools: this.executor!.getSupportedTools(),
         executorId: this.executor!.id,
-        tokioRuntimeAvailable: this.isTokioRuntimeAvailable()
+        tokioRuntimeAvailable: this.isTokioRuntimeAvailable(),
       });
 
       return true;
@@ -153,24 +162,24 @@ export class RustTools {
     try {
       const options = this.buildExecutionOptions(context);
       const result = await this.executor.executeFilesystem(operation, path, content, options);
-      
+
       this.updateMetrics(true, Date.now() - startTime);
-      
+
       logger.debug('Filesystem operation completed', {
         operation,
         path,
         success: (result as any).success,
-        executionTime: (result as any).executionTimeMs ?? (result as any).execution_time_ms
+        executionTime: (result as any).executionTimeMs ?? (result as any).execution_time_ms,
       });
 
       return result;
     } catch (error) {
       this.updateMetrics(false, Date.now() - startTime);
-      
+
       logger.error('Filesystem operation failed', {
         operation,
         path,
-        error: toErrorOrUndefined(error)
+        error: toErrorOrUndefined(error),
       });
 
       throw error;
@@ -196,24 +205,24 @@ export class RustTools {
     try {
       const options = this.buildExecutionOptions(context);
       const result = await this.executor.executeCommand(command, args, options);
-      
+
       this.updateMetrics(true, Date.now() - startTime);
-      
+
       logger.debug('Command executed', {
         command,
         args,
         success: (result as any).success,
-        executionTime: (result as any).executionTimeMs ?? (result as any).execution_time_ms
+        executionTime: (result as any).executionTimeMs ?? (result as any).execution_time_ms,
       });
 
       return result;
     } catch (error) {
       this.updateMetrics(false, Date.now() - startTime);
-      
+
       logger.error('Command execution failed', {
         command,
         args,
-        error: toErrorOrUndefined(error)
+        error: toErrorOrUndefined(error),
       });
 
       throw error;
@@ -240,22 +249,22 @@ export class RustTools {
       const serializedArgs = JSON.stringify(args);
       const options = this.buildExecutionOptions(context);
       const result = await this.executor.execute(toolId, serializedArgs, options);
-      
+
       this.updateMetrics(true, Date.now() - startTime);
-      
+
       logger.debug('Tool executed', {
         toolId,
         success: (result as any).success,
-        executionTime: (result as any).executionTimeMs ?? (result as any).execution_time_ms
+        executionTime: (result as any).executionTimeMs ?? (result as any).execution_time_ms,
       });
 
       return result;
     } catch (error) {
       this.updateMetrics(false, Date.now() - startTime);
-      
+
       logger.error('Tool execution failed', {
         toolId,
-        error: toErrorOrUndefined(error)
+        error: toErrorOrUndefined(error),
       });
 
       throw error;
@@ -277,7 +286,7 @@ export class RustTools {
    */
   public getPerformanceMetrics(): { rust: string; js: RustToolMetrics; runtime?: any } {
     const rustMetrics = this.executor?.getPerformanceMetrics() || '{}';
-    
+
     // Try to get Tokio runtime statistics
     let runtimeStats;
     try {
@@ -287,11 +296,11 @@ export class RustTools {
     } catch (error) {
       logger.debug('Could not retrieve runtime stats', toErrorOrUndefined(error));
     }
-    
+
     return {
       rust: rustMetrics,
       js: { ...this.metrics },
-      runtime: runtimeStats
+      runtime: runtimeStats,
     };
   }
 
@@ -315,7 +324,7 @@ export class RustTools {
     if (!this.isAvailable()) {
       return {
         status: 'unhealthy',
-        details: 'Rust executor not available'
+        details: 'Rust executor not available',
       };
     }
 
@@ -323,12 +332,12 @@ export class RustTools {
       const healthMessage = await this.executor!.healthCheck();
       return {
         status: 'healthy',
-        details: healthMessage
+        details: healthMessage,
       };
     } catch (error) {
       return {
         status: 'unhealthy',
-        details: `Health check failed: ${toErrorOrUndefined(error)?.message || 'Unknown error'}`
+        details: `Health check failed: ${toErrorOrUndefined(error)?.message || 'Unknown error'}`,
       };
     }
   }
@@ -393,7 +402,10 @@ export class RustTools {
         }
       }
     } catch (error) {
-      logger.warn('Could not ensure Tokio runtime for metrics aggregation', toErrorOrUndefined(error));
+      logger.warn(
+        'Could not ensure Tokio runtime for metrics aggregation',
+        toErrorOrUndefined(error)
+      );
     }
   }
 
@@ -438,9 +450,11 @@ export class RustTools {
     } catch {
       // Fallback to direct NAPI import
       const napiModule = await import('codecrucible-rust-executor' as any).catch(() => {
-        throw new Error('Unable to load Rust executor - neither rust-native-module nor codecrucible-rust-executor available');
+        throw new Error(
+          'Unable to load Rust executor - neither rust-native-module nor codecrucible-rust-executor available'
+        );
       });
-      
+
       return {
         RustExecutor: napiModule.RustExecutor,
         createRustExecutor: napiModule.createRustExecutor,
@@ -471,7 +485,8 @@ export class RustTools {
     }
 
     // Update rolling average
-    const totalTime = this.metrics.averageExecutionTimeMs * (this.metrics.totalRequests - 1) + executionTime;
+    const totalTime =
+      this.metrics.averageExecutionTimeMs * (this.metrics.totalRequests - 1) + executionTime;
     this.metrics.averageExecutionTimeMs = totalTime / this.metrics.totalRequests;
   }
 }

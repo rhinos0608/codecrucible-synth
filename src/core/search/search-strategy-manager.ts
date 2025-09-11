@@ -1,6 +1,6 @@
 /**
  * Search Strategy Manager Module
- * 
+ *
  * Manages different search strategies and approaches including regex,
  * literal, fuzzy matching, semantic search, and hybrid approaches.
  */
@@ -8,7 +8,7 @@
 import type { RAGQuery } from './types.js';
 import type { RipgrepExecutionOptions } from './ripgrep-executor.js';
 
-export type SearchStrategy = 
+export type SearchStrategy =
   | 'literal' // Exact string matching
   | 'regex' // Regular expression search
   | 'fuzzy' // Fuzzy/approximate matching
@@ -20,7 +20,7 @@ export type SearchStrategy =
 export interface SearchStrategyOptions {
   strategy: SearchStrategy;
   fuzzyTolerance?: number; // 0-1, higher = more fuzzy
-  semanticThreshold?: number; // 0-1, semantic similarity threshold  
+  semanticThreshold?: number; // 0-1, semantic similarity threshold
   includeContext?: boolean; // Include surrounding context
   caseInsensitive?: boolean;
   wholeWords?: boolean;
@@ -49,14 +49,32 @@ export interface SearchStrategyResult {
 }
 
 export class SearchStrategyManager {
-  private static readonly STRATEGY_PROFILES: Record<SearchStrategy, SearchStrategyResult['metadata']> = {
+  private static readonly STRATEGY_PROFILES: Record<
+    SearchStrategy,
+    SearchStrategyResult['metadata']
+  > = {
     literal: { complexity: 'low', performance: 'fast', accuracy: 'high', resourceUsage: 'light' },
-    regex: { complexity: 'medium', performance: 'medium', accuracy: 'high', resourceUsage: 'medium' },
+    regex: {
+      complexity: 'medium',
+      performance: 'medium',
+      accuracy: 'high',
+      resourceUsage: 'medium',
+    },
     fuzzy: { complexity: 'high', performance: 'slow', accuracy: 'medium', resourceUsage: 'heavy' },
     semantic: { complexity: 'high', performance: 'slow', accuracy: 'high', resourceUsage: 'heavy' },
     hybrid: { complexity: 'high', performance: 'medium', accuracy: 'high', resourceUsage: 'heavy' },
-    contextual: { complexity: 'medium', performance: 'medium', accuracy: 'high', resourceUsage: 'medium' },
-    structural: { complexity: 'high', performance: 'medium', accuracy: 'high', resourceUsage: 'medium' },
+    contextual: {
+      complexity: 'medium',
+      performance: 'medium',
+      accuracy: 'high',
+      resourceUsage: 'medium',
+    },
+    structural: {
+      complexity: 'high',
+      performance: 'medium',
+      accuracy: 'high',
+      resourceUsage: 'medium',
+    },
   };
 
   /**
@@ -67,11 +85,11 @@ export class SearchStrategyManager {
     options: Partial<SearchStrategyOptions> = {}
   ): SearchStrategyResult {
     const analysis = this.analyzeQuery(query);
-    
+
     // Strategy selection logic based on query characteristics
     let recommendedStrategy: SearchStrategy;
     let confidence: number;
-    
+
     if (analysis.hasRegexPatterns && options.strategy !== 'literal') {
       recommendedStrategy = 'regex';
       confidence = 0.9;
@@ -117,7 +135,7 @@ export class SearchStrategyManager {
     options: Partial<SearchStrategyOptions> = {}
   ): SearchStrategyResult[] {
     const primary = this.determineStrategy(query, options);
-    const fallbacks = primary.fallbackStrategies.map(strategy => 
+    const fallbacks = primary.fallbackStrategies.map(strategy =>
       this.determineStrategy(query, { ...options, strategy })
     );
 
@@ -148,15 +166,19 @@ export class SearchStrategyManager {
     estimatedMatches: 'few' | 'many' | 'extensive';
   } {
     const q = query.query.toLowerCase();
-    
+
     const hasRegexPatterns = /[()[\]{}*+?^$|\\]/.test(query.query);
-    const isCodeQuery = /\b(function|class|const|let|var|import|export|if|for|while)\b/.test(q) ||
-                       query.query.includes('()') || query.query.includes('{}') || query.query.includes('[]');
-    const isNaturalLanguage = /\b(what|how|where|when|why|which|who|find|search|show|list)\b/.test(q) ||
-                              query.query.split(' ').length > 5;
+    const isCodeQuery =
+      /\b(function|class|const|let|var|import|export|if|for|while)\b/.test(q) ||
+      query.query.includes('()') ||
+      query.query.includes('{}') ||
+      query.query.includes('[]');
+    const isNaturalLanguage =
+      /\b(what|how|where|when|why|which|who|find|search|show|list)\b/.test(q) ||
+      query.query.split(' ').length > 5;
     const isFuzzyQuery = query.query.includes('~') || query.query.includes('?');
-    const needsContext = /\b(around|near|before|after|context|surrounding)\b/.test(q) ||
-                        query.includeContext === true;
+    const needsContext =
+      /\b(around|near|before|after|context|surrounding)\b/.test(q) || query.includeContext === true;
 
     let complexity: 'low' | 'medium' | 'high' = 'low';
     if (hasRegexPatterns || isCodeQuery) complexity = 'medium';

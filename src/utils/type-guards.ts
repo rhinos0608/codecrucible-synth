@@ -14,9 +14,10 @@ export function toError(value: unknown): Error {
     return new Error(value);
   }
   if (value && typeof value === 'object') {
-    const message = 'message' in value && typeof value.message === 'string' 
-      ? value.message 
-      : JSON.stringify(value);
+    const message =
+      'message' in value && typeof value.message === 'string'
+        ? value.message
+        : JSON.stringify(value);
     return new Error(message);
   }
   return new Error(String(value));
@@ -60,10 +61,13 @@ export function isStringArray(value: unknown): value is string[] {
  * Converts string array to record for logging purposes
  */
 export function stringArrayToRecord(arr: string[]): Record<string, unknown> {
-  return arr.reduce((acc, item, index) => {
-    acc[`item_${index}`] = item;
-    return acc;
-  }, {} as Record<string, unknown>);
+  return arr.reduce(
+    (acc, item, index) => {
+      acc[`item_${index}`] = item;
+      return acc;
+    },
+    {} as Record<string, unknown>
+  );
 }
 
 /**
@@ -79,7 +83,9 @@ export function toErrorOrUndefined(value: unknown): Error | undefined {
 /**
  * Safely converts string | undefined to proper type for logger calls
  */
-export function stringToRecord(value: string | undefined): Readonly<Record<string, unknown>> | undefined {
+export function stringToRecord(
+  value: string | undefined
+): Readonly<Record<string, unknown>> | undefined {
   if (value === undefined || value === null) {
     return undefined;
   }

@@ -3,21 +3,17 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
-import { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system.js';
-import { ILogger, createLogger } from '../infrastructure/logging/logger-adapter.js';
+import type { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system.js';
+import { type ILogger, createLogger } from '../infrastructure/logging/logger-adapter.js';
 import { type IModelClient } from '../domain/interfaces/model-client.js';
-import { RuntimeContext } from './enterprise-voice-prompts.js';
-import { VoiceDefinition, createArchetypeDefinitions } from './archetype-definitions.js';
+import type { RuntimeContext } from './enterprise-voice-prompts.js';
+import { type VoiceDefinition, createArchetypeDefinitions } from './archetype-definitions.js';
 import { selectVoices } from './voice-selector.js';
 import { CouncilMode, CouncilOrchestrator } from './council-orchestrator.js';
-import {
-  formatSynthesisResult,
-  type SynthesisResult,
-  synthesizePerspectives,
-  VoiceOutput,
-} from './perspective-synthesizer.js';
+import { type SynthesisResult, type VoiceOutput, formatSynthesisResult, synthesizePerspectives } from './perspective-synthesizer.js';
 import { CouncilDecisionEngine } from './collaboration/council-decision-engine.js';
 import { VOICE_GROUPS } from './voice-constants.js';
+import { VoiceMemoryManager } from './voice-memory-manager.js';
 
 export interface VoiceCoordinatorResult {
   finalDecision: string;
@@ -35,6 +31,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
   private voices: Map<string, VoiceDefinition> = new Map();
   private readonly logger: ILogger;
   private council: CouncilOrchestrator;
+  private memoryManager: VoiceMemoryManager;
 
   public constructor(
     private readonly _modelClient?: Readonly<IModelClient>,
@@ -42,6 +39,35 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
   ) {
     this.logger = logger ?? createLogger('VoiceSystem');
     this.council = new CouncilOrchestrator(new CouncilDecisionEngine(this));
+    this.memoryManager = new VoiceMemoryManager(this.logger, {
+      maxSessionMemoryMB: 256, // 256MB per session
+      maxContextWindowSize: 500, // Reduce context window size
+      cleanupIntervalMs: 180000, // 3 minutes cleanup interval
+      sessionTimeoutMs: 900000, // 15 minutes session timeout
+      maxConcurrentSessions: 5, // Limit concurrent sessions
+      enableMemoryAlerts: true,
+      memoryAlertThresholdMB: 128,
+    });
+    
+    // Define types for memory manager events
+    interface MemoryAlert {
+      sessionId: string;
+      memoryUsageMB: number;
+    }
+
+    interface CleanupEvent {
+      sessionsRemoved: number;
+    }
+
+    // Set up memory manager event listeners
+    this.memoryManager.on('memoryAlert', (alert: MemoryAlert) => {
+      this.logger.warn(`Voice memory alert: Session ${alert.sessionId} using ${alert.memoryUsageMB.toFixed(2)}MB`);
+    });
+    
+    this.memoryManager.on('cleanup', (event: CleanupEvent) => {
+      this.logger.info(`Voice memory cleanup: removed ${event.sessionsRemoved} sessions`);
+    });
+    
     // NOTE: Call initialize() explicitly after construction.
   }
 
@@ -105,19 +131,27 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     prompt: string,
     options?: Readonly<{ requiredVoices?: readonly string[]; councilMode?: CouncilMode }>
   ): Promise<VoiceCoordinatorResult> {
-    const selected = selectVoices(this.voices, options?.requiredVoices ? [...options.requiredVoices] : undefined, this.logger);
+    const selected = selectVoices(
+      this.voices,
+      options?.requiredVoices ? [...options.requiredVoices] : undefined,
+      this.logger
+    );
 
     // Parallel processing - all voices get perspectives concurrently
     this.logger.debug(`Processing ${selected.length} voices in parallel for synthesis`);
 
-    const perspectivePromises = selected.map(async (voice: Readonly<typeof selected[number]>) =>
+    const perspectivePromises = selected.map(async (voice: Readonly<(typeof selected)[number]>) =>
       this.getVoicePerspective(voice.id, prompt)
-        .then((perspective: Readonly<{ position: string }>) => ({ voiceId: voice.id, content: perspective.position }))
+        .then((perspective: Readonly<{ position: string }>) => ({
+          voiceId: voice.id,
+          content: perspective.position,
+        }))
         .catch((error: unknown) => {
           this.logger.warn(`Voice ${voice.id} failed during parallel processing:`, error);
-          const errorMsg = (typeof error === 'object' && error !== null && 'message' in error)
-            ? (error as { message?: string }).message
-            : String(error);
+          const errorMsg =
+            typeof error === 'object' && error !== null && 'message' in error
+              ? (error as { message?: string }).message
+              : String(error);
           return {
             voiceId: voice.id,
             content: `${voice.name || voice.id} perspective unavailable due to error: ${errorMsg}`,
@@ -137,16 +171,23 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     const finalDecision: string = formatSynthesisResult(structuredSynthesis);
 
     this.logger.info('Voices synthesized', {
-      voices: selected.map((v: Readonly<typeof selected[number]>) => v.id).join(', '),
-      consensusLevel: typeof structuredSynthesis.consensusLevel === 'number' ? structuredSynthesis.consensusLevel : 0,
-      totalVoices: typeof structuredSynthesis.totalVoices === 'number' ? structuredSynthesis.totalVoices : 0,
+      voices: selected.map((v: Readonly<(typeof selected)[number]>) => v.id).join(', '),
+      consensusLevel:
+        typeof structuredSynthesis.consensusLevel === 'number'
+          ? structuredSynthesis.consensusLevel
+          : 0,
+      totalVoices:
+        typeof structuredSynthesis.totalVoices === 'number' ? structuredSynthesis.totalVoices : 0,
     });
 
     // Living Spiral Phase: Rebirth (deliver result) & Reflection (logging above)
     return {
       finalDecision,
-      voicesUsed: selected.map((v: Readonly<typeof selected[number]>) => v.id),
-      consensus: typeof structuredSynthesis.consensusLevel === 'number' ? structuredSynthesis.consensusLevel : 0,
+      voicesUsed: selected.map((v: Readonly<(typeof selected)[number]>) => v.id),
+      consensus:
+        typeof structuredSynthesis.consensusLevel === 'number'
+          ? structuredSynthesis.consensusLevel
+          : 0,
       structuredSynthesis,
     };
   }
@@ -414,6 +455,28 @@ Respond as ${voice.name} would, focusing on your specialized domain and perspect
       options.councilMode = context.councilMode;
     }
     return this.processPrompt(request, options);
+  }
+
+  /**
+   * Get memory statistics from the memory manager
+   */
+  public getMemoryStats(): import('./voice-memory-manager.js').MemoryStats {
+    return this.memoryManager.getMemoryStats();
+  }
+
+  /**
+   * Force memory cleanup
+   */
+  public forceMemoryCleanup(): void {
+    this.memoryManager.forceCleanup();
+  }
+
+  /**
+   * Dispose of the voice system coordinator and clean up resources
+   */
+  public dispose(): void {
+    this.memoryManager.dispose();
+    this.logger.info('VoiceSystemCoordinator disposed');
   }
 }
 

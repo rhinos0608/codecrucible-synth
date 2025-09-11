@@ -14,4 +14,3 @@ export class StreamingManager implements IStreamingManager {
     return executeWithStreaming(modelClient, request);
   }
 }
-

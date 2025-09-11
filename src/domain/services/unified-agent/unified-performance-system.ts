@@ -24,8 +24,8 @@ export interface PerformanceMetrics {
 
 export interface PerformanceThresholds {
   maxExecutionTime: number; // milliseconds
-  maxMemoryUsage: number;   // bytes
-  maxCpuUsage?: number;     // percentage
+  maxMemoryUsage: number; // bytes
+  maxCpuUsage?: number; // percentage
   maxNetworkLatency?: number; // milliseconds
 }
 
@@ -56,10 +56,10 @@ export class UnifiedPerformanceSystem {
 
   public constructor(thresholds?: Partial<PerformanceThresholds>) {
     this.thresholds = {
-      maxExecutionTime: 30000,  // 30 seconds
+      maxExecutionTime: 30000, // 30 seconds
       maxMemoryUsage: 512 * 1024 * 1024, // 512MB
-      maxCpuUsage: 80,          // 80%
-      maxNetworkLatency: 5000,  // 5 seconds
+      maxCpuUsage: 80, // 80%
+      maxNetworkLatency: 5000, // 5 seconds
       ...thresholds,
     };
   }
@@ -121,7 +121,7 @@ export class UnifiedPerformanceSystem {
    */
   public recordMetrics(metrics: PerformanceMetrics): void {
     const key = `${metrics.agentId}_${metrics.operation}`;
-    
+
     if (!this.metrics.has(key)) {
       this.metrics.set(key, []);
     }
@@ -138,7 +138,10 @@ export class UnifiedPerformanceSystem {
   /**
    * Get performance statistics for an agent or operation
    */
-  public getStatistics(agentId?: string, operation?: string): {
+  public getStatistics(
+    agentId?: string,
+    operation?: string
+  ): {
     average: PerformanceMetrics;
     min: PerformanceMetrics;
     max: PerformanceMetrics;
@@ -168,8 +171,10 @@ export class UnifiedPerformanceSystem {
     }
 
     // Calculate statistics
-    const avgExecutionTime = allMetrics.reduce((sum, m) => sum + m.executionTime, 0) / allMetrics.length;
-    const avgMemoryUsage = allMetrics.reduce((sum, m) => sum + m.memoryUsage, 0) / allMetrics.length;
+    const avgExecutionTime =
+      allMetrics.reduce((sum, m) => sum + m.executionTime, 0) / allMetrics.length;
+    const avgMemoryUsage =
+      allMetrics.reduce((sum, m) => sum + m.memoryUsage, 0) / allMetrics.length;
 
     const minExecution = Math.min(...allMetrics.map(m => m.executionTime));
     const maxExecution = Math.max(...allMetrics.map(m => m.executionTime));
@@ -243,9 +248,10 @@ export class UnifiedPerformanceSystem {
 
     // Summary statistics
     const totalOperations = allMetrics.length;
-    const averageExecutionTime = allMetrics.length > 0 
-      ? allMetrics.reduce((sum, m) => sum + m.executionTime, 0) / allMetrics.length 
-      : 0;
+    const averageExecutionTime =
+      allMetrics.length > 0
+        ? allMetrics.reduce((sum, m) => sum + m.executionTime, 0) / allMetrics.length
+        : 0;
     const totalMemoryUsed = allMetrics.reduce((sum, m) => sum + m.memoryUsage, 0);
 
     // Top slow operations
@@ -314,7 +320,7 @@ export class UnifiedPerformanceSystem {
 
   private addAlert(alert: PerformanceAlert): void {
     this.alerts.push(alert);
-    
+
     // Keep only last 1000 alerts
     if (this.alerts.length > 1000) {
       this.alerts.splice(0, this.alerts.length - 1000);
@@ -351,28 +357,36 @@ export class UnifiedPerformanceSystem {
     return 0;
   }
 
-  private readonly contextStore = new Map<string, { 
-    startTime: number; 
-    startMemory: number; 
-    agentId: string; 
-    operation: string; 
-  }>();
+  private readonly contextStore = new Map<
+    string,
+    {
+      startTime: number;
+      startMemory: number;
+      agentId: string;
+      operation: string;
+    }
+  >();
 
-  private setMetricContext(id: string, context: { 
-    startTime: number; 
-    startMemory: number; 
-    agentId: string; 
-    operation: string; 
-  }): void {
+  private setMetricContext(
+    id: string,
+    context: {
+      startTime: number;
+      startMemory: number;
+      agentId: string;
+      operation: string;
+    }
+  ): void {
     this.contextStore.set(id, context);
   }
 
-  private getMetricContext(id: string): { 
-    startTime: number; 
-    startMemory: number; 
-    agentId: string; 
-    operation: string; 
-  } | undefined {
+  private getMetricContext(id: string):
+    | {
+        startTime: number;
+        startMemory: number;
+        agentId: string;
+        operation: string;
+      }
+    | undefined {
     return this.contextStore.get(id);
   }
 

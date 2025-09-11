@@ -6,7 +6,10 @@
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { FilesystemTools } from './filesystem-tools.js';
 import type { RustExecutionBackend as RealRustExecutionBackend } from '../execution/rust-executor/rust-execution-backend.js';
-import { ToolExecutionContext, ToolExecutionResult } from '../../domain/interfaces/tool-execution.js';
+import {
+  ToolExecutionContext,
+  ToolExecutionResult,
+} from '../../domain/interfaces/tool-execution.js';
 
 export interface LLMFunction {
   type: 'function';
@@ -32,7 +35,6 @@ export interface ToolCall {
 // Use the real RustExecutionBackend type for type safety
 export type RustExecutionBackend = Readonly<RealRustExecutionBackend>;
 
-
 export interface ToolDefinition<TArgs = Record<string, unknown>, TResult = ToolExecutionResult> {
   id: string;
   description: string;
@@ -57,27 +59,27 @@ export class ToolIntegration {
     this.filesystemTools = new FilesystemTools();
   }
 
-/**
- * Ensures that tools are initialized before use.
- */
-private async ensureInitialized(): Promise<void> {
-  if (!this.isInitialized) {
-    await this.initializeTools();
+  /**
+   * Ensures that tools are initialized before use.
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (!this.isInitialized) {
+      await this.initializeTools();
+    }
   }
-}
 
-/**
- * Allows setting or updating the Rust backend after construction.
- */
-public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
-  this.rustBackend = backend;
-  if (typeof this.filesystemTools.setRustBackend === 'function') {
-    // Cast to the correct type for FilesystemTools
-    this.filesystemTools.setRustBackend(backend as RealRustExecutionBackend);
-    this.logger.info('Rust backend updated via setRustBackend');
+  /**
+   * Allows setting or updating the Rust backend after construction.
+   */
+  public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
+    this.rustBackend = backend;
+    if (typeof this.filesystemTools.setRustBackend === 'function') {
+      // Cast to the correct type for FilesystemTools
+      this.filesystemTools.setRustBackend(backend as RealRustExecutionBackend);
+      this.logger.info('Rust backend updated via setRustBackend');
+    }
   }
-}
-/* Duplicate constructor removed; logic merged into the main constructor above */
+  /* Duplicate constructor removed; logic merged into the main constructor above */
 
   private async initializeTools(): Promise<void> {
     try {
@@ -95,7 +97,9 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
       for (const tool of fsTools) {
         if (tool?.id) {
           // Ensure inputSchema has 'properties' (and optionally 'required')
-          const inputSchema = tool.inputSchema as { properties: Record<string, unknown>; required?: string[] } | undefined;
+          const inputSchema = tool.inputSchema as
+            | { properties: Record<string, unknown>; required?: string[] }
+            | undefined;
           const safeTool = {
             ...tool,
             inputSchema: {
@@ -113,7 +117,9 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
       );
     } catch (error) {
       this.logger.error('Failed to initialize tools:', error);
-      throw new Error(`Tool initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Tool initialization failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   /**
@@ -262,12 +268,17 @@ export function setGlobalToolIntegrationRustBackend(backend: RustExecutionBacken
   if (globalToolIntegration) {
     try {
       // Attach if method exists
-      if (typeof (globalToolIntegration as unknown as { setRustBackend?: (b: RustExecutionBackend) => void }).setRustBackend === 'function') {
-        (globalToolIntegration as unknown as { setRustBackend: (b: RustExecutionBackend) => void }).setRustBackend(backend);
+      if (
+        typeof (
+          globalToolIntegration as unknown as { setRustBackend?: (b: RustExecutionBackend) => void }
+        ).setRustBackend === 'function'
+      ) {
+        (
+          globalToolIntegration as unknown as { setRustBackend: (b: RustExecutionBackend) => void }
+        ).setRustBackend(backend);
       }
     } catch (e) {
       // ignore
     }
   }
 }
-

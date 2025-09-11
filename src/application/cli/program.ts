@@ -63,13 +63,15 @@ export async function buildProgram(): Promise<Command> {
       }
     );
 
-  program.command('status').description('Show system status').action(async () => {
-    const { showStatus } = await import('./help.js');
-    await showStatus();
-  });
+  program
+    .command('status')
+    .description('Show system status')
+    .action(async () => {
+      const { showStatus } = await import('./help.js');
+      await showStatus();
+    });
 
   return program;
 }
 
 export default buildProgram;
-

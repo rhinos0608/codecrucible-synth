@@ -109,7 +109,9 @@ export class ErrorFactory {
       context: options.context,
       stackTrace: options.originalError?.stack,
       userMessage: options.userMessage ?? this.generateUserMessage(message, category),
-      suggestedActions: options.suggestedActions ? Array.from(options.suggestedActions) : this.generateSuggestedActions(category),
+      suggestedActions: options.suggestedActions
+        ? Array.from(options.suggestedActions)
+        : this.generateSuggestedActions(category),
       recoverable: options.recoverable ?? this.isRecoverable(category, severity),
       retryable: options.retryable ?? this.isRetryable(category),
       metadata: options.metadata,
@@ -477,14 +479,16 @@ export class ErrorHandler {
     logger.error(
       `${color(`[${error.severity.toUpperCase()}]`)} ${error.category}: ${error.message}`,
       // Cast metadata to unknown and then to Error to satisfy logger.error's expected parameter type
-      { meta: {
+      {
+        meta: {
           errorId: error.id,
           category: error.category,
           severity: error.severity,
           context: error.context,
           stackTrace: error.stackTrace,
           timestamp: error.timestamp,
-        } } as unknown as Error
+        },
+      } as unknown as Error
     );
 
     // Also log to console for immediate visibility
@@ -522,7 +526,9 @@ export class ErrorHandler {
           logger.debug(`No recovery mechanism for category: ${error.category}`);
       }
     } catch (recoveryError) {
-      logger.warn('Recovery attempt failed:', { error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError) });
+      logger.warn('Recovery attempt failed:', {
+        error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
+      });
     }
   }
 }

@@ -104,7 +104,11 @@ export class UnifiedLogger extends EventEmitter {
 
   public error(message: string, error?: Error, metadata?: Readonly<Record<string, unknown>>): void;
   public error(message: string, metadata?: Readonly<Record<string, unknown>>): void;
-  public error(message: string, errorOrMetadata?: Error | Readonly<Record<string, unknown>>, metadata?: Readonly<Record<string, unknown>>): void {
+  public error(
+    message: string,
+    errorOrMetadata?: Error | Readonly<Record<string, unknown>>,
+    metadata?: Readonly<Record<string, unknown>>
+  ): void {
     if (errorOrMetadata instanceof Error) {
       this.log(LogLevel.ERROR, message, {
         ...metadata,
@@ -122,7 +126,11 @@ export class UnifiedLogger extends EventEmitter {
 
   public fatal(message: string, error?: Error, metadata?: Readonly<Record<string, unknown>>): void;
   public fatal(message: string, metadata?: Readonly<Record<string, unknown>>): void;
-  public fatal(message: string, errorOrMetadata?: Error | Readonly<Record<string, unknown>>, metadata?: Readonly<Record<string, unknown>>): void {
+  public fatal(
+    message: string,
+    errorOrMetadata?: Error | Readonly<Record<string, unknown>>,
+    metadata?: Readonly<Record<string, unknown>>
+  ): void {
     const err = errorOrMetadata instanceof Error ? errorOrMetadata : undefined;
     const meta = err ? metadata : errorOrMetadata;
     this.log(LogLevel.FATAL, message, {
@@ -134,7 +142,11 @@ export class UnifiedLogger extends EventEmitter {
     this.emit('fatal', { message, error: err, metadata: meta });
   }
 
-  public audit(action: string, result: 'success' | 'failure', metadata?: Readonly<Record<string, unknown>>): void {
+  public audit(
+    action: string,
+    result: 'success' | 'failure',
+    metadata?: Readonly<Record<string, unknown>>
+  ): void {
     const entry: LogEntry = {
       timestamp: new Date(),
       level: LogLevel.AUDIT,
@@ -236,7 +248,6 @@ export class UnifiedLogger extends EventEmitter {
       process.stderr.write(`${color}${formatted}${resetColor}\n`);
     }
   }
-
 
   private getContext(): string {
     // Get calling context from stack trace

@@ -8,45 +8,45 @@
 export interface SystemMetrics {
   timestamp: number;
   cpu: {
-    usage: number;              // 0-100%
+    usage: number; // 0-100%
     loadAvg: [number, number, number]; // 1min, 5min, 15min
     cores: number;
   };
   memory: {
-    used: number;               // MB
-    free: number;               // MB
-    total: number;              // MB
-    usage: number;              // 0-100%
-    heapUsed: number;           // V8 heap MB
-    heapTotal: number;          // V8 heap total MB
-    external: number;           // V8 external memory MB
+    used: number; // MB
+    free: number; // MB
+    total: number; // MB
+    usage: number; // 0-100%
+    heapUsed: number; // V8 heap MB
+    heapTotal: number; // V8 heap total MB
+    external: number; // V8 external memory MB
   };
   network: {
     bytesIn: number;
     bytesOut: number;
     connectionsActive: number;
-    latencyP95: number;         // ms
+    latencyP95: number; // ms
   };
   disk: {
     reads: number;
     writes: number;
-    usage: number;              // 0-100%
-    iops: number;               // operations per second
+    usage: number; // 0-100%
+    iops: number; // operations per second
   };
   gc: {
     collections: number;
-    pauseTime: number;          // ms
-    heapFragmentation: number;  // 0-1
+    pauseTime: number; // ms
+    heapFragmentation: number; // 0-1
   };
 }
 
 export interface PerformanceThresholds {
-  cpu: { warning: number; critical: number };           // %
-  memory: { warning: number; critical: number };        // %
-  latency: { warning: number; critical: number };       // ms
-  errorRate: { warning: number; critical: number };     // %
-  throughput: { warning: number; critical: number };    // req/s
-  gcPause: { warning: number; critical: number };       // ms
+  cpu: { warning: number; critical: number }; // %
+  memory: { warning: number; critical: number }; // %
+  latency: { warning: number; critical: number }; // ms
+  errorRate: { warning: number; critical: number }; // %
+  throughput: { warning: number; critical: number }; // req/s
+  gcPause: { warning: number; critical: number }; // ms
 }
 
 export interface CircuitBreakerState {
@@ -81,7 +81,7 @@ export interface PredictiveInsights {
   predictions: {
     nextHour: SystemMetrics;
     nextDay: Partial<SystemMetrics>;
-    confidence: number;          // 0-1
+    confidence: number; // 0-1
   };
   trends: {
     cpu: 'INCREASING' | 'DECREASING' | 'STABLE';
@@ -98,13 +98,18 @@ export interface PredictiveInsights {
 
 export interface RealTimeOptimizationAction {
   timestamp: number;
-  type: 'ROUTING_ADJUSTMENT' | 'LOAD_BALANCE' | 'CIRCUIT_BREAKER' | 'SCALE_ADJUSTMENT' | 'CACHE_EVICTION';
+  type:
+    | 'ROUTING_ADJUSTMENT'
+    | 'LOAD_BALANCE'
+    | 'CIRCUIT_BREAKER'
+    | 'SCALE_ADJUSTMENT'
+    | 'CACHE_EVICTION';
   reason: string;
   parameters: Record<string, unknown>;
   estimatedImpact: {
-    latencyImprovement?: number;  // ms
-    throughputGain?: number;      // %
-    resourceReduction?: number;   // %
+    latencyImprovement?: number; // ms
+    throughputGain?: number; // %
+    resourceReduction?: number; // %
   };
   applied: boolean;
   result?: {
@@ -133,7 +138,10 @@ export interface ICircuitBreakerManager {
 }
 
 export interface IPerformanceAnomalyDetector {
-  detectAnomalies(metrics: SystemMetrics, thresholds: PerformanceThresholds): Promise<PerformanceAnomalyEvent[]>;
+  detectAnomalies(
+    metrics: SystemMetrics,
+    thresholds: PerformanceThresholds
+  ): Promise<PerformanceAnomalyEvent[]>;
   getRecentAnomalies(timeWindowMs?: number): PerformanceAnomalyEvent[];
   subscribeToAnomalies(callback: (anomaly: PerformanceAnomalyEvent) => void): void;
   unsubscribeFromAnomalies(callback: (anomaly: PerformanceAnomalyEvent) => void): void;
@@ -147,7 +155,10 @@ export interface IPredictiveAnalytics {
 }
 
 export interface IPerformanceOptimizationEngine {
-  evaluateOptimizationTriggers(metrics: SystemMetrics, thresholds: PerformanceThresholds): Promise<RealTimeOptimizationAction[]>;
+  evaluateOptimizationTriggers(
+    metrics: SystemMetrics,
+    thresholds: PerformanceThresholds
+  ): Promise<RealTimeOptimizationAction[]>;
   applyOptimization(action: RealTimeOptimizationAction): Promise<void>;
   getRecentOptimizations(timeWindowMs?: number): RealTimeOptimizationAction[];
   subscribeToOptimizations(callback: (action: RealTimeOptimizationAction) => void): void;

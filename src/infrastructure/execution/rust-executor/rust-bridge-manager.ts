@@ -7,9 +7,7 @@
 
 import { logger } from '../../logging/logger.js';
 import { toErrorOrUndefined } from '../../../utils/type-guards.js';
-import {
-  loadRustExecutorSafely,
-} from '../../../utils/rust-module-loader.js';
+import { loadRustExecutorSafely } from '../../../utils/rust-module-loader.js';
 
 export interface BridgeConfiguration {
   modulePath: string;
@@ -65,7 +63,10 @@ export class RustBridgeManager {
       const safe = loadRustExecutorSafely();
       if (safe.available && safe.module) {
         this.rustModule = safe.module;
-        logger.info('🦀 Rust bridge loaded via safe loader', { source: safe.source, binaryPath: safe.binaryPath });
+        logger.info('🦀 Rust bridge loaded via safe loader', {
+          source: safe.source,
+          binaryPath: safe.binaryPath,
+        });
       } else {
         // Fallback to dynamic import relative to dist file location
         // dist path: dist/infrastructure/execution/rust-executor/rust-bridge-manager.js
@@ -79,7 +80,10 @@ export class RustBridgeManager {
         for (const p of candidatePaths) {
           try {
             mod = await import(p);
-            if (mod) { this.rustModule = mod; break; }
+            if (mod) {
+              this.rustModule = mod;
+              break;
+            }
           } catch {
             // try next
           }
@@ -140,10 +144,17 @@ export class RustBridgeManager {
       let ok = false;
       // Prefer getVersion if available
       if (typeof this.rustModule.getVersion === 'function') {
-        try { void this.rustModule.getVersion(); ok = true; } catch { ok = false; }
+        try {
+          void this.rustModule.getVersion();
+          ok = true;
+        } catch {
+          ok = false;
+        }
       } else if (this.rustModule.RustExecutor) {
         try {
-          const ex = this.rustModule.createRustExecutor ? this.rustModule.createRustExecutor() : new this.rustModule.RustExecutor();
+          const ex = this.rustModule.createRustExecutor
+            ? this.rustModule.createRustExecutor()
+            : new this.rustModule.RustExecutor();
           ok = typeof ex.initialize === 'function' ? !!ex.initialize() : true;
         } catch {
           ok = false;
@@ -200,29 +211,32 @@ export class RustBridgeManager {
   private async loadRustModuleWithTimeout(timeoutMs: number): Promise<any> {
     // 2025 BEST PRACTICE: Apply AbortSignal timeout to async operations
     const timeoutSignal = AbortSignal.timeout(timeoutMs);
-    
+
     return new Promise((resolve, reject) => {
       // Handle timeout
       const timeoutHandler = () => {
         reject(new Error(`Module load timeout after ${timeoutMs}ms`));
       };
-      
+
       if (timeoutSignal.aborted) {
         timeoutHandler();
         return;
       }
-      
+
       timeoutSignal.addEventListener('abort', timeoutHandler);
-      
+
       // Attempt to load the module
       import(this.config.modulePath)
-        .then((module) => {
+        .then(module => {
           timeoutSignal.removeEventListener('abort', timeoutHandler);
           resolve(module);
         })
-        .catch((error) => {
+        .catch(error => {
           timeoutSignal.removeEventListener('abort', timeoutHandler);
-          logger.warn('Native Rust module not available, this is expected during development:', error);
+          logger.warn(
+            'Native Rust module not available, this is expected during development:',
+            error
+          );
           resolve(null);
         });
     });

@@ -179,17 +179,27 @@ export class ConfigurationMigrator {
       const validation = configManager.validateConfiguration(unifiedConfig);
 
       if (!validation.isValid) {
-        errors.push(...validation.errors.map((e: Readonly<{ field: string; message: string }>) => `${e.field}: ${e.message}`));
+        errors.push(
+          ...validation.errors.map(
+            (e: Readonly<{ field: string; message: string }>) => `${e.field}: ${e.message}`
+          )
+        );
       }
 
       if (validation.warnings.length > 0) {
-        warnings.push(...validation.warnings.map((w: Readonly<{ field: string; message: string }>) => `${w.field}: ${w.message}`));
+        warnings.push(
+          ...validation.warnings.map(
+            (w: Readonly<{ field: string; message: string }>) => `${w.field}: ${w.message}`
+          )
+        );
       }
 
       // Generate migration report
       const migrationReport: MigrationReport = {
         filesProcessed: migrationAnalysis.legacyFiles.length,
-        conflictsResolved: migrationAnalysis.conflicts.filter((c: Readonly<ConfigurationConflict>) => c.resolution === 'auto').length,
+        conflictsResolved: migrationAnalysis.conflicts.filter(
+          (c: Readonly<ConfigurationConflict>) => c.resolution === 'auto'
+        ).length,
         manualInterventionsRequired: migrationAnalysis.conflicts.filter(
           (c: Readonly<ConfigurationConflict>) => c.resolution === 'manual'
         ).length,
@@ -360,7 +370,8 @@ If you encounter issues:
 
     try {
       const parsedRaw: unknown = format === 'json' ? JSON.parse(content) : YAML.parse(content);
-      const parsed = (parsedRaw && typeof parsedRaw === 'object') ? parsedRaw as Record<string, unknown> : {};
+      const parsed =
+        parsedRaw && typeof parsedRaw === 'object' ? (parsedRaw as Record<string, unknown>) : {};
 
       sections.push(...Object.keys(parsed));
 
@@ -439,9 +450,10 @@ If you encounter issues:
       try {
         const filePath = join(this.projectRoot, file.path);
         const content = await readFile(filePath, 'utf-8');
-        const parsed: Record<string, unknown> = file.format === 'json'
-          ? (JSON.parse(content) as Record<string, unknown>)
-          : (YAML.parse(content) as Record<string, unknown>);
+        const parsed: Record<string, unknown> =
+          file.format === 'json'
+            ? (JSON.parse(content) as Record<string, unknown>)
+            : (YAML.parse(content) as Record<string, unknown>);
 
         this.extractConfigValues(parsed, file.path, configValues);
       } catch (error) {
@@ -478,7 +490,12 @@ If you encounter issues:
       const fullKey = prefix ? `${prefix}.${key}` : key;
 
       if (value && typeof value === 'object' && !Array.isArray(value)) {
-        this.extractConfigValues(value as Readonly<Record<string, unknown>>, source, configValues, fullKey);
+        this.extractConfigValues(
+          value as Readonly<Record<string, unknown>>,
+          source,
+          configValues,
+          fullKey
+        );
       } else {
         let arr = configValues.get(fullKey);
         if (!arr) {

@@ -92,7 +92,10 @@ export class EnterpriseErrorHandler {
   /**
    * Process error with enterprise features
    */
-  private async processEnterpriseError(error: Readonly<StructuredError>, context: Readonly<Record<string, unknown>>): Promise<void> {
+  private async processEnterpriseError(
+    error: Readonly<StructuredError>,
+    context: Readonly<Record<string, unknown>>
+  ): Promise<void> {
     try {
       // Update metrics
       if (this.config.enableMetrics) {
@@ -382,10 +385,7 @@ export class EnterpriseErrorHandler {
   /**
    * Process alerts for critical errors
    */
-  private processAlerts(
-    error: StructuredError,
-    context: Readonly<Record<string, unknown>>
-  ): void {
+  private processAlerts(error: StructuredError, context: Readonly<Record<string, unknown>>): void {
     if (error.severity === ErrorSeverity.CRITICAL) {
       // Critical alerts would trigger immediate notifications
       console.error('🚨 CRITICAL ERROR ALERT:', {
@@ -411,7 +411,9 @@ export class EnterpriseErrorHandler {
     category: ErrorCategory,
     severity: ErrorSeverity
   ): string {
-    const enterpriseMessages: Partial<Record<ErrorCategory, Partial<Record<ErrorSeverity, string>>>> = {
+    const enterpriseMessages: Partial<
+      Record<ErrorCategory, Partial<Record<ErrorSeverity, string>>>
+    > = {
       [ErrorCategory.VALIDATION]: {
         [ErrorSeverity.LOW]: 'Please review your input',
         [ErrorSeverity.MEDIUM]: 'Input validation failed - please check your data',
@@ -648,7 +650,10 @@ export class EnterpriseErrorHandler {
     }
   }
 
-  private assessSecurityThreat(error: StructuredError, _context: Readonly<Record<string, unknown>>): string {
+  private assessSecurityThreat(
+    error: StructuredError,
+    _context: Readonly<Record<string, unknown>>
+  ): string {
     if (error.category === ErrorCategory.AUTHENTICATION) {
       return 'potential_credential_attack';
     }
@@ -694,16 +699,28 @@ export class EnterpriseErrorHandler {
     }
 
     const recentErrors = Array.from(this.errorMetrics.entries())
-      .map((readonlyEntry: readonly [string, {
-        count: number;
-        lastOccurrence: Date;
-        severity: ErrorSeverity;
-        category: ErrorCategory;
-      }]) => {
-        const [key, metric] = readonlyEntry;
-        return { key, count: metric.count, lastOccurrence: metric.lastOccurrence };
-      })
-      .sort((a: Readonly<{ key: string; count: number; lastOccurrence: Date }>, b: Readonly<{ key: string; count: number; lastOccurrence: Date }>) => b.lastOccurrence.getTime() - a.lastOccurrence.getTime())
+      .map(
+        (
+          readonlyEntry: readonly [
+            string,
+            {
+              count: number;
+              lastOccurrence: Date;
+              severity: ErrorSeverity;
+              category: ErrorCategory;
+            },
+          ]
+        ) => {
+          const [key, metric] = readonlyEntry;
+          return { key, count: metric.count, lastOccurrence: metric.lastOccurrence };
+        }
+      )
+      .sort(
+        (
+          a: Readonly<{ key: string; count: number; lastOccurrence: Date }>,
+          b: Readonly<{ key: string; count: number; lastOccurrence: Date }>
+        ) => b.lastOccurrence.getTime() - a.lastOccurrence.getTime()
+      )
       .slice(0, 10);
 
     return {

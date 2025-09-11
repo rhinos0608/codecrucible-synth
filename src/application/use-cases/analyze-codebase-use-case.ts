@@ -78,14 +78,18 @@ interface CodebaseInfo {
 }
 
 export class AnalyzeCodebaseUseCase {
-  public constructor(private readonly modelSelectionService: Readonly<ICodebaseAnalysisModelSelector>) {}
+  public constructor(
+    private readonly modelSelectionService: Readonly<ICodebaseAnalysisModelSelector>
+  ) {}
 
   public async execute(input: Readonly<CodebaseAnalysisInput>): Promise<CodebaseAnalysisOutput> {
     const startTime = Date.now();
 
     // Input validation and transformation
     // Select model (assuming modelSelectionService provides a method for this)
-    const selectedModel: AnalysisModel = await this.modelSelectionService.selectModel(input.analysisType);
+    const selectedModel: AnalysisModel = await this.modelSelectionService.selectModel(
+      input.analysisType
+    );
 
     // Gather codebase information
     const codebaseInfo = await this.gatherCodebaseInformation(input);
@@ -104,56 +108,61 @@ export class AnalyzeCodebaseUseCase {
       codebaseInfo
     );
 
-      // Synthesize multi-voice analysis if multiple voices used
-      const synthesizedAnalysis: { voiceId: string; content: string; confidence: number; analysisType: string } =
-        voiceSelection.length > 1
-          ? this.synthesizeAnalysisResponses(analysisResponses)
-          : analysisResponses[0];
-  
-      // Transform to structured output
-      return this.transformToOutput(
-        synthesizedAnalysis,
-        input,
-        voiceSelection,
-        codebaseInfo,
-        startTime
-      );
-    }
-  
-    private transformToProcessingRequest(input: CodebaseAnalysisInput): ProcessingRequest {
-      const analysisPrompt = this.buildAnalysisPrompt(input);
+    // Synthesize multi-voice analysis if multiple voices used
+    const synthesizedAnalysis: {
+      voiceId: string;
+      content: string;
+      confidence: number;
+      analysisType: string;
+    } =
+      voiceSelection.length > 1
+        ? this.synthesizeAnalysisResponses(analysisResponses)
+        : analysisResponses[0];
 
-      // Extend RequestContext to allow additional properties
-      type ExtendedRequestContext = RequestContext & {
-        codebasePath: string;
-        analysisType: string;
-        includeFiles?: string[];
-        excludePatterns?: string[];
-        focusAreas?: string[];
-        voiceId?: string;
-      };
+    // Transform to structured output
+    return this.transformToOutput(
+      synthesizedAnalysis,
+      input,
+      voiceSelection,
+      codebaseInfo,
+      startTime
+    );
+  }
 
-      return ProcessingRequest.create(
-        analysisPrompt,
-        'code-analysis' as RequestType,
-        'medium',
-        {
-          ...(input.context as Record<string, unknown>),
-          codebasePath: input.codebasePath,
-          analysisType: input.analysisType,
-          includeFiles: input.includeFiles,
-          excludePatterns: input.excludePatterns,
-          focusAreas: input.focusAreas,
-        } as ExtendedRequestContext,
-        {
-          // No extra constraints for now
-        }
-      );
-    }
-  
-    // Add missing buildAnalysisPrompt method
-    private buildAnalysisPrompt(input: CodebaseAnalysisInput): string {
-      return `Analyze the following codebase:
+  private transformToProcessingRequest(input: CodebaseAnalysisInput): ProcessingRequest {
+    const analysisPrompt = this.buildAnalysisPrompt(input);
+
+    // Extend RequestContext to allow additional properties
+    type ExtendedRequestContext = RequestContext & {
+      codebasePath: string;
+      analysisType: string;
+      includeFiles?: string[];
+      excludePatterns?: string[];
+      focusAreas?: string[];
+      voiceId?: string;
+    };
+
+    return ProcessingRequest.create(
+      analysisPrompt,
+      'code-analysis' as RequestType,
+      'medium',
+      {
+        ...(input.context as Record<string, unknown>),
+        codebasePath: input.codebasePath,
+        analysisType: input.analysisType,
+        includeFiles: input.includeFiles,
+        excludePatterns: input.excludePatterns,
+        focusAreas: input.focusAreas,
+      } as ExtendedRequestContext,
+      {
+        // No extra constraints for now
+      }
+    );
+  }
+
+  // Add missing buildAnalysisPrompt method
+  private buildAnalysisPrompt(input: CodebaseAnalysisInput): string {
+    return `Analyze the following codebase:
   
   Codebase Path: ${input.codebasePath}
   Analysis Type: ${input.analysisType}
@@ -167,8 +176,7 @@ export class AnalyzeCodebaseUseCase {
   5. Next steps
   
   Be thorough and specific in your analysis.`;
-    }
-  
+  }
 
   private selectAnalysisVoices(analysisType: string): string[] {
     const voiceMap: Record<string, string[]> = {
@@ -182,56 +190,59 @@ export class AnalyzeCodebaseUseCase {
     return voiceMap[analysisType] ?? ['analyzer'];
   }
 
-  private async gatherCodebaseInformation(input: Readonly<CodebaseAnalysisInput>): Promise<CodebaseInfo> {
+  private async gatherCodebaseInformation(
+    input: Readonly<CodebaseAnalysisInput>
+  ): Promise<CodebaseInfo> {
     const fs = await import('fs/promises');
     const path = await import('path');
-    
+
     try {
       // Validate codebase path exists
       await fs.access(input.codebasePath);
-      
+
       const files: string[] = [];
       const languages: Record<string, number> = {};
       let totalLines = 0;
       let complexity = 0;
-      
+
       // Recursively scan directory
       const scanDirectory = async (dirPath: string): Promise<void> => {
         const entries = await fs.readdir(dirPath, { withFileTypes: true });
-        
+
         for (const entry of entries) {
           const fullPath = path.join(dirPath, entry.name);
           const relativePath = path.relative(input.codebasePath, fullPath);
-          
+
           // Skip excluded patterns
-          if (input.excludePatterns?.some(pattern => 
-            new RegExp(pattern).test(relativePath) || 
-            relativePath.includes('node_modules') ||
-            relativePath.includes('.git') ||
-            relativePath.startsWith('.')
-          )) {
+          if (
+            input.excludePatterns?.some(
+              pattern =>
+                new RegExp(pattern).test(relativePath) ||
+                relativePath.includes('node_modules') ||
+                relativePath.includes('.git') ||
+                relativePath.startsWith('.')
+            )
+          ) {
             continue;
           }
-          
+
           if (entry.isDirectory()) {
             await scanDirectory(fullPath);
           } else if (entry.isFile()) {
             // Include only specified files if provided
             if (input.includeFiles && input.includeFiles.length > 0) {
-              if (!input.includeFiles.some(pattern => 
-                new RegExp(pattern).test(relativePath)
-              )) {
+              if (!input.includeFiles.some(pattern => new RegExp(pattern).test(relativePath))) {
                 continue;
               }
             }
-            
+
             // Analyze file
             const fileStats = await this.analyzeFile(fullPath);
             if (fileStats) {
               files.push(relativePath);
               totalLines += fileStats.lines;
               complexity += fileStats.complexity;
-              
+
               const ext = path.extname(entry.name).toLowerCase();
               const language = this.getLanguageFromExtension(ext);
               languages[language] = (languages[language] || 0) + fileStats.lines;
@@ -239,18 +250,18 @@ export class AnalyzeCodebaseUseCase {
           }
         }
       };
-      
+
       await scanDirectory(input.codebasePath);
-      
+
       // Calculate average complexity
       const avgComplexity = files.length > 0 ? complexity / files.length : 0;
-      
+
       // Estimate test coverage by looking for test files
       const testCoverage = this.estimateTestCoverage(input.codebasePath, files);
-      
+
       // Count dependencies
       const dependencies = await this.countDependencies(input.codebasePath);
-      
+
       return {
         structure: this.generateStructureMap(input.codebasePath, files),
         files,
@@ -270,26 +281,41 @@ export class AnalyzeCodebaseUseCase {
     }
   }
 
-  private async analyzeFile(filePath: string): Promise<{ lines: number; complexity: number } | null> {
+  private async analyzeFile(
+    filePath: string
+  ): Promise<{ lines: number; complexity: number } | null> {
     const fs = await import('fs/promises');
-    
+
     try {
       const content = await fs.readFile(filePath, 'utf-8');
       const lines = content.split('\n').filter(line => line.trim()).length;
-      
+
       // Simple complexity calculation based on control flow keywords
       const complexityKeywords = [
-        'if', 'else', 'while', 'for', 'switch', 'case', 'catch', 'try',
-        'forEach', 'map', 'filter', 'reduce', '&&', '||', '?'
+        'if',
+        'else',
+        'while',
+        'for',
+        'switch',
+        'case',
+        'catch',
+        'try',
+        'forEach',
+        'map',
+        'filter',
+        'reduce',
+        '&&',
+        '||',
+        '?',
       ];
-      
+
       let complexity = 1; // Base complexity
       for (const keyword of complexityKeywords) {
         const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
         const matches = content.match(regex);
         complexity += matches ? matches.length : 0;
       }
-      
+
       return { lines, complexity };
     } catch (error) {
       console.warn(`Could not analyze file ${filePath}:`, error);
@@ -326,30 +352,32 @@ export class AnalyzeCodebaseUseCase {
       '.sass': 'SASS',
       '.less': 'Less',
     };
-    
+
     return languageMap[ext] || 'Other';
   }
 
   private estimateTestCoverage(codebasePath: string, files: ReadonlyArray<string>): number {
-    const testFiles = files.filter(file => 
-      file.includes('test') || 
-      file.includes('spec') || 
-      file.includes('__tests__') ||
-      file.endsWith('.test.ts') ||
-      file.endsWith('.test.js') ||
-      file.endsWith('.spec.ts') ||
-      file.endsWith('.spec.js')
+    const testFiles = files.filter(
+      file =>
+        file.includes('test') ||
+        file.includes('spec') ||
+        file.includes('__tests__') ||
+        file.endsWith('.test.ts') ||
+        file.endsWith('.test.js') ||
+        file.endsWith('.spec.ts') ||
+        file.endsWith('.spec.js')
     );
-    
-    const sourceFiles = files.filter(file => 
-      !file.includes('test') && 
-      !file.includes('spec') && 
-      (file.endsWith('.ts') || file.endsWith('.js')) &&
-      !file.endsWith('.d.ts')
+
+    const sourceFiles = files.filter(
+      file =>
+        !file.includes('test') &&
+        !file.includes('spec') &&
+        (file.endsWith('.ts') || file.endsWith('.js')) &&
+        !file.endsWith('.d.ts')
     );
-    
+
     if (sourceFiles.length === 0) return 0;
-    
+
     // Simple estimation: ratio of test files to source files
     const estimatedCoverage = Math.min((testFiles.length / sourceFiles.length) * 100, 100);
     return Math.round(estimatedCoverage * 100) / 100;
@@ -358,15 +386,18 @@ export class AnalyzeCodebaseUseCase {
   private async countDependencies(codebasePath: string): Promise<number> {
     const fs = await import('fs/promises');
     const path = await import('path');
-    
+
     try {
       const packageJsonPath = path.join(codebasePath, 'package.json');
       const packageJsonText = await fs.readFile(packageJsonPath, 'utf-8');
-      const packageJson = JSON.parse(packageJsonText) as { dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
-      
+      const packageJson = JSON.parse(packageJsonText) as {
+        dependencies?: Record<string, unknown>;
+        devDependencies?: Record<string, unknown>;
+      };
+
       const dependencies = Object.keys(packageJson.dependencies ?? {});
       const devDependencies = Object.keys(packageJson.devDependencies ?? {});
-      
+
       return dependencies.length + devDependencies.length;
     } catch (error) {
       // Try other dependency files
@@ -390,7 +421,7 @@ export class AnalyzeCodebaseUseCase {
       } catch (nestedError) {
         console.warn('Could not determine dependencies:', nestedError);
       }
-      
+
       return 0;
     }
   }
@@ -422,18 +453,19 @@ export class AnalyzeCodebaseUseCase {
       }
 
       const sortedFiles = structure[dir].sort();
-      for (const file of sortedFiles.slice(0, 10)) { // Limit to first 10 files per dir
+      for (const file of sortedFiles.slice(0, 10)) {
+        // Limit to first 10 files per dir
         const fileIndent = dir === '.' ? indent : `${indent}  `;
         const icon = this.getFileIcon(file);
         lines.push(`${fileIndent}${icon} ${file}`);
       }
-      
+
       if (sortedFiles.length > 10) {
         const fileIndent = dir === '.' ? indent : `${indent}  `;
         lines.push(`${fileIndent}... and ${sortedFiles.length - 10} more files`);
       }
     }
-    
+
     return lines.join('\n');
   }
 
@@ -458,7 +490,7 @@ export class AnalyzeCodebaseUseCase {
       go: '🐹',
       rs: '🦀',
     };
-    
+
     return iconMap[ext || ''] || '📄';
   }
 
@@ -468,10 +500,15 @@ export class AnalyzeCodebaseUseCase {
     request: Readonly<ProcessingRequest>,
     codebaseInfo: Readonly<CodebaseInfo>
   ): Promise<{ voiceId: string; content: string; confidence: number; analysisType: string }[]> {
-    const responses: { voiceId: string; content: string; confidence: number; analysisType: string }[] = [];
-    
+    const responses: {
+      voiceId: string;
+      content: string;
+      confidence: number;
+      analysisType: string;
+    }[] = [];
+
     // Process voices in parallel for better performance
-    const analysisPromises = voices.map(async (voiceId) => {
+    const analysisPromises = voices.map(async voiceId => {
       try {
         const enhancedRequest = ProcessingRequest.create(
           this.buildVoiceSpecificPrompt(request.prompt, voiceId, codebaseInfo),
@@ -485,13 +522,13 @@ export class AnalyzeCodebaseUseCase {
               fileCount: codebaseInfo.metrics?.totalFiles,
               languages: Object.keys(codebaseInfo.metrics?.languages || {}),
               complexity: codebaseInfo.metrics?.complexity,
-            }
+            },
           },
           request.constraints
         );
-        
+
         const response = await model.generateResponse(enhancedRequest, { id: voiceId });
-        
+
         return {
           voiceId,
           content: response.content,
@@ -508,40 +545,51 @@ export class AnalyzeCodebaseUseCase {
         };
       }
     });
-    
+
     const results = await Promise.allSettled(analysisPromises);
-    
-    results.forEach((result) => {
+
+    results.forEach(result => {
       if (result.status === 'fulfilled') {
         responses.push(result.value);
       }
     });
-    
+
     return responses;
   }
 
   private getDefaultConfidence(voiceId: string): number {
     const confidenceMap: Record<string, number> = {
       architect: 0.85,
-      maintainer: 0.80,
-      security: 0.90,
+      maintainer: 0.8,
+      security: 0.9,
       analyzer: 0.85,
       optimizer: 0.75,
-      guardian: 0.80,
+      guardian: 0.8,
     };
-    
+
     return confidenceMap[voiceId] || 0.75;
   }
 
   private synthesizeAnalysisResponses(
-    responses: ReadonlyArray<{ voiceId: string; content: string; confidence: number; analysisType: string }>
+    responses: ReadonlyArray<{
+      voiceId: string;
+      content: string;
+      confidence: number;
+      analysisType: string;
+    }>
   ): { voiceId: string; content: string; confidence: number; analysisType: string } {
     if (responses.length === 1) {
       return responses[0];
     }
 
     // Weighted synthesis based on confidence scores
-    const totalWeight = responses.reduce((sum: number, r: Readonly<{ voiceId: string; content: string; confidence: number; analysisType: string }>) => sum + r.confidence, 0);
+    const totalWeight = responses.reduce(
+      (
+        sum: number,
+        r: Readonly<{ voiceId: string; content: string; confidence: number; analysisType: string }>
+      ) => sum + r.confidence,
+      0
+    );
     const weightedConfidence = totalWeight / responses.length;
 
     // Group insights by analysis type
@@ -554,8 +602,9 @@ export class AnalyzeCodebaseUseCase {
     }
 
     // Create synthesized content
-    const synthesizedSections = Object.entries(groupedAnalysis).map(([type, contents]: [string, string[]]) => 
-      `## ${type.toUpperCase()} ANALYSIS\n\n${contents.join('\n\n---\n\n')}`
+    const synthesizedSections = Object.entries(groupedAnalysis).map(
+      ([type, contents]: [string, string[]]) =>
+        `## ${type.toUpperCase()} ANALYSIS\n\n${contents.join('\n\n---\n\n')}`
     );
 
     const synthesizedContent = `# COMPREHENSIVE CODEBASE ANALYSIS
@@ -574,7 +623,11 @@ Overall confidence level: ${Math.round(weightedConfidence * 100)}%`;
     };
   }
 
-  private buildVoiceSpecificPrompt(basePrompt: string, voiceId: string, codebaseInfo: CodebaseInfo): string {
+  private buildVoiceSpecificPrompt(
+    basePrompt: string,
+    voiceId: string,
+    codebaseInfo: CodebaseInfo
+  ): string {
     const voiceInstructions: Record<string, string> = {
       architect: `As a Software Architect, focus on:
 - System architecture and design patterns
@@ -582,35 +635,35 @@ Overall confidence level: ${Math.round(weightedConfidence * 100)}%`;
 - Scalability and extensibility concerns
 - Architectural debt and refactoring opportunities
 - Design principle adherence (SOLID, DRY, etc.)`,
-      
+
       maintainer: `As a Code Maintainer, focus on:
 - Code readability and documentation quality
 - Technical debt identification
 - Refactoring opportunities
 - Code complexity and maintainability metrics
 - Developer experience and onboarding friction`,
-      
+
       security: `As a Security Expert, focus on:
 - Security vulnerabilities and attack vectors
 - Authentication and authorization patterns
 - Data protection and privacy concerns
 - Dependency security risks
 - Security best practices compliance`,
-      
+
       analyzer: `As a Code Quality Analyzer, focus on:
 - Code quality metrics and trends
 - Performance patterns and anti-patterns
 - Test coverage and quality
 - Coding standards compliance
 - Error handling patterns`,
-      
+
       optimizer: `As a Performance Optimizer, focus on:
 - Performance bottlenecks and optimization opportunities
 - Resource usage patterns
 - Algorithmic complexity
 - Memory and CPU efficiency
 - Caching and optimization strategies`,
-      
+
       guardian: `As a Quality Guardian, focus on:
 - Risk assessment and mitigation
 - Compliance with coding standards
@@ -652,7 +705,12 @@ Provide specific, actionable insights with concrete examples where possible.`;
   }
 
   private transformToOutput(
-    analysis: Readonly<{ voiceId: string; content: string; confidence: number; analysisType: string }>,
+    analysis: Readonly<{
+      voiceId: string;
+      content: string;
+      confidence: number;
+      analysisType: string;
+    }>,
     input: Readonly<CodebaseAnalysisInput>,
     voices: ReadonlyArray<string>,
     codebaseInfo: Readonly<CodebaseInfo>,
@@ -684,30 +742,53 @@ Provide specific, actionable insights with concrete examples where possible.`;
 
   private extractSummary(content: string): string {
     // Look for summary sections first
-    const summaryMatch = content.match(/(?:## SYNTHESIS SUMMARY|# SUMMARY|## SUMMARY)([\s\S]*?)(?:\n## |\n# |$)/i);
+    const summaryMatch = content.match(
+      /(?:## SYNTHESIS SUMMARY|# SUMMARY|## SUMMARY)([\s\S]*?)(?:\n## |\n# |$)/i
+    );
     if (summaryMatch) {
       return summaryMatch[1].trim().substring(0, 500);
     }
 
     // Fall back to first meaningful paragraph
-    const lines = content.split('\n')
+    const lines = content
+      .split('\n')
       .filter(line => line.trim() && !line.startsWith('#') && !line.startsWith('**'))
       .slice(0, 5);
-    
+
     const summary = lines.join(' ').substring(0, 500);
     return summary + (summary.length >= 500 ? '...' : '');
   }
 
   private extractFindings(content: string): AnalysisFinding[] {
     const findings: AnalysisFinding[] = [];
-    
+
     // Enhanced pattern matching for various finding indicators
     const patterns = [
-      { regex: /(?:issue|problem|concern|vulnerability|risk)[s]?[:\s]([^\n.]+)/gi, type: 'issue' as const, severity: 'medium' as const },
-      { regex: /(?:opportunity|improvement|enhancement)[s]?[:\s]([^\n.]+)/gi, type: 'opportunity' as const, severity: 'low' as const },
-      { regex: /(?:strength|good|well|excellent)[s]?[:\s]([^\n.]+)/gi, type: 'strength' as const, severity: 'low' as const },
-      { regex: /(?:critical|severe|major)[s]?[:\s]([^\n.]+)/gi, type: 'risk' as const, severity: 'high' as const },
-      { regex: /(?:security|vulnerability|exploit)[s]?[:\s]([^\n.]+)/gi, type: 'risk' as const, severity: 'high' as const },
+      {
+        regex: /(?:issue|problem|concern|vulnerability|risk)[s]?[:\s]([^\n.]+)/gi,
+        type: 'issue' as const,
+        severity: 'medium' as const,
+      },
+      {
+        regex: /(?:opportunity|improvement|enhancement)[s]?[:\s]([^\n.]+)/gi,
+        type: 'opportunity' as const,
+        severity: 'low' as const,
+      },
+      {
+        regex: /(?:strength|good|well|excellent)[s]?[:\s]([^\n.]+)/gi,
+        type: 'strength' as const,
+        severity: 'low' as const,
+      },
+      {
+        regex: /(?:critical|severe|major)[s]?[:\s]([^\n.]+)/gi,
+        type: 'risk' as const,
+        severity: 'high' as const,
+      },
+      {
+        regex: /(?:security|vulnerability|exploit)[s]?[:\s]([^\n.]+)/gi,
+        type: 'risk' as const,
+        severity: 'high' as const,
+      },
     ];
 
     patterns.forEach(pattern => {
@@ -729,7 +810,7 @@ Provide specific, actionable insights with concrete examples where possible.`;
 
   private extractRecommendations(content: string): AnalysisRecommendation[] {
     const recommendations: AnalysisRecommendation[] = [];
-    
+
     // Look for recommendation patterns
     const patterns = [
       /(?:recommend|suggest|should|consider|advise)[s]?[:\s]([^\n.]+)/gi,
@@ -758,7 +839,8 @@ Provide specific, actionable insights with concrete examples where possible.`;
     const keywords = description.toLowerCase();
     if (keywords.includes('security') || keywords.includes('vulnerability')) return 'security';
     if (keywords.includes('performance') || keywords.includes('slow')) return 'performance';
-    if (keywords.includes('complex') || keywords.includes('maintainability')) return 'maintainability';
+    if (keywords.includes('complex') || keywords.includes('maintainability'))
+      return 'maintainability';
     if (keywords.includes('test') || keywords.includes('coverage')) return 'testing';
     if (keywords.includes('architecture') || keywords.includes('design')) return 'architecture';
     if (keywords.includes('documentation') || keywords.includes('comment')) return 'documentation';
@@ -772,16 +854,24 @@ Provide specific, actionable insights with concrete examples where possible.`;
       strength: 'Contributes to code quality and maintainability',
       risk: 'Potential for serious problems if not addressed',
     };
-    
+
     return impactMap[type];
   }
 
   private estimatePriority(action: string): AnalysisRecommendation['priority'] {
     const keywords = action.toLowerCase();
-    if (keywords.includes('critical') || keywords.includes('urgent') || keywords.includes('security')) {
+    if (
+      keywords.includes('critical') ||
+      keywords.includes('urgent') ||
+      keywords.includes('security')
+    ) {
       return 'high';
     }
-    if (keywords.includes('important') || keywords.includes('significant') || keywords.includes('should')) {
+    if (
+      keywords.includes('important') ||
+      keywords.includes('significant') ||
+      keywords.includes('should')
+    ) {
       return 'medium';
     }
     return 'low';
@@ -808,20 +898,28 @@ Provide specific, actionable insights with concrete examples where possible.`;
       performance: 'Improves application speed and resource efficiency',
       architecture: 'Improves system scalability and maintainability',
       general: 'Contributes to overall code quality',
-      };
-  
-      // Ensure category is a valid key of rationales
-      return rationales[category as keyof typeof rationales] || rationales.general;
-    }
-  
-    private estimateEffort(action: string): AnalysisRecommendation['estimatedEffort'] {
-      const keywords = action.toLowerCase();
-      if (keywords.includes('major') || keywords.includes('complete') || keywords.includes('entire')) {
-        return 'large';
-      }
-      if (keywords.includes('significant') || keywords.includes('multiple') || keywords.includes('refactor')) {
-        return 'medium';
-      }
-      return 'small';
-    }
+    };
+
+    // Ensure category is a valid key of rationales
+    return rationales[category as keyof typeof rationales] || rationales.general;
   }
+
+  private estimateEffort(action: string): AnalysisRecommendation['estimatedEffort'] {
+    const keywords = action.toLowerCase();
+    if (
+      keywords.includes('major') ||
+      keywords.includes('complete') ||
+      keywords.includes('entire')
+    ) {
+      return 'large';
+    }
+    if (
+      keywords.includes('significant') ||
+      keywords.includes('multiple') ||
+      keywords.includes('refactor')
+    ) {
+      return 'medium';
+    }
+    return 'small';
+  }
+}

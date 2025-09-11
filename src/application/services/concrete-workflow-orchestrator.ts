@@ -83,7 +83,11 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
             ) => {
               return await modelClient.request(request);
             },
-            getModelName: () => 'unified-model-client', // Optional method
+            // Provide an actual model name hint when available for capability checks
+            getModelName: () =>
+              process.env.DEFAULT_MODEL && process.env.DEFAULT_MODEL.trim().length > 0
+                ? (process.env.DEFAULT_MODEL as string)
+                : 'llama3.1:8b',
           } as Provider;
         }
         return undefined;
@@ -295,10 +299,16 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
           },
         };
 
+        // Inject the Rust backend from the runtime context to avoid duplicate initialization
+        const injectedRustBackend = (dependencies.runtimeContext as unknown as {
+          rustBackend?: unknown;
+        })?.rustBackend as unknown;
+
         this.requestExecutionManager = new RequestExecutionManager(
           config,
           processManager,
-          providerRepository
+          providerRepository,
+          (injectedRustBackend as unknown) as import('../../infrastructure/execution/rust-executor/index.js').RustExecutionBackend | null
         );
         logger.info(
           '  - requestExecutionManager: ✅ Initialized with advanced execution strategies'
@@ -558,7 +568,8 @@ IMPORTANT: You have access to tools for filesystem operations, git, and system c
     return {
       id: request.id,
       prompt: enhancedPrompt,
-      model: payloadTyped.options?.model,
+      // Ensure the model string is present for downstream capability checks (e.g., tool calling support)
+      model: payloadTyped.options?.model ?? process.env.DEFAULT_MODEL,
       // Let ModelClient use its properly configured defaultProvider from model selection
       temperature: payloadTyped.options?.temperature,
       maxTokens: payloadTyped.options?.maxTokens,
@@ -607,8 +618,12 @@ IMPORTANT: You have access to tools for filesystem operations, git, and system c
   ): Promise<ModelResponse> {
     logger.debug('ConcreteWorkflowOrchestrator: Checking for tool calls');
     logger.debug('ConcreteWorkflowOrchestrator: response keys:', { keys: Object.keys(response) });
-    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls exists:', { hasToolCalls: !!response.toolCalls });
-    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls length:', { length: response.toolCalls?.length });
+    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls exists:', {
+      hasToolCalls: !!response.toolCalls,
+    });
+    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls length:', {
+      length: response.toolCalls?.length,
+    });
 
     if (
       response.toolCalls &&
@@ -763,7 +778,9 @@ IMPORTANT: You have access to tools for filesystem operations, git, and system c
           }
         } catch (err) {
           // If MCP tool failed, allow fallback to local fs below
-          logger.debug('MCP stats tool failed, falling back to fs.stat', { error: toReadonlyRecord(err) });
+          logger.debug('MCP stats tool failed, falling back to fs.stat', {
+            error: toReadonlyRecord(err),
+          });
           usedMcp = false;
         }
       }
@@ -803,7 +820,9 @@ IMPORTANT: You have access to tools for filesystem operations, git, and system c
             fileContent = undefined;
           }
         } catch (err) {
-          logger.debug('MCP read tool threw, falling back to fs.readFile', { error: toReadonlyRecord(err) });
+          logger.debug('MCP read tool threw, falling back to fs.readFile', {
+            error: toReadonlyRecord(err),
+          });
           fileContent = undefined;
         }
       }
@@ -860,7 +879,9 @@ IMPORTANT: You have access to tools for filesystem operations, git, and system c
         try {
           modelResponse = await this.processToolCalls(modelResponse, request, modelRequest);
         } catch (err) {
-          logger.warn('Processing tool calls during analysis failed', { error: toReadonlyRecord(err) });
+          logger.warn('Processing tool calls during analysis failed', {
+            error: toReadonlyRecord(err),
+          });
         }
 
         // Try to parse model text into JSON result if the model returned plain text

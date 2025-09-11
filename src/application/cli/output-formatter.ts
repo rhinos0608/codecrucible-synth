@@ -4,9 +4,9 @@ import {
   modelDiscoveryService,
 } from '../../infrastructure/discovery/model-discovery-service.js';
 import { toErrorOrUndefined } from '../../utils/type-guards.js';
-import { 
+import {
   unifiedResultFormatter,
-  FormattingOptions 
+  FormattingOptions,
 } from '../../infrastructure/formatting/unified-result-formatter.js';
 import { ProviderType } from '../../domain/types/unified-types.js';
 
@@ -46,14 +46,17 @@ export function formatOutput(result: unknown): string {
   }
 
   // Use centralized result formatter for consistent output
-  const formatted = unifiedResultFormatter.formatResult(result as Readonly<unknown>, {
-    includeMetadata: false,
-    preferMarkdown: false,
-    highlightErrors: true,
-    format: 'text',
-    maxLength: 50000,
-    maxDepth: 10,
-  } as Readonly<FormattingOptions>);
+  const formatted = unifiedResultFormatter.formatResult(
+    result as Readonly<unknown>,
+    {
+      includeMetadata: false,
+      preferMarkdown: false,
+      highlightErrors: true,
+      format: 'text',
+      maxLength: 50000,
+      maxDepth: 10,
+    } as Readonly<FormattingOptions>
+  );
 
   // CRITICAL FIX: Add fallback for empty/null results to prevent blank responses
   if (!formatted.content || formatted.content.trim().length === 0) {

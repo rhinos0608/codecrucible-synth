@@ -19,4 +19,3 @@ export function extractToolCalls(calls?: OllamaToolCall[]): ParsedToolCall[] {
   }
   return parsed;
 }
-

@@ -374,7 +374,11 @@ export class TestFixtures {
  * Type guard for objects with a cleanup method
  */
 function isCleanable(obj: unknown): obj is { cleanup: () => Promise<void> | void } {
-  return typeof obj === 'object' && obj !== null && typeof (obj as { cleanup?: unknown }).cleanup === 'function';
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof (obj as { cleanup?: unknown }).cleanup === 'function'
+  );
 }
 
 // Mock utilities

@@ -49,16 +49,22 @@ interface UrlReadResponse {
 }
 
 interface MCPGlobal {
-  mcp__exa__web_search_exa?: (params: Readonly<{
-    query: string;
-    numResults?: number;
-  }>) => Promise<SearchResponse>;
-  mcp__ref_tools_ref_tools_mcp__ref_search_documentation?: (params: Readonly<{
-    query: string;
-  }>) => Promise<SearchResponse>;
-  mcp__ref_tools_ref_tools_mcp__ref_read_url?: (params: Readonly<{
-    url: string;
-  }>) => Promise<UrlReadResponse>;
+  mcp__exa__web_search_exa?: (
+    params: Readonly<{
+      query: string;
+      numResults?: number;
+    }>
+  ) => Promise<SearchResponse>;
+  mcp__ref_tools_ref_tools_mcp__ref_search_documentation?: (
+    params: Readonly<{
+      query: string;
+    }>
+  ) => Promise<SearchResponse>;
+  mcp__ref_tools_ref_tools_mcp__ref_read_url?: (
+    params: Readonly<{
+      url: string;
+    }>
+  ) => Promise<UrlReadResponse>;
 }
 
 declare const global: typeof globalThis & MCPGlobal;
@@ -249,7 +255,9 @@ export class ExaWebSearchTool extends BaseTool<typeof ExaWebSearchSchema.shape> 
     });
   }
 
-  public async execute(params: Readonly<{ query: string; numResults?: number }>): Promise<SearchResponse> {
+  public async execute(
+    params: Readonly<{ query: string; numResults?: number }>
+  ): Promise<SearchResponse> {
     try {
       logger.info(`🔍 Exa Web Search: ${params.query}`);
 

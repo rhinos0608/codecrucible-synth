@@ -55,4 +55,3 @@ export function createUnifiedMetrics(collector?: MetricsCollector): UnifiedMetri
     new MetricsCollector({ enabled: true, retentionDays: 7, exportInterval: 0, exporters: [] });
   return new UnifiedMetricsAdapter(c);
 }
-

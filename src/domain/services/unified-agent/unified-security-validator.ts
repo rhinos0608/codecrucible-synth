@@ -69,10 +69,11 @@ export class UnifiedSecurityValidator {
       this.assessSecurityRisk(context, result);
 
       result.isValid = result.errors.length === 0;
-
     } catch (error) {
       result.isValid = false;
-      result.errors.push(`Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      result.errors.push(
+        `Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
       result.securityRisk = 'high';
     }
 
@@ -127,14 +128,7 @@ export class UnifiedSecurityValidator {
   }
 
   private validatePermissions(context: SecurityValidationContext, result: ValidationResult): void {
-    const allowedPermissions = [
-      'read',
-      'write',
-      'execute',
-      'delete',
-      'network',
-      'system',
-    ];
+    const allowedPermissions = ['read', 'write', 'execute', 'delete', 'network', 'system'];
 
     const invalidPermissions = context.requestedPermissions.filter(
       perm => !allowedPermissions.includes(perm)
@@ -146,7 +140,7 @@ export class UnifiedSecurityValidator {
 
     // High-risk permissions
     const highRiskPermissions = ['delete', 'system', 'network'];
-    const hasHighRisk = context.requestedPermissions.some(perm => 
+    const hasHighRisk = context.requestedPermissions.some(perm =>
       highRiskPermissions.includes(perm)
     );
 
@@ -217,7 +211,11 @@ export class UnifiedSecurityValidator {
   /**
    * Validate and sanitize input data
    */
-  public validateInput(context: SecurityValidationContext): { isValid: boolean; sanitized: string; errors: string[] } {
+  public validateInput(context: SecurityValidationContext): {
+    isValid: boolean;
+    sanitized: string;
+    errors: string[];
+  } {
     const errors: string[] = [];
     let isValid = true;
 

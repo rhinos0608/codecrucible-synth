@@ -1,6 +1,6 @@
 /**
  * Search Query Sanitizer Module
- * 
+ *
  * Handles comprehensive input sanitization and validation for search queries
  * to prevent command injection, path traversal, and other security issues.
  */
@@ -59,10 +59,7 @@ export class SearchQuerySanitizer {
   /**
    * Sanitize a search query with comprehensive validation
    */
-  public static sanitize(
-    query: string, 
-    options: SanitizationOptions = {}
-  ): SanitizedQuery {
+  public static sanitize(query: string, options: SanitizationOptions = {}): SanitizedQuery {
     const opts = { ...this.DEFAULT_OPTIONS, ...options };
     const warnings: string[] = [];
     let sanitized = query;
@@ -90,14 +87,18 @@ export class SearchQuerySanitizer {
     }
 
     // Detect regex patterns
-    const hasRegex = (this.REGEX_PATTERNS as ReadonlyArray<RegExp>).some((pattern: Readonly<RegExp>) => pattern.test(sanitized));
+    const hasRegex = (this.REGEX_PATTERNS as ReadonlyArray<RegExp>).some(
+      (pattern: Readonly<RegExp>) => pattern.test(sanitized)
+    );
     if (hasRegex && !opts.allowRegex) {
       sanitized = sanitized.replace(/[[\](){}*+?^$|\\]/g, '\\$&');
       warnings.push('Regex patterns escaped due to security policy');
     }
 
     // Detect wildcards
-    const hasWildcards = (this.WILDCARD_PATTERNS as ReadonlyArray<RegExp>).some((pattern: Readonly<RegExp>) => pattern.test(sanitized));
+    const hasWildcards = (this.WILDCARD_PATTERNS as ReadonlyArray<RegExp>).some(
+      (pattern: Readonly<RegExp>) => pattern.test(sanitized)
+    );
     if (hasWildcards && !opts.allowWildcards) {
       sanitized = sanitized.replace(/[*?]/g, '\\$&');
       warnings.push('Wildcards escaped due to security policy');
@@ -162,7 +163,7 @@ export class SearchQuerySanitizer {
    * Validate a query for specific search contexts
    */
   public static validateForContext(
-    query: string, 
+    query: string,
     context: 'code' | 'documentation' | 'logs' | 'general'
   ): SanitizedQuery {
     const contextOptions: Record<string, SanitizationOptions> = {
@@ -204,7 +205,7 @@ export class SearchQuerySanitizer {
    */
   public static isDangerous(query: string): boolean {
     if (!query || typeof query !== 'string') return false;
-    
+
     // Check for command injection patterns
     const dangerousCommands = [
       /rm\s+-rf/i,
@@ -227,21 +228,21 @@ export class SearchQuerySanitizer {
    */
   private static analyzeComplexity(query: string): 'low' | 'medium' | 'high' {
     if (query.length < 10) return 'low';
-    
+
     let complexityScore = 0;
-    
+
     // Length factor
     complexityScore += Math.min(query.length / 50, 2);
-    
+
     // Regex complexity
     if (/[[\](){}*+?^$|\\]/.test(query)) complexityScore += 2;
     if (query.includes('(?:')) complexityScore += 3; // Non-capturing groups
     if (query.includes('(?=') || query.includes('(?!')) complexityScore += 4; // Lookaheads
-    
+
     // Special patterns
     if (/\\\w/.test(query)) complexityScore += 1; // Escaped characters
     if (query.split('|').length > 2) complexityScore += 2; // Multiple alternatives
-    
+
     if (complexityScore <= 2) return 'low';
     if (complexityScore <= 5) return 'medium';
     return 'high';
@@ -251,8 +252,8 @@ export class SearchQuerySanitizer {
    * Estimate security risk level
    */
   private static estimateRisk(
-    query: string, 
-    hasRegex: boolean, 
+    query: string,
+    hasRegex: boolean,
     warnings: string[]
   ): 'safe' | 'moderate' | 'high' {
     if (this.isDangerous(query)) return 'high';

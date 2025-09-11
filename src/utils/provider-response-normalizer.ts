@@ -1,6 +1,6 @@
 /**
  * Provider Response Normalizer
- * 
+ *
  * Standardizes responses from different AI providers into a consistent format.
  * Eliminates the need for adapter-specific parsing logic and reduces maintenance overhead.
  */
@@ -33,12 +33,11 @@ export interface NormalizedToolCall {
  * Comprehensive response normalizer that handles all provider response formats
  */
 export class ProviderResponseNormalizer {
-  
   /**
    * Main normalization method - handles any response type
    */
   public static normalize(
-    response: unknown, 
+    response: unknown,
     defaultModel?: string,
     providerName?: string
   ): NormalizedProviderResponse {
@@ -59,7 +58,11 @@ export class ProviderResponseNormalizer {
 
     // Handle object responses (most common case)
     if (typeof response === 'object') {
-      return this.normalizeObjectResponse(response as Record<string, unknown>, defaultModel, providerName);
+      return this.normalizeObjectResponse(
+        response as Record<string, unknown>,
+        defaultModel,
+        providerName
+      );
     }
 
     // Fallback: convert to string
@@ -70,7 +73,7 @@ export class ProviderResponseNormalizer {
    * Handle string responses
    */
   private static normalizeStringResponse(
-    response: string, 
+    response: string,
     defaultModel?: string,
     providerName?: string
   ): NormalizedProviderResponse {
@@ -78,14 +81,14 @@ export class ProviderResponseNormalizer {
       content: response,
       metadata: {
         originalType: 'string',
-        provider: providerName
+        provider: providerName,
       },
       model: defaultModel,
       usage: {
         promptTokens: 0,
         completionTokens: this.estimateTokenCount(response),
-        totalTokens: this.estimateTokenCount(response)
-      }
+        totalTokens: this.estimateTokenCount(response),
+      },
     };
   }
 
@@ -93,7 +96,7 @@ export class ProviderResponseNormalizer {
    * Handle array responses - aggregate or take first
    */
   private static normalizeArrayResponse(
-    response: unknown[], 
+    response: unknown[],
     defaultModel?: string,
     providerName?: string
   ): NormalizedProviderResponse {
@@ -115,19 +118,19 @@ export class ProviderResponseNormalizer {
       metadata: {
         originalType: 'array_multiple',
         provider: providerName,
-        elementCount: response.length
+        elementCount: response.length,
       },
       model: defaultModel,
       usage: {
         promptTokens: 0,
         completionTokens: 0,
-        totalTokens: 0
-      }
+        totalTokens: 0,
+      },
     };
 
     for (const item of response) {
       const normalized = this.normalize(item, defaultModel, providerName);
-      
+
       // Aggregate content
       if (normalized.content) {
         aggregated.content += (aggregated.content ? '\n' : '') + normalized.content;
@@ -153,7 +156,7 @@ export class ProviderResponseNormalizer {
    * Handle object responses - the most complex case
    */
   private static normalizeObjectResponse(
-    response: Record<string, unknown>, 
+    response: Record<string, unknown>,
     defaultModel?: string,
     providerName?: string
   ): NormalizedProviderResponse {
@@ -164,12 +167,12 @@ export class ProviderResponseNormalizer {
       metadata: {
         originalType: 'object',
         provider: providerName,
-        originalKeys: Object.keys(response)
+        originalKeys: Object.keys(response),
       },
       model: this.extractModel(response, defaultModel),
       finishReason: this.extractFinishReason(response),
       id: this.extractId(response),
-      responseTime: this.extractResponseTime(response)
+      responseTime: this.extractResponseTime(response),
     };
 
     // Include any additional metadata from the original response
@@ -183,16 +186,14 @@ export class ProviderResponseNormalizer {
    */
   private static extractContent(response: Record<string, unknown>): string {
     // Try common content field names in order of preference
-    const contentFields = [
-      'content', 'response', 'message', 'output', 'text', 'data', 'result'
-    ];
+    const contentFields = ['content', 'response', 'message', 'output', 'text', 'data', 'result'];
 
     for (const field of contentFields) {
       const value = response[field];
       if (typeof value === 'string' && value.trim()) {
         return value;
       }
-      
+
       // Handle nested content (e.g., response.message.content)
       if (value && typeof value === 'object') {
         const nestedContent = this.extractContent(value as Record<string, unknown>);
@@ -208,11 +209,11 @@ export class ProviderResponseNormalizer {
   /**
    * Extract and normalize tool calls from response
    */
-  private static extractToolCalls(response: Record<string, unknown>): NormalizedToolCall[] | undefined {
+  private static extractToolCalls(
+    response: Record<string, unknown>
+  ): NormalizedToolCall[] | undefined {
     // Try different field names for tool calls
-    const toolCallFields = [
-      'toolCalls', 'tool_calls', 'tools', 'function_calls', 'functions'
-    ];
+    const toolCallFields = ['toolCalls', 'tool_calls', 'tools', 'function_calls', 'functions'];
 
     for (const field of toolCallFields) {
       const value = response[field];
@@ -240,26 +241,28 @@ export class ProviderResponseNormalizer {
    * Normalize tool calls array to consistent format
    */
   private static normalizeToolCalls(toolCalls: unknown[]): NormalizedToolCall[] {
-    return toolCalls.map((tc, index) => {
-      if (!tc || typeof tc !== 'object') {
-        return this.createEmptyToolCall(index);
-      }
-
-      const call = tc as Record<string, unknown>;
-      
-      // Extract tool call components with fallbacks
-      const id = this.extractToolCallId(call, index);
-      const functionData = this.extractToolCallFunction(call);
-
-      return {
-        id,
-        type: 'function' as const,
-        function: {
-          name: functionData.name,
-          arguments: functionData.arguments
+    return toolCalls
+      .map((tc, index) => {
+        if (!tc || typeof tc !== 'object') {
+          return this.createEmptyToolCall(index);
         }
-      };
-    }).filter(tc => tc.function.name); // Filter out empty tool calls
+
+        const call = tc as Record<string, unknown>;
+
+        // Extract tool call components with fallbacks
+        const id = this.extractToolCallId(call, index);
+        const functionData = this.extractToolCallFunction(call);
+
+        return {
+          id,
+          type: 'function' as const,
+          function: {
+            name: functionData.name,
+            arguments: functionData.arguments,
+          },
+        };
+      })
+      .filter(tc => tc.function.name); // Filter out empty tool calls
   }
 
   /**
@@ -276,13 +279,16 @@ export class ProviderResponseNormalizer {
   /**
    * Extract function data from tool call
    */
-  private static extractToolCallFunction(call: Record<string, unknown>): { name: string; arguments: string } {
+  private static extractToolCallFunction(call: Record<string, unknown>): {
+    name: string;
+    arguments: string;
+  } {
     // Direct function field
     if (call.function && typeof call.function === 'object') {
       const func = call.function as Record<string, unknown>;
       return {
         name: String(func.name || ''),
-        arguments: this.normalizeToolArguments(func.arguments)
+        arguments: this.normalizeToolArguments(func.arguments),
       };
     }
 
@@ -290,7 +296,7 @@ export class ProviderResponseNormalizer {
     if (call.name) {
       return {
         name: String(call.name),
-        arguments: this.normalizeToolArguments(call.arguments || call.args)
+        arguments: this.normalizeToolArguments(call.arguments || call.args),
       };
     }
 
@@ -330,36 +336,46 @@ export class ProviderResponseNormalizer {
   /**
    * Extract usage/token information
    */
-  private static extractUsage(response: Record<string, unknown>): { promptTokens: number; completionTokens: number; totalTokens: number } {
+  private static extractUsage(response: Record<string, unknown>): {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  } {
     const usage = response.usage || response.token_usage || response.tokens;
-    
+
     if (usage && typeof usage === 'object') {
       const u = usage as Record<string, unknown>;
       const promptTokens = Number(u.prompt_tokens || u.promptTokens || u.input_tokens || 0);
-      const completionTokens = Number(u.completion_tokens || u.completionTokens || u.output_tokens || u.eval_count || 0);
-      
+      const completionTokens = Number(
+        u.completion_tokens || u.completionTokens || u.output_tokens || u.eval_count || 0
+      );
+
       return {
         promptTokens,
         completionTokens,
-        totalTokens: promptTokens + completionTokens || Number(u.total_tokens || u.totalTokens || 0)
+        totalTokens:
+          promptTokens + completionTokens || Number(u.total_tokens || u.totalTokens || 0),
       };
     }
 
     // Fallback: estimate from content
     const content = this.extractContent(response);
     const estimated = this.estimateTokenCount(content);
-    
+
     return {
       promptTokens: 0,
       completionTokens: estimated,
-      totalTokens: estimated
+      totalTokens: estimated,
     };
   }
 
   /**
    * Extract model information
    */
-  private static extractModel(response: Record<string, unknown>, defaultModel?: string): string | undefined {
+  private static extractModel(
+    response: Record<string, unknown>,
+    defaultModel?: string
+  ): string | undefined {
     const model = response.model || response.model_name || response.modelName;
     return typeof model === 'string' ? model : defaultModel;
   }
@@ -372,12 +388,12 @@ export class ProviderResponseNormalizer {
     if (typeof reason === 'string') {
       return reason;
     }
-    
+
     // Check if done/finished flags indicate completion
     if (response.done === true || response.finished === true) {
       return 'stop';
     }
-    
+
     return undefined;
   }
 
@@ -406,27 +422,30 @@ export class ProviderResponseNormalizer {
       type: 'function',
       function: {
         name: '',
-        arguments: '{}'
-      }
+        arguments: '{}',
+      },
     };
   }
 
   /**
    * Create empty response for null/undefined inputs
    */
-  private static createEmptyResponse(defaultModel?: string, providerName?: string): NormalizedProviderResponse {
+  private static createEmptyResponse(
+    defaultModel?: string,
+    providerName?: string
+  ): NormalizedProviderResponse {
     return {
       content: '',
       metadata: {
         originalType: 'empty',
-        provider: providerName
+        provider: providerName,
       },
       model: defaultModel,
       usage: {
         promptTokens: 0,
         completionTokens: 0,
-        totalTokens: 0
-      }
+        totalTokens: 0,
+      },
     };
   }
 

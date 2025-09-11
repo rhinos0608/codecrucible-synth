@@ -240,7 +240,10 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
         resultText = (obj.message as { content: string }).content;
       } else {
         // If no standard content field found, try to stringify but log for debugging
-        logger.error('Unexpected result format in generate-code-use-case', new Error(JSON.stringify({ result })));
+        logger.error(
+          'Unexpected result format in generate-code-use-case',
+          new Error(JSON.stringify({ result }))
+        );
         resultText = JSON.stringify(result, null, 2);
       }
     } else {
@@ -409,13 +412,10 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
     // Handle file creation case
     let summary = `Generated ${files.length} file(s) based on: "${request.prompt}"\n\n`;
 
-    const filesByType = files.reduce<Record<string, number>>(
-      (acc, file) => {
-        acc[file.type] = (acc[file.type] || 0) + 1;
-        return acc;
-      },
-      {}
-    );
+    const filesByType = files.reduce<Record<string, number>>((acc, file) => {
+      acc[file.type] = (acc[file.type] || 0) + 1;
+      return acc;
+    }, {});
 
     if (files.length > 0) {
       summary += 'Files created:\n';

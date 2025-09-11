@@ -52,7 +52,7 @@ security:
 
 The `LivingSpiralCoordinator` will be updated to handle these dependencies.
 
-**File**: `src/core/living-spiral-coordinator.ts` (modified)
+**File**: `src/domain/services/living-spiral-coordinator.ts` (modified)
 
 ```typescript
 import { DepGraph } from 'dependency-graph';
@@ -136,7 +136,7 @@ councils:
 
 The CLI will be updated to allow users to select a council from the library.
 
-**File**: `src/core/cli.ts` (modified)
+**File**: `src/application/cli/program.ts` (modified)
 
 ```typescript
 // ... existing class ...

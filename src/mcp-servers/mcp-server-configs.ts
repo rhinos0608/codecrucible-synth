@@ -5,8 +5,8 @@ export const MCP_SERVER_CONFIGS: MCPServerConfig[] = [
     id: 'terminal-controller',
     name: 'Terminal Controller',
     url: 'https://server.smithery.ai/@GongRzhe/terminal-controller-mcp/mcp',
-    apiKey: (process.env.MCP_TERMINAL_API_KEY ?? process.env.SMITHERY_API_KEY) ?? '',
-    enabled: !!((process.env.MCP_TERMINAL_API_KEY ?? process.env.SMITHERY_API_KEY)),
+    apiKey: process.env.MCP_TERMINAL_API_KEY ?? process.env.SMITHERY_API_KEY ?? '',
+    enabled: !!(process.env.MCP_TERMINAL_API_KEY ?? process.env.SMITHERY_API_KEY),
     capabilities: [
       'execute_command',
       'get_command_history',
@@ -24,8 +24,8 @@ export const MCP_SERVER_CONFIGS: MCPServerConfig[] = [
     id: 'task-manager',
     name: 'Task Manager',
     url: 'https://server.smithery.ai/@kazuph/mcp-taskmanager/mcp',
-    apiKey: (process.env.MCP_TASK_MANAGER_API_KEY ?? process.env.SMITHERY_API_KEY) ?? '',
-    enabled: !!((process.env.MCP_TASK_MANAGER_API_KEY ?? process.env.SMITHERY_API_KEY)),
+    apiKey: process.env.MCP_TASK_MANAGER_API_KEY ?? process.env.SMITHERY_API_KEY ?? '',
+    enabled: !!(process.env.MCP_TASK_MANAGER_API_KEY ?? process.env.SMITHERY_API_KEY),
     capabilities: [
       'request_planning',
       'get_next_task',
@@ -38,8 +38,8 @@ export const MCP_SERVER_CONFIGS: MCPServerConfig[] = [
     id: 'remote-shell',
     name: 'Remote Shell',
     url: 'https://server.smithery.ai/@samihalawa/remote-shell-terminal-mcp/mcp',
-    apiKey: (process.env.MCP_REMOTE_SHELL_API_KEY ?? process.env.SMITHERY_API_KEY) ?? '',
-    enabled: !!((process.env.MCP_REMOTE_SHELL_API_KEY ?? process.env.SMITHERY_API_KEY)),
+    apiKey: process.env.MCP_REMOTE_SHELL_API_KEY ?? process.env.SMITHERY_API_KEY ?? '',
+    enabled: !!(process.env.MCP_REMOTE_SHELL_API_KEY ?? process.env.SMITHERY_API_KEY),
     capabilities: ['shell-exec'],
   },
 ];

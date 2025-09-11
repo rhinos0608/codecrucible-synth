@@ -65,4 +65,3 @@ export function startBridgeHealthReporter(
 }
 
 export default startBridgeHealthReporter;
-

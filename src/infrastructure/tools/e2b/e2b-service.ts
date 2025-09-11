@@ -270,7 +270,10 @@ export class E2BService {
       return executionResult;
     } catch (error) {
       const executionTime = Date.now() - startTime;
-      logger.error(`❌ Code execution failed for session ${sessionId}:`, error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        `❌ Code execution failed for session ${sessionId}:`,
+        error instanceof Error ? error : new Error(String(error))
+      );
 
       return {
         success: false,
@@ -632,7 +635,8 @@ except Exception as e:
     const averageSessionAge =
       this.sandboxPool.size > 0
         ? Array.from(this.sandboxPool.values()).reduce(
-            (sum: number, sandbox: Readonly<E2BSandbox>) => sum + (now - sandbox.createdAt.getTime()),
+            (sum: number, sandbox: Readonly<E2BSandbox>) =>
+              sum + (now - sandbox.createdAt.getTime()),
             0
           ) / this.sandboxPool.size
         : 0;

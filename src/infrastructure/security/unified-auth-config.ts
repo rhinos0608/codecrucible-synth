@@ -238,10 +238,10 @@ export class UnifiedAuthConfigManager {
   public async getServiceConfig(
     service: keyof UnifiedAuthConfig['services']
   ): Promise<
-    UnifiedAuthConfig['services']['e2b'] |
-    UnifiedAuthConfig['services']['api'] |
-    UnifiedAuthConfig['services']['cli'] |
-    UnifiedAuthConfig['services']['mcp']
+    | UnifiedAuthConfig['services']['e2b']
+    | UnifiedAuthConfig['services']['api']
+    | UnifiedAuthConfig['services']['cli']
+    | UnifiedAuthConfig['services']['mcp']
   > {
     const config = await this.loadConfig();
     return config.services[service];

@@ -19,7 +19,8 @@ export class ResponseNormalizer {
    * CRITICAL: This prevents "string 58" display issues from Buffer objects
    */
   public static normalizeToString(input: unknown): string {
-    if (input === undefined || input === null || (typeof input === 'number' && isNaN(input))) return '';
+    if (input === undefined || input === null || (typeof input === 'number' && isNaN(input)))
+      return '';
     if (input === '' || input === 0 || input === false) return String(input);
 
     // Handle Buffer types (primary cause of "string 58" issue)
@@ -46,10 +47,7 @@ export class ResponseNormalizer {
     ) {
       const ctor = (input as { constructor: { name: string } }).constructor;
       const ctorName = ctor.name;
-      if (
-        ctor === Uint8Array ||
-        (typeof ctorName === 'string' && ctorName.endsWith('Array'))
-      ) {
+      if (ctor === Uint8Array || (typeof ctorName === 'string' && ctorName.endsWith('Array'))) {
         logger.debug('ResponseNormalizer: Converting typed array to string', {
           arrayType: ctorName,
           length: (input as { length?: number }).length ?? 0,

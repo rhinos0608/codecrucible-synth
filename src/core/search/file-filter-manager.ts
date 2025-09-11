@@ -1,6 +1,6 @@
 /**
  * File Filter Manager Module
- * 
+ *
  * Manages file type filtering, exclusions, and smart filtering
  * based on project context and search requirements.
  */

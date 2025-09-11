@@ -87,7 +87,9 @@ export class CircuitBreaker {
         result = await Promise.race([
           fn(),
           new Promise<never>((_, reject) => {
-            setTimeout(() => { reject(new Error('Operation timeout')); }, this.config.timeout);
+            setTimeout(() => {
+              reject(new Error('Operation timeout'));
+            }, this.config.timeout);
           }),
         ]);
       } else {

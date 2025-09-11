@@ -27,7 +27,9 @@ export class GitMCPServer extends BaseMCPServer {
   private readonly status = new StatusTracker();
   private readonly remotes = new RemoteManager();
 
-  public constructor(private readonly approvals: Readonly<ApprovalManager> = new ApprovalManager()) {
+  public constructor(
+    private readonly approvals: Readonly<ApprovalManager> = new ApprovalManager()
+  ) {
     super('git', 'Git MCP Server');
     this.registerTools();
   }

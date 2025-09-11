@@ -81,10 +81,7 @@ export class CLIUserInteraction implements IUserInteraction {
     }
   }
 
-  public async prompt(
-    question: string,
-    options: Readonly<PromptOptions> = {}
-  ): Promise<string> {
+  public async prompt(question: string, options: Readonly<PromptOptions> = {}): Promise<string> {
     // Stop any current spinner
     if (this.currentSpinner) {
       this.currentSpinner.stop();
@@ -107,7 +104,7 @@ export class CLIUserInteraction implements IUserInteraction {
           return 'Invalid input';
         }
         return true;
-      }
+      },
     };
 
     // Cast to any to avoid strict Inquirer generic typing issues across versions

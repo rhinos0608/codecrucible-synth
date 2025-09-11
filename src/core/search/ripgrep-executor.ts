@@ -1,6 +1,6 @@
 /**
  * Ripgrep Executor Module
- * 
+ *
  * Handles secure execution of ripgrep processes with comprehensive
  * performance monitoring, resource limits, and error handling.
  */
@@ -91,10 +91,10 @@ export class RipgrepExecutor {
     try {
       // Build command
       const command = this.buildCommand(query, opts);
-      
+
       // Execute with monitoring
       const result = await this.executeWithMonitoring(command, opts, executionId);
-      
+
       // Calculate final metrics
       const duration = performance.now() - startTime;
       result.duration = duration;
@@ -318,7 +318,7 @@ export class RipgrepExecutor {
       });
 
       // Handle process completion
-      child.on('close', (code) => {
+      child.on('close', code => {
         clearTimeout(timeoutId);
         this.activeProcesses.delete(executionId);
 
@@ -335,7 +335,8 @@ export class RipgrepExecutor {
           performance: this.calculatePerformanceMetrics(stdout, 0), // Duration set later
         };
 
-        if (code === 0 || code === 1) { // 0 = found, 1 = not found (both valid)
+        if (code === 0 || code === 1) {
+          // 0 = found, 1 = not found (both valid)
           resolve(result);
         } else {
           reject(new Error(`ripgrep exited with code ${code}: ${stderr}`));
@@ -374,49 +375,49 @@ export class RipgrepExecutor {
   }
 
   /**
-     * Count files in output for metrics
-     */
-    private countFiles(output: string): number {
-      if (!output) return 0;
-      const files = new Set<string>();
+   * Count files in output for metrics
+   */
+  private countFiles(output: string): number {
+    if (!output) return 0;
+    const files = new Set<string>();
 
-      interface RipgrepMatch {
-        type: 'match';
-        data?: {
-          path?: {
-            text?: string;
-          };
+    interface RipgrepMatch {
+      type: 'match';
+      data?: {
+        path?: {
+          text?: string;
         };
-      }
+      };
+    }
 
-      function isMatchType(obj: unknown): obj is RipgrepMatch {
-        return (
-          typeof obj === 'object' &&
-          obj !== null &&
-          (obj as { type?: string }).type === 'match' &&
-          typeof (obj as { data?: unknown }).data === 'object' &&
-          (obj as { data?: unknown }).data !== null &&
-          typeof (obj as { data?: { path?: unknown } }).data?.path === 'object' &&
-          (obj as { data?: { path?: unknown } }).data?.path !== null &&
-          typeof (obj as { data?: { path?: { text?: unknown } } }).data?.path?.text === 'string'
-        );
-      }
+    function isMatchType(obj: unknown): obj is RipgrepMatch {
+      return (
+        typeof obj === 'object' &&
+        obj !== null &&
+        (obj as { type?: string }).type === 'match' &&
+        typeof (obj as { data?: unknown }).data === 'object' &&
+        (obj as { data?: unknown }).data !== null &&
+        typeof (obj as { data?: { path?: unknown } }).data?.path === 'object' &&
+        (obj as { data?: { path?: unknown } }).data?.path !== null &&
+        typeof (obj as { data?: { path?: { text?: unknown } } }).data?.path?.text === 'string'
+      );
+    }
 
-      for (const line of output.split('\n')) {
-        try {
-          const parsed: unknown = JSON.parse(line);
-          if (isMatchType(parsed)) {
-            const filePath = parsed.data?.path?.text;
-            if (filePath) {
-              files.add(filePath);
-            }
+    for (const line of output.split('\n')) {
+      try {
+        const parsed: unknown = JSON.parse(line);
+        if (isMatchType(parsed)) {
+          const filePath = parsed.data?.path?.text;
+          if (filePath) {
+            files.add(filePath);
           }
-        } catch {
-          // Not JSON, skip
         }
+      } catch {
+        // Not JSON, skip
       }
-  
-      return files.size;
+    }
+
+    return files.size;
   }
 
   /**
@@ -425,7 +426,7 @@ export class RipgrepExecutor {
   private countMatches(output: string): number {
     if (!output) return 0;
     let matches = 0;
-    
+
     for (const line of output.split('\n')) {
       try {
         const parsed: unknown = JSON.parse(line);
@@ -444,14 +445,17 @@ export class RipgrepExecutor {
         }
       }
     }
-    
+
     return matches;
   }
 
   /**
    * Calculate performance metrics
    */
-  private calculatePerformanceMetrics(output: string, duration: number): {
+  private calculatePerformanceMetrics(
+    output: string,
+    duration: number
+  ): {
     searchRate: number;
     throughput: number;
     efficiency: number;
@@ -460,8 +464,8 @@ export class RipgrepExecutor {
     const files = this.countFiles(output);
     const matches = this.countMatches(output);
 
-    const searchRate = duration > 0 ? (lines / (duration / 1000)) : 0;
-    const throughput = duration > 0 ? (output.length / 1024 / 1024) / (duration / 1000) : 0;
+    const searchRate = duration > 0 ? lines / (duration / 1000) : 0;
+    const throughput = duration > 0 ? output.length / 1024 / 1024 / (duration / 1000) : 0;
     const efficiency = files > 0 ? matches / files : 0;
 
     return {

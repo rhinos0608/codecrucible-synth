@@ -457,7 +457,7 @@ Security review needed?
 
 ### Extending Security Framework
 
-1. Follow existing patterns in `src/core/security/`
+1. Follow existing patterns in `src/infrastructure/security/`
 2. Integrate with audit logging
 3. Add comprehensive security tests
 4. Update compliance documentation

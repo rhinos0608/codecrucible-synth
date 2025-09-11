@@ -186,7 +186,10 @@ export class ProductionDatabaseManager {
         this.replicaPools.push(replicaPool);
         logger.info(`Read replica connected: ${replica.host}`);
       } catch (error) {
-        logger.error(`Failed to connect to read replica ${replica.host}:`, toErrorOrUndefined(error));
+        logger.error(
+          `Failed to connect to read replica ${replica.host}:`,
+          toErrorOrUndefined(error)
+        );
       }
     }
   }

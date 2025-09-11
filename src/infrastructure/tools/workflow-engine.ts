@@ -40,20 +40,19 @@ export class WorkflowEngine {
     steps.forEach((step: Readonly<WorkflowStep<Readonly<Record<string, unknown>>>>) => {
       this.resolver.register(step.tool, step.dependsOn);
     });
-    const order = this.resolver.resolveOrder(steps.map((s: Readonly<WorkflowStep<Readonly<Record<string, unknown>>>>) => s.tool));
+    const order = this.resolver.resolveOrder(
+      steps.map((s: Readonly<WorkflowStep<Readonly<Record<string, unknown>>>>) => s.tool)
+    );
 
     const tasks = order.map((toolId: string) => {
-      const step = steps.find((s: Readonly<WorkflowStep<Readonly<Record<string, unknown>>>>) => s.tool === toolId);
+      const step = steps.find(
+        (s: Readonly<WorkflowStep<Readonly<Record<string, unknown>>>>) => s.tool === toolId
+      );
       if (!step) {
         throw new Error(`Workflow step for toolId "${toolId}" not found.`);
       }
       // Ensure step.input is Readonly<Record<string, unknown>>
-      return async () =>
-        unifiedToolRegistry.executeTool(
-          toolId,
-          step.input,
-          context
-        );
+      return async () => unifiedToolRegistry.executeTool(toolId, step.input, context);
     });
 
     const results: ReadonlyArray<ToolExecutionResult> = await this.scheduler.schedule(tasks);

@@ -17,7 +17,12 @@ export interface BridgeResult {
 export interface IRustExecutionBridge {
   initialize(): Promise<boolean>;
   isAvailable(): boolean;
-  executeFilesystem(operation: string, path: string, content?: string, options?: unknown): Promise<BridgeResult>;
+  executeFilesystem(
+    operation: string,
+    path: string,
+    content?: string,
+    options?: unknown
+  ): Promise<BridgeResult>;
   executeCommand(command: string, args: string[], options?: unknown): Promise<BridgeResult>;
   execute(toolId: string, argsJson: string, options?: unknown): Promise<BridgeResult>;
   getSupportedTools(): string[];
@@ -30,7 +35,12 @@ export interface IRustExecutionBridge {
 
 type NativeExecutor = {
   initialize(): boolean;
-  executeFilesystem: (op: string, path: string, content?: string, options?: unknown) => Promise<BridgeResult>;
+  executeFilesystem: (
+    op: string,
+    path: string,
+    content?: string,
+    options?: unknown
+  ) => Promise<BridgeResult>;
   executeCommand: (cmd: string, args: string[], options?: unknown) => Promise<BridgeResult>;
   execute: (toolId: string, argsJson: string, options?: unknown) => Promise<BridgeResult>;
   getPerformanceMetrics: () => string;
@@ -49,16 +59,25 @@ export class BridgeAdapter implements IRustExecutionBridge {
     if (!ok) return false;
     const mod: any = this.manager.getRustModule();
     if (!mod) return false;
-    const exec: NativeExecutor = (mod.createRustExecutor ? mod.createRustExecutor() : new mod.RustExecutor()) as NativeExecutor;
+    const exec: NativeExecutor = (
+      mod.createRustExecutor ? mod.createRustExecutor() : new mod.RustExecutor()
+    ) as NativeExecutor;
     const inited = exec && typeof exec.initialize === 'function' ? exec.initialize() : false;
     this.available = !!inited;
     this.executor = inited ? exec : null;
     return this.available;
   }
 
-  isAvailable(): boolean { return this.available && !!this.executor; }
+  isAvailable(): boolean {
+    return this.available && !!this.executor;
+  }
 
-  async executeFilesystem(operation: string, path: string, content?: string, options?: unknown): Promise<BridgeResult> {
+  async executeFilesystem(
+    operation: string,
+    path: string,
+    content?: string,
+    options?: unknown
+  ): Promise<BridgeResult> {
     if (!this.executor) throw new Error('executor not available');
     return this.executor.executeFilesystem(operation, path, content, options);
   }
@@ -73,12 +92,26 @@ export class BridgeAdapter implements IRustExecutionBridge {
     return this.executor.execute(toolId, argsJson, options);
   }
 
-  getSupportedTools(): string[] { return this.executor?.getSupportedTools() ?? []; }
-  getPerformanceMetrics(): string { return this.executor?.getPerformanceMetrics() ?? '{}'; }
-  resetPerformanceMetrics(): void { this.executor?.resetPerformanceMetrics(); }
-  async cleanup(): Promise<void> { await this.manager.shutdown(); this.executor = null; this.available = false; }
-  getId(): string | undefined { return this.executor?.id; }
-  getHealth(): BridgeHealth { return this.manager.getHealth(); }
+  getSupportedTools(): string[] {
+    return this.executor?.getSupportedTools() ?? [];
+  }
+  getPerformanceMetrics(): string {
+    return this.executor?.getPerformanceMetrics() ?? '{}';
+  }
+  resetPerformanceMetrics(): void {
+    this.executor?.resetPerformanceMetrics();
+  }
+  async cleanup(): Promise<void> {
+    await this.manager.shutdown();
+    this.executor = null;
+    this.available = false;
+  }
+  getId(): string | undefined {
+    return this.executor?.id;
+  }
+  getHealth(): BridgeHealth {
+    return this.manager.getHealth();
+  }
 }
 
 export default BridgeAdapter;

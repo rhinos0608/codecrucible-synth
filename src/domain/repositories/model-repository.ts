@@ -19,7 +19,10 @@ export interface IModelRepository {
   /**
    * Find a model by its name and provider
    */
-  findByNameAndProvider: (name: string, providerType: Readonly<ProviderType>) => Promise<Model | null>;
+  findByNameAndProvider: (
+    name: string,
+    providerType: Readonly<ProviderType>
+  ) => Promise<Model | null>;
 
   /**
    * Find all models
@@ -44,12 +47,14 @@ export interface IModelRepository {
   /**
    * Find models suitable for a request
    */
-  findSuitableModels: (request: Readonly<{
-    requiredCapabilities?: ReadonlyArray<string>;
-    preferredSize?: 'small' | 'medium' | 'large';
-    maxLatency?: number;
-    qualityThreshold?: number;
-  }>) => Promise<Model[]>;
+  findSuitableModels: (
+    request: Readonly<{
+      requiredCapabilities?: ReadonlyArray<string>;
+      preferredSize?: 'small' | 'medium' | 'large';
+      maxLatency?: number;
+      qualityThreshold?: number;
+    }>
+  ) => Promise<Model[]>;
 
   /**
    * Save a model (create or update)
@@ -119,13 +124,15 @@ export interface IAdvancedModelRepository extends IModelRepository {
   /**
    * Find the best model for a given request
    */
-  findBestMatch: (request: Readonly<{
-    readonly requiredCapabilities?: ReadonlyArray<string>;
-    readonly preferredSize?: 'small' | 'medium' | 'large';
-    readonly maxLatency?: number;
-    readonly qualityThreshold?: number;
-    readonly excludedProviders?: ReadonlyArray<ProviderType>;
-  }>) => Promise<Model | null>;
+  findBestMatch: (
+    request: Readonly<{
+      readonly requiredCapabilities?: ReadonlyArray<string>;
+      readonly preferredSize?: 'small' | 'medium' | 'large';
+      readonly maxLatency?: number;
+      readonly qualityThreshold?: number;
+      readonly excludedProviders?: ReadonlyArray<ProviderType>;
+    }>
+  ) => Promise<Model | null>;
 
   /**
    * Get model performance statistics

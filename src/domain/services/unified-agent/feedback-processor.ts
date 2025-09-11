@@ -67,7 +67,8 @@ export class FeedbackProcessor {
 
     // Create the task that will call agent.learn with retries and timeout
     const task = async () => {
-      const maybeLearn = (agent as unknown as { learn?: (f: AgentFeedback) => Promise<unknown> }).learn;
+      const maybeLearn = (agent as unknown as { learn?: (f: AgentFeedback) => Promise<unknown> })
+        .learn;
       if (typeof maybeLearn !== 'function') {
         throw new Error('agent.learn is not a function');
       }
@@ -139,22 +140,13 @@ export class FeedbackProcessor {
     const normalizeText = (t: unknown): unknown =>
       typeof t === 'string' ? t.replace(/\s+/g, ' ').trim() : t;
 
-    if (
-      'content' in normalized &&
-      typeof normalized.content === 'string'
-    ) {
+    if ('content' in normalized && typeof normalized.content === 'string') {
       normalized.content = normalizeText(normalized.content);
     }
-    if (
-      'message' in normalized &&
-      typeof normalized.message === 'string'
-    ) {
+    if ('message' in normalized && typeof normalized.message === 'string') {
       normalized.message = normalizeText(normalized.message);
     }
-    if (
-      'source' in normalized &&
-      typeof normalized.source === 'string'
-    ) {
+    if ('source' in normalized && typeof normalized.source === 'string') {
       normalized.source = normalized.source.trim();
     }
 
@@ -193,13 +185,15 @@ export class FeedbackProcessor {
       .catch(() => {
         // swallow errors from previous task so queue continues
       })
-      .then(async () => { await taskFn(); });
+      .then(async () => {
+        await taskFn();
+      });
     FeedbackProcessor.agentQueues.set(agentId, next);
     return next;
   }
 
   private static async sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   private static hashString(input: string): string {
@@ -215,7 +209,9 @@ export class FeedbackProcessor {
   private static async withTimeout<T>(p: Readonly<Promise<T>>, ms: number): Promise<T> {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => { reject(new Error('operation timed out')); }, ms);
+      timeoutId = setTimeout(() => {
+        reject(new Error('operation timed out'));
+      }, ms);
     });
     return Promise.race([p, timeout]).finally(() => {
       if (timeoutId) clearTimeout(timeoutId);

@@ -126,7 +126,7 @@ export class FilesystemMCPServer {
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
       const typedArgs = args ?? {};
 
@@ -195,7 +195,10 @@ export class FilesystemMCPServer {
     return PathUtilities.isWithinBoundaries(targetPath, this.config.allowedPaths ?? []);
   }
 
-  private async readFile(filePath: string, encoding?: BufferEncoding): Promise<{ content: { type: string; text: string; }[]; isError: boolean; }> {
+  private async readFile(
+    filePath: string,
+    encoding?: BufferEncoding
+  ): Promise<{ content: { type: string; text: string }[]; isError: boolean }> {
     if (!this.isPathAllowed(filePath)) {
       throw new Error(`Access denied: ${filePath}`);
     }

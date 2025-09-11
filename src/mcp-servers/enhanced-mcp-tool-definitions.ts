@@ -104,13 +104,20 @@ export class EnhancedMCPToolDefinitions {
       },
       {
         description: 'Read last 20 lines of log file',
-        input: { path: 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\logs\\app.log', offset: -20 },
+        input: {
+          path: 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\logs\\app.log',
+          offset: -20,
+        },
         expectedOutput: 'Last 20 lines of log file',
         useCase: 'Debugging recent errors',
       },
       {
         description: 'Read specific section of large file',
-        input: { path: 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src\\large-file.ts', offset: 100, length: 50 },
+        input: {
+          path: 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src\\large-file.ts',
+          offset: 100,
+          length: 50,
+        },
         expectedOutput: 'Lines 100-149 of the file',
         useCase: 'Examining specific code sections',
       },
@@ -323,7 +330,10 @@ export class EnhancedMCPToolDefinitions {
         workingDirectory: {
           type: 'string',
           description: 'Working directory for command execution. Default: current directory.',
-          examples: ['C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src', 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth'],
+          examples: [
+            'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src',
+            'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth',
+          ],
         },
       },
       required: ['command', 'description'],
@@ -402,7 +412,10 @@ export class EnhancedMCPToolDefinitions {
         directory: {
           type: 'string',
           description: 'Starting directory for search. Default: current working directory',
-          examples: ['C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src', 'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\config'],
+          examples: [
+            'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\src',
+            'C:\\Users\\Admin\\Documents\\RST\\codecrucible-synth\\config',
+          ],
         },
         fileTypes: {
           type: 'array',

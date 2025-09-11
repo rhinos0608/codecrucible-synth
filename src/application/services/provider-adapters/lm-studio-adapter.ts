@@ -54,7 +54,7 @@ export class LMStudioAdapter implements ProviderAdapter {
         timeout: req.timeout,
       };
 
-      const response = await this.provider.request(requestOptions) as LLMResponse;
+      const response = (await this.provider.request(requestOptions)) as LLMResponse;
 
       return {
         id: response.id || `${this.name}_${Date.now()}`,

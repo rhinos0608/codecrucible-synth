@@ -20,10 +20,11 @@ export async function initialize(
     const startTime = Date.now();
 
     const { ServiceFactory } = await import('../services/service-factory.js');
-    const serviceFactory: import('../services/service-factory.js').ServiceFactory = new ServiceFactory({
-      correlationId: `cli-${Date.now()}`,
-      logLevel: cliOptions.verbose ? 'debug' : 'info',
-    });
+    const serviceFactory: import('../services/service-factory.js').ServiceFactory =
+      new ServiceFactory({
+        correlationId: `cli-${Date.now()}`,
+        logLevel: cliOptions.verbose ? 'debug' : 'info',
+      });
 
     // Get runtime context and set global event bus for legacy consumers
     const runtimeContext = serviceFactory.getRuntimeContext();
@@ -68,7 +69,10 @@ export async function initialize(
         const modelSelector = new ModelSelector();
         selectedModelInfo = await modelSelector.selectModel();
       } catch (error) {
-        logger.warn('Interactive model selection failed, using quick select:', toReadonlyRecord(error));
+        logger.warn(
+          'Interactive model selection failed, using quick select:',
+          toReadonlyRecord(error)
+        );
         selectedModelInfo = await quickSelectModel();
       }
     } else {
@@ -132,16 +136,31 @@ export async function initialize(
       logger.info(`Using model: ${selectedModelInfo.selectedModel.name}`);
     }
 
+    // Expose the selected model for downstream components that need a concrete model string
+    try {
+      // Use the model id (provider-recognized) instead of the display name
+      process.env.DEFAULT_MODEL = selectedModelInfo.selectedModel.id;
+      logger.info(`Set DEFAULT_MODEL to ${process.env.DEFAULT_MODEL}`);
+    } catch {
+      // noop
+    }
+
     // Orchestrator
-    const { ConcreteWorkflowOrchestrator } = await import('../services/concrete-workflow-orchestrator.js');
+    const { ConcreteWorkflowOrchestrator } = await import(
+      '../services/concrete-workflow-orchestrator.js'
+    );
     const { StreamingManager } = await import('../services/orchestrator/streaming-manager.js');
-    const { ToolExecutionRouter } = await import('../services/orchestrator/tool-execution-router.js');
-    const { ProviderCapabilityRegistry } = await import('../services/provider-capability-registry.js');
+    const { ToolExecutionRouter } = await import(
+      '../services/orchestrator/tool-execution-router.js'
+    );
+    const { ProviderCapabilityRegistry } = await import(
+      '../services/provider-capability-registry.js'
+    );
 
     const streamingManager = new StreamingManager();
     const capabilityRegistry = new ProviderCapabilityRegistry();
     const toolExecutionRouter = new ToolExecutionRouter(
-      (mcpServerManager as unknown) as import('../../domain/interfaces/mcp-manager.js').IMcpManager
+      mcpServerManager as unknown as import('../../domain/interfaces/mcp-manager.js').IMcpManager
     );
     const orchestrator = new ConcreteWorkflowOrchestrator(
       streamingManager,
@@ -150,21 +169,55 @@ export async function initialize(
     ) as unknown as import('../../domain/interfaces/workflow-orchestrator.js').IWorkflowOrchestrator;
 
     await orchestrator.initialize({
-      userInteraction: (userInteraction as unknown) as import('../../domain/interfaces/user-interaction.js').IUserInteraction,
+      userInteraction:
+        userInteraction as unknown as import('../../domain/interfaces/user-interaction.js').IUserInteraction,
       eventBus,
       modelClient,
-      mcpManager: (mcpServerManager as unknown) as import('../../domain/interfaces/mcp-manager.js').IMcpManager,
+      mcpManager:
+        mcpServerManager as unknown as import('../../domain/interfaces/mcp-manager.js').IMcpManager,
       runtimeContext,
     });
+
+    // Expose SubAgent dependencies for agent_spawn tool
+    try {
+      const { setSubAgentDependencies } = await import('../services/orchestrator/sub-agent-runtime.js');
+      setSubAgentDependencies(
+        (modelClient as unknown) as import('../../domain/interfaces/model-client.js').IModelClient,
+        (mcpServerManager as unknown) as import('../../domain/interfaces/mcp-manager.js').IMcpManager
+      );
+    } catch (e) {
+      logger.warn('Failed to set SubAgent dependencies', toReadonlyRecord(e));
+    }
 
     const cli = new UnifiedCLI(cliOptions);
     await cli.initialize(orchestrator);
 
     const initTime = Date.now() - startTime;
     logger.info(`Unified system initialized in ${initTime}ms`);
+
+    // Generate codecrucible.md at startup with a high-level overview
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const file = path.resolve(process.cwd(), 'codecrucible.md');
+      const content = `# CodeCrucible Synth Overview\n\n`
+        + `This file is generated at startup to summarize the architecture.\n\n`
+        + `## Layers\n- Domain: Core interfaces and types under \`src/domain\`.\n- Application: Orchestrators, services, CLI under \`src/application\`.\n- Infrastructure: Providers, tools, logging, MCP, Rust backend under \`src/infrastructure\`.\n- Providers: Local and hybrid model providers under \`src/providers\`.\n\n`
+        + `## Orchestration\n- Main orchestrator: ConcreteWorkflowOrchestrator.\n- Sub-agent: SubAgentOrchestrator (own context window) via \`agent_spawn\`.\n- Request execution: RequestExecutionManager with Rust backend.\n\n`
+        + `## Tools\n- Built-in suite: bash_run, file_read, file_write, glob_search, grep_search, agent_spawn.\n- Tool calls prefer MCP (JSON-RPC 2.0) via MCPServerManager.\n- Domain-aware selection narrows tools for accuracy/performance.\n\n`
+        + `## Rust Execution\n- High-performance ops via \`RustExecutionBackend\` (N-API).\n- Integrated through RequestExecutionManager and FilesystemTools.\n\n`
+        + `For details, see ARCHITECTURE.md and docs/TOOL_SUITE.md.\n`;
+      await fs.writeFile(file, content, 'utf-8');
+      logger.info('Generated codecrucible.md overview at startup');
+    } catch (e) {
+      logger.warn('Failed to generate codecrucible.md', toReadonlyRecord(e));
+    }
     return { cli, serviceFactory };
   } catch (error) {
-    logger.error('Failed to initialize system:', error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      'Failed to initialize system:',
+      error instanceof Error ? error : new Error(String(error))
+    );
     // rethrow to outer runCLI handler to keep behavior identical
     throw error;
   }

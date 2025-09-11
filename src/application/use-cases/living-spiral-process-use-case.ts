@@ -6,7 +6,10 @@
  * Imports: Domain services only (follows ARCHITECTURE.md)
  */
 
-import { IVoiceOrchestrationService, SynthesisMode } from '../../domain/services/voice-orchestration-service.js';
+import {
+  IVoiceOrchestrationService,
+  SynthesisMode,
+} from '../../domain/services/voice-orchestration-service.js';
 import { ProcessingRequest, RequestType } from '../../domain/entities/request.js';
 import { RequestPriority } from '../../domain/value-objects/voice-values.js';
 import { IModelClient } from '../../domain/interfaces/model-client.js';
@@ -139,25 +142,25 @@ export class LivingSpiralProcessUseCase {
     collapsed: Readonly<{ output: string; voices: readonly string[] }>
   ): Promise<{ output: string; voices: string[] }> {
     // Build the council request
-        const requestId = `council-${Date.now()}`;
-        const requestType = 'MultiPerspective' as unknown as RequestType; // Use proper RequestType
-        const priority = RequestPriority.medium(); // Create proper RequestPriority instance
-    
-        const request: ProcessingRequest = new ProcessingRequest(
-          requestId, // id
-          collapsed.output, // content
-          requestType, // type
-          priority, // priority
-          {}, // context
-          {} as Record<string, unknown> // constraints
-        );
+    const requestId = `council-${Date.now()}`;
+    const requestType = 'MultiPerspective' as unknown as RequestType; // Use proper RequestType
+    const priority = RequestPriority.medium(); // Create proper RequestPriority instance
+
+    const request: ProcessingRequest = new ProcessingRequest(
+      requestId, // id
+      collapsed.output, // content
+      requestType, // type
+      priority, // priority
+      {}, // context
+      {} as Record<string, unknown> // constraints
+    );
 
     // Use multi-voice synthesis for council
-        const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
-          maxVoices: 3,
-          minVoices: 2,
-          synthesisMode: SynthesisMode.COLLABORATIVE,
-        });
+    const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
+      maxVoices: 3,
+      minVoices: 2,
+      synthesisMode: SynthesisMode.COLLABORATIVE,
+    });
 
     const allVoices = [voiceSelection.primaryVoice, ...voiceSelection.supportingVoices];
 
@@ -195,10 +198,12 @@ export class LivingSpiralProcessUseCase {
     };
   }
 
-  private async synthesisPhase(council: Readonly<{
-    output: string;
-    voices: string[];
-  }>): Promise<{ output: string; voices: string[] }> {
+  private async synthesisPhase(
+    council: Readonly<{
+      output: string;
+      voices: string[];
+    }>
+  ): Promise<{ output: string; voices: string[] }> {
     const prompt = this.buildSynthesisPrompt(council.output);
 
     try {

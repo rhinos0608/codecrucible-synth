@@ -1,4 +1,3 @@
-
 import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
 import * as path from 'path';
@@ -90,32 +89,32 @@ interface ExtendedOrchestrationResponse extends OrchestrationResponse {
  */
 export class UnifiedOrchestrationService extends EventEmitter {
   private readonly logger = createLogger('UnifiedOrchestrationService');
-  
+
   // Core service properties
   private initialized = false;
   private readonly activeRequests = new Map<string, OrchestrationRequest>();
   private readonly cleanupHandlers: (() => void | Promise<void>)[] = [];
   private readonly startTime = Date.now();
-  
+
   // Real metrics tracking
   private totalProcessedRequests = 0;
   private totalFailedRequests = 0;
   private responseTimeSum = 0;
   private responseTimes: number[] = [];
-  
+
   // Service dependencies
   private configManager!: UnifiedConfigurationManager;
   private config!: UnifiedConfiguration;
   private eventBus!: IEventBus;
   private userInteraction!: IUserInteraction;
   private runtimeContext!: RuntimeContext;
-  
+
   // Domain services
   private securityValidator!: UnifiedSecurityValidator;
   private performanceSystem!: UnifiedPerformanceSystem;
   private agentSystem!: UnifiedAgentSystem;
   private serverSystem!: UnifiedServerSystem;
-  
+
   // Application services
   private commandBus!: CommandBus;
   private commandRegistry!: CommandRegistry;
@@ -159,8 +158,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
       });
 
       // Initialize agent system
-      this.agentSystem = new UnifiedAgentSystem(
-      );
+      this.agentSystem = new UnifiedAgentSystem();
       await this.agentSystem.initialize();
       this.registerCleanup((): void => {
         void this.agentSystem.shutdown();
@@ -249,19 +247,19 @@ export class UnifiedOrchestrationService extends EventEmitter {
           // Register with command bus for execution
           this.commandRegistry?.register(name, handler, { plugin: 'plugin' });
 
-
           // Also expose via dependency resolver so executePluginCommand works
           this.registerPlugin(name, async (...args: unknown[]) => {
             return Promise.resolve(handler(...args));
           });
-
 
           this.eventBus.emit('plugin:command_registered', { name });
         },
       });
 
       // Use project root resolution to avoid deep relative paths
-      const { resolvePluginDirectories } = await import('../../infrastructure/plugins/plugin-path-resolver.js');
+      const { resolvePluginDirectories } = await import(
+        '../../infrastructure/plugins/plugin-path-resolver.js'
+      );
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = path.dirname(__filename);
       const projectRoot = path.resolve(__dirname, '../../..');
@@ -341,12 +339,12 @@ export class UnifiedOrchestrationService extends EventEmitter {
       };
 
       this.emit('request-completed', { request, response });
-      
+
       // Track successful request metrics
       this.totalProcessedRequests++;
       this.responseTimeSum += processingTime;
       this.responseTimes.push(processingTime);
-      
+
       return response;
     } catch (error) {
       const processingTime = Date.now() - startTime;
@@ -365,7 +363,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
       this.emit('request-failed', { request, response, error });
       this.logger.error(`Orchestration request failed: ${request.id}`, error);
-      
+
       // Track failed request metrics
       this.totalProcessedRequests++;
       this.totalFailedRequests++;
@@ -378,7 +376,9 @@ export class UnifiedOrchestrationService extends EventEmitter {
     }
   }
 
-  private async processAgentRequest(request: Readonly<ExtendedOrchestrationRequest>): Promise<unknown> {
+  private async processAgentRequest(
+    request: Readonly<ExtendedOrchestrationRequest>
+  ): Promise<unknown> {
     // Map command types to AgentRequest types - using command field from base interface
     const typeMapping: Record<string, string> = {
       analyze: 'analyze',
@@ -431,7 +431,9 @@ export class UnifiedOrchestrationService extends EventEmitter {
           id: request.id,
           description:
             typeof request.input === 'string' ? request.input : JSON.stringify(request.input),
-          requirements: [request.type, request.command].filter((req): req is string => req !== undefined),
+          requirements: [request.type, request.command].filter(
+            (req): req is string => req !== undefined
+          ),
           expectedOutput: 'Collaborative response',
           coordination: {
             type: 'parallel' as const,
@@ -652,23 +654,21 @@ export class UnifiedOrchestrationService extends EventEmitter {
         performanceSystem: this.performanceSystem.getSystemMetrics(),
       },
     };
-
   }
 
   public async shutdown(): Promise<void> {
     this.logger.info('UnifiedOrchestrationService shutting down');
   }
 
-
   // === Missing Interface Methods ===
-  
+
   /**
    * Register a cleanup handler for shutdown
    */
   private registerCleanup(handler: () => void | Promise<void>): void {
     this.cleanupHandlers.push(handler);
   }
-  
+
   /**
    * Setup event handlers for system events
    */
@@ -804,13 +804,11 @@ export class UnifiedOrchestrationService extends EventEmitter {
         timestamp: Date.now(),
       };
     }
-
   }
 
   public registerPlugin(name: string, handler: DependencyHandler): void {
     this.dependencies.register(name, handler);
   }
-
 
   public async executePluginCommand(name: string, ...args: unknown[]): Promise<unknown> {
     const handler = this.dependencies.resolve(name);
@@ -821,34 +819,37 @@ export class UnifiedOrchestrationService extends EventEmitter {
   }
 
   // === Helper Methods for Performance Stats ===
-  
+
   private getTotalProcessedRequests(): number {
     return this.totalProcessedRequests;
   }
-  
+
   private getAverageResponseTime(): number {
     if (this.responseTimes.length === 0) return 0;
     return this.responseTimeSum / this.responseTimes.length;
   }
-  
+
   private getSuccessRate(): number {
     const total = this.totalProcessedRequests;
     if (total === 0) return 1.0;
     const successful = total - this.totalFailedRequests;
     return successful / total;
   }
-  
+
   private getUptime(): number {
     return Date.now() - this.startTime;
   }
 
   // === Helper Methods for Result Synthesis ===
-  
-  private combineResults(results: readonly unknown[], _options: Readonly<Record<string, unknown>>): string {
+
+  private combineResults(
+    results: readonly unknown[],
+    _options: Readonly<Record<string, unknown>>
+  ): string {
     // Simple combination - in a real implementation this would be more sophisticated
-    return results.map(r => typeof r === 'string' ? r : JSON.stringify(r)).join('\n\n');
+    return results.map(r => (typeof r === 'string' ? r : JSON.stringify(r))).join('\n\n');
   }
-  
+
   private extractMetadata(results: readonly unknown[]): {
     componentsUsed: string[];
     totalProcessingTime: number;
@@ -859,17 +860,17 @@ export class UnifiedOrchestrationService extends EventEmitter {
       totalProcessingTime: 0,
     };
   }
-  
+
   private calculateCompleteness(results: readonly unknown[]): number {
     // Simple completeness calculation
     return results.length > 0 ? 1.0 : 0.0;
   }
-  
+
   private calculateConsistency(results: readonly unknown[]): number {
-    // Simple consistency calculation  
+    // Simple consistency calculation
     return results.length > 0 ? 1.0 : 0.0;
   }
-  
+
   private calculateAverageConfidence(results: readonly unknown[]): number {
     // Simple confidence calculation
     return results.length > 0 ? 0.8 : 0.0;
@@ -902,4 +903,3 @@ export function createUnifiedOrchestrationServiceWithContext(
 
   return new UnifiedOrchestrationService(engine, dependencies, context, eventBus, userInteraction);
 }
-

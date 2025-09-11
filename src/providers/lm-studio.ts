@@ -214,7 +214,7 @@ export class LMStudioProvider {
             yield chunk.content;
           }
         }
-      }());
+      })();
     } catch (error) {
       logger.error('LMStudioProvider generateTextStreaming failed', toErrorOrUndefined(error));
       throw error;
@@ -242,8 +242,14 @@ export class LMStudioProvider {
 
       // Filter/convert to roles supported by LM Studio ('system' | 'user' | 'assistant')
       const lmMessages: LMChatMessageInput[] = messages
-        .filter((m: Readonly<ChatMessage>) => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
-        .map((m: Readonly<ChatMessage>) => ({ role: m.role as LMChatMessageInput['role'], content: m.content }));
+        .filter(
+          (m: Readonly<ChatMessage>) =>
+            m.role === 'system' || m.role === 'user' || m.role === 'assistant'
+        )
+        .map((m: Readonly<ChatMessage>) => ({
+          role: m.role as LMChatMessageInput['role'],
+          content: m.content,
+        }));
 
       // Use respond with sanitized messages
       const response = await model.respond(lmMessages, {

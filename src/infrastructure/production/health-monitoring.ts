@@ -5,10 +5,34 @@ const defaultHealth: IntegratedSystemHealth = {
   overallStatus: 'healthy',
   overallScore: 100,
   components: {
-    hardeningSystem: { status: 'healthy', lastChecked: Date.now(), uptime: 0, metrics: {}, issues: [] },
-    securityAuditLogger: { status: 'healthy', lastChecked: Date.now(), uptime: 0, metrics: {}, issues: [] },
-    resourceEnforcer: { status: 'healthy', lastChecked: Date.now(), uptime: 0, metrics: {}, issues: [] },
-    observabilitySystem: { status: 'healthy', lastChecked: Date.now(), uptime: 0, metrics: {}, issues: [] },
+    hardeningSystem: {
+      status: 'healthy',
+      lastChecked: Date.now(),
+      uptime: 0,
+      metrics: {},
+      issues: [],
+    },
+    securityAuditLogger: {
+      status: 'healthy',
+      lastChecked: Date.now(),
+      uptime: 0,
+      metrics: {},
+      issues: [],
+    },
+    resourceEnforcer: {
+      status: 'healthy',
+      lastChecked: Date.now(),
+      uptime: 0,
+      metrics: {},
+      issues: [],
+    },
+    observabilitySystem: {
+      status: 'healthy',
+      lastChecked: Date.now(),
+      uptime: 0,
+      metrics: {},
+      issues: [],
+    },
   },
   systemMetrics: {
     uptime: 0,

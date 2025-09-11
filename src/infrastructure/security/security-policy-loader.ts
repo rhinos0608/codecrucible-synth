@@ -132,7 +132,9 @@ export class SecurityPolicyLoader {
       if (!this.isValidConfig(configRaw)) {
         throw new Error('Invalid security policy config structure');
       }
-      const config = configRaw as SecurityPolicies & { environments?: Record<string, Partial<SecurityPolicies>> };
+      const config = configRaw as SecurityPolicies & {
+        environments?: Record<string, Partial<SecurityPolicies>>;
+      };
 
       // Apply environment-specific overrides
       const basePolicies: SecurityPolicies = {
@@ -155,7 +157,9 @@ export class SecurityPolicyLoader {
 
       return SecurityPolicyLoader.policies;
     } catch (error) {
-      logger.error(`❌ Failed to load security policies: ${(error instanceof Error ? error.message : String(error))}`);
+      logger.error(
+        `❌ Failed to load security policies: ${error instanceof Error ? error.message : String(error)}`
+      );
 
       // Return fallback policies
       return this.getFallbackPolicies();
@@ -165,7 +169,9 @@ export class SecurityPolicyLoader {
   /**
    * Type guard for config object
    */
-  private isValidConfig(config: unknown): config is SecurityPolicies & { environments?: Record<string, Partial<SecurityPolicies>> } {
+  private isValidConfig(
+    config: unknown
+  ): config is SecurityPolicies & { environments?: Record<string, Partial<SecurityPolicies>> } {
     if (typeof config !== 'object' || config === null) return false;
     const c = config as Record<string, unknown>;
     return (
@@ -187,7 +193,7 @@ export class SecurityPolicyLoader {
         return new RegExp(pattern.pattern, pattern.flags ?? 'g');
       } catch (error) {
         logger.warn(
-          `⚠️ Invalid security pattern: ${pattern.pattern} - ${(error instanceof Error ? error.message : String(error))}`
+          `⚠️ Invalid security pattern: ${pattern.pattern} - ${error instanceof Error ? error.message : String(error)}`
         );
         return new RegExp('__INVALID_PATTERN__', 'g'); // Safe fallback
       }
@@ -225,7 +231,7 @@ export class SecurityPolicyLoader {
     const output: any = { ...target };
 
     if (this.isObject(target) && this.isObject(source)) {
-      (Object.keys(source) as (keyof U)[]).forEach((key) => {
+      (Object.keys(source) as (keyof U)[]).forEach(key => {
         if (this.isObject((source as any)[key])) {
           if (!(key in target)) {
             output[key] = (source as any)[key];

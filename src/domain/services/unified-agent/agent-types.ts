@@ -10,7 +10,10 @@ export interface IAgent {
   isActive?: boolean;
   initialize: () => Promise<void>;
   process: (request: Readonly<AgentRequest>) => Promise<AgentResponse>;
-  collaborate: (agents: ReadonlyArray<IAgent>, task: Readonly<CollaborativeTask>) => Promise<CollaborativeResponse>;
+  collaborate: (
+    agents: ReadonlyArray<IAgent>,
+    task: Readonly<CollaborativeTask>
+  ) => Promise<CollaborativeResponse>;
   learn: (feedback: Readonly<AgentFeedback>) => Promise<void>;
   shutdown: () => Promise<void>;
 }

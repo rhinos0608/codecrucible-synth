@@ -1,6 +1,6 @@
 /**
  * Command Line Search Engine - Full Modular Implementation
- * 
+ *
  * Orchestrates all search modules to provide comprehensive, secure,
  * and high-performance search capabilities with multiple strategies.
  */
@@ -14,7 +14,11 @@ import { toErrorOrUndefined } from '../../utils/type-guards.js';
 import { type SanitizedQuery, SearchQuerySanitizer } from './search-query-sanitizer.js';
 import { type RipgrepExecutionOptions, RipgrepExecutor } from './ripgrep-executor.js';
 import { type ParsedSearchResult, SearchResultParser } from './search-result-parser.js';
-import { type SearchStrategy, SearchStrategyManager, type SearchStrategyOptions } from './search-strategy-manager.js';
+import {
+  type SearchStrategy,
+  SearchStrategyManager,
+  type SearchStrategyOptions,
+} from './search-strategy-manager.js';
 import { FileFilterManager, type FileFilterOptions } from './file-filter-manager.js';
 import { type CacheOptions, SearchCacheManager } from './search-cache-manager.js';
 
@@ -66,8 +70,8 @@ export class CommandLineSearchEngine {
     };
 
     this.ripgrepExecutor = new RipgrepExecutor();
-    this.cacheManager = this.options.enableCache 
-      ? new SearchCacheManager(this.options.cacheOptions) 
+    this.cacheManager = this.options.enableCache
+      ? new SearchCacheManager(this.options.cacheOptions)
       : new SearchCacheManager({ maxEntries: 0 }); // Disabled cache
   }
 
@@ -89,8 +93,8 @@ export class CommandLineSearchEngine {
         if (cached) {
           metrics.cacheHit = true;
           metrics.totalTime = performance.now() - startTime;
-          
-          logger.debug('Cache hit for search query', { 
+
+          logger.debug('Cache hit for search query', {
             query: query.query.slice(0, 50),
             totalTime: metrics.totalTime,
           });
@@ -105,7 +109,7 @@ export class CommandLineSearchEngine {
       metrics.sanitizationTime = performance.now() - sanitizationStart;
 
       if (!sanitizedQuery.isValid) {
-        logger.warn('Query failed sanitization', { 
+        logger.warn('Query failed sanitization', {
           query: query.query.slice(0, 100),
           warnings: sanitizedQuery.warnings,
         });
@@ -114,7 +118,10 @@ export class CommandLineSearchEngine {
 
       // Phase 3: Strategy selection
       const strategyStart = performance.now();
-      const strategyResult = SearchStrategyManager.determineStrategy(query, this.options.strategyOptions);
+      const strategyResult = SearchStrategyManager.determineStrategy(
+        query,
+        this.options.strategyOptions
+      );
       metrics.strategy = strategyResult.strategy;
       metrics.strategySelectionTime = performance.now() - strategyStart;
 
@@ -125,12 +132,7 @@ export class CommandLineSearchEngine {
       });
 
       // Phase 4: Execute search with retries and fallbacks
-      const result = await this.executeWithRetries(
-        query,
-        sanitizedQuery,
-        strategyResult,
-        metrics
-      );
+      const result = await this.executeWithRetries(query, sanitizedQuery, strategyResult, metrics);
 
       // Phase 5: Cache successful results
       if (this.options.enableCache && result.documents.length > 0) {
@@ -144,12 +146,14 @@ export class CommandLineSearchEngine {
       }
 
       return this.convertToRAGResult(result, metrics as SearchExecutionMetrics);
-
     } catch (error) {
       metrics.totalTime = performance.now() - startTime;
       logger.error('Search execution failed', toErrorOrUndefined(error));
 
-      return this.createEmptyResult(metrics as SearchExecutionMetrics, error instanceof Error ? error : new Error(String(error)));
+      return this.createEmptyResult(
+        metrics as SearchExecutionMetrics,
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }
 
@@ -189,22 +193,31 @@ export class CommandLineSearchEngine {
 
   private sanitizeQuery(query: RAGQuery): SanitizedQuery {
     const context = this.determineQueryContext(query);
-    
-    return SearchQuerySanitizer.validateForContext(
-      query.query,
-      context
-    );
+
+    return SearchQuerySanitizer.validateForContext(query.query, context);
   }
 
   private determineQueryContext(query: RAGQuery): 'code' | 'documentation' | 'logs' | 'general' {
     // Simple heuristics to determine context
-    if (query.query.includes('function') || query.query.includes('class') || query.query.includes('()')) {
+    if (
+      query.query.includes('function') ||
+      query.query.includes('class') ||
+      query.query.includes('()')
+    ) {
       return 'code';
     }
-    if (query.query.includes('error') || query.query.includes('exception') || query.query.includes('failed')) {
+    if (
+      query.query.includes('error') ||
+      query.query.includes('exception') ||
+      query.query.includes('failed')
+    ) {
       return 'logs';
     }
-    if (query.query.includes('TODO') || query.query.includes('FIXME') || query.query.includes('README')) {
+    if (
+      query.query.includes('TODO') ||
+      query.query.includes('FIXME') ||
+      query.query.includes('README')
+    ) {
       return 'documentation';
     }
     return 'general';
@@ -217,13 +230,13 @@ export class CommandLineSearchEngine {
     metrics: Partial<SearchExecutionMetrics>
   ): Promise<ParsedSearchResult> {
     let lastError: Error | null = null;
-    
+
     // Try primary strategy
     try {
       return await this.executeSingleSearch(query, sanitizedQuery, strategyResult, metrics);
     } catch (error) {
       lastError = error as Error;
-      logger.debug('Primary strategy failed, trying fallbacks', { 
+      logger.debug('Primary strategy failed, trying fallbacks', {
         strategy: strategyResult.strategy,
         error: lastError.message,
       });
@@ -233,23 +246,28 @@ export class CommandLineSearchEngine {
     if (this.options.fallbackOnError) {
       for (const fallbackStrategy of strategyResult.fallbackStrategies.slice(0, 2)) {
         try {
-          const fallbackStrategyResult = SearchStrategyManager.determineStrategy(
-            query, 
-            { ...this.options.strategyOptions, strategy: fallbackStrategy }
+          const fallbackStrategyResult = SearchStrategyManager.determineStrategy(query, {
+            ...this.options.strategyOptions,
+            strategy: fallbackStrategy,
+          });
+
+          const result = await this.executeSingleSearch(
+            query,
+            sanitizedQuery,
+            fallbackStrategyResult,
+            metrics
           );
-          
-          const result = await this.executeSingleSearch(query, sanitizedQuery, fallbackStrategyResult, metrics);
           metrics.fallbackUsed = true;
           metrics.strategy = fallbackStrategy;
-          
-          logger.info('Fallback strategy succeeded', { 
+
+          logger.info('Fallback strategy succeeded', {
             originalStrategy: strategyResult.strategy,
             fallbackStrategy,
           });
-          
+
           return result;
         } catch (error) {
-          logger.debug('Fallback strategy failed', { 
+          logger.debug('Fallback strategy failed', {
             strategy: fallbackStrategy,
             error: (error as Error).message,
           });
@@ -275,7 +293,10 @@ export class CommandLineSearchEngine {
     };
 
     // Apply file filtering
-    const filteredOptions = FileFilterManager.applyFilters(ripgrepOptions as unknown as Record<string, unknown>, this.options.filterOptions);
+    const filteredOptions = FileFilterManager.applyFilters(
+      ripgrepOptions as unknown as Record<string, unknown>,
+      this.options.filterOptions
+    );
     ripgrepOptions = { ...ripgrepOptions, ...filteredOptions };
 
     // Execute ripgrep
@@ -288,16 +309,12 @@ export class CommandLineSearchEngine {
 
     // Parse results
     const parsingStart = performance.now();
-    const parsedResult = SearchResultParser.parse(
-      executionResult.stdout,
-      'ripgrep',
-      {
-        maxFilePathLength: 500,
-        maxContentLength: 2000,
-        deduplicateResults: true,
-        normalizeWhitespace: true,
-      }
-    );
+    const parsedResult = SearchResultParser.parse(executionResult.stdout, 'ripgrep', {
+      maxFilePathLength: 500,
+      maxContentLength: 2000,
+      deduplicateResults: true,
+      normalizeWhitespace: true,
+    });
     metrics.parsingTime = performance.now() - parsingStart;
 
     // Store execution metrics for later use
@@ -332,10 +349,7 @@ export class CommandLineSearchEngine {
     };
   }
 
-  private createEmptyResult(
-    metrics: SearchExecutionMetrics,
-    error?: Error
-  ): RAGResult {
+  private createEmptyResult(metrics: SearchExecutionMetrics, error?: Error): RAGResult {
     return {
       documents: [],
       metadata: {

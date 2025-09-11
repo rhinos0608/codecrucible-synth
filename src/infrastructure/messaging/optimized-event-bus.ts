@@ -307,9 +307,13 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
 
     // Process queue immediately for high priority events
     if (queuedEvent.priority >= 8) {
-      setImmediate(() => { this.processPriorityQueue(); });
+      setImmediate(() => {
+        this.processPriorityQueue();
+      });
     } else {
-      process.nextTick(() => { this.processPriorityQueue(); });
+      process.nextTick(() => {
+        this.processPriorityQueue();
+      });
     }
 
     this.updateQueueSizes();
@@ -467,7 +471,9 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
 
     // Schedule next processing if more events remain
     if (this.priorityQueue.length > 0) {
-      setImmediate(() => { this.processPriorityQueue(); });
+      setImmediate(() => {
+        this.processPriorityQueue();
+      });
     }
 
     this.updateQueueSizes();

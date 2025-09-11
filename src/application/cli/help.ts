@@ -42,4 +42,3 @@ export async function showStatus(): Promise<void> {
   console.log('🧠 Context Intelligence: Project-aware responses');
   console.log(''.padEnd(40, '─'));
 }
-

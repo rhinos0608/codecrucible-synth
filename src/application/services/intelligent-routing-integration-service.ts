@@ -4,10 +4,10 @@
  *
  * Handles: CLI command routing, Living Spiral phase-aware routing, real-time performance monitoring,
  *          system analytics integration, predictive optimization, circuit breakers, anomaly detection
- * 
+ *
  * ARCHITECTURE: This service now orchestrates focused, single-responsibility modules instead of
  *               implementing everything monolithically. Each module handles its specific domain.
- * 
+ *
  * Imports: Domain services and core routing systems (follows ARCHITECTURE.md)
  */
 
@@ -28,7 +28,7 @@ import {
   DEFAULT_PERFORMANCE_SYSTEM_CONFIG,
   DEFAULT_ANOMALY_DETECTION_CONFIG,
   DEFAULT_PREDICTIVE_CONFIG,
-  DEFAULT_OPTIMIZATION_CONFIG
+  DEFAULT_OPTIMIZATION_CONFIG,
 } from './performance/index.js';
 
 // Re-export types for backward compatibility
@@ -40,7 +40,7 @@ import type {
   PredictiveInsights,
   RealTimeOptimizationAction,
   MetricsCollectionConfig,
-  PerformanceSystemConfig
+  PerformanceSystemConfig,
 } from './performance/index.js';
 
 // Core imports
@@ -111,11 +111,18 @@ export interface IIntelligentRoutingIntegrationService {
   executePlan: (plan: Readonly<ExecutionPlan>) => Promise<string>;
 
   // Living Spiral Integration
-  routeLivingSpiralPhase: (context: Readonly<LivingSpiralRoutingContext>) => Promise<IntelligentRoutingDecision>;
-  optimizeIterativeProcess: (iterations: ReadonlyArray<SpiralIteration>) => Promise<RoutingPreferences>;
+  routeLivingSpiralPhase: (
+    context: Readonly<LivingSpiralRoutingContext>
+  ) => Promise<IntelligentRoutingDecision>;
+  optimizeIterativeProcess: (
+    iterations: ReadonlyArray<SpiralIteration>
+  ) => Promise<RoutingPreferences>;
 
   // Performance Monitoring (Legacy)
-  recordExecutionPerformance: (trackingId: string, performance: Readonly<RoutingPerformance>) => Promise<void>;
+  recordExecutionPerformance: (
+    trackingId: string,
+    performance: Readonly<RoutingPerformance>
+  ) => Promise<void>;
   getRoutingAnalytics: () => Promise<unknown>;
   optimizeRouting: () => Promise<void>;
 
@@ -125,27 +132,29 @@ export interface IIntelligentRoutingIntegrationService {
   getCurrentSystemMetrics: () => Promise<SystemMetrics>;
   getPerformanceThresholds: () => PerformanceThresholds;
   updatePerformanceThresholds: (thresholds: Partial<PerformanceThresholds>) => Promise<void>;
-  
+
   // Circuit Breaker Management (Delegated)
   getCircuitBreakerStates: () => Promise<CircuitBreakerState[]>;
   resetCircuitBreaker: (name: string) => Promise<void>;
   executeWithCircuitBreaker: <T>(name: string, operation: () => Promise<T>) => Promise<T>;
-  
+
   // Anomaly Detection (Delegated)
   getRecentAnomalies: (timeWindowMs?: number) => Promise<PerformanceAnomalyEvent[]>;
   subscribeToAnomalies: (callback: (anomaly: PerformanceAnomalyEvent) => void) => void;
   unsubscribeFromAnomalies: (callback: (anomaly: PerformanceAnomalyEvent) => void) => void;
-  
+
   // Predictive Analytics (Delegated)
   getPredictiveInsights: () => Promise<PredictiveInsights>;
   getOptimizationRecommendations: () => Promise<RealTimeOptimizationAction[]>;
-  
+
   // Real-Time Streaming (EventEmitter-based)
   subscribeToMetrics: (callback: (metrics: SystemMetrics) => void) => void;
   subscribeToOptimizationActions: (callback: (action: RealTimeOptimizationAction) => void) => void;
   unsubscribeFromMetrics: (callback: (metrics: SystemMetrics) => void) => void;
-  unsubscribeFromOptimizationActions: (callback: (action: RealTimeOptimizationAction) => void) => void;
-  
+  unsubscribeFromOptimizationActions: (
+    callback: (action: RealTimeOptimizationAction) => void
+  ) => void;
+
   // System Health and Status
   getSystemHealth: () => Promise<{
     overall: 'HEALTHY' | 'DEGRADED' | 'CRITICAL';
@@ -165,75 +174,78 @@ export interface IIntelligentRoutingIntegrationService {
  */
 /**
  * Intelligent Routing Integration Service (Modular Architecture)
- * 
+ *
  * REFACTORED: This service now orchestrates specialized performance modules instead of
  * implementing everything monolithically. Each module has a single responsibility:
- * 
+ *
  * - SystemMetricsCollector: Real-time system resource monitoring
  * - CircuitBreakerManager: Adaptive circuit breakers for resilience
  * - PerformanceAnomalyDetector: Anomaly detection with auto-remediation
  * - PredictiveAnalytics: Machine learning predictions and insights
  * - PerformanceOptimizationEngine: Real-time optimization triggers
  */
-export class IntelligentRoutingIntegrationService extends EventEmitter implements IIntelligentRoutingIntegrationService {
+export class IntelligentRoutingIntegrationService
+  extends EventEmitter
+  implements IIntelligentRoutingIntegrationService
+{
   private routingCoordinator: IIntelligentRoutingCoordinator;
   private executionTracking: Map<string, { plan: ExecutionPlan; startTime: number }> = new Map();
-  
+
   // ========================= PERFORMANCE SYSTEM MODULES =========================
   private metricsCollector: SystemMetricsCollector;
   private circuitBreakerManager: CircuitBreakerManager;
   private anomalyDetector: PerformanceAnomalyDetector;
   private predictiveAnalytics: PredictiveAnalytics;
   private optimizationEngine: PerformanceOptimizationEngine;
-  
+
   // Module State
   private isInitialized = false;
   private startupTime = Date.now();
-  
+
   constructor(
     routingCoordinator: IIntelligentRoutingCoordinator,
     config?: Partial<PerformanceSystemConfig>
   ) {
     super();
     this.routingCoordinator = routingCoordinator;
-    
+
     // Initialize performance modules with configuration
     const systemConfig = { ...DEFAULT_PERFORMANCE_SYSTEM_CONFIG, ...config };
-    
+
     this.metricsCollector = new SystemMetricsCollector({
       ...DEFAULT_METRICS_CONFIG,
-      ...systemConfig
+      ...systemConfig,
     });
-    
+
     this.circuitBreakerManager = new CircuitBreakerManager(systemConfig.circuitBreakers);
-    
+
     this.anomalyDetector = new PerformanceAnomalyDetector(DEFAULT_ANOMALY_DETECTION_CONFIG);
-    
+
     this.predictiveAnalytics = new PredictiveAnalytics(DEFAULT_PREDICTIVE_CONFIG);
-    
+
     this.optimizationEngine = new PerformanceOptimizationEngine(DEFAULT_OPTIMIZATION_CONFIG);
-    
+
     // Wire up module interactions
     this.setupModuleInteractions();
-    
+
     // Auto-initialize
     process.nextTick(() => {
-      this.initialize().catch(err => 
+      this.initialize().catch(err =>
         logger.error('Failed to initialize performance system', { error: err })
       );
     });
-    
+
     logger.info('IntelligentRoutingIntegrationService created with modular architecture', {
       modules: {
         metricsCollector: 'SystemMetricsCollector',
         circuitBreakerManager: 'CircuitBreakerManager',
         anomalyDetector: 'PerformanceAnomalyDetector',
         predictiveAnalytics: 'PredictiveAnalytics',
-        optimizationEngine: 'PerformanceOptimizationEngine'
-      }
+        optimizationEngine: 'PerformanceOptimizationEngine',
+      },
     });
   }
-  
+
   /**
    * Initialize all performance modules and wire up their interactions
    */
@@ -242,78 +254,77 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
       logger.warn('Performance system already initialized');
       return;
     }
-    
+
     try {
       logger.info('Initializing modular performance system...');
-      
+
       // Start metrics collection
       await this.metricsCollector.startCollection();
-      
+
       // All modules are initialized in their constructors
       // Wire up real-time data flow
       this.wireModuleDataFlow();
-      
+
       this.isInitialized = true;
-      
+
       logger.info('Modular performance system initialized successfully', {
         modules: 5,
-        startupTime: Date.now() - this.startupTime
+        startupTime: Date.now() - this.startupTime,
       });
-      
+
       this.emit('system-initialized', { timestamp: Date.now() });
-      
     } catch (error) {
       logger.error('Failed to initialize performance system', { error });
       throw error;
     }
   }
-  
+
   /**
    * Setup interactions between performance modules
    */
   private setupModuleInteractions(): void {
     // Circuit breaker events -> Anomaly detector
-    this.circuitBreakerManager.on('state-change', (event) => {
+    this.circuitBreakerManager.on('state-change', event => {
       logger.debug('Circuit breaker state change detected', event.data);
       this.emit('circuit-breaker-event', event);
     });
-    
+
     // Anomaly events -> Optimization engine
-    this.anomalyDetector.on('anomaly', (event) => {
-      logger.debug('Performance anomaly detected', { 
-        type: event.data.type, 
-        severity: event.data.severity 
+    this.anomalyDetector.on('anomaly', event => {
+      logger.debug('Performance anomaly detected', {
+        type: event.data.type,
+        severity: event.data.severity,
       });
       this.emit('anomaly-detected', event);
     });
-    
+
     // Optimization actions -> External subscribers
-    this.optimizationEngine.on('optimization-applied', (event) => {
-      logger.debug('Optimization action applied', { 
-        type: event.data.type, 
-        success: event.data.result?.success 
+    this.optimizationEngine.on('optimization-applied', event => {
+      logger.debug('Optimization action applied', {
+        type: event.data.type,
+        success: event.data.result?.success,
       });
       this.emit('optimization-applied', event);
     });
-    
+
     // Predictive insights -> Optimization recommendations
-    this.predictiveAnalytics.on('insights-generated', (insights) => {
-      logger.debug('Predictive insights generated', { 
+    this.predictiveAnalytics.on('insights-generated', insights => {
+      logger.debug('Predictive insights generated', {
         confidence: insights.predictions.confidence,
-        recommendations: insights.recommendations.length 
+        recommendations: insights.recommendations.length,
       });
       this.emit('insights-generated', insights);
     });
   }
-  
+
   /**
    * Wire up real-time data flow between modules
    */
   private wireModuleDataFlow(): void {
     // Metrics -> Anomaly Detection -> Optimization
-    this.metricsCollector.on('metrics', async (event) => {
+    this.metricsCollector.on('metrics', async event => {
       const metrics = event.data;
-      
+
       // Forward to anomaly detector
       try {
         const thresholds = DEFAULT_PERFORMANCE_SYSTEM_CONFIG.thresholds;
@@ -321,14 +332,14 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
       } catch (error) {
         logger.error('Error in anomaly detection', { error });
       }
-      
+
       // Forward to predictive analytics
       try {
         await this.predictiveAnalytics.updatePredictionModel([metrics]);
       } catch (error) {
         logger.error('Error updating prediction model', { error });
       }
-      
+
       // Forward to optimization engine
       try {
         const thresholds = DEFAULT_PERFORMANCE_SYSTEM_CONFIG.thresholds;
@@ -336,7 +347,7 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
       } catch (error) {
         logger.error('Error evaluating optimization triggers', { error });
       }
-      
+
       // Forward to external subscribers
       this.emit('metrics', event);
     });
@@ -375,7 +386,9 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
   /**
    * Update performance thresholds
    */
-  public async updatePerformanceThresholds(thresholds: Partial<PerformanceThresholds>): Promise<void> {
+  public async updatePerformanceThresholds(
+    thresholds: Partial<PerformanceThresholds>
+  ): Promise<void> {
     // Update the default config (in production, this would persist)
     Object.assign(DEFAULT_PERFORMANCE_SYSTEM_CONFIG.thresholds, thresholds);
     logger.info('Performance thresholds updated', { thresholds });
@@ -443,9 +456,9 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
   public async getOptimizationRecommendations(): Promise<RealTimeOptimizationAction[]> {
     const [predictiveActions, optimizationActions] = await Promise.all([
       this.predictiveAnalytics.getOptimizationRecommendations(),
-      this.optimizationEngine.getRecentOptimizations(300000) // Last 5 minutes
+      this.optimizationEngine.getRecentOptimizations(300000), // Last 5 minutes
     ]);
-    
+
     return [...predictiveActions, ...optimizationActions];
   }
 
@@ -453,13 +466,15 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
    * Subscribe to metrics (EventEmitter-based)
    */
   public subscribeToMetrics(callback: (metrics: SystemMetrics) => void): void {
-    this.metricsCollector.on('metrics', (event) => callback(event.data));
+    this.metricsCollector.on('metrics', event => callback(event.data));
   }
 
   /**
    * Subscribe to optimization actions (EventEmitter-based)
    */
-  public subscribeToOptimizationActions(callback: (action: RealTimeOptimizationAction) => void): void {
+  public subscribeToOptimizationActions(
+    callback: (action: RealTimeOptimizationAction) => void
+  ): void {
     this.optimizationEngine.subscribeToOptimizations(callback);
   }
 
@@ -473,7 +488,9 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
   /**
    * Unsubscribe from optimization actions
    */
-  public unsubscribeFromOptimizationActions(callback: (action: RealTimeOptimizationAction) => void): void {
+  public unsubscribeFromOptimizationActions(
+    callback: (action: RealTimeOptimizationAction) => void
+  ): void {
     this.optimizationEngine.unsubscribeFromOptimizations(callback);
   }
 
@@ -494,19 +511,25 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
     const circuitBreakerHealth = this.circuitBreakerManager.getHealthStatus();
     const optimizationStats = this.optimizationEngine.getOptimizationStats();
     const anomalyStats = this.anomalyDetector.getDetectionStats();
-    
+
     // Determine overall health
     let overall: 'HEALTHY' | 'DEGRADED' | 'CRITICAL' = 'HEALTHY';
-    
-    if (currentMetrics.cpu.usage > 90 || currentMetrics.memory.usage > 95 || 
-        circuitBreakerHealth.unhealthy.length > 0) {
+
+    if (
+      currentMetrics.cpu.usage > 90 ||
+      currentMetrics.memory.usage > 95 ||
+      circuitBreakerHealth.unhealthy.length > 0
+    ) {
       overall = 'CRITICAL';
-    } else if (currentMetrics.cpu.usage > 80 || currentMetrics.memory.usage > 85 || 
-               circuitBreakerHealth.degraded.length > 0 || 
-               anomalyStats.totalAnomalies > 10) {
+    } else if (
+      currentMetrics.cpu.usage > 80 ||
+      currentMetrics.memory.usage > 85 ||
+      circuitBreakerHealth.degraded.length > 0 ||
+      anomalyStats.totalAnomalies > 10
+    ) {
       overall = 'DEGRADED';
     }
-    
+
     return {
       overall,
       modules: {
@@ -514,16 +537,15 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
         circuitBreakerManager: 'ACTIVE',
         anomalyDetector: 'ACTIVE',
         predictiveAnalytics: 'ACTIVE',
-        optimizationEngine: 'ACTIVE'
+        optimizationEngine: 'ACTIVE',
       },
       metrics: {
         uptime: Date.now() - this.startupTime,
         totalRequests: optimizationStats.totalOptimizations,
         activeConnections: currentMetrics.network.connectionsActive,
-        errorRate: optimizationStats.totalOptimizations > 0 
-          ? (1 - optimizationStats.successRate) * 100 
-          : 0
-      }
+        errorRate:
+          optimizationStats.totalOptimizations > 0 ? (1 - optimizationStats.successRate) * 100 : 0,
+      },
     };
   }
 
@@ -542,19 +564,19 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
       try {
         // Analyze command and create processing request
         const processingRequest = this.createProcessingRequestFromCLI(request);
-        
+
         // Build routing context
         const routingContext = this.buildRoutingContextFromCLI(processingRequest, request);
-        
+
         // Get routing decision
         const routingDecision = await this.routingCoordinator.routeRequest(routingContext);
-        
+
         // Create execution plan
         const executionPlan = this.createExecutionPlan(routingDecision, request);
-        
+
         // Generate tracking ID
         const trackingId = this.generateTrackingId(request.command);
-        
+
         // Store execution tracking
         this.executionTracking.set(trackingId, {
           plan: executionPlan,
@@ -659,7 +681,9 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
   /**
    * Optimize routing preferences based on iterative process performance
    */
-  public async optimizeIterativeProcess(iterations: readonly SpiralIteration[]): Promise<RoutingPreferences> {
+  public async optimizeIterativeProcess(
+    iterations: readonly SpiralIteration[]
+  ): Promise<RoutingPreferences> {
     logger.info('Optimizing iterative process routing', { iterations: iterations.length });
 
     try {
@@ -703,7 +727,10 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
   /**
    * Record execution performance for routing optimization
    */
-  public async recordExecutionPerformance(trackingId: string, performance: Readonly<RoutingPerformance>): Promise<void> {
+  public async recordExecutionPerformance(
+    trackingId: string,
+    performance: Readonly<RoutingPerformance>
+  ): Promise<void> {
     logger.debug('Recording execution performance', { trackingId, success: performance.success });
 
     try {
@@ -735,21 +762,21 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
   public async getRoutingAnalytics(): Promise<Record<string, unknown>> {
     try {
       const coreAnalytics = await this.routingCoordinator.getAnalytics();
-      
+
       // Add integration-specific analytics from performance modules
       const systemHealth = await this.getSystemHealth();
       const predictiveInsights = await this.getPredictiveInsights();
       const optimizationStats = this.optimizationEngine.getOptimizationStats();
-      
+
       const integrationAnalytics = {
         systemHealth,
         predictiveInsights: {
           confidence: predictiveInsights.predictions.confidence,
           trends: predictiveInsights.trends,
-          recommendationsCount: predictiveInsights.recommendations.length
+          recommendationsCount: predictiveInsights.recommendations.length,
         },
         optimization: optimizationStats,
-        circuitBreakers: this.circuitBreakerManager.getHealthStatus()
+        circuitBreakers: this.circuitBreakerManager.getHealthStatus(),
       };
 
       return {
@@ -776,7 +803,7 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
       // Run performance module optimizations
       const currentMetrics = await this.getCurrentSystemMetrics();
       const thresholds = this.getPerformanceThresholds();
-      
+
       await this.optimizationEngine.evaluateOptimizationTriggers(currentMetrics, thresholds);
 
       logger.info('Comprehensive routing optimization completed successfully');
@@ -792,11 +819,11 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
     const requestTypeMap: Record<string, RequestType> = {
       analyze: RequestType.CODE_ANALYSIS,
       generate: RequestType.CODE_GENERATION,
-      create: RequestType.CODE_GENERATION, 
+      create: RequestType.CODE_GENERATION,
       refactor: RequestType.OPTIMIZATION,
       review: RequestType.REVIEW,
       document: RequestType.DOCUMENTATION,
-      test: RequestType.CODE_ANALYSIS
+      test: RequestType.CODE_ANALYSIS,
     };
 
     return ProcessingRequest.create(
@@ -829,14 +856,19 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
     };
   }
 
-  private createExecutionPlan(decision: IntelligentRoutingDecision, request: CLIRoutingRequest): ExecutionPlan {
-    const steps: ExecutionStep[] = [{
-      stepId: 'primary_execution',
-      description: `Execute ${request.command} with ${decision.routingStrategy} strategy`,
-      routingDecision: decision,
-      dependencies: [],
-      estimatedDuration: decision.estimatedLatency,
-    }];
+  private createExecutionPlan(
+    decision: IntelligentRoutingDecision,
+    request: CLIRoutingRequest
+  ): ExecutionPlan {
+    const steps: ExecutionStep[] = [
+      {
+        stepId: 'primary_execution',
+        description: `Execute ${request.command} with ${decision.routingStrategy} strategy`,
+        routingDecision: decision,
+        dependencies: [],
+        estimatedDuration: decision.estimatedLatency,
+      },
+    ];
 
     let totalTime = decision.estimatedLatency;
 
@@ -883,7 +915,7 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
     const sequentialSteps = plan.steps.filter(step => step.dependencies.length > 0);
 
     const parallelResults = await Promise.all(
-      parallelSteps.map(async (step) => `Step ${step.stepId} completed in parallel.`)
+      parallelSteps.map(async step => `Step ${step.stepId} completed in parallel.`)
     );
 
     let sequentialResult = '';
@@ -894,7 +926,9 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
     return [...parallelResults, sequentialResult].join('\n');
   }
 
-  private createProcessingRequestFromSpiral(context: LivingSpiralRoutingContext): ProcessingRequest {
+  private createProcessingRequestFromSpiral(
+    context: LivingSpiralRoutingContext
+  ): ProcessingRequest {
     const phaseTypes: Record<string, RequestType> = {
       collapse: RequestType.CODE_ANALYSIS,
       council: RequestType.REVIEW,
@@ -926,11 +960,13 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
       preferences: {
         ...spiralContext.preferences,
         enableMultiVoice: spiralContext.phase === 'council',
-        prioritizeQuality: spiralContext.phase === 'synthesis' || spiralContext.phase === 'reflection',
+        prioritizeQuality:
+          spiralContext.phase === 'synthesis' || spiralContext.phase === 'reflection',
         prioritizeSpeed: spiralContext.phase === 'collapse',
       },
       metrics: {
-        requiresDeepAnalysis: spiralContext.phase === 'council' || spiralContext.phase === 'reflection',
+        requiresDeepAnalysis:
+          spiralContext.phase === 'council' || spiralContext.phase === 'reflection',
         estimatedProcessingTime: 10000,
       },
     };
@@ -941,8 +977,9 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
     context: LivingSpiralRoutingContext
   ): Promise<void> {
     if (context.currentIteration > 1) {
-      const avgQuality = context.previousIterations.reduce((sum, iter) => sum + iter.quality, 0) / 
-                         context.previousIterations.length;
+      const avgQuality =
+        context.previousIterations.reduce((sum, iter) => sum + iter.quality, 0) /
+        context.previousIterations.length;
 
       if (avgQuality < context.qualityThreshold) {
         decision.confidence = Math.min(decision.confidence * 1.1, 1.0);
@@ -955,11 +992,14 @@ export class IntelligentRoutingIntegrationService extends EventEmitter implement
     }
   }
 
-  private analyzePhasePerformance(iterations: readonly SpiralIteration[]): { councilPhaseEffective: boolean } {
+  private analyzePhasePerformance(iterations: readonly SpiralIteration[]): {
+    councilPhaseEffective: boolean;
+  } {
     const councilIterations = iterations.filter(iter => iter.phase === 'council');
-    const avgCouncilQuality = councilIterations.length > 0
-      ? councilIterations.reduce((sum, iter) => sum + iter.quality, 0) / councilIterations.length
-      : 0;
+    const avgCouncilQuality =
+      councilIterations.length > 0
+        ? councilIterations.reduce((sum, iter) => sum + iter.quality, 0) / councilIterations.length
+        : 0;
 
     return { councilPhaseEffective: avgCouncilQuality > 0.7 };
   }

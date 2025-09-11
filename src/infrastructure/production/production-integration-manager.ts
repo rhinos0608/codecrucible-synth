@@ -33,29 +33,28 @@ import {
 
 // Production Integration Manager - Class implementation only
 
-
 export class ProductionIntegrationManager extends EventEmitter {
   private static instance?: ProductionIntegrationManager;
   private readonly orchestrator: DeploymentOrchestrator;
   private readonly env: EnvironmentManager;
   private readonly health: HealthMonitoring;
-  
+
   // Component instances
   private hardeningSystem?: ProductionHardeningSystem;
   private securityAuditLogger?: ProductionSecurityAuditLogger;
   private resourceEnforcer?: ProductionResourceEnforcer;
   private observabilitySystem?: ObservabilitySystem;
-  
+
   // Monitoring intervals
   private healthCheckInterval?: NodeJS.Timeout;
   private performanceMonitoringInterval?: NodeJS.Timeout;
-  
+
   // System state
   private emergencyMode = false;
   private systemStartTime = Date.now();
   private lastHealthCheck = 0;
   private activeOperations = new Map<string, ProductionOperationContext>();
-  
+
   // Statistics
   private integrationStats = {
     systemUptime: 0,
@@ -111,7 +110,6 @@ export class ProductionIntegrationManager extends EventEmitter {
     this.emit('shutdown:start');
     this.emit('shutdown:completed');
   }
-
 
   // Private Implementation Methods
 
@@ -376,7 +374,11 @@ export class ProductionIntegrationManager extends EventEmitter {
     }
 
     // Security audit - post-execution
-    if (this.securityAuditLogger && this.config.components.securityAuditLogger && context.security.auditTrailId) {
+    if (
+      this.securityAuditLogger &&
+      this.config.components.securityAuditLogger &&
+      context.security.auditTrailId
+    ) {
       await this.securityAuditLogger.logSecurityEvent({
         eventType: success ? SecurityEventType.SYSTEM_START : SecurityEventType.SECURITY_ALERT,
         severity: success ? SecuritySeverity.INFO : SecuritySeverity.MEDIUM,
@@ -418,7 +420,7 @@ export class ProductionIntegrationManager extends EventEmitter {
 
     // Attempt partial cleanup
     await this.shutdownProductionSystem();
-    
+
     this.emit('initialization:failed', { error });
   }
 
@@ -778,13 +780,13 @@ export class ProductionIntegrationManager extends EventEmitter {
   public async triggerEmergencyMode(reason: string, source: string): Promise<void> {
     this.emergencyMode = true;
     logger.error(`Emergency mode activated: ${reason} (source: ${source})`);
-    
+
     this.emit('emergency:activated', {
       reason,
       source,
       timestamp: Date.now(),
     });
-    
+
     // Attempt to stabilize system
     try {
       await this.performEmergencyStabilization();
@@ -795,13 +797,13 @@ export class ProductionIntegrationManager extends EventEmitter {
 
   private async performEmergencyStabilization(): Promise<void> {
     logger.info('Performing emergency stabilization...');
-    
+
     // Stop non-critical monitoring to reduce load
     this.stopIntegratedMonitoring();
-    
+
     // Clear active operations to free resources
     this.activeOperations.clear();
-    
+
     // Attempt to restart critical components
     if (this.config.components.resourceEnforcer && this.resourceEnforcer) {
       try {

@@ -9,9 +9,7 @@ import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
 import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
-import {
-  loadRustExecutorSafely,
-} from '../../utils/rust-module-loader.js';
+import { loadRustExecutorSafely } from '../../utils/rust-module-loader.js';
 import type {
   StreamChunk,
   StreamEvent,
@@ -62,28 +60,31 @@ export class RustStreamingClient extends EventEmitter {
 
   private async initializeRustExecutor(): Promise<void> {
     if (!this.rustExecutor) return;
-    
+
     try {
       const initSuccess = await this.rustExecutor.initialize();
       this.isInitialized = initSuccess;
-      
+
       // Check if runtime is available
       if (typeof this.rustExecutor.is_runtime_available === 'function') {
         const runtimeAvailable = this.rustExecutor.is_runtime_available();
-        logger.info('🦀 Rust streaming client initialized', { 
+        logger.info('🦀 Rust streaming client initialized', {
           initSuccess,
           runtimeAvailable,
-          hasRuntimeStats: typeof this.rustExecutor.get_runtime_stats === 'function'
+          hasRuntimeStats: typeof this.rustExecutor.get_runtime_stats === 'function',
         });
-        
+
         if (typeof this.rustExecutor.get_runtime_stats === 'function') {
           try {
             const stats = this.rustExecutor.get_runtime_stats();
             logger.debug('Rust runtime stats:', JSON.parse(stats));
           } catch (e) {
             const errorInfo = toErrorOrUndefined(e);
-            logger.warn('Failed to get runtime stats:', 
-              errorInfo ? { message: errorInfo.message, name: errorInfo.name } : { error: String(e) }
+            logger.warn(
+              'Failed to get runtime stats:',
+              errorInfo
+                ? { message: errorInfo.message, name: errorInfo.name }
+                : { error: String(e) }
             );
           }
         }
@@ -304,11 +305,17 @@ export class RustStreamingClient extends EventEmitter {
           source: rawChunk.metadata.source,
           isLast: !!rawChunk.metadata.isLast,
           progress: typeof rawChunk.metadata.progress === 'number' ? rawChunk.metadata.progress : 0,
-          totalSize: typeof rawChunk.metadata.totalSize === 'number' ? rawChunk.metadata.totalSize : 0,
+          totalSize:
+            typeof rawChunk.metadata.totalSize === 'number' ? rawChunk.metadata.totalSize : 0,
           error: typeof rawChunk.metadata.error === 'string' ? rawChunk.metadata.error : undefined,
-          encoding: typeof rawChunk.metadata.encoding === 'string' ? rawChunk.metadata.encoding : undefined,
-          mimeType: typeof rawChunk.metadata.mimeType === 'string' ? rawChunk.metadata.mimeType : undefined,
-          compression: typeof rawChunk.metadata.compression === 'string' ? rawChunk.metadata.compression : undefined,
+          encoding:
+            typeof rawChunk.metadata.encoding === 'string' ? rawChunk.metadata.encoding : undefined,
+          mimeType:
+            typeof rawChunk.metadata.mimeType === 'string' ? rawChunk.metadata.mimeType : undefined,
+          compression:
+            typeof rawChunk.metadata.compression === 'string'
+              ? rawChunk.metadata.compression
+              : undefined,
         },
         timing: {
           generatedAt: rawChunk.timing.generatedAt,
@@ -474,7 +481,9 @@ export class RustStreamingClient extends EventEmitter {
           this.rustExecutor.terminateStream(sessionId);
         }
       } catch (error) {
-        logger.warn(`Failed to terminate Rust stream ${sessionId}:`, { error: error instanceof Error ? error.message : String(error) });
+        logger.warn(`Failed to terminate Rust stream ${sessionId}:`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 

@@ -44,20 +44,20 @@ export class ModelCapabilityService {
   // NOTE: Rankings based on actual benchmarks and research
   // Top-tier function calling models (excellent performance)
   private readonly KNOWN_FUNCTION_CALLING_MODELS = [
-    'llama3.1',       // EXCELLENT: 89.06% BFCL accuracy (8B), 90.76% (70B) - #1 & #3 on benchmark
-    'qwen2.5-coder',  // Excellent function calling support, especially 7B+
-    'deepseek-coder', // Good function calling for coding tasks  
-    'mistral-',       // Mistral models have native function calling
-    'mixtral-',       // Mixtral models have native function calling
-    'phi-3',          // Microsoft Phi-3 has function calling
-    'gemma2:27b',     // Larger Gemma models have better support
+    'llama3.1', // EXCELLENT: 89.06% BFCL accuracy (8B), 90.76% (70B) - #1 & #3 on benchmark
+    'qwen2.5-coder', // Excellent function calling support, especially 7B+
+    'deepseek-coder', // Good function calling for coding tasks
+    'mistral-', // Mistral models have native function calling
+    'mixtral-', // Mixtral models have native function calling
+    'phi-3', // Microsoft Phi-3 has function calling
+    'gemma2:27b', // Larger Gemma models have better support
   ];
-  
+
   // Models with limited function calling (size or architecture constraints)
   private readonly LIMITED_FUNCTION_CALLING = [
-    'gemma:2b',       // Too small for reliable function calling
-    'gemma:7b',       // Limited function calling compared to larger models
-    'codellama',      // Primarily code generation, limited tool calling
+    'gemma:2b', // Too small for reliable function calling
+    'gemma:7b', // Limited function calling compared to larger models
+    'codellama', // Primarily code generation, limited tool calling
   ];
 
   public constructor() {
@@ -119,10 +119,9 @@ export class ModelCapabilityService {
       return capabilities;
     } catch (error) {
       // Use debug instead of warn since falling back to inference is expected behavior
-      logger.debug(
-        `Capability detection failed for ${modelName}, using inference fallback:`,
-        { error }
-      );
+      logger.debug(`Capability detection failed for ${modelName}, using inference fallback:`, {
+        error,
+      });
       capabilities = this.inferCapabilitiesFromName(modelName);
       this.capabilityCache.set(cacheKey, capabilities);
       return capabilities;
@@ -164,8 +163,10 @@ export class ModelCapabilityService {
       ) {
         const modelInfo = modelInfoRaw as HuggingFaceModelInfo;
         const tags: string[] = Array.isArray(modelInfo.tags) ? modelInfo.tags : [];
-        const pipeline: string = typeof modelInfo.pipeline_tag === 'string' ? modelInfo.pipeline_tag : '';
-        const config: Record<string, unknown> = (modelInfo.config && typeof modelInfo.config === 'object') ? modelInfo.config : {};
+        const pipeline: string =
+          typeof modelInfo.pipeline_tag === 'string' ? modelInfo.pipeline_tag : '';
+        const config: Record<string, unknown> =
+          modelInfo.config && typeof modelInfo.config === 'object' ? modelInfo.config : {};
 
         // Analyze model configuration and tags for function calling capability
         const functionCalling = this.analyzeForFunctionCalling(tags, config, modelName);
@@ -190,7 +191,9 @@ export class ModelCapabilityService {
         throw new Error('Unexpected HuggingFace API response structure');
       }
     } catch (error) {
-      logger.debug(`HuggingFace API failed for ${modelName}:`, { error: error instanceof Error ? error.message : String(error) });
+      logger.debug(`HuggingFace API failed for ${modelName}:`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -220,9 +223,10 @@ export class ModelCapabilityService {
       }
 
       const modelInfoRaw: unknown = await response.json();
-      const modelInfo: OllamaModelInfo = (typeof modelInfoRaw === 'object' && modelInfoRaw !== null)
-        ? modelInfoRaw as OllamaModelInfo
-        : {};
+      const modelInfo: OllamaModelInfo =
+        typeof modelInfoRaw === 'object' && modelInfoRaw !== null
+          ? (modelInfoRaw as OllamaModelInfo)
+          : {};
 
       const template: string = typeof modelInfo.template === 'string' ? modelInfo.template : '';
       const system: string = typeof modelInfo.system === 'string' ? modelInfo.system : '';
@@ -247,7 +251,9 @@ export class ModelCapabilityService {
 
       return capabilities;
     } catch (error) {
-      logger.debug(`Ollama API query failed for ${modelName}:`, { error: error instanceof Error ? error.message : String(error) });
+      logger.debug(`Ollama API query failed for ${modelName}:`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -280,7 +286,8 @@ export class ModelCapabilityService {
       }
 
       const dataRaw: unknown = await response.json();
-      const data: LMStudioModelsResponse = typeof dataRaw === 'object' && dataRaw !== null ? dataRaw as LMStudioModelsResponse : {};
+      const data: LMStudioModelsResponse =
+        typeof dataRaw === 'object' && dataRaw !== null ? (dataRaw as LMStudioModelsResponse) : {};
       const model = data.data?.find((m: Readonly<LMStudioModel>) => m.id === modelName);
 
       if (!model) {
@@ -307,7 +314,9 @@ export class ModelCapabilityService {
 
       return capabilities;
     } catch (error) {
-      logger.debug(`LM Studio API query failed for ${modelName}:`, { error: error instanceof Error ? error.message : String(error) });
+      logger.debug(`LM Studio API query failed for ${modelName}:`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -336,39 +345,39 @@ export class ModelCapabilityService {
   }
 
   /**
-     * Analyze HuggingFace model for function calling capability
-     */
-    private analyzeForFunctionCalling(
-      tags: readonly string[],
-      config: Readonly<{ architectures?: readonly string[] }>,
-      modelName: string
-    ): boolean {
-      // Check for explicit function calling support in tags
-      if (
-        tags.some(
-          tag =>
-            tag.includes('function') ||
-            tag.includes('tool') ||
-            tag.includes('agent') ||
-            tag.includes('reasoning')
-        )
-      ) {
-        return true;
-      }
-  
-      // Check config for function calling related settings
-      if (
-        Array.isArray(config.architectures) &&
-        config.architectures.some(
-          (arch: string) => arch.includes('ForCausalLM') || arch.includes('ForConditional')
-        )
-      ) {
-        // These architectures can potentially do function calling
-        return this.inferFunctionCallingFromName(modelName);
-      }
-  
+   * Analyze HuggingFace model for function calling capability
+   */
+  private analyzeForFunctionCalling(
+    tags: readonly string[],
+    config: Readonly<{ architectures?: readonly string[] }>,
+    modelName: string
+  ): boolean {
+    // Check for explicit function calling support in tags
+    if (
+      tags.some(
+        tag =>
+          tag.includes('function') ||
+          tag.includes('tool') ||
+          tag.includes('agent') ||
+          tag.includes('reasoning')
+      )
+    ) {
+      return true;
+    }
+
+    // Check config for function calling related settings
+    if (
+      Array.isArray(config.architectures) &&
+      config.architectures.some(
+        (arch: string) => arch.includes('ForCausalLM') || arch.includes('ForConditional')
+      )
+    ) {
+      // These architectures can potentially do function calling
       return this.inferFunctionCallingFromName(modelName);
     }
+
+    return this.inferFunctionCallingFromName(modelName);
+  }
 
   /**
    * Analyze Ollama model template for function calling patterns
@@ -398,7 +407,7 @@ export class ModelCapabilityService {
    */
   private inferFunctionCallingFromName(modelName: string): boolean {
     const nameLower = modelName.toLowerCase();
-    
+
     // Check if it's in the limited function calling list first
     if (this.LIMITED_FUNCTION_CALLING.some(pattern => nameLower.includes(pattern))) {
       return false; // These models don't have reliable function calling
@@ -477,14 +486,24 @@ export class ModelCapabilityService {
 
     return {
       totalEntries: entries.length,
-      validEntries: entries.filter(([_key, cap]: readonly [string, Readonly<ModelCapabilities>]) => this.isCacheValid(cap)).length,
+      validEntries: entries.filter(([_key, cap]: readonly [string, Readonly<ModelCapabilities>]) =>
+        this.isCacheValid(cap)
+      ).length,
       oldestEntry:
         entries.length > 0
-          ? Math.min(...entries.map(([_key, cap]: readonly [string, Readonly<ModelCapabilities>]) => cap.lastChecked.getTime()))
+          ? Math.min(
+              ...entries.map(([_key, cap]: readonly [string, Readonly<ModelCapabilities>]) =>
+                cap.lastChecked.getTime()
+              )
+            )
           : null,
       newestEntry:
         entries.length > 0
-          ? Math.max(...entries.map(([_key, cap]: readonly [string, Readonly<ModelCapabilities>]) => cap.lastChecked.getTime()))
+          ? Math.max(
+              ...entries.map(([_key, cap]: readonly [string, Readonly<ModelCapabilities>]) =>
+                cap.lastChecked.getTime()
+              )
+            )
           : null,
     };
   }
@@ -492,15 +511,17 @@ export class ModelCapabilityService {
   /**
    * Check if a model supports function calling
    */
-  public async supportsFunctionCalling(modelName: string, provider: string = 'unknown'): Promise<boolean> {
+  public async supportsFunctionCalling(
+    modelName: string,
+    provider: string = 'unknown'
+  ): Promise<boolean> {
     try {
       const capabilities = await this.getModelCapabilities(modelName, provider);
       return capabilities.functionCalling;
     } catch (error) {
-      logger.warn(
-        `Failed to check function calling support for ${modelName}:`,
-        { error: error instanceof Error ? error.message : String(error) }
-      );
+      logger.warn(`Failed to check function calling support for ${modelName}:`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
       // Fallback to name-based inference
       return this.inferFunctionCallingFromName(modelName);
     }

@@ -18,23 +18,24 @@ export class LoggerAdapter implements ILogger {
     const contextMessage = this.context ? `[${this.context}] ${message}` : message;
     concreteLogger.info(
       contextMessage,
-      meta && typeof meta === 'object' && meta !== null ? (meta as Record<string, unknown>) : undefined
+      meta && typeof meta === 'object' && meta !== null
+        ? (meta as Record<string, unknown>)
+        : undefined
     );
   }
 
   public error(message: string, error?: unknown): void {
     const contextMessage = this.context ? `[${this.context}] ${message}` : message;
-    concreteLogger.error(
-      contextMessage,
-      error instanceof Error ? error : undefined
-    );
+    concreteLogger.error(contextMessage, error instanceof Error ? error : undefined);
   }
 
   public warn(message: string, meta?: unknown): void {
     const contextMessage = this.context ? `[${this.context}] ${message}` : message;
     concreteLogger.warn(
       contextMessage,
-      meta && typeof meta === 'object' && meta !== null ? (meta as Readonly<Record<string, unknown>>) : undefined
+      meta && typeof meta === 'object' && meta !== null
+        ? (meta as Readonly<Record<string, unknown>>)
+        : undefined
     );
   }
 
@@ -42,7 +43,9 @@ export class LoggerAdapter implements ILogger {
     const contextMessage = this.context ? `[${this.context}] ${message}` : message;
     concreteLogger.debug(
       contextMessage,
-      meta && typeof meta === 'object' && meta !== null ? (meta as Record<string, unknown>) : undefined
+      meta && typeof meta === 'object' && meta !== null
+        ? (meta as Record<string, unknown>)
+        : undefined
     );
   }
 
@@ -50,7 +53,9 @@ export class LoggerAdapter implements ILogger {
     const contextMessage = this.context ? `[${this.context}] ${message}` : message;
     concreteLogger.trace(
       contextMessage,
-      meta && typeof meta === 'object' && meta !== null ? (meta as Record<string, unknown>) : undefined
+      meta && typeof meta === 'object' && meta !== null
+        ? (meta as Record<string, unknown>)
+        : undefined
     );
   }
 }

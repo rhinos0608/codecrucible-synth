@@ -82,7 +82,10 @@ export class UnifiedCacheSystem extends EventEmitter {
   /**
    * Main cache interface - routes to appropriate strategy based on key pattern
    */
-  public async get<T = unknown>(key: string, context?: Readonly<Record<string, unknown>>): Promise<CacheResult<T> | null> {
+  public async get<T = unknown>(
+    key: string,
+    context?: Readonly<Record<string, unknown>>
+  ): Promise<CacheResult<T> | null> {
     const strategy = this.determineStrategy(key);
 
     try {
@@ -97,7 +100,10 @@ export class UnifiedCacheSystem extends EventEmitter {
           return this.getStandard<T>(key);
       }
     } catch (error) {
-      logger.error('Unified cache get error:', toErrorOrUndefined(error), { key, strategy: strategy.name });
+      logger.error('Unified cache get error:', toErrorOrUndefined(error), {
+        key,
+        strategy: strategy.name,
+      });
       return null;
     }
   }
@@ -161,7 +167,7 @@ export class UnifiedCacheSystem extends EventEmitter {
     if (this.config.semantic.enabled && typeof context?.prompt === 'string') {
       const semanticResult = await this.searchSemantically<T>(
         context.prompt,
-        Array.isArray(context.context) ? [...context.context as string[]] : []
+        Array.isArray(context.context) ? [...(context.context as string[])] : []
       );
       if (semanticResult) {
         return { ...semanticResult, source: 'semantic' };
@@ -192,8 +198,10 @@ export class UnifiedCacheSystem extends EventEmitter {
     // Get best match
     if (similarResults.length > 0) {
       const [bestMatch] = similarResults.sort(
-        (a: Readonly<{ key: string; similarity: number }>, b: Readonly<{ key: string; similarity: number }>) =>
-          b.similarity - a.similarity
+        (
+          a: Readonly<{ key: string; similarity: number }>,
+          b: Readonly<{ key: string; similarity: number }>
+        ) => b.similarity - a.similarity
       );
       const cached = this.cacheManager.get<T>(bestMatch.key);
 
@@ -254,10 +262,7 @@ export class UnifiedCacheSystem extends EventEmitter {
       const metadata = options?.metadata;
       let prompt: string | undefined;
       let contextArr: string[] = [];
-      if (
-        metadata &&
-        typeof (metadata as Record<string, unknown>).prompt === 'string'
-      ) {
+      if (metadata && typeof (metadata as Record<string, unknown>).prompt === 'string') {
         prompt = (metadata as Record<string, unknown>).prompt as string;
         const contextVal = (metadata as Record<string, unknown>).context;
         if (Array.isArray(contextVal)) {
@@ -265,9 +270,7 @@ export class UnifiedCacheSystem extends EventEmitter {
         }
       }
       if (!embedding && prompt) {
-        embedding = await this.getEmbedding(
-          `${prompt} ${contextArr.join(' ')}`
-        );
+        embedding = await this.getEmbedding(`${prompt} ${contextArr.join(' ')}`);
       }
 
       if (embedding) {
@@ -308,7 +311,11 @@ export class UnifiedCacheSystem extends EventEmitter {
   private setStandard<T>(
     key: string,
     value: T,
-    options?: Readonly<{ ttl?: number; tags?: readonly string[]; metadata?: Readonly<Record<string, unknown>> }>
+    options?: Readonly<{
+      ttl?: number;
+      tags?: readonly string[];
+      metadata?: Readonly<Record<string, unknown>>;
+    }>
   ): boolean {
     try {
       this.cacheManager.set(key, value, {
@@ -335,7 +342,11 @@ export class UnifiedCacheSystem extends EventEmitter {
   private setSecure<T>(
     key: string,
     value: T,
-    options?: Readonly<{ ttl?: number; tags?: readonly string[]; metadata?: Readonly<Record<string, unknown>> }>
+    options?: Readonly<{
+      ttl?: number;
+      tags?: readonly string[];
+      metadata?: Readonly<Record<string, unknown>>;
+    }>
   ): boolean {
     try {
       // Force shorter TTL for security data
@@ -364,7 +375,11 @@ export class UnifiedCacheSystem extends EventEmitter {
   private setPerformant<T>(
     key: string,
     value: T,
-    options?: Readonly<{ ttl?: number; tags?: readonly string[]; metadata?: Readonly<Record<string, unknown>> }>
+    options?: Readonly<{
+      ttl?: number;
+      tags?: readonly string[];
+      metadata?: Readonly<Record<string, unknown>>;
+    }>
   ): boolean {
     try {
       // Use longer TTL for performance data
@@ -511,49 +526,52 @@ export class UnifiedCacheSystem extends EventEmitter {
   }
 
   /**
-     * Legacy cache system migration support
-     */
-    public async migrateLegacyCache(
-      legacySystemName: string,
-      adapter: Readonly<LegacyCacheAdapter>
-    ): Promise<void> {
-      this.legacyAdapters.set(legacySystemName, adapter);
-  
-      // Migrate existing data
-      const legacyData = await adapter.exportData();
-      let migratedCount = 0;
-  
-      for (const item of legacyData) {
-        const success = await this.set(item.key, item.value, {
-          ttl: item.ttl,
-          tags: item.tags,
-          metadata: item.metadata,
-        });
-  
-        if (success) migratedCount++;
-      }
-  
-      logger.info(`Migrated ${migratedCount}/${legacyData.length} entries from ${legacySystemName}`);
-      this.emit('migration-complete', { system: legacySystemName, migrated: migratedCount });
+   * Legacy cache system migration support
+   */
+  public async migrateLegacyCache(
+    legacySystemName: string,
+    adapter: Readonly<LegacyCacheAdapter>
+  ): Promise<void> {
+    this.legacyAdapters.set(legacySystemName, adapter);
+
+    // Migrate existing data
+    const legacyData = await adapter.exportData();
+    let migratedCount = 0;
+
+    for (const item of legacyData) {
+      const success = await this.set(item.key, item.value, {
+        ttl: item.ttl,
+        tags: item.tags,
+        metadata: item.metadata,
+      });
+
+      if (success) migratedCount++;
     }
-  
-    /**
-     * Get comprehensive cache statistics
-     */
-    public async getStats(): Promise<{
-      [key: string]: unknown;
-      semantic: {
+
+    logger.info(`Migrated ${migratedCount}/${legacyData.length} entries from ${legacySystemName}`);
+    this.emit('migration-complete', { system: legacySystemName, migrated: migratedCount });
+  }
+
+  /**
+   * Get comprehensive cache statistics
+   */
+  public async getStats(): Promise<{
+    [key: string]: unknown;
+    semantic: {
       vectorIndexSize: number;
       embeddingCacheSize: number;
       enabled: boolean;
-      };
-      routing: {
+    };
+    routing: {
       strategies: number;
       adapters: number;
-      };
-    }> {
-      const baseStats = await Promise.resolve(this.cacheManager.getStats()) as Record<string, unknown>;
-      return {
+    };
+  }> {
+    const baseStats = (await Promise.resolve(this.cacheManager.getStats())) as Record<
+      string,
+      unknown
+    >;
+    return {
       ...baseStats,
       semantic: {
         vectorIndexSize: this.vectorIndex.size,
@@ -564,447 +582,454 @@ export class UnifiedCacheSystem extends EventEmitter {
         strategies: this.config.routing.strategies.length,
         adapters: this.legacyAdapters.size,
       },
+    };
+  }
+
+  /**
+   * Delete a specific cache entry
+   */
+  public delete(key: string): boolean {
+    const result = this.cacheManager.delete(key);
+
+    // Also remove from vector index if present
+    if (this.vectorIndex.has(key)) {
+      this.vectorIndex.delete(key);
+      logger.debug('Removed vector index entry', { key });
+    }
+
+    // Remove from embedding cache if it's related to this key
+    const keyHash = createHash('sha256').update(key).digest('hex');
+    if (this.embeddingCache.has(keyHash)) {
+      this.embeddingCache.delete(keyHash);
+      logger.debug('Removed embedding cache entry', { key, keyHash });
+    }
+
+    this.emit('cache-deleted', { key, success: result });
+    return result;
+  }
+
+  /**
+   * Clear cache entries by tags with proper tag tracking
+   */
+  public async clearByTags(tags: readonly string[]): Promise<number> {
+    const tagSet = new Set(tags);
+    const deletedKeys: string[] = [];
+    let deletedCount = 0;
+
+    try {
+      // Get all cache entries and check their tags
+      const allEntries = await this.getAllEntriesWithMetadata();
+
+      for (const { key, metadata } of allEntries) {
+        const entryTags = metadata?.tags as string[] | undefined;
+        if (entryTags && Array.isArray(entryTags)) {
+          // Check if any entry tag matches any of the target tags
+          const hasMatchingTag = entryTags.some(tag => tagSet.has(tag));
+          if (hasMatchingTag) {
+            if (this.delete(key)) {
+              deletedKeys.push(key);
+              deletedCount++;
+            }
+          }
+        }
+      }
+
+      logger.info(`Cleared ${deletedCount} cache entries with tags`, {
+        tags: Array.from(tags),
+        deletedCount,
+        deletedKeys: deletedKeys.slice(0, 10), // Log first 10 keys only
+      });
+
+      this.emit('cache-cleared-by-tags', {
+        tags: Array.from(tags),
+        deletedCount,
+        deletedKeys,
+      });
+
+      return deletedCount;
+    } catch (error) {
+      logger.error('Error clearing cache by tags', { tags: Array.from(tags), error });
+      this.emit('error', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Clear cache entries by pattern matching
+   */
+  public async clearByPattern(pattern: Readonly<RegExp>): Promise<number> {
+    const deletedKeys: string[] = [];
+    let deletedCount = 0;
+
+    try {
+      const allEntries = await this.getAllEntriesWithMetadata();
+
+      for (const { key } of allEntries) {
+        if (pattern.test(key)) {
+          if (this.delete(key)) {
+            deletedKeys.push(key);
+            deletedCount++;
+          }
+        }
+      }
+
+      logger.info(`Cleared ${deletedCount} cache entries by pattern`, {
+        pattern: pattern.toString(),
+        deletedCount,
+        deletedKeys: deletedKeys.slice(0, 10),
+      });
+
+      this.emit('cache-cleared-by-pattern', {
+        pattern: pattern.toString(),
+        deletedCount,
+        deletedKeys,
+      });
+
+      return deletedCount;
+    } catch (error) {
+      logger.error('Error clearing cache by pattern', { pattern: pattern.toString(), error });
+      this.emit('error', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Clear cache entries by strategy
+   */
+  public async clearByStrategy(strategyName: string): Promise<number> {
+    const strategy = this.config.routing.strategies.find(s => s.name === strategyName);
+    if (!strategy) {
+      logger.warn(`Strategy '${strategyName}' not found`);
+      return 0;
+    }
+
+    return this.clearByPattern(strategy.pattern);
+  }
+
+  /**
+   * Clear expired entries across all cache layers
+   */
+  public async clearExpired(): Promise<number> {
+    let deletedCount = 0;
+
+    try {
+      const allEntries = await this.getAllEntriesWithMetadata();
+      const now = Date.now();
+
+      for (const { key, metadata } of allEntries) {
+        const expiresAt = metadata?.expiresAt as number | undefined;
+        if (expiresAt && expiresAt < now) {
+          if (this.delete(key)) {
+            deletedCount++;
+          }
+        }
+      }
+
+      logger.info(`Cleared ${deletedCount} expired cache entries`);
+      this.emit('cache-cleared-expired', { deletedCount });
+
+      return deletedCount;
+    } catch (error) {
+      logger.error('Error clearing expired cache entries', { error });
+      this.emit('error', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Clear all caches (unified operation)
+   */
+  public clear(): void {
+    try {
+      const stats = {
+        cacheManagerSize:
+          typeof this.cacheManager.size === 'function' ? this.cacheManager.size() : 0,
+        vectorIndexSize: this.vectorIndex.size,
+        embeddingCacheSize: this.embeddingCache.size,
       };
+
+      this.cacheManager.clear();
+      this.vectorIndex.clear();
+      this.embeddingCache.clear();
+
+      logger.info('Unified cache system cleared', stats);
+      this.emit('cache-cleared', stats);
+    } catch (error) {
+      logger.error('Error clearing unified cache system', { error });
+      this.emit('error', error);
     }
+  }
 
-      /**
-       * Delete a specific cache entry
-       */
-      public delete(key: string): boolean {
-        const result = this.cacheManager.delete(key);
-        
-        // Also remove from vector index if present
-        if (this.vectorIndex.has(key)) {
-          this.vectorIndex.delete(key);
-          logger.debug('Removed vector index entry', { key });
-        }
-        
-        // Remove from embedding cache if it's related to this key
-        const keyHash = createHash('sha256').update(key).digest('hex');
-        if (this.embeddingCache.has(keyHash)) {
-          this.embeddingCache.delete(keyHash);
-          logger.debug('Removed embedding cache entry', { key, keyHash });
-        }
-        
-        this.emit('cache-deleted', { key, success: result });
-        return result;
+  /**
+   * Get all cache entries with their metadata (helper method)
+   */
+  private async getAllEntriesWithMetadata(): Promise<
+    Array<{
+      key: string;
+      value: unknown;
+      metadata?: Record<string, unknown>;
+    }>
+  > {
+    // This would need to be implemented based on the cache-manager's capabilities
+    // For now, we'll use the cache manager's getAllKeys method if available
+    try {
+      const entries: Array<{ key: string; value: unknown; metadata?: Record<string, unknown> }> =
+        [];
+
+      // Define a type guard for cache managers with getAllKeys and getMetadata
+      interface CacheManagerWithMetadata {
+        getAllKeys?: () => Promise<string[]> | string[];
+        getMetadata?: (key: string) => Record<string, unknown> | undefined;
       }
+      const cacheManagerWithMeta = this.cacheManager as CacheManagerWithMetadata;
 
-      /**
-       * Clear cache entries by tags with proper tag tracking
-       */
-      public async clearByTags(tags: readonly string[]): Promise<number> {
-        const tagSet = new Set(tags);
-        const deletedKeys: string[] = [];
-        let deletedCount = 0;
-
-        try {
-          // Get all cache entries and check their tags
-          const allEntries = await this.getAllEntriesWithMetadata();
-          
-          for (const { key, metadata } of allEntries) {
-            const entryTags = metadata?.tags as string[] | undefined;
-            if (entryTags && Array.isArray(entryTags)) {
-              // Check if any entry tag matches any of the target tags
-              const hasMatchingTag = entryTags.some(tag => tagSet.has(tag));
-              if (hasMatchingTag) {
-                if (this.delete(key)) {
-                  deletedKeys.push(key);
-                  deletedCount++;
-                }
-              }
-            }
-          }
-
-          logger.info(`Cleared ${deletedCount} cache entries with tags`, { 
-            tags: Array.from(tags), 
-            deletedCount,
-            deletedKeys: deletedKeys.slice(0, 10) // Log first 10 keys only
-          });
-          
-          this.emit('cache-cleared-by-tags', { 
-            tags: Array.from(tags), 
-            deletedCount, 
-            deletedKeys 
-          });
-          
-          return deletedCount;
-        } catch (error) {
-          logger.error('Error clearing cache by tags', { tags: Array.from(tags), error });
-          this.emit('error', error);
-          return 0;
-        }
-      }
-
-      /**
-       * Clear cache entries by pattern matching
-       */
-      public async clearByPattern(pattern: Readonly<RegExp>): Promise<number> {
-        const deletedKeys: string[] = [];
-        let deletedCount = 0;
-
-        try {
-          const allEntries = await this.getAllEntriesWithMetadata();
-          
-          for (const { key } of allEntries) {
-            if (pattern.test(key)) {
-              if (this.delete(key)) {
-                deletedKeys.push(key);
-                deletedCount++;
-              }
-            }
-          }
-
-          logger.info(`Cleared ${deletedCount} cache entries by pattern`, { 
-            pattern: pattern.toString(), 
-            deletedCount,
-            deletedKeys: deletedKeys.slice(0, 10)
-          });
-          
-          this.emit('cache-cleared-by-pattern', { 
-            pattern: pattern.toString(), 
-            deletedCount, 
-            deletedKeys 
-          });
-          
-          return deletedCount;
-        } catch (error) {
-          logger.error('Error clearing cache by pattern', { pattern: pattern.toString(), error });
-          this.emit('error', error);
-          return 0;
-        }
-      }
-
-      /**
-       * Clear cache entries by strategy
-       */
-      public async clearByStrategy(strategyName: string): Promise<number> {
-        const strategy = this.config.routing.strategies.find(s => s.name === strategyName);
-        if (!strategy) {
-          logger.warn(`Strategy '${strategyName}' not found`);
-          return 0;
-        }
-
-        return this.clearByPattern(strategy.pattern);
-      }
-
-      /**
-       * Clear expired entries across all cache layers
-       */
-      public async clearExpired(): Promise<number> {
-        let deletedCount = 0;
-
-        try {
-          const allEntries = await this.getAllEntriesWithMetadata();
-          const now = Date.now();
-          
-          for (const { key, metadata } of allEntries) {
-            const expiresAt = metadata?.expiresAt as number | undefined;
-            if (expiresAt && expiresAt < now) {
-              if (this.delete(key)) {
-                deletedCount++;
-              }
-            }
-          }
-
-          logger.info(`Cleared ${deletedCount} expired cache entries`);
-          this.emit('cache-cleared-expired', { deletedCount });
-          
-          return deletedCount;
-        } catch (error) {
-          logger.error('Error clearing expired cache entries', { error });
-          this.emit('error', error);
-          return 0;
-        }
-      }
-
-      /**
-       * Clear all caches (unified operation)
-       */
-      public clear(): void {
-        try {
-          const stats = {
-            cacheManagerSize: typeof this.cacheManager.size === 'function' ? this.cacheManager.size() : 0,
-            vectorIndexSize: this.vectorIndex.size,
-            embeddingCacheSize: this.embeddingCache.size
-          };
-
-          this.cacheManager.clear();
-          this.vectorIndex.clear();
-          this.embeddingCache.clear();
-          
-          logger.info('Unified cache system cleared', stats);
-          this.emit('cache-cleared', stats);
-        } catch (error) {
-          logger.error('Error clearing unified cache system', { error });
-          this.emit('error', error);
-        }
-      }
-
-      /**
-       * Get all cache entries with their metadata (helper method)
-       */
-      private async getAllEntriesWithMetadata(): Promise<Array<{
-        key: string;
-        value: unknown;
-        metadata?: Record<string, unknown>;
-      }>> {
-        // This would need to be implemented based on the cache-manager's capabilities
-        // For now, we'll use the cache manager's getAllKeys method if available
-        try {
-          const entries: Array<{ key: string; value: unknown; metadata?: Record<string, unknown> }> = [];
-          
-          // Define a type guard for cache managers with getAllKeys and getMetadata
-          interface CacheManagerWithMetadata {
-            getAllKeys?: () => Promise<string[]> | string[];
-            getMetadata?: (key: string) => Record<string, unknown> | undefined;
-          }
-          const cacheManagerWithMeta = this.cacheManager as CacheManagerWithMetadata;
-
-          if (typeof cacheManagerWithMeta.getAllKeys === 'function') {
-            const keys = await cacheManagerWithMeta.getAllKeys();
-            for (const key of keys) {
-              const value = this.cacheManager.get(key);
-              const metadata =
-                typeof cacheManagerWithMeta.getMetadata === 'function'
-                  ? cacheManagerWithMeta.getMetadata(key)
-                  : undefined;
-              if (value !== undefined) {
-                entries.push({ key, value, metadata });
-              }
-            }
-          } else {
-            // Fallback: iterate through known keys (vector index and any tracked keys)
-            const knownKeys = new Set([
-              ...this.vectorIndex.keys(),
-              ...Array.from(this.embeddingCache.keys())
-            ]);
-            
-            for (const key of knownKeys) {
-              const value = this.cacheManager.get(key);
-              let metadata: Record<string, unknown> | undefined = undefined;
-              if (
-                typeof (cacheManagerWithMeta.getMetadata) === 'function'
-              ) {
-                metadata = cacheManagerWithMeta.getMetadata(key);
-              }
-              if (value !== undefined) {
-                entries.push({ key, value, metadata });
-              }
-            }
-          }
-          
-          return entries;
-        } catch (error) {
-          logger.error('Error getting all cache entries', { error });
-          return [];
-        }
-      }
-
-      /**
-       * Optimize vector index by removing orphaned entries
-       */
-      public optimizeVectorIndex(): { removed: number; remaining: number } {
-        const orphanedKeys: string[] = [];
-        
-        for (const key of this.vectorIndex.keys()) {
-          const exists = typeof this.cacheManager.has === 'function'
-            ? this.cacheManager.has(key)
-            : this.cacheManager.get(key) !== undefined;
-          if (!exists) {
-            orphanedKeys.push(key);
+      if (typeof cacheManagerWithMeta.getAllKeys === 'function') {
+        const keys = await cacheManagerWithMeta.getAllKeys();
+        for (const key of keys) {
+          const value = this.cacheManager.get(key);
+          const metadata =
+            typeof cacheManagerWithMeta.getMetadata === 'function'
+              ? cacheManagerWithMeta.getMetadata(key)
+              : undefined;
+          if (value !== undefined) {
+            entries.push({ key, value, metadata });
           }
         }
-        
-        for (const key of orphanedKeys) {
-          this.vectorIndex.delete(key);
-        }
-        
-        const stats = {
-          removed: orphanedKeys.length,
-          remaining: this.vectorIndex.size
-        };
-        
-        if (orphanedKeys.length > 0) {
-          logger.info('Vector index optimized', stats);
-          this.emit('vector-index-optimized', stats);
-        }
-        
-        return stats;
-      }
+      } else {
+        // Fallback: iterate through known keys (vector index and any tracked keys)
+        const knownKeys = new Set([
+          ...this.vectorIndex.keys(),
+          ...Array.from(this.embeddingCache.keys()),
+        ]);
 
-      /**
-       * Cleanup embedding cache by removing least recently used entries
-       */
-      public cleanupEmbeddingCache(maxSize: number = 1000): number {
-        const currentSize = this.embeddingCache.size;
-        let removedCount = 0;
-        
-        if (currentSize > maxSize) {
-          // Convert to array to be able to slice
-          const entries = Array.from(this.embeddingCache.entries());
-          const toRemove = currentSize - maxSize;
-          
-          // Remove oldest entries (first in the map)
-          for (let i = 0; i < toRemove; i++) {
-            const [key] = entries[i];
-            this.embeddingCache.delete(key);
-            removedCount++;
+        for (const key of knownKeys) {
+          const value = this.cacheManager.get(key);
+          let metadata: Record<string, unknown> | undefined = undefined;
+          if (typeof cacheManagerWithMeta.getMetadata === 'function') {
+            metadata = cacheManagerWithMeta.getMetadata(key);
           }
-          
-          logger.debug('Embedding cache cleaned up', { 
-            removed: removedCount, 
-            remaining: this.embeddingCache.size 
-          });
-        }
-        
-        return removedCount;
-      }
-
-      /**
-       * Perform comprehensive cache maintenance
-       */
-      public async performMaintenance(): Promise<{
-        expiredCleared: number;
-        vectorIndexOptimized: { removed: number; remaining: number };
-        embeddingCacheCleaned: number;
-      }> {
-        logger.info('Starting cache maintenance');
-        
-        const results = {
-          expiredCleared: await this.clearExpired(),
-          vectorIndexOptimized: this.optimizeVectorIndex(),
-          embeddingCacheCleaned: this.cleanupEmbeddingCache()
-        };
-        
-        logger.info('Cache maintenance completed', results);
-        this.emit('maintenance-completed', results);
-        
-        return results;
-      }
-
-      /**
-       * Cleanup and destroy with proper resource management
-       */
-      public async destroy(): Promise<void> {
-        try {
-          logger.info('Destroying unified cache system');
-          
-          // Stop any periodic maintenance
-          await this.performMaintenance();
-          
-          // Clear all caches
-          this.clear();
-          
-          // Stop the underlying cache manager
-          if (typeof this.cacheManager.stop === 'function') {
-            this.cacheManager.stop();
-          } else if (typeof this.cacheManager.destroy === 'function') {
-            this.cacheManager.destroy();
+          if (value !== undefined) {
+            entries.push({ key, value, metadata });
           }
-          
-          // Clear legacy adapters
-          this.legacyAdapters.clear();
-          
-          // Remove all event listeners
-          this.removeAllListeners();
-          
-          logger.info('Unified cache system destroyed successfully');
-          this.emit('destroyed');
-        } catch (error) {
-          logger.error('Error during cache system destruction', { error });
-          this.emit('error', error);
-          throw error;
         }
+      }
+
+      return entries;
+    } catch (error) {
+      logger.error('Error getting all cache entries', { error });
+      return [];
+    }
+  }
+
+  /**
+   * Optimize vector index by removing orphaned entries
+   */
+  public optimizeVectorIndex(): { removed: number; remaining: number } {
+    const orphanedKeys: string[] = [];
+
+    for (const key of this.vectorIndex.keys()) {
+      const exists =
+        typeof this.cacheManager.has === 'function'
+          ? this.cacheManager.has(key)
+          : this.cacheManager.get(key) !== undefined;
+      if (!exists) {
+        orphanedKeys.push(key);
       }
     }
 
-    /**
-     * Interface for migrating legacy cache systems
-     */
-    export interface LegacyCacheAdapter {
-      readonly name: string;
-      
-      /**
-       * Export all data from legacy cache system
-       */
-      exportData: () => Promise<Array<{
-        key: string;
-        value: unknown;
-        ttl?: number;
-        tags?: string[];
-        metadata?: Record<string, unknown>;
-        createdAt?: number;
-        accessedAt?: number;
-      }>>;
-
-      /**
-       * Clear all data from legacy cache system
-       */
-      clear: () => Promise<void>;
-
-      /**
-       * Validate data integrity before migration
-       */
-      validateData?: () => Promise<{
-        isValid: boolean;
-        errors: string[];
-        totalEntries: number;
-        validEntries: number;
-      }>;
-
-      /**
-       * Cleanup legacy cache system resources
-       */
-      destroy?: () => Promise<void>;
-
-      /**
-       * Get statistics about the legacy cache system
-       */
-      getStats?: () => Promise<{
-        totalEntries: number;
-        totalSize: number;
-        oldestEntry?: number;
-        newestEntry?: number;
-      }>;
+    for (const key of orphanedKeys) {
+      this.vectorIndex.delete(key);
     }
 
-    /**
-     * Built-in adapter for migrating from simple Map-based caches
-     */
-    export class MapCacheAdapter implements LegacyCacheAdapter {
-      public readonly name: string;
-      private readonly cache: Map<string, { value: unknown; metadata?: Record<string, unknown> }>;
+    const stats = {
+      removed: orphanedKeys.length,
+      remaining: this.vectorIndex.size,
+    };
 
-      public constructor(
-        name: string, 
-        cache: Map<string, { value: unknown; metadata?: Record<string, unknown> }>
-      ) {
-        this.name = name;
-        this.cache = cache;
+    if (orphanedKeys.length > 0) {
+      logger.info('Vector index optimized', stats);
+      this.emit('vector-index-optimized', stats);
+    }
+
+    return stats;
+  }
+
+  /**
+   * Cleanup embedding cache by removing least recently used entries
+   */
+  public cleanupEmbeddingCache(maxSize: number = 1000): number {
+    const currentSize = this.embeddingCache.size;
+    let removedCount = 0;
+
+    if (currentSize > maxSize) {
+      // Convert to array to be able to slice
+      const entries = Array.from(this.embeddingCache.entries());
+      const toRemove = currentSize - maxSize;
+
+      // Remove oldest entries (first in the map)
+      for (let i = 0; i < toRemove; i++) {
+        const [key] = entries[i];
+        this.embeddingCache.delete(key);
+        removedCount++;
       }
 
-      public async exportData(): Promise<Array<{
-        key: string;
-        value: unknown;
-        ttl?: number;
-        tags?: string[];
-        metadata?: Record<string, unknown>;
-        createdAt?: number;
-        accessedAt?: number;
-      }>> {
-        const entries: Array<{
-          key: string;
-          value: unknown;
-          ttl?: number;
-          tags?: string[];
-          metadata?: Record<string, unknown>;
-          createdAt?: number;
-          accessedAt?: number;
-        }> = [];
+      logger.debug('Embedding cache cleaned up', {
+        removed: removedCount,
+        remaining: this.embeddingCache.size,
+      });
+    }
 
-        for (const [key, { value, metadata }] of this.cache.entries()) {
-          entries.push({
+    return removedCount;
+  }
+
+  /**
+   * Perform comprehensive cache maintenance
+   */
+  public async performMaintenance(): Promise<{
+    expiredCleared: number;
+    vectorIndexOptimized: { removed: number; remaining: number };
+    embeddingCacheCleaned: number;
+  }> {
+    logger.info('Starting cache maintenance');
+
+    const results = {
+      expiredCleared: await this.clearExpired(),
+      vectorIndexOptimized: this.optimizeVectorIndex(),
+      embeddingCacheCleaned: this.cleanupEmbeddingCache(),
+    };
+
+    logger.info('Cache maintenance completed', results);
+    this.emit('maintenance-completed', results);
+
+    return results;
+  }
+
+  /**
+   * Cleanup and destroy with proper resource management
+   */
+  public async destroy(): Promise<void> {
+    try {
+      logger.info('Destroying unified cache system');
+
+      // Stop any periodic maintenance
+      await this.performMaintenance();
+
+      // Clear all caches
+      this.clear();
+
+      // Stop the underlying cache manager
+      if (typeof this.cacheManager.stop === 'function') {
+        this.cacheManager.stop();
+      } else if (typeof this.cacheManager.destroy === 'function') {
+        this.cacheManager.destroy();
+      }
+
+      // Clear legacy adapters
+      this.legacyAdapters.clear();
+
+      // Remove all event listeners
+      this.removeAllListeners();
+
+      logger.info('Unified cache system destroyed successfully');
+      this.emit('destroyed');
+    } catch (error) {
+      logger.error('Error during cache system destruction', { error });
+      this.emit('error', error);
+      throw error;
+    }
+  }
+}
+
+/**
+ * Interface for migrating legacy cache systems
+ */
+export interface LegacyCacheAdapter {
+  readonly name: string;
+
+  /**
+   * Export all data from legacy cache system
+   */
+  exportData: () => Promise<
+    Array<{
+      key: string;
+      value: unknown;
+      ttl?: number;
+      tags?: string[];
+      metadata?: Record<string, unknown>;
+      createdAt?: number;
+      accessedAt?: number;
+    }>
+  >;
+
+  /**
+   * Clear all data from legacy cache system
+   */
+  clear: () => Promise<void>;
+
+  /**
+   * Validate data integrity before migration
+   */
+  validateData?: () => Promise<{
+    isValid: boolean;
+    errors: string[];
+    totalEntries: number;
+    validEntries: number;
+  }>;
+
+  /**
+   * Cleanup legacy cache system resources
+   */
+  destroy?: () => Promise<void>;
+
+  /**
+   * Get statistics about the legacy cache system
+   */
+  getStats?: () => Promise<{
+    totalEntries: number;
+    totalSize: number;
+    oldestEntry?: number;
+    newestEntry?: number;
+  }>;
+}
+
+/**
+ * Built-in adapter for migrating from simple Map-based caches
+ */
+export class MapCacheAdapter implements LegacyCacheAdapter {
+  public readonly name: string;
+  private readonly cache: Map<string, { value: unknown; metadata?: Record<string, unknown> }>;
+
+  public constructor(
+    name: string,
+    cache: Map<string, { value: unknown; metadata?: Record<string, unknown> }>
+  ) {
+    this.name = name;
+    this.cache = cache;
+  }
+
+  public async exportData(): Promise<
+    Array<{
+      key: string;
+      value: unknown;
+      ttl?: number;
+      tags?: string[];
+      metadata?: Record<string, unknown>;
+      createdAt?: number;
+      accessedAt?: number;
+    }>
+  > {
+    const entries: Array<{
+      key: string;
+      value: unknown;
+      ttl?: number;
+      tags?: string[];
+      metadata?: Record<string, unknown>;
+      createdAt?: number;
+      accessedAt?: number;
+    }> = [];
+
+    for (const [key, { value, metadata }] of this.cache.entries()) {
+      entries.push({
         key,
         value,
         ttl: metadata?.ttl as number | undefined,
@@ -1012,91 +1037,90 @@ export class UnifiedCacheSystem extends EventEmitter {
         metadata,
         createdAt: metadata?.createdAt as number | undefined,
         accessedAt: metadata?.accessedAt as number | undefined,
-          });
+      });
+    }
+
+    return entries;
+  }
+
+  public async clear(): Promise<void> {
+    this.cache.clear();
+  }
+
+  public async validateData(): Promise<{
+    isValid: boolean;
+    errors: string[];
+    totalEntries: number;
+    validEntries: number;
+  }> {
+    const errors: string[] = [];
+    let validEntries = 0;
+    const totalEntries = this.cache.size;
+
+    for (const [key, entry] of this.cache.entries()) {
+      if (!key || typeof key !== 'string') {
+        errors.push(`Invalid key: ${key}`);
+        continue;
+      }
+
+      if (!entry || typeof entry !== 'object') {
+        errors.push(`Invalid entry for key ${key}`);
+        continue;
+      }
+
+      if (!('value' in entry)) {
+        errors.push(`Missing value for key ${key}`);
+        continue;
+      }
+
+      validEntries++;
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      totalEntries,
+      validEntries,
+    };
+  }
+
+  public async getStats(): Promise<{
+    totalEntries: number;
+    totalSize: number;
+    oldestEntry?: number;
+    newestEntry?: number;
+  }> {
+    let totalSize = 0;
+    let oldestEntry: number | undefined;
+    let newestEntry: number | undefined;
+
+    for (const [, { metadata }] of this.cache.entries()) {
+      // Rough size estimation
+      totalSize += JSON.stringify(metadata).length;
+
+      const createdAt = metadata?.createdAt as number | undefined;
+      if (createdAt) {
+        if (!oldestEntry || createdAt < oldestEntry) {
+          oldestEntry = createdAt;
         }
-
-        return entries;
-      }
-
-      public async clear(): Promise<void> {
-        this.cache.clear();
-      }
-
-      public async validateData(): Promise<{
-        isValid: boolean;
-        errors: string[];
-        totalEntries: number;
-        validEntries: number;
-      }> {
-        const errors: string[] = [];
-        let validEntries = 0;
-        const totalEntries = this.cache.size;
-
-        for (const [key, entry] of this.cache.entries()) {
-          if (!key || typeof key !== 'string') {
-            errors.push(`Invalid key: ${key}`);
-            continue;
-          }
-
-          if (!entry || typeof entry !== 'object') {
-            errors.push(`Invalid entry for key ${key}`);
-            continue;
-          }
-
-          if (!('value' in entry)) {
-            errors.push(`Missing value for key ${key}`);
-            continue;
-          }
-
-          validEntries++;
+        if (!newestEntry || createdAt > newestEntry) {
+          newestEntry = createdAt;
         }
-
-        return {
-          isValid: errors.length === 0,
-          errors,
-          totalEntries,
-          validEntries,
-        };
-      }
-
-      public async getStats(): Promise<{
-        totalEntries: number;
-        totalSize: number;
-        oldestEntry?: number;
-        newestEntry?: number;
-      }> {
-        let totalSize = 0;
-        let oldestEntry: number | undefined;
-        let newestEntry: number | undefined;
-
-        for (const [, { metadata }] of this.cache.entries()) {
-          // Rough size estimation
-          totalSize += JSON.stringify(metadata).length;
-
-          const createdAt = metadata?.createdAt as number | undefined;
-          if (createdAt) {
-            if (!oldestEntry || createdAt < oldestEntry) {
-              oldestEntry = createdAt;
-            }
-            if (!newestEntry || createdAt > newestEntry) {
-              newestEntry = createdAt;
-            }
-          }
-        }
-
-        return {
-          totalEntries: this.cache.size,
-          totalSize,
-          oldestEntry,
-          newestEntry,
-        };
-      }
-
-      public async destroy(): Promise<void> {
-        this.cache.clear();
       }
     }
 
+    return {
+      totalEntries: this.cache.size,
+      totalSize,
+      oldestEntry,
+      newestEntry,
+    };
+  }
+
+  public async destroy(): Promise<void> {
+    this.cache.clear();
+  }
+}
 
 /**
  * Default configuration for unified cache system

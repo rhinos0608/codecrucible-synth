@@ -40,7 +40,7 @@ export class FilesystemTools {
         // Use the new fast file read method from Rust
         const { loadRustExecutorSafely } = await import('../../utils/rust-module-loader.js');
         const { module: rustExecutorModule } = loadRustExecutorSafely();
-        
+
         if (rustExecutorModule?.RustExecutor) {
           const executor = new rustExecutorModule.RustExecutor();
           // Type-safe async initialization
@@ -51,11 +51,14 @@ export class FilesystemTools {
             return content;
           }
         }
-        
+
         throw new Error('Rust executor not available for fast file read');
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        logger.warn('Fast Rust read failed, trying next method', { path, error: lastError.message });
+        logger.warn('Fast Rust read failed, trying next method', {
+          path,
+          error: lastError.message,
+        });
       }
     }
 
@@ -85,7 +88,7 @@ export class FilesystemTools {
         });
 
         const result = await Promise.race([rustPromise, timeoutPromise]);
-        
+
         if (result.success && result.result) {
           const content = typeof result.result === 'string' ? result.result : String(result.result);
           logger.info(`✅ Rust executor succeeded for ${path} in ${Date.now() - startTime}ms`);
@@ -111,7 +114,7 @@ export class FilesystemTools {
 
     try {
       logger.info(`📁 Using MCP fallback for file read: ${path}`);
-      
+
       // Add timeout to MCP calls too
       const mcpPromise = this.mcpManager.readFileSecure(path);
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -128,11 +131,13 @@ export class FilesystemTools {
       logger.error(`❌ All filesystem read methods failed for path: ${path}`, {
         rustStreamingError: lastError?.message,
         mcpError: mcpError.message,
-        totalTime: `${Date.now() - startTime}ms`
+        totalTime: `${Date.now() - startTime}ms`,
       });
-      
+
       // Throw the most informative error
-      throw new Error(`File read failed for '${path}'. Tried: Rust streaming (${lastError?.message || 'not available'}), MCP (${mcpError.message})`);
+      throw new Error(
+        `File read failed for '${path}'. Tried: Rust streaming (${lastError?.message || 'not available'}), MCP (${mcpError.message})`
+      );
     }
   }
 
@@ -416,7 +421,9 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
+          _context: Readonly<
+            import('../../domain/interfaces/tool-execution.js').ToolExecutionContext
+          >
         ): Promise<{ success: boolean; data: string; metadata: { executionTime: number } }> => {
           const startTime = Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
@@ -448,7 +455,9 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
+          _context: Readonly<
+            import('../../domain/interfaces/tool-execution.js').ToolExecutionContext
+          >
         ): Promise<{ success: boolean; data: string; metadata: { executionTime: number } }> => {
           const startTime = Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
@@ -477,7 +486,9 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
+          _context: Readonly<
+            import('../../domain/interfaces/tool-execution.js').ToolExecutionContext
+          >
         ): Promise<{ success: boolean; data: string[]; metadata: { executionTime: number } }> => {
           const startTime = Date.now();
           const dirPath = typeof args.path === 'string' ? args.path : '';
@@ -505,8 +516,14 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
-        ): Promise<{ success: boolean; data: { exists: boolean; path: string }; metadata: { executionTime: number } }> => {
+          _context: Readonly<
+            import('../../domain/interfaces/tool-execution.js').ToolExecutionContext
+          >
+        ): Promise<{
+          success: boolean;
+          data: { exists: boolean; path: string };
+          metadata: { executionTime: number };
+        }> => {
           const startTime = Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
           const exists = await this.exists(filePath);

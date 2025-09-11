@@ -30,12 +30,12 @@ export class OllamaHttpClient {
       body: JSON.stringify(body),
       signal,
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
       throw new Error(`Request failed with status ${response.status}: ${errorText}`);
     }
-    
+
     return response;
   }
 }

@@ -624,8 +624,12 @@ User Request: ${userPrompt}`;
   ): Promise<ModelResponse> {
     logger.debug('ConcreteWorkflowOrchestrator: Checking for tool calls');
     logger.debug('ConcreteWorkflowOrchestrator: response keys:', { keys: Object.keys(response) });
-    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls exists:', { hasToolCalls: !!response.toolCalls });
-    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls length:', { length: response.toolCalls?.length });
+    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls exists:', {
+      hasToolCalls: !!response.toolCalls,
+    });
+    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls length:', {
+      length: response.toolCalls?.length,
+    });
 
     if (
       response.toolCalls &&
@@ -780,7 +784,9 @@ User Request: ${userPrompt}`;
           }
         } catch (err) {
           // If MCP tool failed, allow fallback to local fs below
-          logger.debug('MCP stats tool failed, falling back to fs.stat', { error: toReadonlyRecord(err) });
+          logger.debug('MCP stats tool failed, falling back to fs.stat', {
+            error: toReadonlyRecord(err),
+          });
           usedMcp = false;
         }
       }
@@ -820,7 +826,9 @@ User Request: ${userPrompt}`;
             fileContent = undefined;
           }
         } catch (err) {
-          logger.debug('MCP read tool threw, falling back to fs.readFile', { error: toReadonlyRecord(err) });
+          logger.debug('MCP read tool threw, falling back to fs.readFile', {
+            error: toReadonlyRecord(err),
+          });
           fileContent = undefined;
         }
       }
@@ -877,7 +885,9 @@ User Request: ${userPrompt}`;
         try {
           modelResponse = await this.processToolCalls(modelResponse, request, modelRequest);
         } catch (err) {
-          logger.warn('Processing tool calls during analysis failed', { error: toReadonlyRecord(err) });
+          logger.warn('Processing tool calls during analysis failed', {
+            error: toReadonlyRecord(err),
+          });
         }
 
         // Try to parse model text into JSON result if the model returned plain text
@@ -994,4 +1004,3 @@ User Request: ${userPrompt}`;
     }
   }
 }
-

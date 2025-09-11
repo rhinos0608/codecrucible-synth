@@ -16,4 +16,3 @@ export interface IUnifiedMetrics {
   /** Start a timer; returns a function to stop and record duration in seconds. */
   startTimer(name: string, tags?: MetricTags): () => void;
 }
-

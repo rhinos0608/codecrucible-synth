@@ -46,4 +46,3 @@ export function createEventBus(options: Readonly<EventBusFactoryOptions> = {}): 
 }
 
 export default createEventBus;
-

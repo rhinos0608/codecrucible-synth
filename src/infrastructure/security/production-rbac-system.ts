@@ -127,7 +127,10 @@ export class ProductionRBACSystem extends EventEmitter {
       this.startCacheCleanup();
       logger.info('Production RBAC system initialized');
     } catch (error) {
-      logger.error('Failed to initialize RBAC system:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Failed to initialize RBAC system:',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -138,14 +141,17 @@ export class ProductionRBACSystem extends EventEmitter {
   private async loadJWTSecrets(): Promise<void> {
     try {
       this.jwtSecret =
-        (await this.secretsManager.getSecret('jwt_access_secret')) ?? 
+        (await this.secretsManager.getSecret('jwt_access_secret')) ??
         (await this.generateAndStoreSecret('jwt_access_secret'));
 
       this.jwtRefreshSecret =
-        (await this.secretsManager.getSecret('jwt_refresh_secret')) ?? 
+        (await this.secretsManager.getSecret('jwt_refresh_secret')) ??
         (await this.generateAndStoreSecret('jwt_refresh_secret'));
     } catch (error) {
-      logger.error('Failed to load JWT secrets:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Failed to load JWT secrets:',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -165,13 +171,15 @@ export class ProductionRBACSystem extends EventEmitter {
   /**
    * Register new user with secure password hashing
    */
-  public async registerUser(userData: Readonly<{
-    username: string;
-    email?: string;
-    password: string;
-    roles?: string[];
-    metadata?: Record<string, unknown>;
-  }>): Promise<string> {
+  public async registerUser(
+    userData: Readonly<{
+      username: string;
+      email?: string;
+      password: string;
+      roles?: string[];
+      metadata?: Record<string, unknown>;
+    }>
+  ): Promise<string> {
     try {
       // Validate password strength
       this.validatePasswordStrength(userData.password);
@@ -223,7 +231,10 @@ export class ProductionRBACSystem extends EventEmitter {
       logger.info(`User registered: ${userData.username}`, { userId });
       return userId;
     } catch (error) {
-      logger.error('User registration failed:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'User registration failed:',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -368,7 +379,10 @@ export class ProductionRBACSystem extends EventEmitter {
         expiresIn: this.accessTokenExpiryMs,
       };
     } catch (error) {
-      logger.error('Authentication error:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Authentication error:',
+        error instanceof Error ? error : new Error(String(error))
+      );
       return { success: false, error: 'Authentication service error' };
     }
   }
@@ -438,7 +452,10 @@ export class ProductionRBACSystem extends EventEmitter {
         constraints: constraintCheck.appliedConstraints,
       };
     } catch (error) {
-      logger.error('Authorization error:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Authorization error:',
+        error instanceof Error ? error : new Error(String(error))
+      );
 
       // Fail secure - deny access on error
       return {
@@ -456,7 +473,11 @@ export class ProductionRBACSystem extends EventEmitter {
   public async refreshToken(refreshToken: string): Promise<AuthenticationResult> {
     try {
       // Verify refresh token
-      const payload = jwt.verify(refreshToken, this.jwtRefreshSecret) as { jti: string; sessionId: string; sub: string };
+      const payload = jwt.verify(refreshToken, this.jwtRefreshSecret) as {
+        jti: string;
+        sessionId: string;
+        sub: string;
+      };
 
       if (this.revokedTokens.has(payload.jti)) {
         return { success: false, error: 'Token revoked' };
@@ -513,7 +534,10 @@ export class ProductionRBACSystem extends EventEmitter {
         expiresIn: this.accessTokenExpiryMs,
       };
     } catch (error) {
-      logger.error('Token refresh failed:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Token refresh failed:',
+        error instanceof Error ? error : new Error(String(error))
+      );
       return { success: false, error: 'Invalid refresh token' };
     }
   }
@@ -539,7 +563,10 @@ export class ProductionRBACSystem extends EventEmitter {
 
       return false;
     } catch (error) {
-      logger.error('Session revocation failed:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Session revocation failed:',
+        error instanceof Error ? error : new Error(String(error))
+      );
       return false;
     }
   }
@@ -588,7 +615,9 @@ export class ProductionRBACSystem extends EventEmitter {
       return [];
     }
 
-    interface UserRolesRow { roles: string | string[] | null; }
+    interface UserRolesRow {
+      roles: string | string[] | null;
+    }
     const [row] = userResult.rows as UserRolesRow[];
     const rolesRaw = row.roles;
     const roles: readonly string[] = Array.isArray(rolesRaw)
@@ -614,7 +643,9 @@ export class ProductionRBACSystem extends EventEmitter {
 
         if (!Array.isArray(roleResult.rows) || roleResult.rows.length === 0) continue;
 
-        const [role] = roleResult.rows as [{ permission_ids: string | null; inherited_role_ids: string | null }];
+        const [role] = roleResult.rows as [
+          { permission_ids: string | null; inherited_role_ids: string | null },
+        ];
 
         const permissionIdsRaw = role.permission_ids;
         const inheritedRoleIdsRaw = role.inherited_role_ids;
@@ -702,7 +733,12 @@ export class ProductionRBACSystem extends EventEmitter {
   private extractJTI(token: string): string {
     try {
       const decoded = jwt.decode(token);
-      if (decoded && typeof decoded === 'object' && 'jti' in decoded && typeof (decoded as { jti?: unknown }).jti === 'string') {
+      if (
+        decoded &&
+        typeof decoded === 'object' &&
+        'jti' in decoded &&
+        typeof (decoded as { jti?: unknown }).jti === 'string'
+      ) {
         return (decoded as { jti: string }).jti;
       }
       return '';
@@ -724,7 +760,9 @@ export class ProductionRBACSystem extends EventEmitter {
   private async validateRoles(roles: string[]): Promise<void> {
     const result = await this.db.query('SELECT name FROM roles WHERE name = ANY($1)', [roles]);
 
-    const validRoles = (result.rows as Array<{ name: string }>).map((r: { name: string }) => r.name);
+    const validRoles = (result.rows as Array<{ name: string }>).map(
+      (r: { name: string }) => r.name
+    );
     const invalidRoles = roles.filter(role => !validRoles.includes(role));
 
     if (invalidRoles.length > 0) {
@@ -766,22 +804,24 @@ export class ProductionRBACSystem extends EventEmitter {
   }
 
   // Define a type for the user row returned from the database
-  private mapDatabaseUser(row: Readonly<{
-    id: string;
-    username: string;
-    email?: string;
-    password_hash: string;
-    salt: string;
-    roles: string | string[] | null;
-    status: 'active' | 'inactive' | 'suspended';
-    last_login?: Date | null;
-    failed_login_attempts: number;
-    account_locked: boolean;
-    lockout_expires?: Date | null;
-    metadata: string | null;
-    created_at: Date;
-    updated_at: Date;
-  }>): User {
+  private mapDatabaseUser(
+    row: Readonly<{
+      id: string;
+      username: string;
+      email?: string;
+      password_hash: string;
+      salt: string;
+      roles: string | string[] | null;
+      status: 'active' | 'inactive' | 'suspended';
+      last_login?: Date | null;
+      failed_login_attempts: number;
+      account_locked: boolean;
+      lockout_expires?: Date | null;
+      metadata: string | null;
+      created_at: Date;
+      updated_at: Date;
+    }>
+  ): User {
     return {
       id: row.id,
       username: row.username,
@@ -798,19 +838,28 @@ export class ProductionRBACSystem extends EventEmitter {
       failedLoginAttempts: row.failed_login_attempts,
       accountLocked: row.account_locked,
       lockoutExpires: row.lockout_expires ? new Date(row.lockout_expires) : undefined,
-      metadata: row.metadata ? (typeof row.metadata === 'string' ? JSON.parse(row.metadata) as Record<string, unknown> : {}) : {},
+      metadata: row.metadata
+        ? typeof row.metadata === 'string'
+          ? (JSON.parse(row.metadata) as Record<string, unknown>)
+          : {}
+        : {},
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     };
   }
 
-  private async getRequiredPermissions(resource: string, action: string): Promise<readonly string[]> {
+  private async getRequiredPermissions(
+    resource: string,
+    action: string
+  ): Promise<readonly string[]> {
     const result = await this.db.query(
       "SELECT id FROM permissions WHERE resource = $1 AND (action = $2 OR action = '*')",
       [resource, action]
     );
 
-    return ((result.rows as unknown) as ReadonlyArray<Readonly<{ id: string }>>).map((r: Readonly<{ id: string }>) => r.id);
+    return (result.rows as unknown as ReadonlyArray<Readonly<{ id: string }>>).map(
+      (r: Readonly<{ id: string }>) => r.id
+    );
   }
 
   private permissionMatches(userPermissionId: string, requiredPermissionId: string): boolean {
@@ -869,18 +918,20 @@ export class ProductionRBACSystem extends EventEmitter {
     return { allowed: true };
   }
 
-  private async logSecurityEvent(event: Readonly<{
-    userId?: string;
-    sessionId?: string;
-    eventType: string;
-    severity: string;
-    outcome: string;
-    sourceIp?: string;
-    userAgent?: string;
-    resource?: string;
-    description: string;
-    details?: Record<string, unknown>;
-  }>): Promise<void> {
+  private async logSecurityEvent(
+    event: Readonly<{
+      userId?: string;
+      sessionId?: string;
+      eventType: string;
+      severity: string;
+      outcome: string;
+      sourceIp?: string;
+      userAgent?: string;
+      resource?: string;
+      description: string;
+      details?: Record<string, unknown>;
+    }>
+  ): Promise<void> {
     try {
       await this.db.query(
         `INSERT INTO security_audit_log 
@@ -900,7 +951,10 @@ export class ProductionRBACSystem extends EventEmitter {
         ]
       );
     } catch (error) {
-      logger.error('Failed to log security event:', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Failed to log security event:',
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }
 
@@ -942,7 +996,11 @@ export class ProductionRBACSystem extends EventEmitter {
   /**
    * Check if user has specific permission
    */
-  public async hasPermission(userId: string, permission: string, _resource?: string): Promise<boolean> {
+  public async hasPermission(
+    userId: string,
+    permission: string,
+    _resource?: string
+  ): Promise<boolean> {
     try {
       const userPermissions = await this.getUserPermissions(userId);
       return userPermissions.includes(permission) || userPermissions.includes('*');
@@ -972,22 +1030,24 @@ export class ProductionRBACSystem extends EventEmitter {
 
     const result = await this.db.query(query, [userData.username, userData.email, hashedPassword]);
 
-    return this.mapDatabaseUser(result.rows[0] as {
-      id: string;
-      username: string;
-      email?: string;
-      password_hash: string;
-      salt: string;
-      roles: string | string[] | null;
-      status: 'active' | 'inactive' | 'suspended';
-      last_login?: Date | null;
-      failed_login_attempts: number;
-      account_locked: boolean;
-      lockout_expires?: Date | null;
-      metadata: string | null;
-      created_at: Date;
-      updated_at: Date;
-    });
+    return this.mapDatabaseUser(
+      result.rows[0] as {
+        id: string;
+        username: string;
+        email?: string;
+        password_hash: string;
+        salt: string;
+        roles: string | string[] | null;
+        status: 'active' | 'inactive' | 'suspended';
+        last_login?: Date | null;
+        failed_login_attempts: number;
+        account_locked: boolean;
+        lockout_expires?: Date | null;
+        metadata: string | null;
+        created_at: Date;
+        updated_at: Date;
+      }
+    );
   }
 
   public async assignRoleToUser(userId: string, role: string): Promise<void> {
@@ -1001,21 +1061,23 @@ export class ProductionRBACSystem extends EventEmitter {
     logger.info('Role assigned to user', { userId, role });
   }
 
-  public async getUsers(): Promise<Array<{
-    id: string;
-    username: string;
-    email?: string;
-    status: string;
-    createdAt: Date;
-    lastLogin?: Date;
-  }>> {
+  public async getUsers(): Promise<
+    Array<{
+      id: string;
+      username: string;
+      email?: string;
+      status: string;
+      createdAt: Date;
+      lastLogin?: Date;
+    }>
+  > {
     const query = `
       SELECT id, username, email, status, created_at, last_login
       FROM users
       WHERE status != 'deleted'
       ORDER BY username ASC
     `;
-    
+
     const result = await this.db.query(query);
     const rows = Array.isArray(result) ? result : result.rows || [];
     return rows.map((row: any) => ({
@@ -1024,7 +1086,7 @@ export class ProductionRBACSystem extends EventEmitter {
       email: row.email,
       status: row.status,
       createdAt: new Date(row.created_at),
-      lastLogin: row.last_login ? new Date(row.last_login) : undefined
+      lastLogin: row.last_login ? new Date(row.last_login) : undefined,
     }));
   }
 

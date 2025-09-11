@@ -44,25 +44,27 @@ export class OllamaAdapter implements ProviderAdapter {
       } else {
         messages = [{ role: 'user', content: 'How can I help you?' }];
       }
-      
+
       logger.info('🔧 OllamaAdapter: Using structured messages for Llama 3.1', {
         messageCount: messages.length,
         toolCount: mappedTools.length,
         toolNames: mappedTools.map(t => t.function.name),
-        firstMessage: messages[0]?.content?.substring(0, 100)
+        firstMessage: messages[0]?.content?.substring(0, 100),
       });
 
       // Call provider with structured messages instead of flattened prompt
-      const providerResponse = await this.provider.generateCode('', {
+      const providerResponse = (await this.provider.generateCode('', {
         model: req.model || cfg.defaultModel,
         messages: messages, // Pass structured messages to provider
         tools: mappedTools,
         // Remove tool_choice as it's not documented by Ollama
         availableTools: mappedTools.map(t => t.function.name),
-        onStreamingToken: req.stream ? (token: any) => {
-          // Handle streaming if needed
-        } : undefined,
-      }) as any;  // Provider response type varies
+        onStreamingToken: req.stream
+          ? (token: any) => {
+              // Handle streaming if needed
+            }
+          : undefined,
+      })) as any; // Provider response type varies
 
       // Use the standardized response normalizer
       const normalized = ProviderResponseNormalizer.normalize(
@@ -98,7 +100,7 @@ export class OllamaAdapter implements ProviderAdapter {
         usage: normalized.usage,
         responseTime: normalized.responseTime,
         finishReason: normalized.finishReason,
-        toolCalls: normalized.toolCalls?.map((tc) => ({
+        toolCalls: normalized.toolCalls?.map(tc => ({
           id: tc.id,
           type: tc.type,
           function: {

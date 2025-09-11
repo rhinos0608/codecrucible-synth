@@ -10,4 +10,3 @@ export async function routeThroughTools(
 ): Promise<CLIOperationResponse> {
   return coordinator.processOperation(request);
 }
-

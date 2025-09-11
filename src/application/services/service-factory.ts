@@ -72,7 +72,12 @@ export class ServiceFactory {
     private logger: ILogger = createLogger('ServiceFactory')
   ) {
     // Observability primitives
-    const metrics = new MetricsCollector({ enabled: true, retentionDays: 7, exportInterval: 0, exporters: [] });
+    const metrics = new MetricsCollector({
+      enabled: true,
+      retentionDays: 7,
+      exportInterval: 0,
+      exporters: [],
+    });
     const eventBus = createEventBus({ enableProfiling: true, metrics });
 
     this.runtimeContext = createRuntimeContext({
@@ -175,7 +180,9 @@ export class ServiceFactory {
    */
   async dispose(): Promise<void> {
     if (this.stopBridgeHealth) {
-      try { this.stopBridgeHealth(); } catch {}
+      try {
+        this.stopBridgeHealth();
+      } catch {}
       this.stopBridgeHealth = undefined;
     }
     if (this.resourceCoordinator) {
@@ -231,11 +238,22 @@ export class ServiceFactory {
         const obs = getGlobalObservability();
         if (obs) {
           const metrics = obs.getMetricsCollector();
-          this.stopBridgeHealth = startBridgeHealthReporter(metrics, bridge, { service: 'rust_bridge', intervalMs: 30000 });
+          this.stopBridgeHealth = startBridgeHealthReporter(metrics, bridge, {
+            service: 'rust_bridge',
+            intervalMs: 30000,
+          });
         } else {
           // Fallback to a local collector to avoid missing telemetry in dev
-          const metrics = new MetricsCollector({ enabled: true, retentionDays: 7, exportInterval: 0, exporters: [] });
-          this.stopBridgeHealth = startBridgeHealthReporter(metrics, bridge, { service: 'rust_bridge', intervalMs: 30000 });
+          const metrics = new MetricsCollector({
+            enabled: true,
+            retentionDays: 7,
+            exportInterval: 0,
+            exporters: [],
+          });
+          this.stopBridgeHealth = startBridgeHealthReporter(metrics, bridge, {
+            service: 'rust_bridge',
+            intervalMs: 30000,
+          });
         }
       } catch (err) {
         this.logger?.warn('Failed to start bridge health reporter', err);

@@ -201,7 +201,10 @@ export class BackupManager {
       return metadata;
     } catch (error) {
       const duration = performance.now() - startTime;
-      logger.error('Full backup failed', toErrorOrUndefined(error), { backupId, duration: duration.toFixed(2) });
+      logger.error('Full backup failed', toErrorOrUndefined(error), {
+        backupId,
+        duration: duration.toFixed(2),
+      });
 
       // Send failure notification
       await this.sendNotification('failure', {
@@ -249,7 +252,10 @@ export class BackupManager {
       logger.info(`Restore completed: ${options.backupId} (${duration.toFixed(2)}ms)`);
     } catch (error) {
       const duration = performance.now() - startTime;
-      logger.error('Restore failed', toErrorOrUndefined(error), { backupId: options.backupId, duration: duration.toFixed(2) });
+      logger.error('Restore failed', toErrorOrUndefined(error), {
+        backupId: options.backupId,
+        duration: duration.toFixed(2),
+      });
       throw error;
     }
   }
@@ -302,7 +308,9 @@ export class BackupManager {
         await fs.rm(tempDir, { recursive: true, force: true });
       }
     } catch (error) {
-      logger.error('Backup integrity verification failed', toErrorOrUndefined(error), { backupId: backup.id });
+      logger.error('Backup integrity verification failed', toErrorOrUndefined(error), {
+        backupId: backup.id,
+      });
       return false;
     }
   }
@@ -744,7 +752,9 @@ export class BackupManager {
             logger.warn(`Unsupported backup destination type: ${destination.type}`);
         }
       } catch (error) {
-        logger.error('Failed to store backup to destination', toErrorOrUndefined(error), { destinationType: destination.type });
+        logger.error('Failed to store backup to destination', toErrorOrUndefined(error), {
+          destinationType: destination.type,
+        });
       }
     }
   }

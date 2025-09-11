@@ -165,7 +165,6 @@ function createParametersForTool(registryKey: ToolRegistryKey): {
 export function createDefaultToolRegistry(
   _options: ToolRegistryOptions = {}
 ): Map<ToolRegistryKey, ModelTool> {
-
   const registry = new Map<ToolRegistryKey, ModelTool>();
 
   // Helper function to create ModelTool from typed definition
@@ -219,7 +218,10 @@ export class DefaultToolRegistryHelpers {
   /**
    * Check if registry contains tool (type-safe)
    */
-  public static hasTool(registry: ReadonlyMap<ToolRegistryKey, ModelTool>, key: ToolRegistryKey): boolean {
+  public static hasTool(
+    registry: ReadonlyMap<ToolRegistryKey, ModelTool>,
+    key: ToolRegistryKey
+  ): boolean {
     return registry.has(key);
   }
 

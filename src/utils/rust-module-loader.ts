@@ -206,7 +206,12 @@ export interface RustExecutorModule {
     id: () => string;
     initialize: () => Promise<boolean>;
     execute: (toolId: string, args: string, options?: unknown) => unknown;
-    executeFilesystem: (operation: string, path: string, content?: string, options?: unknown) => unknown;
+    executeFilesystem: (
+      operation: string,
+      path: string,
+      content?: string,
+      options?: unknown
+    ) => unknown;
     executeCommand: (command: string, args: string[], options?: unknown) => unknown;
     read_file_fast: (path: string) => Promise<string>;
     is_runtime_available: () => boolean;
@@ -219,8 +224,18 @@ export interface RustExecutorModule {
     get_filesystem_operations: () => string[];
     get_supported_commands: () => string[];
     cleanup: () => void;
-    stream_file: (filePath: string, chunkSize?: number, contextType?: string, callback?: unknown) => string;
-    stream_command: (command: string, args: string[], chunkSize?: number, callback?: unknown) => string;
+    stream_file: (
+      filePath: string,
+      chunkSize?: number,
+      contextType?: string,
+      callback?: unknown
+    ) => string;
+    stream_command: (
+      command: string,
+      args: string[],
+      chunkSize?: number,
+      callback?: unknown
+    ) => string;
     terminateStream?: (sessionId: string) => void;
   };
   createRustExecutor?: () => unknown;
@@ -355,22 +370,37 @@ export function loadRustExecutorSafely(baseDir?: string): {
  */
 export function createFallbackRustExecutor(error: string): RustExecutorModule {
   const fallbackExecutor = {
-    id: (): never => { throw new Error(`Rust module not available: ${error}`); },
-    initialize: async (): Promise<never> => { throw new Error(`Rust module not available: ${error}`); },
-    execute: (): never => { throw new Error(`Rust module not available: ${error}`); },
-    executeFilesystem: (): never => { throw new Error(`Rust module not available: ${error}`); },
-    executeCommand: (): never => { throw new Error(`Rust module not available: ${error}`); },
-    read_file_fast: async (): Promise<never> => { throw new Error(`Rust file operations not available: ${error}`); },
+    id: (): never => {
+      throw new Error(`Rust module not available: ${error}`);
+    },
+    initialize: async (): Promise<never> => {
+      throw new Error(`Rust module not available: ${error}`);
+    },
+    execute: (): never => {
+      throw new Error(`Rust module not available: ${error}`);
+    },
+    executeFilesystem: (): never => {
+      throw new Error(`Rust module not available: ${error}`);
+    },
+    executeCommand: (): never => {
+      throw new Error(`Rust module not available: ${error}`);
+    },
+    read_file_fast: async (): Promise<never> => {
+      throw new Error(`Rust file operations not available: ${error}`);
+    },
     is_runtime_available: (): boolean => false,
     get_runtime_stats: (): string => JSON.stringify({ runtime_available: false, error }),
     ensure_tokio_runtime: (): boolean => false,
-    get_performance_metrics: async (): Promise<string> => Promise.resolve(JSON.stringify({
-      total_requests: 0,
-      successful_requests: 0,
-      failed_requests: 0,
-      average_execution_time_ms: 0,
-      error: 'Rust module not available',
-    })),
+    get_performance_metrics: async (): Promise<string> =>
+      Promise.resolve(
+        JSON.stringify({
+          total_requests: 0,
+          successful_requests: 0,
+          failed_requests: 0,
+          average_execution_time_ms: 0,
+          error: 'Rust module not available',
+        })
+      ),
     reset_performance_metrics: async (): Promise<void> => {
       logger.warn('Rust performance metrics not available - module failed to load');
       return Promise.resolve();
@@ -379,9 +409,15 @@ export function createFallbackRustExecutor(error: string): RustExecutorModule {
     get_supported_tools: (): string[] => [],
     get_filesystem_operations: (): string[] => [],
     get_supported_commands: (): string[] => [],
-    cleanup: (): void => { /* no-op */ },
-    stream_file: (): never => { throw new Error(`Rust streaming not available: ${error}`); },
-    stream_command: (): never => { throw new Error(`Rust streaming not available: ${error}`); },
+    cleanup: (): void => {
+      /* no-op */
+    },
+    stream_file: (): never => {
+      throw new Error(`Rust streaming not available: ${error}`);
+    },
+    stream_command: (): never => {
+      throw new Error(`Rust streaming not available: ${error}`);
+    },
   };
 
   return {

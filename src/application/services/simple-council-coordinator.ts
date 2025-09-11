@@ -68,7 +68,7 @@ export class SimpleCouncilCoordinator {
       generateResponse: selectedModel.generateResponse?.bind(selectedModel) as unknown as (
         request: Readonly<ProcessingRequest>,
         options: Readonly<{ id: string }>
-      ) => Promise<{ content: string; confidence?: number; processingTime?: number }>
+      ) => Promise<{ content: string; confidence?: number; processingTime?: number }>,
     };
 
     // Generate responses from all voices
@@ -94,7 +94,9 @@ export class SimpleCouncilCoordinator {
    * Get voice recommendations without synthesis
    * For cases where individual perspectives are needed
    */
-  public async getVoiceRecommendations(request: Readonly<CouncilRequest>): Promise<VoiceContribution[]> {
+  public async getVoiceRecommendations(
+    request: Readonly<CouncilRequest>
+  ): Promise<VoiceContribution[]> {
     const processingRequest = this.transformToProcessingRequest(request);
     const selectedModel = await Promise.resolve(
       this.modelSelectionService.selectOptimalModel(processingRequest)
@@ -106,14 +108,15 @@ export class SimpleCouncilCoordinator {
         (async (
           _request: Readonly<ProcessingRequest>,
           _options: Readonly<{ readonly id: string }>
-        ): Promise<{ content: string; confidence?: number; processingTime?: number }> => Promise.resolve({
-          content: '',
-          confidence: 0,
-          processingTime: 0,
-        }))) as (
+        ): Promise<{ content: string; confidence?: number; processingTime?: number }> =>
+          Promise.resolve({
+            content: '',
+            confidence: 0,
+            processingTime: 0,
+          }))) as (
         request: Readonly<ProcessingRequest>,
         options: Readonly<{ readonly id: string }>
-      ) => Promise<{ content: string; confidence?: number; processingTime?: number }>
+      ) => Promise<{ content: string; confidence?: number; processingTime?: number }>,
     };
 
     const voiceResponses = await this.generateVoiceResponses(
@@ -145,7 +148,12 @@ export class SimpleCouncilCoordinator {
   private async generateVoiceResponses(
     voiceIds: readonly string[],
     request: Readonly<ProcessingRequest>,
-    model: { generateResponse: (request: ProcessingRequest, options: { id: string }) => Promise<{ content: string; confidence?: number; processingTime?: number }> }
+    model: {
+      generateResponse: (
+        request: ProcessingRequest,
+        options: { id: string }
+      ) => Promise<{ content: string; confidence?: number; processingTime?: number }>;
+    }
   ): Promise<VoiceResponse[]> {
     const responses: VoiceResponse[] = [];
 
@@ -249,8 +257,10 @@ export class SimpleCouncilCoordinator {
 
     // Calculate average confidence as a simple consensus metric
     const avgConfidence =
-      voiceResponses.reduce((sum: number, response: Readonly<VoiceResponse>) => sum + response.confidence, 0) /
-      voiceResponses.length;
+      voiceResponses.reduce(
+        (sum: number, response: Readonly<VoiceResponse>) => sum + response.confidence,
+        0
+      ) / voiceResponses.length;
 
     // Adjust for number of voices (more voices = potentially less consensus)
     const voiceCountFactor = Math.min(1.0, 2.0 / voiceResponses.length);

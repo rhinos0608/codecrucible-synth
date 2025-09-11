@@ -111,7 +111,7 @@ class SystemMonitoringUtils {
     let totalIdle = 0;
     let totalTick = 0;
 
-    cpuInfo.forEach((cpu: Readonly<typeof cpuInfo[0]>) => {
+    cpuInfo.forEach((cpu: Readonly<(typeof cpuInfo)[0]>) => {
       for (const type in cpu.times) {
         if (Object.prototype.hasOwnProperty.call(cpu.times, type)) {
           totalTick += cpu.times[type as keyof typeof cpu.times];
@@ -522,7 +522,6 @@ export class MCPServerMonitoring extends EventEmitter {
       this.collectServerMetrics(serverId).catch(error => {
         logger.error(`Error collecting server metrics for ${serverId}:`, error);
       });
-
     }, this.config.healthCheckInterval);
 
     this.monitoringIntervals.set(serverId, interval);
@@ -788,7 +787,8 @@ export class MCPServerMonitoring extends EventEmitter {
 
       // Remove old acknowledged alerts
       serverMetric.alerts = serverMetric.alerts.filter(
-        (alert: Readonly<AlertEntry>) => !alert.acknowledged || alert.timestamp.getTime() > cutoffTime
+        (alert: Readonly<AlertEntry>) =>
+          !alert.acknowledged || alert.timestamp.getTime() > cutoffTime
       );
     }
 
@@ -839,9 +839,9 @@ export class MCPServerMonitoring extends EventEmitter {
             const v =
               typeof mObj.cpu_usage !== 'undefined'
                 ? mObj.cpu_usage
-                : (mObj.cpu && typeof mObj.cpu === 'object'
-                    ? (mObj.cpu as Record<string, unknown>).usage
-                    : undefined);
+                : mObj.cpu && typeof mObj.cpu === 'object'
+                  ? (mObj.cpu as Record<string, unknown>).usage
+                  : undefined;
             if (v !== undefined) return Number(v) || 0;
           }
         }

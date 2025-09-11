@@ -175,7 +175,8 @@ export class ContextualToolFilter {
   private readonly MIN_TOOLS = 3; // Always include at least core tools
 
   // Performance optimization: Pre-computed lookup indices
-  private readonly toolNameIndex: Map<string, { function?: { name?: string }; name?: string }> = new Map();
+  private readonly toolNameIndex: Map<string, { function?: { name?: string }; name?: string }> =
+    new Map();
   private readonly aliasIndex: Map<string, string[]> = new Map(); // alias -> [registryKeys]
   private readonly functionNameIndex: Map<string, string> = new Map(); // functionName -> registryKey
   private isIndexInitialized = false;
@@ -183,7 +184,9 @@ export class ContextualToolFilter {
   /**
    * Initialize performance indices for O(1) tool lookups
    */
-  private initializeIndices(allTools: ReadonlyArray<Readonly<{ function?: { name?: string }; name?: string }>>): void {
+  private initializeIndices(
+    allTools: ReadonlyArray<Readonly<{ function?: { name?: string }; name?: string }>>
+  ): void {
     if (this.isIndexInitialized) return;
 
     const indexStartTime = Date.now();
@@ -197,7 +200,11 @@ export class ContextualToolFilter {
     for (const tool of allTools) {
       let toolName: string = '';
       if (tool && typeof tool === 'object') {
-        if (tool.function && typeof tool.function === 'object' && typeof tool.function.name === 'string') {
+        if (
+          tool.function &&
+          typeof tool.function === 'object' &&
+          typeof tool.function.name === 'string'
+        ) {
           toolName = tool.function.name;
         } else if (typeof tool.name === 'string') {
           toolName = tool.name;
@@ -244,17 +251,25 @@ export class ContextualToolFilter {
   /**
    * Filter tools based on request context
    */
-  public filterTools(allTools: readonly unknown[], context: Readonly<ToolFilterContext>): FilterResult {
+  public filterTools(
+    allTools: readonly unknown[],
+    context: Readonly<ToolFilterContext>
+  ): FilterResult {
     const startTime = Date.now();
 
     // Initialize indices on first use for O(1) lookups
-    this.initializeIndices(allTools as ReadonlyArray<{ function?: { name?: string }; name?: string }>);
+    this.initializeIndices(
+      allTools as ReadonlyArray<{ function?: { name?: string }; name?: string }>
+    );
 
     // Analyze the request to determine relevant categories
     const analysis = this.analyzeRequest(context);
 
     // Select tools based on analysis (now using O(1) lookups)
-    const selectedTools = this.selectRelevantTools(analysis) as Array<{ function?: { name?: string }; name?: string }>;
+    const selectedTools = this.selectRelevantTools(analysis) as Array<{
+      function?: { name?: string };
+      name?: string;
+    }>;
 
     // Build result
     const result: FilterResult = {
@@ -408,8 +423,12 @@ export class ContextualToolFilter {
       // O(1) lookup by function name
       const { functionName } = toolDef;
       const tool =
-        this.toolNameIndex.get(functionName) as { function?: { name?: string }; name?: string } | undefined ||
-        this.toolNameIndex.get(functionName.toLowerCase()) as { function?: { name?: string }; name?: string } | undefined;
+        (this.toolNameIndex.get(functionName) as
+          | { function?: { name?: string }; name?: string }
+          | undefined) ||
+        (this.toolNameIndex.get(functionName.toLowerCase()) as
+          | { function?: { name?: string }; name?: string }
+          | undefined);
       if (tool) {
         matchedTools.add(tool);
         continue;
@@ -417,8 +436,12 @@ export class ContextualToolFilter {
 
       // Strategy 2: Direct tool name lookup
       const directTool =
-        this.toolNameIndex.get(selectedName) as { function?: { name?: string }; name?: string } | undefined ||
-        this.toolNameIndex.get(selectedName.toLowerCase()) as { function?: { name?: string }; name?: string } | undefined;
+        (this.toolNameIndex.get(selectedName) as
+          | { function?: { name?: string }; name?: string }
+          | undefined) ||
+        (this.toolNameIndex.get(selectedName.toLowerCase()) as
+          | { function?: { name?: string }; name?: string }
+          | undefined);
       if (directTool) {
         matchedTools.add(directTool);
         continue;
@@ -426,14 +449,15 @@ export class ContextualToolFilter {
 
       // Strategy 3: Function name reverse lookup
       const registryKey =
-        this.functionNameIndex.get(selectedName) ?? 
+        this.functionNameIndex.get(selectedName) ??
         this.functionNameIndex.get(selectedName.toLowerCase());
       if (registryKey) {
         const toolDef = TYPED_TOOL_CATALOG[registryKey as keyof typeof TYPED_TOOL_CATALOG];
         // toolDef is always truthy by type
-        const tool =
-          (this.toolNameIndex.get(toolDef.functionName) ??
-            this.toolNameIndex.get(toolDef.functionName.toLowerCase())) as { function?: { name?: string }; name?: string } | undefined;
+        const tool = (this.toolNameIndex.get(toolDef.functionName) ??
+          this.toolNameIndex.get(toolDef.functionName.toLowerCase())) as
+          | { function?: { name?: string }; name?: string }
+          | undefined;
         if (tool) {
           matchedTools.add(tool as { function?: { name?: string }; name?: string });
           continue;
@@ -446,9 +470,10 @@ export class ContextualToolFilter {
         for (const key of registryKeys) {
           const toolDef = TYPED_TOOL_CATALOG[key as keyof typeof TYPED_TOOL_CATALOG];
           // toolDef.functionName is always truthy by type, so no need for conditional
-          const tool =
-            (this.toolNameIndex.get(toolDef?.functionName) ??
-              this.toolNameIndex.get(toolDef?.functionName.toLowerCase())) as { function?: { name?: string }; name?: string } | undefined;
+          const tool = (this.toolNameIndex.get(toolDef?.functionName) ??
+            this.toolNameIndex.get(toolDef?.functionName.toLowerCase())) as
+            | { function?: { name?: string }; name?: string }
+            | undefined;
           if (tool) {
             matchedTools.add(tool as { function?: { name?: string }; name?: string });
           }
@@ -475,26 +500,31 @@ export class ContextualToolFilter {
       }
 
       filteredTools = filteredTools
-        .sort((a: Readonly<{ function?: { name?: string }; name?: string }>, b: Readonly<{ function?: { name?: string }; name?: string }>) => {
-          const aName = a.function?.name ?? a.name ?? '';
-          const bName = b.function?.name ?? b.name ?? '';
+        .sort(
+          (
+            a: Readonly<{ function?: { name?: string }; name?: string }>,
+            b: Readonly<{ function?: { name?: string }; name?: string }>
+          ) => {
+            const aName = a.function?.name ?? a.name ?? '';
+            const bName = b.function?.name ?? b.name ?? '';
 
-          // O(1) priority lookup instead of O(n) findIndex
-          let aPriority = 999;
-          let bPriority = 999;
+            // O(1) priority lookup instead of O(n) findIndex
+            let aPriority = 999;
+            let bPriority = 999;
 
-          // Check direct tool name priority
-          for (const [toolName, priority] of priorityMap) {
-            if (aName === toolName || aName.includes(toolName) || toolName.includes(aName)) {
-              aPriority = Math.min(aPriority, priority);
+            // Check direct tool name priority
+            for (const [toolName, priority] of priorityMap) {
+              if (aName === toolName || aName.includes(toolName) || toolName.includes(aName)) {
+                aPriority = Math.min(aPriority, priority);
+              }
+              if (bName === toolName || bName.includes(toolName) || toolName.includes(bName)) {
+                bPriority = Math.min(bPriority, priority);
+              }
             }
-            if (bName === toolName || bName.includes(toolName) || toolName.includes(bName)) {
-              bPriority = Math.min(bPriority, priority);
-            }
+
+            return aPriority - bPriority;
           }
-
-          return aPriority - bPriority;
-        })
+        )
         .slice(0, this.MAX_TOOLS);
     }
 
@@ -504,8 +534,13 @@ export class ContextualToolFilter {
       const fallbackTools: Array<{ function?: { name?: string }; name?: string }> = [];
 
       for (const key of fallbackKeys) {
-        const tool = (this.toolNameIndex.get(key) as { function?: { name?: string }; name?: string } | undefined)
-          ?? (this.toolNameIndex.get(key.toLowerCase()) as { function?: { name?: string }; name?: string } | undefined);
+        const tool =
+          (this.toolNameIndex.get(key) as
+            | { function?: { name?: string }; name?: string }
+            | undefined) ??
+          (this.toolNameIndex.get(key.toLowerCase()) as
+            | { function?: { name?: string }; name?: string }
+            | undefined);
         if (
           tool &&
           !filteredTools.some(
@@ -563,7 +598,10 @@ export class ContextualToolFilter {
     alwaysInclude: boolean;
   }> {
     return Object.entries(TOOL_CATEGORIES).map(
-      ([name, category]: readonly [string, typeof TOOL_CATEGORIES[keyof typeof TOOL_CATEGORIES]]) => ({
+      ([name, category]: readonly [
+        string,
+        (typeof TOOL_CATEGORIES)[keyof typeof TOOL_CATEGORIES],
+      ]) => ({
         name,
         keywords: category.keywords.slice(0, 5), // First 5 keywords
         toolCount: category.tools.length,

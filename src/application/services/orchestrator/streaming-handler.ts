@@ -1,4 +1,4 @@
-import {
+import type {
   IModelClient,
   ModelRequest,
   ModelResponse,
@@ -22,7 +22,7 @@ export async function executeWithStreaming(
   try {
     const response = await modelClient.streamRequest(modelRequest, (token: StreamToken) => {
       tokenCount++;
-      
+
       if (token.content) {
         process.stdout.write(token.content);
         accumulatedContent += token.content;
@@ -43,7 +43,7 @@ export async function executeWithStreaming(
       tokenCount,
       contentLength: accumulatedContent.length,
       duration,
-      hasToolCalls: !!response.toolCalls?.length
+      hasToolCalls: !!response.toolCalls?.length,
     });
 
     return response;
@@ -52,7 +52,7 @@ export async function executeWithStreaming(
     logger.error('Streaming failed', {
       error: error instanceof Error ? error.message : String(error),
       tokenCount,
-      duration
+      duration,
     });
     throw error;
   }

@@ -90,10 +90,7 @@ export class PackageManagerMCPServer {
       switch (name) {
         case 'install_package': {
           const typedArgs = args as unknown as InstallPackageArgs;
-          const result = await this.installPackage(
-            typedArgs.name,
-            typedArgs.manager
-          );
+          const result = await this.installPackage(typedArgs.name, typedArgs.manager);
           return {
             content: [{ type: 'text', text: result.stdout || result.stderr || '' }],
           };
@@ -144,7 +141,10 @@ export class PackageManagerMCPServer {
     switch (toolName) {
       case 'install_package': {
         const { name, manager } = args as unknown as InstallPackageArgs;
-        const result = await this.installPackage(String(name), manager ? String(manager) : undefined);
+        const result = await this.installPackage(
+          String(name),
+          manager ? String(manager) : undefined
+        );
         return {
           content: [{ type: 'text', text: result.stdout || result.stderr || '' }],
         };
@@ -177,7 +177,10 @@ export class PackageManagerMCPServer {
     return { stdout, stderr };
   }
 
-  private async listInstalled(): Promise<{ dependencies: Record<string, string>; devDependencies: Record<string, string> }> {
+  private async listInstalled(): Promise<{
+    dependencies: Record<string, string>;
+    devDependencies: Record<string, string>;
+  }> {
     const pkgPath = path.join(this.config.workingDirectory ?? process.cwd(), 'package.json');
     let file: string;
     let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
@@ -196,7 +199,10 @@ export class PackageManagerMCPServer {
       }
     }
     try {
-      pkg = JSON.parse(file) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+      pkg = JSON.parse(file) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error(`Invalid JSON in package.json at ${pkgPath}: ${message}`);

@@ -51,7 +51,9 @@ export class MCPServerRegistry extends EventEmitter {
     this.setMaxListeners(50); // Reasonable limit
 
     // Clean up listeners on process exit
-    process.on('beforeExit', () => { this.cleanup(); });
+    process.on('beforeExit', () => {
+      this.cleanup();
+    });
   }
 
   /**
@@ -211,11 +213,15 @@ export class MCPServerRegistry extends EventEmitter {
       case 'smithery': {
         const { SmitheryMCPServer } = await import('../smithery-mcp-server.js');
         // Validate config for SmitheryMCPConfig
-        const config = definition.config as Partial<import('../smithery-mcp-server.js').SmitheryMCPConfig>;
+        const config = definition.config as Partial<
+          import('../smithery-mcp-server.js').SmitheryMCPConfig
+        >;
         if (typeof config.apiKey !== 'string') {
           throw new Error(`SmitheryMCPServer requires a valid 'apiKey' in config`);
         }
-        return new SmitheryMCPServer(config as import('../smithery-mcp-server.js').SmitheryMCPConfig);
+        return new SmitheryMCPServer(
+          config as import('../smithery-mcp-server.js').SmitheryMCPConfig
+        );
       }
 
       default:

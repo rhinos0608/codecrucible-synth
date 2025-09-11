@@ -21,7 +21,7 @@ import { CapacityPlanner } from './capacity-planner.js';
 const DEFAULT_LIMITS: ResourceLimits = {
   memory: {
     hardLimit: 1_024 * 1_024 * 1_024, // 1GB in MB
-    softLimit: 768 * 1_024 * 1_024,   // 768MB
+    softLimit: 768 * 1_024 * 1_024, // 768MB
     emergencyLimit: 1_280 * 1_024 * 1_024, // 1.25GB
     gcThreshold: 0.85,
     leakDetectionEnabled: true,
@@ -220,7 +220,8 @@ export class ProductionResourceEnforcer extends EventEmitter {
           // Ensure cleanup if the Promise is rejected or interrupted.
           this.off('operation-start', onStart);
         }
-        const timeoutMs = ctx.timeout > 0 ? ctx.timeout : (this.limits?.concurrency?.operationTimeout ?? 60000);
+        const timeoutMs =
+          ctx.timeout > 0 ? ctx.timeout : (this.limits?.concurrency?.operationTimeout ?? 60000);
         const timeoutHandle = setTimeout(() => {
           this.off('operation-start', onStart);
           ctx.state = 'failed';
@@ -274,8 +275,6 @@ export class ProductionResourceEnforcer extends EventEmitter {
   async performEmergencyCleanup(): Promise<void> {
     await this.triggerEmergencyCleanup('Emergency cleanup requested');
   }
-
-
 
   private handleSnapshot(snapshot: ResourceSnapshot): void {
     this.history.push(snapshot);
@@ -332,10 +331,6 @@ export class ProductionResourceEnforcer extends EventEmitter {
     const queued = this.operationQueue.length;
     this.monitor.updateConcurrency(active, queued, this.rejectedOperations, 0);
   }
-
-
-
-
 
   async shutdown(): Promise<void> {
     await this.stop();

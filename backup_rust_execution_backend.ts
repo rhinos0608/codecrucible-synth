@@ -241,7 +241,10 @@ export class RustExecutionBackend {
           averageExecutionTime: metrics.average_execution_time_ms ?? 0,
         };
       } catch (err) {
-        logger.warn('Failed to parse Rust executor global performance metrics', toReadonlyRecord(err));
+        logger.warn(
+          'Failed to parse Rust executor global performance metrics',
+          toReadonlyRecord(err)
+        );
       }
 
       if (result.performance_metrics) {
@@ -325,7 +328,7 @@ export class RustExecutionBackend {
         } else if (typeof (this.rustExecutor as any).destroy === 'function') {
           await (this.rustExecutor as any).destroy();
         }
-        
+
         // Reset performance stats
         this.performanceStats = {
           totalRequests: 0,
@@ -333,12 +336,12 @@ export class RustExecutionBackend {
           failedRequests: 0,
           averageExecutionTime: 0,
         };
-        
+
         // Clear executor and state
         this.rustExecutor = null;
         this.initialized = false;
         this.initializationPromise = null;
-        
+
         logger.info('RustExecutionBackend cleaned up successfully');
       } catch (error) {
         logger.error('Error cleaning up Rust executor:', toErrorOrUndefined(error));
@@ -454,7 +457,12 @@ export class RustExecutionBackend {
       workingDirectory: request.context?.workingDirectory || process.cwd(),
     };
 
-    return await (this.rustExecutor as any).executeFilesystem(operation, filePath, content, options);
+    return await (this.rustExecutor as any).executeFilesystem(
+      operation,
+      filePath,
+      content,
+      options
+    );
   }
 
   private async executeCommandOperation(
@@ -549,4 +557,3 @@ export class RustExecutionBackend {
     }
   }
 }
-

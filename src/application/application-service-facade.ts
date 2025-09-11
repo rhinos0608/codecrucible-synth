@@ -84,8 +84,8 @@ export class ApplicationServiceFacade {
           // Use the domain service's selectOptimalModel method
           const selection = await modelSelectionService.selectOptimalModel(request);
           return { content: `Analysis result for ${analysisType}`, confidence: 0.8 };
-        }
-      })
+        },
+      }),
     };
     this.analyzeCodebaseUseCase = new AnalyzeCodebaseUseCase(codebaseAnalysisModelSelector);
 
@@ -117,7 +117,9 @@ export class ApplicationServiceFacade {
    * Execute Living Spiral process (legacy interface)
    * Use case: Iterative development methodology
    */
-  public async executeLivingSpiralProcess(input: Readonly<LivingSpiralInput>): Promise<LivingSpiralOutput> {
+  public async executeLivingSpiralProcess(
+    input: Readonly<LivingSpiralInput>
+  ): Promise<LivingSpiralOutput> {
     return this.livingSpiralProcessUseCase.execute(input);
   }
 
@@ -135,7 +137,9 @@ export class ApplicationServiceFacade {
    * Analyze codebase
    * Use case: Code analysis and recommendations
    */
-  public async analyzeCodebase(input: Readonly<CodebaseAnalysisInput>): Promise<CodebaseAnalysisOutput> {
+  public async analyzeCodebase(
+    input: Readonly<CodebaseAnalysisInput>
+  ): Promise<CodebaseAnalysisOutput> {
     return this.analyzeCodebaseUseCase.execute(input);
   }
 
@@ -184,43 +188,43 @@ export class ApplicationServiceFacade {
   }
 
   /**
-     * Health check for application services
-     * Returns: Status of application layer components
-     */
-    public getHealthStatus(): {
-      status: 'healthy' | 'degraded' | 'unhealthy';
-      services: Record<string, 'available' | 'unavailable'>;
-      timestamp: Date;
-    } {
-      const services: Record<string, 'available' | 'unavailable'> = {};
-  
-      try {
-        // All use cases are always initialized in the constructor, so they're always available
-        services.processAIRequest = 'available';
-        services.multiVoiceSynthesis = 'available';
-        services.livingSpiralProcess = 'available';
-        services.simplifiedSpiralProcess = 'available';
-        services.codebaseAnalysis = 'available';
-  
-        const unavailableCount = Object.values(services).filter(
-          status => status === 'unavailable'
-        ).length;
-        const status =
-          unavailableCount === 0 ? 'healthy' : unavailableCount < 3 ? 'degraded' : 'unhealthy';
-  
-        return {
-          status,
-          services,
-          timestamp: new Date(),
-        };
-      } catch (error) {
-        return {
-          status: 'unhealthy',
-          services: Object.fromEntries(Object.keys(services).map(key => [key, 'unavailable'])),
-          timestamp: new Date(),
-        };
-      }
+   * Health check for application services
+   * Returns: Status of application layer components
+   */
+  public getHealthStatus(): {
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    services: Record<string, 'available' | 'unavailable'>;
+    timestamp: Date;
+  } {
+    const services: Record<string, 'available' | 'unavailable'> = {};
+
+    try {
+      // All use cases are always initialized in the constructor, so they're always available
+      services.processAIRequest = 'available';
+      services.multiVoiceSynthesis = 'available';
+      services.livingSpiralProcess = 'available';
+      services.simplifiedSpiralProcess = 'available';
+      services.codebaseAnalysis = 'available';
+
+      const unavailableCount = Object.values(services).filter(
+        status => status === 'unavailable'
+      ).length;
+      const status =
+        unavailableCount === 0 ? 'healthy' : unavailableCount < 3 ? 'degraded' : 'unhealthy';
+
+      return {
+        status,
+        services,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        services: Object.fromEntries(Object.keys(services).map(key => [key, 'unavailable'])),
+        timestamp: new Date(),
+      };
     }
+  }
 
   /**
    * Graceful shutdown

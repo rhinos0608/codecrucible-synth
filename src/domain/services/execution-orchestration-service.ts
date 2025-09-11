@@ -223,7 +223,9 @@ export class ExecutionResult {
     const successfulToolSteps = this._reasoningChain.filter(
       (step: Readonly<ReasoningStep>) => step.isToolStep() && step.isSuccessful()
     ).length;
-    const totalToolSteps = this._reasoningChain.filter((step: Readonly<ReasoningStep>) => step.isToolStep()).length;
+    const totalToolSteps = this._reasoningChain.filter((step: Readonly<ReasoningStep>) =>
+      step.isToolStep()
+    ).length;
 
     if (totalToolSteps > 0) {
       score += (successfulToolSteps / totalToolSteps) * 0.3;
@@ -252,7 +254,9 @@ export class ExecutionOrchestrationService {
     const complexity = goal.estimateComplexity();
 
     if (workflowTemplate && workflowTemplate.matches(prompt)) {
-      return this.createWorkflowBasedPlan(goal, domain, workflowTemplate as WorkflowTemplate, [...availableTools]);
+      return this.createWorkflowBasedPlan(goal, domain, workflowTemplate as WorkflowTemplate, [
+        ...availableTools,
+      ]);
     }
 
     return this.createHeuristicPlan(goal, domain, complexity, [...availableTools]);
@@ -301,7 +305,10 @@ export class ExecutionOrchestrationService {
   /**
    * Business rule: Optimize execution plan based on preferences
    */
-  public optimizeExecutionPlan(plan: ExecutionPlan, context: Readonly<ExecutionContext>): ExecutionPlan {
+  public optimizeExecutionPlan(
+    plan: ExecutionPlan,
+    context: Readonly<ExecutionContext>
+  ): ExecutionPlan {
     let optimizedPlan = plan;
 
     // Speed optimization: reduce optional tools
@@ -350,7 +357,11 @@ export class ExecutionOrchestrationService {
 
     // If we have AI-generated content, process it
     if (aiGeneratedContent) {
-      return this.processAIReasoningContent(stepNumber, aiGeneratedContent, context as ExecutionContext);
+      return this.processAIReasoningContent(
+        stepNumber,
+        aiGeneratedContent,
+        context as ExecutionContext
+      );
     }
 
     // If we have a tool result, create observation step
@@ -382,7 +393,9 @@ export class ExecutionOrchestrationService {
     }
 
     // Check for consecutive errors
-    const recentErrors = currentChain.slice(-3).filter((step: Readonly<ReasoningStep>) => step.hasError()).length;
+    const recentErrors = currentChain
+      .slice(-3)
+      .filter((step: Readonly<ReasoningStep>) => step.hasError()).length;
     if (recentErrors >= 2) {
       return ContinuationDecision.stop('Too many consecutive errors');
     }
@@ -410,9 +423,19 @@ export class ExecutionOrchestrationService {
     context: Readonly<ExecutionContext>,
     executionTime: number
   ): ExecutionResult {
-    const success = this.determineExecutionSuccess(reasoningChain as ReasoningStep[], plan as ExecutionPlan);
-    const finalResult = this.extractFinalResult(reasoningChain as ReasoningStep[], plan as ExecutionPlan);
-    const insights = this.generateExecutionInsights(reasoningChain as ReasoningStep[], plan as ExecutionPlan, context as ExecutionContext);
+    const success = this.determineExecutionSuccess(
+      reasoningChain as ReasoningStep[],
+      plan as ExecutionPlan
+    );
+    const finalResult = this.extractFinalResult(
+      reasoningChain as ReasoningStep[],
+      plan as ExecutionPlan
+    );
+    const insights = this.generateExecutionInsights(
+      reasoningChain as ReasoningStep[],
+      plan as ExecutionPlan,
+      context as ExecutionContext
+    );
 
     return ExecutionResult.create(
       success,
@@ -562,7 +585,10 @@ export class ExecutionOrchestrationService {
     const hasError = typeof toolResult.error === 'string' || toolResult.success === false;
 
     if (hasError) {
-      return ReasoningStep.createErrorStep(stepNumber, typeof toolResult.error === 'string' ? toolResult.error : 'Tool execution failed');
+      return ReasoningStep.createErrorStep(
+        stepNumber,
+        typeof toolResult.error === 'string' ? toolResult.error : 'Tool execution failed'
+      );
     }
 
     const observation = `Tool executed successfully. Result: ${JSON.stringify(toolResult).substring(0, 200)}`;
@@ -604,7 +630,10 @@ export class ExecutionOrchestrationService {
     );
   }
 
-  private isGoalAchieved(currentChain: ReadonlyArray<ReasoningStep>, _goal: Readonly<Goal>): boolean {
+  private isGoalAchieved(
+    currentChain: ReadonlyArray<ReasoningStep>,
+    _goal: Readonly<Goal>
+  ): boolean {
     // Simplified goal achievement check
     const successfulSteps = currentChain.filter(step => step.isSuccessful()).length;
     const totalSteps = currentChain.length;
@@ -621,7 +650,10 @@ export class ExecutionOrchestrationService {
     return ConfidenceScore.create(avgConfidence);
   }
 
-  private determineExecutionSuccess(reasoningChain: ReadonlyArray<ReasoningStep>, _plan: Readonly<ExecutionPlan>): boolean {
+  private determineExecutionSuccess(
+    reasoningChain: ReadonlyArray<ReasoningStep>,
+    _plan: Readonly<ExecutionPlan>
+  ): boolean {
     if (reasoningChain.length === 0) return false;
 
     const successfulSteps = reasoningChain.filter(step => step.isSuccessful()).length;
@@ -630,7 +662,10 @@ export class ExecutionOrchestrationService {
     return successfulSteps > errorSteps && successfulSteps >= reasoningChain.length * 0.6;
   }
 
-  private extractFinalResult(reasoningChain: ReadonlyArray<ReasoningStep>, _plan: Readonly<ExecutionPlan>): string {
+  private extractFinalResult(
+    reasoningChain: ReadonlyArray<ReasoningStep>,
+    _plan: Readonly<ExecutionPlan>
+  ): string {
     // Find the last conclusion step
     const conclusionSteps = reasoningChain.filter(step => step.type.value === 'conclusion');
     if (conclusionSteps.length > 0) {
@@ -687,7 +722,11 @@ export class ValidationResult {
     private readonly _warnings: readonly string[]
   ) {}
 
-  public static create(isValid: boolean, issues: readonly string[], warnings: readonly string[]): ValidationResult {
+  public static create(
+    isValid: boolean,
+    issues: readonly string[],
+    warnings: readonly string[]
+  ): ValidationResult {
     return new ValidationResult(isValid, Object.freeze([...issues]), Object.freeze([...warnings]));
   }
 

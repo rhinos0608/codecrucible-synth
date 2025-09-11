@@ -185,7 +185,9 @@ export type SearchToolArgs = Pick<
 >;
 
 // Type guards for runtime type checking
-export function isFileOperationResult(result: Readonly<ToolExecutionResult>): result is FileOperationResult {
+export function isFileOperationResult(
+  result: Readonly<ToolExecutionResult>
+): result is FileOperationResult {
   return result.success && typeof result.data === 'string';
 }
 
@@ -201,6 +203,8 @@ export function isCommandExecutionResult(
   return result.success && typeof result.data === 'string' && 'exitCode' in (result.metadata ?? {});
 }
 
-export function isGitOperationResult(result: Readonly<ToolExecutionResult>): result is GitOperationResult {
+export function isGitOperationResult(
+  result: Readonly<ToolExecutionResult>
+): result is GitOperationResult {
   return result.success && typeof result.data === 'string' && 'commit' in (result.metadata ?? {});
 }

@@ -228,7 +228,10 @@ export class ModelClient extends EventEmitter implements IModelClient {
   }
 
   // Core interfaces compatibility methods
-  public async processRequest(request: Readonly<ModelRequest>, _context?: Readonly<unknown>): Promise<ModelResponse> {
+  public async processRequest(
+    request: Readonly<ModelRequest>,
+    _context?: Readonly<unknown>
+  ): Promise<ModelResponse> {
     return this.request(request);
   }
 
@@ -271,7 +274,10 @@ export class ModelClient extends EventEmitter implements IModelClient {
     };
   }
 
-  public async generateText(prompt: Readonly<string>, options?: Readonly<Record<string, unknown>>): Promise<string> {
+  public async generateText(
+    prompt: Readonly<string>,
+    options?: Readonly<Record<string, unknown>>
+  ): Promise<string> {
     return this.generate(prompt, options);
   }
 
@@ -290,4 +296,3 @@ export class ModelClient extends EventEmitter implements IModelClient {
 }
 
 export { ModelClient as UnifiedModelClient };
-

@@ -212,7 +212,9 @@ export class StreamChunkUtils {
    * Find missing sequences in chunk array
    */
   public static findMissingSequences(chunks: readonly StreamChunk[]): number[] {
-    const sequences = [...chunks].map((c: Readonly<StreamChunk>) => c.sequence).sort((a: number, b: number) => a - b);
+    const sequences = [...chunks]
+      .map((c: Readonly<StreamChunk>) => c.sequence)
+      .sort((a: number, b: number) => a - b);
     const missing: number[] = [];
 
     for (let i = 0; i < sequences.length - 1; i++) {

@@ -19,10 +19,7 @@ export interface ModelClient {
     options: Readonly<ModelOptions>
   ) => Promise<ModelResponse>;
   processRequest: (request: Readonly<ModelRequest>) => Promise<ModelResponse>;
-  generateResponse: (
-    prompt: string,
-    options?: Readonly<ModelOptions>
-  ) => Promise<ModelResponse>;
+  generateResponse: (prompt: string, options?: Readonly<ModelOptions>) => Promise<ModelResponse>;
   getCapabilities: () => ModelCapabilities;
 }
 

@@ -67,7 +67,10 @@ export class E2BCodeExecutionTool {
   private readonly environments: Map<string, ExecutionEnvironment> = new Map();
   private environmentCounter = 0;
 
-  public constructor(workingDirectory: Readonly<string> = process.cwd(), rustBackend?: RustExecutionBackend | null) {
+  public constructor(
+    workingDirectory: Readonly<string> = process.cwd(),
+    rustBackend?: RustExecutionBackend | null
+  ) {
     this.rustBackend = rustBackend ?? null;
 
     this.securityValidator = new SecurityValidator();
@@ -88,7 +91,7 @@ export class E2BCodeExecutionTool {
   public async initialize(): Promise<void> {
     try {
       // SecurityValidator doesn't need initialization
-      
+
       // Initialize Rust backend if available
       try {
         if (this.rustBackend) {
@@ -309,8 +312,8 @@ export class E2BCodeExecutionTool {
           sessionId: request.sessionId || 'system',
           workingDirectory: environment.workingDirectory,
           permissions: [],
-          environment: {}
-        }
+          environment: {},
+        },
       });
 
       // Clean up temporary file
@@ -318,11 +321,16 @@ export class E2BCodeExecutionTool {
 
       return {
         success: result.success,
-        output: typeof result.result === 'string' ? result.result : JSON.stringify(result.result ?? ''),
+        output:
+          typeof result.result === 'string' ? result.result : JSON.stringify(result.result ?? ''),
         error: result.error?.message,
         executionTime: result.executionTimeMs,
-        memoryUsed: typeof result.metadata?.memoryUsage === 'number' ? result.metadata.memoryUsage : undefined,
-        exitCode: typeof result.metadata?.exitCode === 'number' ? result.metadata.exitCode : undefined,
+        memoryUsed:
+          typeof result.metadata?.memoryUsage === 'number'
+            ? result.metadata.memoryUsage
+            : undefined,
+        exitCode:
+          typeof result.metadata?.exitCode === 'number' ? result.metadata.exitCode : undefined,
       };
     } catch (error) {
       logger.error('Rust backend execution failed:', error);
@@ -376,9 +384,10 @@ export class E2BCodeExecutionTool {
 
       const parsed: unknown = JSON.parse(result.content[0]?.text || '{}');
       const executionResult: TerminalExecutionResult =
-        typeof parsed === 'object' && parsed !== null &&
+        typeof parsed === 'object' &&
+        parsed !== null &&
         ('stdout' in parsed || 'stderr' in parsed || 'exitCode' in parsed)
-          ? parsed as TerminalExecutionResult
+          ? (parsed as TerminalExecutionResult)
           : {};
 
       return {
@@ -386,7 +395,8 @@ export class E2BCodeExecutionTool {
         output: typeof executionResult.stdout === 'string' ? executionResult.stdout : undefined,
         error: typeof executionResult.stderr === 'string' ? executionResult.stderr : undefined,
         executionTime: Date.now() - startTime,
-        exitCode: typeof executionResult.exitCode === 'number' ? executionResult.exitCode : undefined,
+        exitCode:
+          typeof executionResult.exitCode === 'number' ? executionResult.exitCode : undefined,
       };
     } catch (error) {
       logger.error('Terminal server execution failed:', error);
@@ -432,7 +442,6 @@ export class E2BCodeExecutionTool {
           command: `rustc "${rustFile}" -o "${executableName}" && "${executableName}"`,
           tempFile: rustFile,
         };
-
       }
       case 'go': {
         const goFile = await this.createTemporaryFile(request.code, language, environment);
@@ -458,7 +467,10 @@ export class E2BCodeExecutionTool {
       case 'cpp': {
         const cppFile = await this.createTemporaryFile(request.code, language, environment);
         const exe = cppFile.replace(/\.cpp$/, '');
-        return { command: `g++ "${cppFile}" -O2 -std=c++17 -o "${exe}" && "${exe}"`, tempFile: cppFile };
+        return {
+          command: `g++ "${cppFile}" -O2 -std=c++17 -o "${exe}" && "${exe}"`,
+          tempFile: cppFile,
+        };
       }
 
       case 'ruby': {
@@ -599,7 +611,9 @@ export class E2BCodeExecutionTool {
     if (staleEnvironments.length > 0) {
       logger.info(`Cleaning up ${staleEnvironments.length} stale execution environments`);
       await Promise.allSettled(
-        staleEnvironments.map(async (env: Readonly<ExecutionEnvironment>) => this.cleanupEnvironment(env.id))
+        staleEnvironments.map(async (env: Readonly<ExecutionEnvironment>) =>
+          this.cleanupEnvironment(env.id)
+        )
       );
     }
 

@@ -1,13 +1,11 @@
 import { ResourceSnapshot } from './resource-types.js';
 
-
 export interface ScalingConfig {
   window?: number;
   cpuScaleUpThreshold?: number;
   cpuScaleDownThreshold?: number;
   queueScaleUpThreshold?: number;
 }
-
 
 export interface ScalingThresholds {
   cpuScaleUp: number;
@@ -22,7 +20,6 @@ const DEFAULT_THRESHOLDS: ScalingThresholds = {
   queueScaleUp: 0,
   queueScaleDown: 0,
 };
-
 
 export class ScalingController {
   private history: ResourceSnapshot[] = [];

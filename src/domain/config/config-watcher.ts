@@ -13,16 +13,15 @@ export class ConfigWatcher {
 
     this.watcher = watch(this.filePath, eventType => {
       if (eventType === 'change') {
-        this.onChange()
-          .catch(error => {
-            console.error('Error in ConfigWatcher onChange callback:', error);
-          });
+        this.onChange().catch(error => {
+          console.error('Error in ConfigWatcher onChange callback:', error);
+        });
       }
     });
   }
 
-    public stop(): void {
-      this.watcher?.close();
-      this.watcher = undefined;
-    }
+  public stop(): void {
+    this.watcher?.close();
+    this.watcher = undefined;
   }
+}

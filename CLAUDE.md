@@ -60,9 +60,14 @@ node dist/index.js --help
 node dist/index.js status
 node dist/index.js models
 
+# Fast CLI for quick operations
+node dist/fast-cli.js --help
+
 # After building and linking globally
 crucible --help
 cc status
+cc analyze src/file.ts
+cc "generate a function to parse JSON"
 ```
 
 ### Server Mode
@@ -71,19 +76,21 @@ cc status
 npm run start
 # or
 node dist/index.js --server --port 3002
+# or using the dedicated server module
+node dist/server/server-mode.js --port 3002
 ```
 
 ## High-Level Architecture
 
 ### Core System Components
 
-1. **Unified Model Client (`src/core/client.ts`)**
+1. **Unified Model Client (`src/application/services/model-client.ts`)**
    - Consolidates all LLM provider integrations
    - Supports Ollama, LM Studio, HuggingFace
    - Handles provider failover and load balancing
    - Implements security sandboxing and input validation
 
-2. **Living Spiral Coordinator (`src/core/living-spiral-coordinator.ts`)**
+2. **Living Spiral Coordinator (`src/domain/services/living-spiral-coordinator.ts`)**
    - Implements the 5-phase iterative development methodology:
      - **Collapse**: Problem decomposition
      - **Council**: Multi-voice perspective gathering
@@ -91,7 +98,7 @@ node dist/index.js --server --port 3002
      - **Rebirth**: Implementation with testing
      - **Reflection**: Learning and quality assessment
 
-3. **Voice Archetype System (`src/voices/voice-archetype-system.ts`)**
+3. **Voice Archetype System (`src/voices/voice-system-coordinator.ts`)**
    - 10 specialized AI personalities with different expertise areas:
      - Explorer (innovation, creativity)
      - Maintainer (stability, quality)
@@ -104,10 +111,10 @@ node dist/index.js --server --port 3002
      - Optimizer (efficiency)
      - Guardian (quality gates)
 
-4. **CLI System (`src/core/cli.ts`)**
-   - Main command-line interface
+4. **CLI System (`src/application/cli/program.ts`)**
+   - Main command-line interface via `buildProgram()` function
    - Handles multi-modal interactions (file analysis, code generation)
-   - Integrates with all core systems
+   - Integrates with all core systems via `UnifiedCLICoordinator`
    - Supports both interactive and batch modes
 
 5. **MCP Server Manager (`src/mcp-servers/mcp-server-manager.ts`)**
@@ -134,31 +141,40 @@ node dist/index.js --server --port 3002
 
 ```
 src/
-├── core/                    # Core system components
-│   ├── cli.ts              # Main CLI interface
-│   ├── client.ts           # Unified model client
-│   ├── agent.ts            # AI agent orchestration
-│   ├── living-spiral-coordinator.ts  # Spiral methodology
-│   ├── types.ts            # Core type definitions
-│   ├── tools/              # Tool implementations
-│   ├── streaming/          # Real-time response handling
-│   ├── security/           # Security and validation
-│   └── intelligence/       # Context-aware features
-├── voices/                 # Voice archetype system
-├── mcp-servers/           # Model Context Protocol servers
-├── config/                # Configuration management
-└── providers/             # LLM provider implementations
+├── domain/                      # Domain layer (business logic)
+│   ├── entities/               # Core business entities
+│   ├── interfaces/             # Contract definitions
+│   ├── services/               # Domain services
+│   ├── repositories/           # Data access contracts
+│   └── types/                  # Domain type definitions
+├── application/                 # Application layer (orchestration)
+│   ├── cli/                   # Command-line interface
+│   ├── services/              # Application services
+│   ├── use-cases/             # Business workflows
+│   ├── routing/               # Request routing
+│   └── interfaces/            # Application interfaces
+├── infrastructure/             # Infrastructure layer (external concerns)
+│   ├── execution/             # Execution backends (Rust/TS)
+│   ├── providers/             # AI model providers
+│   ├── security/              # Security and authentication
+│   ├── tools/                 # Tool implementations
+│   ├── logging/               # Logging infrastructure
+│   └── messaging/             # Event bus and messaging
+├── voices/                     # Voice archetype system
+├── mcp-servers/               # Model Context Protocol servers
+├── providers/                 # LLM provider implementations
+└── config/                    # Configuration management
 
 config/                    # Configuration files
 ├── default.yaml          # Default configuration
 ├── hybrid-config.json    # Hybrid model settings
 └── voices.yaml           # Voice archetype definitions
 
-Docs/                      # Comprehensive documentation
-├── Hybrid-LLM-Architecture.md
-├── Quick-Start-Hybrid.md
-├── Coding Grimoire and Implementation Guide - MUST READ FIRST
-└── IMPLEMENTATION_STATUS_REPORT.md
+docs/                      # Comprehensive documentation
+├── ARCHITECTURE.md        # Detailed architecture guide
+├── TOOL_SUITE.md         # Tool suite documentation
+├── SECURITY.md           # Security documentation
+└── SETUP.md              # Setup and deployment guide
 ```
 
 ## Key Configuration Files
@@ -198,25 +214,26 @@ Docs/                      # Comprehensive documentation
 ## Common Development Tasks
 
 ### Adding a New Voice Archetype
-1. Add voice definition to `src/voices/voice-archetype-system.ts`
+1. Add voice definition to `src/voices/archetype-definitions.ts`
 2. Update voice configuration in `config/voices.yaml`
-3. Add corresponding tests
+3. Register with voice system coordinator
+4. Add corresponding tests
 
 ### Adding a New Tool
-1. Create tool class extending `BaseTool` in `src/core/tools/`
+1. Create tool class in `src/infrastructure/tools/`
 2. Register tool in appropriate MCP server
-3. Add security validation for tool inputs
+3. Add security validation for tool inputs through `SecurityValidator`
 4. Write comprehensive tests
 
 ### Modifying the Living Spiral Process
-1. Update phases in `src/core/living-spiral-coordinator.ts`
+1. Update phases in `src/domain/services/living-spiral-coordinator.ts`
 2. Ensure convergence detection works with changes
-3. Update documentation in `Docs/` folder
+3. Update documentation in `docs/` folder
 
 ### Adding a New LLM Provider
-1. Implement provider interface in `src/providers/`
+1. Implement provider interface in `src/providers/hybrid/`
 2. Add provider configuration to `UnifiedClientConfig`
-3. Update fallback chain logic
+3. Update fallback chain logic in hybrid router
 4. Add provider-specific error handling
 
 ## Environment Setup
@@ -283,10 +300,13 @@ DEBUG=codecrucible:* npm run dev
 crucible status
 
 # Analyze specific files
-crucible analyze src/core/cli.ts
+crucible analyze src/application/cli/program.ts
 
 # Test MCP integration
 node dist/index.js "Show me available MCP tools"
+
+# Test voice synthesis system
+crucible "analyze this codebase using multiple AI voices"
 ```
 
 ## Notable Implementation Details

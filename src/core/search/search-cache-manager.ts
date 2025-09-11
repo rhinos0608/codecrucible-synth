@@ -1,6 +1,6 @@
 /**
  * Search Cache Manager Module
- * 
+ *
  * Manages caching of search results with TTL and smart invalidation.
  */
 
@@ -93,7 +93,7 @@ export class SearchCacheManager {
     if (this.cache.size > this.options.maxEntries) {
       const entries = Array.from(this.cache.entries());
       entries.sort((a, b) => a[1].lastAccess - b[1].lastAccess);
-      
+
       const toRemove = entries.slice(0, entries.length - this.options.maxEntries);
       for (const [key] of toRemove) {
         this.cache.delete(key);

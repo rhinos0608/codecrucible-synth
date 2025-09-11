@@ -32,7 +32,9 @@ export class OllamaProvider implements LLMProvider {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(
-        () => { controller.abort(); },
+        () => {
+          controller.abort();
+        },
         parseEnvInt('OLLAMA_HEALTH_CHECK_TIMEOUT', 5000, 1000, 30000)
       );
       await this.http.get('/api/tags', controller.signal);
@@ -54,18 +56,18 @@ export class OllamaProvider implements LLMProvider {
     const availableTools: readonly string[] = Array.isArray(options.availableTools)
       ? (options.availableTools as readonly string[])
       : [];
-    const userContext: string | undefined = typeof options.userContext === 'string'
-      ? options.userContext
-      : undefined;
+    const userContext: string | undefined =
+      typeof options.userContext === 'string' ? options.userContext : undefined;
 
     const messages: import('./ollama-config.js').OllamaMessage[] = [
       { role: 'system', content: generateContextualSystemPrompt(availableTools, userContext) },
       { role: 'user', content: prompt },
     ];
 
-    const onStreamingToken = typeof options.onStreamingToken === 'function'
-      ? options.onStreamingToken as (token: string, metadata?: unknown) => void
-      : undefined;
+    const onStreamingToken =
+      typeof options.onStreamingToken === 'function'
+        ? (options.onStreamingToken as (token: string, metadata?: unknown) => void)
+        : undefined;
 
     const request: OllamaRequest = {
       model,
@@ -87,7 +89,9 @@ export class OllamaProvider implements LLMProvider {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => { controller.abort(); }, this.config.timeout);
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, this.config.timeout);
 
     try {
       const response = await this.http.post('/api/chat', request, controller.signal);
@@ -96,8 +100,11 @@ export class OllamaProvider implements LLMProvider {
       let toolCalls: Array<{ id?: string; function: { name: string; arguments: string } }> = [];
 
       if (request.stream && onStreamingToken) {
-        const { text: streamedText, metadata: streamedMetadata, toolCalls: streamedToolCalls } =
-          await handleStreaming(response, onStreamingToken);
+        const {
+          text: streamedText,
+          metadata: streamedMetadata,
+          toolCalls: streamedToolCalls,
+        } = await handleStreaming(response, onStreamingToken);
         text = streamedText;
         metadata = streamedMetadata as Record<string, unknown>;
         toolCalls = extractToolCalls(streamedToolCalls);
@@ -175,4 +182,3 @@ export class OllamaProvider implements LLMProvider {
     };
   }
 }
-

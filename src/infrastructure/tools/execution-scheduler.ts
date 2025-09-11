@@ -15,7 +15,9 @@ export class ExecutionScheduler {
       }
     };
 
-    const workers = Array.from({ length: Math.min(this.concurrency, tasks.length) }, async () => runTask());
+    const workers = Array.from({ length: Math.min(this.concurrency, tasks.length) }, async () =>
+      runTask()
+    );
 
     await Promise.all(workers);
     return results;

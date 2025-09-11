@@ -99,7 +99,9 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Store a voice interaction with performance tracking
    */
-  public async storeVoiceInteraction(interaction: Readonly<VoiceInteractionRecord>): Promise<number> {
+  public async storeVoiceInteraction(
+    interaction: Readonly<VoiceInteractionRecord>
+  ): Promise<number> {
     const query = `
       INSERT INTO voice_interactions 
       (session_id, voice_name, prompt, response, confidence, tokens_used, response_time, created_at)
@@ -133,7 +135,9 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Retrieve session history with pagination
    */
-  public async getSessionHistory(query: Readonly<SessionHistoryQuery>): Promise<VoiceInteractionRecord[]> {
+  public async getSessionHistory(
+    query: Readonly<SessionHistoryQuery>
+  ): Promise<VoiceInteractionRecord[]> {
     const cacheKey = `session_history:${query.sessionId}:${query.limit}:${query.offset}`;
 
     // Try cache first
@@ -178,17 +182,19 @@ export class DatabaseAdapter extends EventEmitter {
 
     try {
       const result = await this.client.query(sql, params, { readReplica: true });
-      const interactions = this.mapToVoiceInteractionRecords(result.rows as Array<{
-        id?: number;
-        session_id: string;
-        voice_name: string;
-        prompt: string;
-        response: string;
-        confidence: number;
-        tokens_used: number;
-        response_time?: number | null;
-        created_at?: Date;
-      }>);
+      const interactions = this.mapToVoiceInteractionRecords(
+        result.rows as Array<{
+          id?: number;
+          session_id: string;
+          voice_name: string;
+          prompt: string;
+          response: string;
+          confidence: number;
+          tokens_used: number;
+          response_time?: number | null;
+          created_at?: Date;
+        }>
+      );
 
       // Cache results for 1 minute
       await this.client.setCachedResult(cacheKey, interactions, 60);
@@ -208,11 +214,15 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Get voice interaction analytics
    */
-  public async getVoiceAnalytics(query: Readonly<AnalyticsQuery> = {}): Promise<ReturnType<DataAnalyticsService['analyzeVoiceInteractions']>> {
+  public async getVoiceAnalytics(
+    query: Readonly<AnalyticsQuery> = {}
+  ): Promise<ReturnType<DataAnalyticsService['analyzeVoiceInteractions']>> {
     const cacheKey = `voice_analytics:${JSON.stringify(query)}`;
 
     // Try cache first
-    const cached = await this.client.getCachedResult(cacheKey) as ReturnType<DataAnalyticsService['analyzeVoiceInteractions']> | null;
+    const cached = (await this.client.getCachedResult(cacheKey)) as ReturnType<
+      DataAnalyticsService['analyzeVoiceInteractions']
+    > | null;
     if (cached) {
       return cached;
     }
@@ -249,7 +259,6 @@ export class DatabaseAdapter extends EventEmitter {
     try {
       const result = await this.client.query(sql, params, { readReplica: true });
 
-
       interface VoiceInteractionAnalyticsData {
         sessionId: string;
         voiceName: string;
@@ -259,14 +268,16 @@ export class DatabaseAdapter extends EventEmitter {
         responseTime?: number;
       }
 
-      const analyticsData: Readonly<VoiceInteractionAnalyticsData>[] = result.rows.map((row: Readonly<Record<string, unknown>>) => ({
-        sessionId: row.session_id as string,
-        voiceName: row.voice_name as string,
-        confidence: row.confidence as number,
-        tokensUsed: row.tokens_used as number,
-        createdAt: row.created_at as Date,
-        responseTime: (row.response_time as number | null) ?? undefined,
-      }));
+      const analyticsData: Readonly<VoiceInteractionAnalyticsData>[] = result.rows.map(
+        (row: Readonly<Record<string, unknown>>) => ({
+          sessionId: row.session_id as string,
+          voiceName: row.voice_name as string,
+          confidence: row.confidence as number,
+          tokensUsed: row.tokens_used as number,
+          createdAt: row.created_at as Date,
+          responseTime: (row.response_time as number | null) ?? undefined,
+        })
+      );
 
       const analytics = this.analyticsService.analyzeVoiceInteractions(analyticsData);
 
@@ -327,7 +338,9 @@ export class DatabaseAdapter extends EventEmitter {
   ): Promise<ReturnType<DataAnalyticsService['analyzeCodeAnalysisResults']>> {
     const cacheKey = `code_analytics:${JSON.stringify(query)}`;
 
-    const cached = await this.client.getCachedResult(cacheKey) as ReturnType<DataAnalyticsService['analyzeCodeAnalysisResults']> | null;
+    const cached = (await this.client.getCachedResult(cacheKey)) as ReturnType<
+      DataAnalyticsService['analyzeCodeAnalysisResults']
+    > | null;
     if (cached) {
       return cached;
     }
@@ -437,7 +450,7 @@ export class DatabaseAdapter extends EventEmitter {
   public async getProjects(): Promise<ProjectRecord[]> {
     const cacheKey = 'projects_all';
 
-    const cached = await this.client.getCachedResult(cacheKey) as ProjectRecord[] | null;
+    const cached = (await this.client.getCachedResult(cacheKey)) as ProjectRecord[] | null;
     if (cached) {
       return cached;
     }
@@ -450,14 +463,16 @@ export class DatabaseAdapter extends EventEmitter {
 
     try {
       const result = await this.client.query(query, [], { readReplica: true });
-      const projects = this.mapToProjectRecords(result.rows as Array<{
-        id?: number;
-        name: string;
-        description?: string | null;
-        repository_url?: string | null;
-        created_at?: Date;
-        updated_at?: Date;
-      }>);
+      const projects = this.mapToProjectRecords(
+        result.rows as Array<{
+          id?: number;
+          name: string;
+          description?: string | null;
+          repository_url?: string | null;
+          created_at?: Date;
+          updated_at?: Date;
+        }>
+      );
 
       await this.client.setCachedResult(cacheKey, projects, 600); // 10 minutes
 
@@ -473,7 +488,9 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Bulk insert voice interactions
    */
-  public async bulkInsertVoiceInteractions(interactions: Readonly<VoiceInteractionRecord[]>): Promise<void> {
+  public async bulkInsertVoiceInteractions(
+    interactions: Readonly<VoiceInteractionRecord[]>
+  ): Promise<void> {
     if (interactions.length === 0) return;
 
     const query = `
@@ -584,9 +601,7 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Get comprehensive analytics combining all data types
    */
-  public async getComprehensiveAnalytics(
-    query: Readonly<AnalyticsQuery> = {}
-  ): Promise<{
+  public async getComprehensiveAnalytics(query: Readonly<AnalyticsQuery> = {}): Promise<{
     voice: ReturnType<DataAnalyticsService['analyzeVoiceInteractions']>;
     code: ReturnType<DataAnalyticsService['analyzeCodeAnalysisResults']>;
     database: ReturnType<PostgreSQLClient['getMetrics']>;
@@ -649,7 +664,7 @@ export class DatabaseAdapter extends EventEmitter {
       created_at?: Date;
     }>
   ): VoiceInteractionRecord[] {
-    return rows.map((row) => ({
+    return rows.map(row => ({
       id: row.id,
       sessionId: row.session_id,
       voiceName: row.voice_name,
@@ -672,7 +687,7 @@ export class DatabaseAdapter extends EventEmitter {
       updated_at?: Date;
     }>
   ): ProjectRecord[] {
-    return rows.map((row) => ({
+    return rows.map(row => ({
       id: row.id,
       name: row.name,
       description: row.description ?? undefined,

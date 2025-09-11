@@ -28,7 +28,10 @@ import type {
   ToolExecutionOptions,
   ToolExecutionResult,
 } from '../domain/interfaces/tool-execution.js';
-import { unifiedToolRegistry, type UnifiedToolRegistry } from '../infrastructure/tools/unified-tool-registry.js';
+import {
+  unifiedToolRegistry,
+  type UnifiedToolRegistry,
+} from '../infrastructure/tools/unified-tool-registry.js';
 import { toolRegistrationService } from '../infrastructure/tools/tool-registration-service.js';
 import { PathUtilities } from '../utils/path-utilities.js';
 
@@ -214,7 +217,10 @@ export class MCPServerManager {
         context: { serverCount: 0, phase: 'startup' },
       });
 
-      logger.error('❌ MCP Server Manager initialization failed:', toReadonlyRecord({ message: structuredError.message }));
+      logger.error(
+        '❌ MCP Server Manager initialization failed:',
+        toReadonlyRecord({ message: structuredError.message })
+      );
 
       // Provide recovery suggestions
       if (structuredError.recoverable) {
@@ -360,6 +366,24 @@ export class MCPServerManager {
       }
     }
 
+    // Windows-specific fallback for execute_command to improve compatibility
+    if (
+      process.platform === 'win32' &&
+      (toolName === 'execute_command' || toolName === 'mcp_execute_command')
+    ) {
+      try {
+        const fallback = await this.executeCommandWithWindowsFallback(
+          args as Readonly<Record<string, unknown>>,
+          context
+        );
+        if (fallback) {
+          return fallback;
+        }
+      } catch (fallbackError) {
+        logger.warn('Windows fallback for execute_command failed', toReadonlyRecord(fallbackError));
+      }
+    }
+
     // Execute through unified tool registry
     const startTime = Date.now();
     try {
@@ -470,6 +494,108 @@ export class MCPServerManager {
   }
 
   /**
+   * Windows fallback for common POSIX command patterns (grep/ls/cat/pwd)
+   * Returns a ToolExecutionResult when handled, otherwise null to continue normal flow.
+   */
+  private async executeCommandWithWindowsFallback(
+    rawArgs: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
+  ): Promise<ToolExecutionResult | null> {
+    const command = String((rawArgs as { command?: string }).command || '').trim();
+    if (!command) return null;
+
+    const argsArray = Array.isArray((rawArgs as { args?: unknown[] }).args)
+      ? ((rawArgs as { args?: unknown[] }).args as unknown[]).map(String)
+      : [];
+    const workingDirectory = (rawArgs as { workingDirectory?: string }).workingDirectory;
+    const timeout = (rawArgs as { timeout?: number }).timeout as number | undefined;
+
+    // Heuristic: translate common grep usage to Windows pipeline using findstr
+    const fullCmd = argsArray.length > 0 ? `${command} ${argsArray.join(' ')}` : command;
+    const grepMatch = /grep\s+(-[\w]*r[\w]*n?[\w]*E?\b)?\s+["']([^"']+)["']\s+([^|\r\n]+)/i.exec(fullCmd);
+    const excludeMatch = /\|\s*grep\s+-vE?\s+["']([^"']+)["']/i.exec(fullCmd);
+
+    const isGrep = /(^|\s)grep\b/i.test(fullCmd);
+    const isLs = /^ls(\s|$)/i.test(command);
+    const isCat = /^cat(\s|$)/i.test(command);
+    const isPwd = /^pwd(\s|$)/i.test(command);
+
+    // If no recognizable pattern, do not intercept
+    if (!isGrep && !isLs && !isCat && !isPwd) {
+      return null;
+    }
+
+    // Build Windows-friendly command via cmd /c
+    let windowsShellCommand = '';
+    if (isGrep) {
+      // Default pattern/path if not captured
+      const pattern = grepMatch?.[2] ?? '';
+      const target = grepMatch?.[3]?.trim() || '.';
+      // Convert glob like src/infrastructure/* → dir /s /b src\infrastructure
+      const normalizedTarget = target.replace(/\*/g, '').replace(/\//g, '\\');
+      const exclude = excludeMatch?.[1];
+      const excludePipe = exclude ? ` | findstr /V /R "${exclude}"` : '';
+      windowsShellCommand = `dir /S /B ${normalizedTarget} | findstr /R /N "${pattern}"${excludePipe}`;
+    } else if (isLs) {
+      windowsShellCommand = 'dir';
+    } else if (isCat) {
+      // cat file → type file (keep original args)
+      const file = argsArray[0] ? String(argsArray[0]) : '';
+      windowsShellCommand = `type ${file}`;
+    } else if (isPwd) {
+      windowsShellCommand = 'cd';
+    }
+
+    if (!windowsShellCommand) return null;
+
+    try {
+      // Execute via Terminal server directly to avoid recursion on registry
+      const terminal = (await mcpServerRegistry.getServer('terminal')) as unknown as {
+        callTool: (
+          name: string,
+          args: Readonly<{ command: string; args?: string[]; workingDirectory?: string; timeout?: number; captureOutput?: boolean }>
+        ) => Promise<{ content: Array<{ type: 'text'; text: string }>; isError: boolean }>;
+      };
+
+      const result = await terminal.callTool('run_command', {
+        command: 'cmd',
+        args: ['/c', windowsShellCommand],
+        workingDirectory: workingDirectory as string | undefined,
+        timeout: typeof timeout === 'number' ? timeout : 30000,
+        captureOutput: true,
+      });
+
+      const outputText = Array.isArray(result.content)
+        ? result.content.map(c => c.text).join('\n')
+        : '';
+
+      return {
+        success: !result.isError,
+        data: outputText,
+        metadata: {
+          executionTime: 0,
+          toolName: 'execute_command',
+          requestId: (context as { requestId?: string } | undefined)?.requestId,
+        },
+      } as ToolExecutionResult;
+    } catch (err) {
+      logger.warn('Terminal execution via Windows fallback failed', toReadonlyRecord(err));
+      return {
+        success: false,
+        error: {
+          code: 'WindowsFallbackError',
+          message: err instanceof Error ? err.message : String(err),
+        },
+        metadata: {
+          executionTime: 0,
+          toolName: 'execute_command',
+          requestId: (context as { requestId?: string } | undefined)?.requestId,
+        },
+      } as ToolExecutionResult;
+    }
+  }
+
+  /**
    * Secure file operations - delegates to filesystem server
    */
   public async readFileSecure(filePath: string): Promise<string> {
@@ -485,7 +611,7 @@ export class MCPServerManager {
   public async listDirectorySecure(directoryPath: string): Promise<string[]> {
     const result = await this.executeTool('filesystem_list_directory', { path: directoryPath });
     // Ensure result.data is an array of strings
-    return Array.isArray(result.data) ? result.data as string[] : [];
+    return Array.isArray(result.data) ? (result.data as string[]) : [];
   }
 
   public async getFileStats(
@@ -494,7 +620,9 @@ export class MCPServerManager {
     try {
       // Get file stats directly - the server will return error if file doesn't exist
       const statsResult = await this.executeTool('filesystem_get_stats', { file_path: filePath });
-      const stats = statsResult.data as { size?: number; modified?: string | number | Date } | undefined;
+      const stats = statsResult.data as
+        | { size?: number; modified?: string | number | Date }
+        | undefined;
 
       let size: number | undefined = undefined;
       let modified: Date | undefined = undefined;
@@ -522,12 +650,14 @@ export class MCPServerManager {
   /**
    * Secure command execution - delegates to terminal server
    */
-  public async executeCommandSecure(command: string, args: ReadonlyArray<string> = []): Promise<string> {
+  public async executeCommandSecure(
+    command: string,
+    args: ReadonlyArray<string> = []
+  ): Promise<string> {
     const result = await this.executeTool('execute_command', { command, args: [...args] });
     // Ensure result.data is a string
     return typeof result.data === 'string' ? result.data : '';
   }
-
 
   /**
    * Get real server capabilities from active services
@@ -605,7 +735,11 @@ export class MCPServerManager {
     const servers = mcpServerMonitoring.getAllServerMetrics();
 
     // Calculate interface-expected values from available data
-    const successCount = servers.reduce((sum: number, s: Readonly<{ readonly metrics: { readonly successfulRequests: number } }>) => sum + s.metrics.successfulRequests, 0);
+    const successCount = servers.reduce(
+      (sum: number, s: Readonly<{ readonly metrics: { readonly successfulRequests: number } }>) =>
+        sum + s.metrics.successfulRequests,
+      0
+    );
     const { totalRequests } = actualSummary;
     const errorCount = totalRequests - successCount;
     const uptimePercentage =
@@ -688,7 +822,7 @@ export class MCPServerManager {
       const status = this.getServerStatus(serverId) as any;
       return {
         serverId,
-        status: status?.status || 'stopped' as 'running' | 'error' | 'stopped',
+        status: status?.status || ('stopped' as 'running' | 'error' | 'stopped'),
         uptime: 0, // Would need actual implementation
         successRate: 0.95, // Would need actual metrics
         lastSeen: new Date(),
@@ -697,7 +831,7 @@ export class MCPServerManager {
 
     const runningCount = serverStatuses.filter(s => s.status === 'running').length;
     const errorCount = serverStatuses.filter(s => s.status === 'error').length;
-    
+
     let overall: 'healthy' | 'degraded' | 'critical' = 'healthy';
     if (errorCount > 0) {
       overall = runningCount > errorCount ? 'degraded' : 'critical';
@@ -831,7 +965,9 @@ export class MCPServerManager {
       })
     );
 
-    const allHealthy = serverStatuses.every((server: Readonly<{ status: string }>) => server.status === 'running');
+    const allHealthy = serverStatuses.every(
+      (server: Readonly<{ status: string }>) => server.status === 'running'
+    );
 
     return {
       status: allHealthy ? 'healthy' : 'degraded',

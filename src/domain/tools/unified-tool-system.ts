@@ -45,7 +45,10 @@ export abstract class BaseTool implements ITool {
     context: Readonly<ToolExecutionContext>
   ): Promise<ToolExecutionResult>;
 
-  public validateArguments(args: Readonly<Record<string, unknown>>): { valid: boolean; errors?: string[] } {
+  public validateArguments(args: Readonly<Record<string, unknown>>): {
+    valid: boolean;
+    errors?: string[];
+  } {
     const errors: string[] = [];
 
     // Check required parameters
@@ -90,8 +93,9 @@ export abstract class BaseTool implements ITool {
 
     // Check permissions
     return this.definition.permissions.every((permission: { type: string; resource: string }) =>
-      context.permissions.some((contextPerm: { type: string; resource: string }) =>
-        contextPerm.type === permission.type && contextPerm.resource === permission.resource
+      context.permissions.some(
+        (contextPerm: { type: string; resource: string }) =>
+          contextPerm.type === permission.type && contextPerm.resource === permission.resource
       )
     );
   }
@@ -125,7 +129,11 @@ export abstract class BaseTool implements ITool {
     return `tool_${name.toLowerCase().replace(/\s+/g, '_')}`;
   }
 
-  private validateParameter(paramName: string, value: unknown, paramDef: Readonly<ParameterDefinition>): string | null {
+  private validateParameter(
+    paramName: string,
+    value: unknown,
+    paramDef: Readonly<ParameterDefinition>
+  ): string | null {
     // Type validation
     if (paramDef.type === 'string' && typeof value !== 'string') {
       return `Parameter ${paramName} must be a string`;
@@ -179,10 +187,12 @@ interface ParameterDefinition {
  */
 export interface ToolDecorator {
   name: string;
-  preProcess?: ((
-    args: Record<string, unknown>,
-    context: ToolExecutionContext
-  ) => Promise<Record<string, unknown>>) | undefined;
+  preProcess?:
+    | ((
+        args: Record<string, unknown>,
+        context: ToolExecutionContext
+      ) => Promise<Record<string, unknown>>)
+    | undefined;
   postProcess: (
     result: ToolExecutionResult,
     args: Record<string, unknown>,
@@ -213,8 +223,10 @@ export class SecurityDecorator implements ToolDecorator {
           timestamp: new Date(),
           operationType: 'input',
           environment: 'sandbox',
-          permissions: (context.permissions as readonly { type: string }[]).map((p: { type: string }) => p.type),
-        })
+          permissions: (context.permissions as readonly { type: string }[]).map(
+            (p: { type: string }) => p.type
+          ),
+        });
 
         if (!validation.isValid) {
           throw new Error(
@@ -406,329 +418,340 @@ export class LoggingDecorator implements ToolDecorator {
   }
 }
 
+/**
+ * Enhanced RetryDecorator
+ *
+ * Reworked to accept a reexecute function that performs the actual tool invocation
+ * (usually the underlying tool's execute method without decorators). This
+ * prevents retry loops (re-applying the retry decorator) and lets the
+ * executor supply the correct execution implementation.
+ */
+export class RetryDecorator implements ToolDecorator {
+  public readonly name = 'retry';
 
-    /**
-     * Enhanced RetryDecorator
-     *
-     * Reworked to accept a reexecute function that performs the actual tool invocation
-     * (usually the underlying tool's execute method without decorators). This
-     * prevents retry loops (re-applying the retry decorator) and lets the
-     * executor supply the correct execution implementation.
-     */
-    export class RetryDecorator implements ToolDecorator {
-      public readonly name = 'retry';
-    
-      // Optional reexecute callback: (args, context) => Promise<ToolExecutionResult>
-      public constructor(
-        private readonly maxRetries: number = 3,
-        private readonly backoffMs: number = 1000,
-        private readonly backoffMultiplier: number = 2,
-        private readonly reexecute?: (args: Record<string, unknown>, context: ToolExecutionContext) => Promise<ToolExecutionResult>
-      ) {}
-    
-      public async postProcess(
-        result: Readonly<ToolExecutionResult>,
-        args: Readonly<Record<string, unknown>>,
-        context: Readonly<ToolExecutionContext>
-      ): Promise<ToolExecutionResult> {
-        if (result.success) {
-          return result;
-        }
-    
-        // Check if the error is retryable
-        if (!this.isRetryableError(result.error)) {
-          return result;
-        }
-    
-        // Prefer an explicitly provided reexecute function, else try to use one from context.metadata
-        const reexecutor =
-          this.reexecute ??
-          (context.metadata && (context.metadata.reexecute as ((a: Record<string, unknown>, c: ToolExecutionContext) => Promise<ToolExecutionResult>) | undefined));
-    
-        if (!reexecutor) {
-          // If we cannot reexecute, return original result
-          return result;
-        }
-    
-        let lastResult: ToolExecutionResult = result;
-        let delay = this.backoffMs;
-    
-        for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-          try {
-            // Wait before retry (exponential backoff)
-            await this.delay(delay);
-            delay *= this.backoffMultiplier;
-    
-            const retryResult = await reexecutor(args as Record<string, unknown>, context as ToolExecutionContext);
-    
-            // If successful, return immediately (attach retry metadata)
-            if (retryResult.success) {
-              return {
-                ...retryResult,
-                metadata: {
-                  ...retryResult.metadata,
-                  retry: {
-                    attempts: attempt,
-                    backoffMs: delay / this.backoffMultiplier,
-                  },
-                },
-              };
-            }
-    
-            // Otherwise preserve the last failure and continue
-            lastResult = {
-              ...retryResult,
-              metadata: {
-                ...retryResult.metadata,
-                retryAttempt: attempt,
-              },
-            };
-          } catch (error) {
-            lastResult = {
-              success: false,
-              error: {
-                code: 'retry_failed',
-                message: error instanceof Error ? error.message : String(error),
-              },
-              executionTimeMs: 0,
-              metadata: {
-                ...(lastResult.metadata ?? {}),
-                retryAttempt: attempt,
-              },
-            };
-          }
-        }
-    
-        // Return the last observed result after exhausting retries
-        return lastResult;
-      }
-    
-      private isRetryableError(error?: { code: string; message: string }): boolean {
-        if (!error) return false;
-    
-        // Define retryable error codes
-        const retryableErrors = [
-          'network_timeout',
-          'temporary_failure',
-          'rate_limited',
-          'service_unavailable',
-          'transient_error',
-          'connection_reset',
-        ];
-    
-        return retryableErrors.includes(error.code);
-      }
-    
-      private async delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
-      }
+  // Optional reexecute callback: (args, context) => Promise<ToolExecutionResult>
+  public constructor(
+    private readonly maxRetries: number = 3,
+    private readonly backoffMs: number = 1000,
+    private readonly backoffMultiplier: number = 2,
+    private readonly reexecute?: (
+      args: Record<string, unknown>,
+      context: ToolExecutionContext
+    ) => Promise<ToolExecutionResult>
+  ) {}
+
+  public async postProcess(
+    result: Readonly<ToolExecutionResult>,
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
+  ): Promise<ToolExecutionResult> {
+    if (result.success) {
+      return result;
     }
-    
-    /**
-     * Performance monitoring decorator
-     */
-    export class PerformanceDecorator implements ToolDecorator {
-      public readonly name = 'performance';
-      private readonly metrics = new Map<string, { count: number; totalTime: number; errors: number }>();
-    
-      public async preProcess(
-        args: Readonly<Record<string, unknown>>,
-        context: Readonly<ToolExecutionContext>
-      ): Promise<Record<string, unknown>> {
-        // Record start time
-        // Cast to mutable context so we can write metadata safely; the incoming type is Readonly.
-        const mutableCtx = context as ToolExecutionContext;
-    
-        if (!mutableCtx.metadata) {
-          mutableCtx.metadata = {};
-        }
-    
-        // Strongly type metadata to avoid 'any' and unsafe member access
-        const metadata = mutableCtx.metadata as Record<string, unknown> & {
-          startTime?: number;
-          toolId?: string;
-        };
-    
-        metadata.startTime = Date.now();
-    
-        return args as Record<string, unknown>;
-      }
-    
-      public async postProcess(
-        result: Readonly<ToolExecutionResult>,
-        _args: Readonly<Record<string, unknown>>,
-        context: Readonly<ToolExecutionContext>
-      ): Promise<ToolExecutionResult> {
-        const mutableCtx = context as ToolExecutionContext;
-    
-        const metadata = (mutableCtx.metadata ?? {}) as Record<string, unknown> & {
-          startTime?: number;
-          toolId?: string;
-        };
-    
-        const startTime = Number(metadata.startTime ?? 0);
-        const executionTime = Date.now() - startTime;
-    
-        // Safely extract toolId from metadata with a string fallback
-        const toolId = typeof metadata.toolId === 'string' ? metadata.toolId : 'unknown';
-    
-        // Update metrics
-        const current = this.metrics.get(toolId) ?? { count: 0, totalTime: 0, errors: 0 };
-        current.count++;
-        current.totalTime += executionTime;
-        if (!result.success) {
-          current.errors++;
-        }
-        this.metrics.set(toolId, current);
-    
-        // Add performance metadata to result
-        return {
-          ...result,
-          executionTimeMs: executionTime,
-          metadata: {
-            ...result.metadata,
-            performance: {
-              executionTime,
-              averageTime: current.totalTime / current.count,
-              errorRate: current.errors / current.count,
+
+    // Check if the error is retryable
+    if (!this.isRetryableError(result.error)) {
+      return result;
+    }
+
+    // Prefer an explicitly provided reexecute function, else try to use one from context.metadata
+    const reexecutor =
+      this.reexecute ??
+      (context.metadata &&
+        (context.metadata.reexecute as
+          | ((a: Record<string, unknown>, c: ToolExecutionContext) => Promise<ToolExecutionResult>)
+          | undefined));
+
+    if (!reexecutor) {
+      // If we cannot reexecute, return original result
+      return result;
+    }
+
+    let lastResult: ToolExecutionResult = result;
+    let delay = this.backoffMs;
+
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        // Wait before retry (exponential backoff)
+        await this.delay(delay);
+        delay *= this.backoffMultiplier;
+
+        const retryResult = await reexecutor(
+          args as Record<string, unknown>,
+          context as ToolExecutionContext
+        );
+
+        // If successful, return immediately (attach retry metadata)
+        if (retryResult.success) {
+          return {
+            ...retryResult,
+            metadata: {
+              ...retryResult.metadata,
+              retry: {
+                attempts: attempt,
+                backoffMs: delay / this.backoffMultiplier,
+              },
             },
+          };
+        }
+
+        // Otherwise preserve the last failure and continue
+        lastResult = {
+          ...retryResult,
+          metadata: {
+            ...retryResult.metadata,
+            retryAttempt: attempt,
+          },
+        };
+      } catch (error) {
+        lastResult = {
+          success: false,
+          error: {
+            code: 'retry_failed',
+            message: error instanceof Error ? error.message : String(error),
+          },
+          executionTimeMs: 0,
+          metadata: {
+            ...(lastResult.metadata ?? {}),
+            retryAttempt: attempt,
           },
         };
       }
-    
-      public getMetrics(): Map<string, { count: number; totalTime: number; errors: number }> {
-        return new Map(this.metrics);
-      }
     }
 
-    // ============================================================================
-    // TOOL REGISTRY - Manages all available tools
-    // ============================================================================
+    // Return the last observed result after exhausting retries
+    return lastResult;
+  }
 
-    export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
-      private readonly tools = new Map<string, ITool>();
-      private readonly categories = new Map<string, Set<string>>();
+  private isRetryableError(error?: { code: string; message: string }): boolean {
+    if (!error) return false;
 
-      public constructor(private readonly logger: ILogger) {
-        super();
-        this.logger.info('UnifiedToolRegistry initialized');
-      }
+    // Define retryable error codes
+    const retryableErrors = [
+      'network_timeout',
+      'temporary_failure',
+      'rate_limited',
+      'service_unavailable',
+      'transient_error',
+      'connection_reset',
+    ];
 
-      public register(tool: ITool): void {
-        if (this.tools.has(tool.definition.id)) {
+    return retryableErrors.includes(error.code);
+  }
+
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+/**
+ * Performance monitoring decorator
+ */
+export class PerformanceDecorator implements ToolDecorator {
+  public readonly name = 'performance';
+  private readonly metrics = new Map<
+    string,
+    { count: number; totalTime: number; errors: number }
+  >();
+
+  public async preProcess(
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
+  ): Promise<Record<string, unknown>> {
+    // Record start time
+    // Cast to mutable context so we can write metadata safely; the incoming type is Readonly.
+    const mutableCtx = context as ToolExecutionContext;
+
+    if (!mutableCtx.metadata) {
+      mutableCtx.metadata = {};
+    }
+
+    // Strongly type metadata to avoid 'any' and unsafe member access
+    const metadata = mutableCtx.metadata as Record<string, unknown> & {
+      startTime?: number;
+      toolId?: string;
+    };
+
+    metadata.startTime = Date.now();
+
+    return args as Record<string, unknown>;
+  }
+
+  public async postProcess(
+    result: Readonly<ToolExecutionResult>,
+    _args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
+  ): Promise<ToolExecutionResult> {
+    const mutableCtx = context as ToolExecutionContext;
+
+    const metadata = (mutableCtx.metadata ?? {}) as Record<string, unknown> & {
+      startTime?: number;
+      toolId?: string;
+    };
+
+    const startTime = Number(metadata.startTime ?? 0);
+    const executionTime = Date.now() - startTime;
+
+    // Safely extract toolId from metadata with a string fallback
+    const toolId = typeof metadata.toolId === 'string' ? metadata.toolId : 'unknown';
+
+    // Update metrics
+    const current = this.metrics.get(toolId) ?? { count: 0, totalTime: 0, errors: 0 };
+    current.count++;
+    current.totalTime += executionTime;
+    if (!result.success) {
+      current.errors++;
+    }
+    this.metrics.set(toolId, current);
+
+    // Add performance metadata to result
+    return {
+      ...result,
+      executionTimeMs: executionTime,
+      metadata: {
+        ...result.metadata,
+        performance: {
+          executionTime,
+          averageTime: current.totalTime / current.count,
+          errorRate: current.errors / current.count,
+        },
+      },
+    };
+  }
+
+  public getMetrics(): Map<string, { count: number; totalTime: number; errors: number }> {
+    return new Map(this.metrics);
+  }
+}
+
+// ============================================================================
+// TOOL REGISTRY - Manages all available tools
+// ============================================================================
+
+export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
+  private readonly tools = new Map<string, ITool>();
+  private readonly categories = new Map<string, Set<string>>();
+
+  public constructor(private readonly logger: ILogger) {
+    super();
+    this.logger.info('UnifiedToolRegistry initialized');
+  }
+
+  public register(tool: ITool): void {
+    if (this.tools.has(tool.definition.id)) {
       this.logger.warn(`Tool ${tool.definition.id} is already registered, overwriting`);
-        }
+    }
 
-        this.tools.set(tool.definition.id, tool);
+    this.tools.set(tool.definition.id, tool);
 
-        // Update category index
-        const { category } = tool.definition;
-        if (!this.categories.has(category)) {
+    // Update category index
+    const { category } = tool.definition;
+    if (!this.categories.has(category)) {
       this.categories.set(category, new Set());
-        }
-        const categorySet = this.categories.get(category);
-        if (categorySet) {
-          categorySet.add(tool.definition.id);
-        }
+    }
+    const categorySet = this.categories.get(category);
+    if (categorySet) {
+      categorySet.add(tool.definition.id);
+    }
 
-        this.emit('toolRegistered', { tool: tool.definition });
-        this.logger.info(`Tool registered: ${tool.definition.name} (${tool.definition.id})`);
-      }
+    this.emit('toolRegistered', { tool: tool.definition });
+    this.logger.info(`Tool registered: ${tool.definition.name} (${tool.definition.id})`);
+  }
 
-      public getTool(id: string): ITool | undefined {
-        return this.tools.get(id);
-      }
+  public getTool(id: string): ITool | undefined {
+    return this.tools.get(id);
+  }
 
-      public getAllTools(): ITool[] {
-        return Array.from(this.tools.values());
-      }
+  public getAllTools(): ITool[] {
+    return Array.from(this.tools.values());
+  }
 
-      public getToolsByCategory(category: string): ITool[] {
-        const toolIds = this.categories.get(category);
-        if (!toolIds) {
+  public getToolsByCategory(category: string): ITool[] {
+    const toolIds = this.categories.get(category);
+    if (!toolIds) {
       return [];
-        }
+    }
 
-        return Array.from(toolIds)
+    return Array.from(toolIds)
       .map(id => this.tools.get(id))
       .filter((tool): tool is ITool => tool !== undefined);
-      }
+  }
 
-      public searchTools(query: string): ITool[] {
-        const lowerQuery = query.toLowerCase();
-        return this.getAllTools().filter(
+  public searchTools(query: string): ITool[] {
+    const lowerQuery = query.toLowerCase();
+    return this.getAllTools().filter(
       tool =>
         tool.definition.name.toLowerCase().includes(lowerQuery) ||
         tool.definition.description.toLowerCase().includes(lowerQuery)
-        );
-      }
+    );
+  }
 
-      public unregister(id: string): boolean {
-        const tool = this.tools.get(id);
-        if (!tool) {
+  public unregister(id: string): boolean {
+    const tool = this.tools.get(id);
+    if (!tool) {
       return false;
-        }
+    }
 
-        this.tools.delete(id);
+    this.tools.delete(id);
 
-        // Remove from category index
-        const { category } = tool.definition;
-        const categoryTools = this.categories.get(category);
-        if (categoryTools) {
+    // Remove from category index
+    const { category } = tool.definition;
+    const categoryTools = this.categories.get(category);
+    if (categoryTools) {
       categoryTools.delete(id);
       if (categoryTools.size === 0) {
         this.categories.delete(category);
       }
-        }
-
-        this.emit('toolUnregistered', { toolId: id });
-        this.logger.info(`Tool unregistered: ${id}`);
-
-        return true;
-      }
-
-      public getCategories(): string[] {
-        return Array.from(this.categories.keys());
-      }
-
-      public getToolCount(): number {
-        return this.tools.size;
-      }
     }
 
-    // ============================================================================
-    // TOOL EXECUTOR - Executes tools with decorators
-    // ============================================================================
+    this.emit('toolUnregistered', { toolId: id });
+    this.logger.info(`Tool unregistered: ${id}`);
 
-    export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
-      private rustBackend?: IExecutionBackend;
+    return true;
+  }
 
-      public constructor(
-        private readonly logger: ILogger,
-        private readonly registry: IToolRegistry,
-        private readonly securityValidator?: IUnifiedSecurityValidator,
-        private readonly eventBus?: IEventBus,
-        rustBackend?: IExecutionBackend
-      ) {
-        super();
-        this.rustBackend = rustBackend;
-        // Inject this orchestrator into the execution backend for fallback execution
-        try {
+  public getCategories(): string[] {
+    return Array.from(this.categories.keys());
+  }
+
+  public getToolCount(): number {
+    return this.tools.size;
+  }
+}
+
+// ============================================================================
+// TOOL EXECUTOR - Executes tools with decorators
+// ============================================================================
+
+export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
+  private rustBackend?: IExecutionBackend;
+
+  public constructor(
+    private readonly logger: ILogger,
+    private readonly registry: IToolRegistry,
+    private readonly securityValidator?: IUnifiedSecurityValidator,
+    private readonly eventBus?: IEventBus,
+    rustBackend?: IExecutionBackend
+  ) {
+    super();
+    this.rustBackend = rustBackend;
+    // Inject this orchestrator into the execution backend for fallback execution
+    try {
       this.rustBackend?.setTypescriptOrchestrator(this);
-        } catch (e) {
+    } catch (e) {
       // Backend may be a no-op implementation in tests
-        }
-        this.logger.info('UnifiedToolExecutor initialized', {
+    }
+    this.logger.info('UnifiedToolExecutor initialized', {
       rustBackendEnabled: !!this.rustBackend,
       rustAvailable: this.rustBackend?.isAvailable() ?? false,
-        });
-      }
+    });
+  }
 
-      public async execute(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
-        const startTime = Date.now();
+  public async execute(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
+    const startTime = Date.now();
 
-        // Try Rust backend first if available and enabled
-        if (this.rustBackend?.isAvailable()) {
+    // Try Rust backend first if available and enabled
+    if (this.rustBackend?.isAvailable()) {
       try {
         this.logger.debug('Attempting Rust backend execution for tool:', request.toolId);
         const rustResult = await this.rustBackend.execute(request);
@@ -738,25 +761,25 @@ export class LoggingDecorator implements ToolDecorator {
           return rustResult;
         } else {
           this.logger.warn(
-        'Rust backend execution failed, falling back to TypeScript:',
-        rustResult.error
+            'Rust backend execution failed, falling back to TypeScript:',
+            rustResult.error
           );
         }
       } catch (error) {
         this.logger.warn('Rust backend error, falling back to TypeScript:', error);
       }
-        }
+    }
 
-        // Fallback to TypeScript implementation
-        try {
+    // Fallback to TypeScript implementation
+    try {
       // Get the tool
       const tool = this.registry.getTool(request.toolId);
       if (!tool) {
         return {
           success: false,
           error: {
-        code: 'tool_not_found',
-        message: `Tool not found: ${request.toolId}`,
+            code: 'tool_not_found',
+            message: `Tool not found: ${request.toolId}`,
           },
           executionTimeMs: Date.now() - startTime,
         };
@@ -768,8 +791,8 @@ export class LoggingDecorator implements ToolDecorator {
         return {
           success: false,
           error: {
-        code: 'invalid_arguments',
-        message: `Invalid arguments: ${validation.errors?.join(', ')}`,
+            code: 'invalid_arguments',
+            message: `Invalid arguments: ${validation.errors?.join(', ')}`,
           },
           executionTimeMs: Date.now() - startTime,
         };
@@ -780,8 +803,8 @@ export class LoggingDecorator implements ToolDecorator {
         return {
           success: false,
           error: {
-        code: 'permission_denied',
-        message: 'Tool execution not permitted in this context',
+            code: 'permission_denied',
+            message: 'Tool execution not permitted in this context',
           },
           executionTimeMs: Date.now() - startTime,
         };
@@ -804,16 +827,16 @@ export class LoggingDecorator implements ToolDecorator {
       } catch (error) {
         if (error instanceof CacheHitException) {
           return {
-        ...error.cachedResult,
-        metadata: {
-          ...error.cachedResult.metadata,
-          cached: true,
-        },
+            ...error.cachedResult,
+            metadata: {
+              ...error.cachedResult.metadata,
+              cached: true,
+            },
           };
         }
         throw error;
       }
-        } catch (error) {
+    } catch (error) {
       return {
         success: false,
         error: {
@@ -823,13 +846,15 @@ export class LoggingDecorator implements ToolDecorator {
         },
         executionTimeMs: Date.now() - startTime,
       };
-        }
-      }
+    }
+  }
 
-      public async executeSequence(requests: readonly ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
-        const results: ToolExecutionResult[] = [];
+  public async executeSequence(
+    requests: readonly ToolExecutionRequest[]
+  ): Promise<ToolExecutionResult[]> {
+    const results: ToolExecutionResult[] = [];
 
-        for (const request of requests) {
+    for (const request of requests) {
       const result = await this.execute(request);
       results.push(result);
 
@@ -837,111 +862,123 @@ export class LoggingDecorator implements ToolDecorator {
       if (!result.success) {
         break;
       }
-        }
+    }
 
-        return results;
-      }
+    return results;
+  }
 
-      public async executeParallel(requests: readonly ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
-        const promises = requests.map(async (request): Promise<ToolExecutionResult> => this.execute(request));
-        return Promise.all(promises);
-      }
+  public async executeParallel(
+    requests: readonly ToolExecutionRequest[]
+  ): Promise<ToolExecutionResult[]> {
+    const promises = requests.map(
+      async (request): Promise<ToolExecutionResult> => this.execute(request)
+    );
+    return Promise.all(promises);
+  }
 
-      private applyDecorators(tool: ITool, request: ToolExecutionRequest): ITool {
-        // Create a shallow copy of the tool object so we can attach decorators without mutating registry
-        const decoratedTool: ITool = Object.create(tool) as ITool;
+  private applyDecorators(tool: ITool, request: ToolExecutionRequest): ITool {
+    // Create a shallow copy of the tool object so we can attach decorators without mutating registry
+    const decoratedTool: ITool = Object.create(tool) as ITool;
 
-        // Apply standard decorators based on context
-        const decorators: ToolDecorator[] = [];
+    // Apply standard decorators based on context
+    const decorators: ToolDecorator[] = [];
 
-        // Always apply logging (inject executor event bus if available)
-        decorators.push(new LoggingDecorator(undefined, this.eventBus));
+    // Always apply logging (inject executor event bus if available)
+    decorators.push(new LoggingDecorator(undefined, this.eventBus));
 
-        // Apply security if validator is available
-        if (this.securityValidator) {
-          decorators.push(new SecurityDecorator(this.securityValidator));
-        }
+    // Apply security if validator is available
+    if (this.securityValidator) {
+      decorators.push(new SecurityDecorator(this.securityValidator));
+    }
 
-        // Apply performance monitoring
-        decorators.push(new PerformanceDecorator());
+    // Apply performance monitoring
+    decorators.push(new PerformanceDecorator());
 
-        // Apply caching for read-only operations
-        if (this.isReadOnlyOperation(request)) {
-          decorators.push(new CachingDecorator());
-        }
+    // Apply caching for read-only operations
+    if (this.isReadOnlyOperation(request)) {
+      decorators.push(new CachingDecorator());
+    }
 
-        // Apply retry for network operations
-        if (this.isNetworkOperation(request)) {
-          // Provide a reexecute function that invokes the underlying tool implementation directly
-          // This bypasses decorators (including retry) to avoid recursive retry loops.
-          const reexecute = async (args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolExecutionResult> => {
-            try {
-              // Call the raw tool implementation (not decorated). We intentionally pass the original context.
-              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-              // @ts-ignore - tool.execute exists on concrete tool implementations
-              return await tool.execute(args, ctx);
-            } catch (e) {
-              return {
-                success: false,
-                error: {
-                  code: isErrorWithCode(e) ? e.code : 'execution_error',
-                  message: e instanceof Error ? e.message : String(e),
-                },
-                executionTimeMs: 0,
-              };
-            }
+    // Apply retry for network operations
+    if (this.isNetworkOperation(request)) {
+      // Provide a reexecute function that invokes the underlying tool implementation directly
+      // This bypasses decorators (including retry) to avoid recursive retry loops.
+      const reexecute = async (
+        args: Record<string, unknown>,
+        ctx: ToolExecutionContext
+      ): Promise<ToolExecutionResult> => {
+        try {
+          // Call the raw tool implementation (not decorated). We intentionally pass the original context.
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore - tool.execute exists on concrete tool implementations
+          return await tool.execute(args, ctx);
+        } catch (e) {
+          return {
+            success: false,
+            error: {
+              code: isErrorWithCode(e) ? e.code : 'execution_error',
+              message: e instanceof Error ? e.message : String(e),
+            },
+            executionTimeMs: 0,
           };
-
-          decorators.push(new RetryDecorator(3, 1000, 2, reexecute));
         }
+      };
 
-        // Add decorators to tool if the implementation supports it
-        decorators.forEach((decorator: Readonly<ToolDecorator>): void => {
-          if (typeof decoratedTool.addDecorator === 'function') {
-            decoratedTool.addDecorator(decorator);
-          }
-        });
+      decorators.push(new RetryDecorator(3, 1000, 2, reexecute));
+    }
 
-        // Also surface a reexecute function in context.metadata for decorators that may prefer it
-        request.context.metadata = request.context.metadata ?? {};
-        // Attach a reexecute callback that calls the underlying tool implementation (used by RetryDecorator fallback)
-        (request.context.metadata as {
-          reexecute?: (args: Readonly<Record<string, unknown>>, ctx: Readonly<ToolExecutionContext>) => Promise<ToolExecutionResult>;
-        }).reexecute = async (
+    // Add decorators to tool if the implementation supports it
+    decorators.forEach((decorator: Readonly<ToolDecorator>): void => {
+      if (typeof decoratedTool.addDecorator === 'function') {
+        decoratedTool.addDecorator(decorator);
+      }
+    });
+
+    // Also surface a reexecute function in context.metadata for decorators that may prefer it
+    request.context.metadata = request.context.metadata ?? {};
+    // Attach a reexecute callback that calls the underlying tool implementation (used by RetryDecorator fallback)
+    (
+      request.context.metadata as {
+        reexecute?: (
           args: Readonly<Record<string, unknown>>,
           ctx: Readonly<ToolExecutionContext>
-        ): Promise<ToolExecutionResult> => {
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore - calling underlying tool implementation directly
-          return tool.execute(args, ctx);
-        };
-
-        return decoratedTool;
+        ) => Promise<ToolExecutionResult>;
       }
+    ).reexecute = async (
+      args: Readonly<Record<string, unknown>>,
+      ctx: Readonly<ToolExecutionContext>
+    ): Promise<ToolExecutionResult> => {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - calling underlying tool implementation directly
+      return tool.execute(args, ctx);
+    };
 
-      private isReadOnlyOperation(request: ToolExecutionRequest): boolean {
-        // Heuristic: operations that don't modify state
-        const readOnlyPatterns = [
-          'read',
-          'get',
-          'list',
-          'search',
-          'find',
-          'analyze',
-          'check',
-          'validate',
-        ];
+    return decoratedTool;
+  }
 
-        return readOnlyPatterns.some(pattern => request.toolId.toLowerCase().includes(pattern));
-      }
+  private isReadOnlyOperation(request: ToolExecutionRequest): boolean {
+    // Heuristic: operations that don't modify state
+    const readOnlyPatterns = [
+      'read',
+      'get',
+      'list',
+      'search',
+      'find',
+      'analyze',
+      'check',
+      'validate',
+    ];
 
-      private isNetworkOperation(request: ToolExecutionRequest): boolean {
-        // Heuristic: operations that involve network calls
-        const networkPatterns = ['fetch', 'download', 'upload', 'sync', 'api', 'http', 'request'];
+    return readOnlyPatterns.some(pattern => request.toolId.toLowerCase().includes(pattern));
+  }
 
-        return networkPatterns.some(pattern => request.toolId.toLowerCase().includes(pattern));
-      }
-    }
+  private isNetworkOperation(request: ToolExecutionRequest): boolean {
+    // Heuristic: operations that involve network calls
+    const networkPatterns = ['fetch', 'download', 'upload', 'sync', 'api', 'http', 'request'];
+
+    return networkPatterns.some(pattern => request.toolId.toLowerCase().includes(pattern));
+  }
+}
 
 function isErrorWithCode(e: unknown): e is { code: string } {
   return (
@@ -951,4 +988,3 @@ function isErrorWithCode(e: unknown): e is { code: string } {
     typeof (e as Record<string, unknown>).code === 'string'
   );
 }
-

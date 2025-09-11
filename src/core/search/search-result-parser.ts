@@ -1,6 +1,6 @@
 /**
  * Search Result Parser Module
- * 
+ *
  * Handles parsing of search results from various formats (JSON, plain text, XML)
  * with support for different search tools and output structures.
  */
@@ -98,9 +98,9 @@ export class SearchResultParser {
     try {
       // Auto-detect format
       const format = this.detectFormat(output);
-      
+
       let result: ParsedSearchResult;
-      
+
       switch (format) {
         case 'json':
           result = this.parseJsonFormat(output, tool, opts);
@@ -136,7 +136,7 @@ export class SearchResultParser {
       return result;
     } catch (error) {
       logger.error('Search result parsing failed', toErrorOrUndefined(error));
-      
+
       // Return empty result with error info
       return {
         documents: [],
@@ -166,40 +166,43 @@ export class SearchResultParser {
   /**
    * Parse plain text grep-like format
    */
-  public static parsePlainTextGrep(output: string, options: ParserOptions = {}): ParsedSearchResult {
+  public static parsePlainTextGrep(
+    output: string,
+    options: ParserOptions = {}
+  ): ParsedSearchResult {
     return this.parsePlainTextFormat(output, 'grep', options);
   }
 
   /**
-     * Detect the format of search output
-     */
-    private static detectFormat(output: string): 'json' | 'plain' | 'structured' | 'unknown' {
-      if (!output?.trim()) return 'unknown';
-  
-      const [firstLine] = output.trim().split('\n');
-      
-      // Check for JSON format
-      if (firstLine.startsWith('{') && firstLine.includes('"type"')) {
-        try {
-          JSON.parse(firstLine);
-          return 'json';
-        } catch {
-          // Not valid JSON
-        }
+   * Detect the format of search output
+   */
+  private static detectFormat(output: string): 'json' | 'plain' | 'structured' | 'unknown' {
+    if (!output?.trim()) return 'unknown';
+
+    const [firstLine] = output.trim().split('\n');
+
+    // Check for JSON format
+    if (firstLine.startsWith('{') && firstLine.includes('"type"')) {
+      try {
+        JSON.parse(firstLine);
+        return 'json';
+      } catch {
+        // Not valid JSON
       }
-  
-      // Check for structured format (XML-like)
-      if (firstLine.includes('<') && firstLine.includes('>')) {
-        return 'structured';
-      }
-  
-      // Check for typical grep format (filename:line:content)
-      if (firstLine.includes(':') && firstLine.split(':').length >= 3) {
-        return 'plain';
-      }
-  
-      return 'plain'; // Default fallback
     }
+
+    // Check for structured format (XML-like)
+    if (firstLine.includes('<') && firstLine.includes('>')) {
+      return 'structured';
+    }
+
+    // Check for typical grep format (filename:line:content)
+    if (firstLine.includes(':') && firstLine.split(':').length >= 3) {
+      return 'plain';
+    }
+
+    return 'plain'; // Default fallback
+  }
 
   /**
    * Parse JSON format (primarily ripgrep --json)
@@ -220,14 +223,14 @@ export class SearchResultParser {
 
       try {
         const entry = JSON.parse(line) as unknown as RipgrepJsonEntry;
-        
+
         if (entry.type === 'match' && entry.data) {
           const { path, lines: lineData, line_number } = entry.data;
-          
+
           if (path?.text && lineData?.text) {
             const filePath = this.validateAndTruncatePath(path.text, options);
             const content = this.validateAndTruncateContent(lineData.text, options);
-            
+
             if (filePath && content) {
               documents.push({
                 filePath,
@@ -294,7 +297,7 @@ export class SearchResultParser {
       if (match) {
         const filePath = this.validateAndTruncatePath(match.filePath, options);
         const content = this.validateAndTruncateContent(match.content, options);
-        
+
         if (filePath && content) {
           documents.push({
             filePath,
@@ -349,7 +352,7 @@ export class SearchResultParser {
    */
   private static parsePlainTextLine(line: string): PlainTextMatch | null {
     // Try different common formats
-    
+
     // Format: filename:line:content
     let match = line.match(/^([^:]+):(\d+):(.+)$/);
     if (match) {
@@ -388,7 +391,7 @@ export class SearchResultParser {
    */
   private static validateAndTruncatePath(path: string, options: ParserOptions): string | null {
     if (!path || typeof path !== 'string') return null;
-    
+
     if (options.validatePaths) {
       // Basic path validation
       if (path.includes('\0') || path.includes('\n') || path.includes('\r')) {
@@ -396,22 +399,23 @@ export class SearchResultParser {
       }
     }
 
-      const maxLength = typeof options.maxFilePathLength === 'number' ? options.maxFilePathLength : 1000;
-      return path.length > maxLength
-        ? path.slice(0, maxLength)
-        : path;
-    }
-  
+    const maxLength =
+      typeof options.maxFilePathLength === 'number' ? options.maxFilePathLength : 1000;
+    return path.length > maxLength ? path.slice(0, maxLength) : path;
+  }
+
   /**
    * Validate and truncate content
    */
-  private static validateAndTruncateContent(content: string, options: Readonly<ParserOptions>): string | null {
+  private static validateAndTruncateContent(
+    content: string,
+    options: Readonly<ParserOptions>
+  ): string | null {
     if (!content || typeof content !== 'string') return null;
-  
-    const maxLength = typeof options.maxContentLength === 'number' ? options.maxContentLength : 10000;
-    return content.length > maxLength
-      ? `${content.slice(0, maxLength)}...`
-      : content;
+
+    const maxLength =
+      typeof options.maxContentLength === 'number' ? options.maxContentLength : 10000;
+    return content.length > maxLength ? `${content.slice(0, maxLength)}...` : content;
   }
 
   /**
@@ -446,7 +450,7 @@ export class SearchResultParser {
     const uniqueFiles = new Set(documents.map(doc => doc.filePath));
     const fileTypes: Record<string, number> = {};
     const directories: Record<string, number> = {};
-    
+
     let longestMatch = 0;
     let shortestMatch = Infinity;
 

@@ -19,7 +19,7 @@ export { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 
 export { UnifiedAgentSystem } from './domain/services/unified-agent/index.js';
 export { UnifiedConfigurationManager } from './domain/config/config-manager.js';
-export { UnifiedSecurityValidator } from './domain/services/unified-security-validator.js';
+export type { UnifiedSecurityValidator } from './domain/services/unified-security-validator.js';
 export { UnifiedPerformanceSystem } from './domain/services/unified-performance-system.js';
 export { UnifiedServerSystem } from './domain/services/unified-server-system.js';
 
@@ -48,4 +48,3 @@ if (process.argv[1]?.includes('index.js') || process.argv[1]?.includes('index.ts
 }
 
 export default main;
-

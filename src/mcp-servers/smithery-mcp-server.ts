@@ -77,7 +77,7 @@ export class SmitheryMCPServer {
           if (typeof name !== 'string') {
             throw new Error('Invalid tool name');
           }
-          const safeArgs: ToolCallArgs = (args && typeof args === 'object') ? args : {};
+          const safeArgs: ToolCallArgs = args && typeof args === 'object' ? args : {};
           const result = this.handleToolCall(name, safeArgs);
           return {
             content: result.content,

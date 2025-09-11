@@ -209,11 +209,10 @@ export class ToolRegistry {
       contexts.add('server');
     }
 
-    // If no specific context detected, include common contexts
+    // If no specific context detected, include a safe default (avoid terminal by default)
     if (contexts.size === 1) {
-      // Only filesystem
+      // Only filesystem detected → add development, but do NOT add terminal implicitly
       contexts.add('development');
-      contexts.add('terminal');
     }
 
     return contexts;

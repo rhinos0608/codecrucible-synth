@@ -159,7 +159,10 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
    * Resolve conflicts between voices
    * Business rule: Use expertise, confidence, and reasoning quality
    */
-  resolveVoiceConflicts(conflicts: ReadonlyArray<VoiceConflict>, voices: ReadonlyArray<Voice>): ConflictResolution[] {
+  resolveVoiceConflicts(
+    conflicts: ReadonlyArray<VoiceConflict>,
+    voices: ReadonlyArray<Voice>
+  ): ConflictResolution[] {
     return conflicts.map(conflict => {
       const voice1 = voices.find(v => v.id === conflict.voice1Id);
       const voice2 = voices.find(v => v.id === conflict.voice2Id);
@@ -210,7 +213,9 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
 
   // Private helper methods
 
-  private determineTaskType(request: Readonly<ProcessingRequest>): 'creative' | 'analytical' | 'balanced' {
+  private determineTaskType(
+    request: Readonly<ProcessingRequest>
+  ): 'creative' | 'analytical' | 'balanced' {
     switch (request.type) {
       case 'code-generation':
         return 'creative';

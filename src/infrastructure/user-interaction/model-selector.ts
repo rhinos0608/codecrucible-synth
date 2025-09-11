@@ -178,7 +178,8 @@ export class ModelSelector {
             });
             return;
           }
-          case '\u0003': { // Ctrl+C
+          case '\u0003': {
+            // Ctrl+C
             this.cleanup();
             rl.close();
             console.log('\n\n👋 Goodbye!');

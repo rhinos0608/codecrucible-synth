@@ -61,7 +61,7 @@ async function tryImportTypeScript(): Promise<typeof import('typescript') | null
 
   if (importCache.has(cacheKey)) {
     const cached = importCache.get(cacheKey);
-    return cached === 'loading' ? null : cached as typeof import('typescript') | null;
+    return cached === 'loading' ? null : (cached as typeof import('typescript') | null);
   }
 
   try {
@@ -132,7 +132,9 @@ export class LintCodeTool extends BaseTool<typeof LintCodeSchema.shape> {
       this.eslintAvailable = true;
       // TypeScript cannot know the type of ESLint here, so we use 'unknown'
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      this.eslint = new (ESLint as new (options: { cwd: string }) => unknown)({ cwd: this.agentContext.workingDirectory });
+      this.eslint = new (ESLint as new (options: { cwd: string }) => unknown)({
+        cwd: this.agentContext.workingDirectory,
+      });
     }
   }
 
@@ -452,15 +454,16 @@ export class GetAstTool extends BaseTool<typeof GetAstSchema.shape> {
         fileName: sourceFile.fileName,
         kind: this.ts.SyntaxKind[sourceFile.kind],
         text: sourceFile.text.slice(0, 500) + (sourceFile.text.length > 500 ? '...' : ''),
-        statements: Array.isArray(sourceFile.statements) && this.ts
-          ? sourceFile.statements
-              .map((stmt: import('typescript').Node) => ({
-                kind: this.ts ? this.ts.SyntaxKind[stmt.kind] : 'Unknown',
-                start: typeof stmt.getStart === 'function' ? stmt.getStart() : 0,
-                end: typeof stmt.getEnd === 'function' ? stmt.getEnd() : 0,
-              }))
-              .slice(0, 10)
-          : [],
+        statements:
+          Array.isArray(sourceFile.statements) && this.ts
+            ? sourceFile.statements
+                .map((stmt: import('typescript').Node) => ({
+                  kind: this.ts ? this.ts.SyntaxKind[stmt.kind] : 'Unknown',
+                  start: typeof stmt.getStart === 'function' ? stmt.getStart() : 0,
+                  end: typeof stmt.getEnd === 'function' ? stmt.getEnd() : 0,
+                }))
+                .slice(0, 10)
+            : [],
         childCount: typeof sourceFile.getChildCount === 'function' ? sourceFile.getChildCount() : 0,
         fullStart: typeof sourceFile.getFullStart === 'function' ? sourceFile.getFullStart() : 0,
         start: typeof sourceFile.getStart === 'function' ? sourceFile.getStart() : 0,

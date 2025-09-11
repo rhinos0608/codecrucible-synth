@@ -1,22 +1,22 @@
 /**
  * Tool Registration Service
- * 
+ *
  * Bridges the gap between typed tool definitions and actual MCP server implementations.
  * Registers all tools with the UnifiedToolRegistry with proper handlers that delegate
  * to the MCP server implementations.
  */
 
 import { createLogger } from '../logging/logger-adapter.js';
-import { 
-  unifiedToolRegistry, 
-  ToolDefinition, 
-  ToolExecutionContext, 
-  ToolExecutionResult 
+import {
+  unifiedToolRegistry,
+  ToolDefinition,
+  ToolExecutionContext,
+  ToolExecutionResult,
 } from './unified-tool-registry.js';
-import { 
-  TYPED_TOOL_CATALOG, 
-  ToolRegistryKey, 
-  TypedToolIdentifiers 
+import {
+  TYPED_TOOL_CATALOG,
+  ToolRegistryKey,
+  TypedToolIdentifiers,
 } from './typed-tool-identifiers.js';
 import { IMcpManager } from '../../domain/interfaces/mcp-manager.js';
 
@@ -70,7 +70,7 @@ export class ToolRegistrationService {
    */
   private async registerTool(toolKey: ToolRegistryKey): Promise<void> {
     const toolDef = TYPED_TOOL_CATALOG[toolKey];
-    
+
     // Create a ToolDefinition for the UnifiedToolRegistry
     const unifiedToolDef: ToolDefinition = {
       id: toolKey,
@@ -82,8 +82,8 @@ export class ToolRegistrationService {
       handler: this.createHandlerForTool(toolKey),
       security: {
         requiresApproval: toolDef.riskLevel === 'high',
-        riskLevel: toolDef.riskLevel === 'high' ? 'high' : 
-                   toolDef.riskLevel === 'medium' ? 'medium' : 'low',
+        riskLevel:
+          toolDef.riskLevel === 'high' ? 'high' : toolDef.riskLevel === 'medium' ? 'medium' : 'low',
         allowedOrigins: ['*'], // Allow all origins for now
       },
       performance: {
@@ -104,12 +104,18 @@ export class ToolRegistrationService {
     category: string
   ): 'filesystem' | 'git' | 'terminal' | 'network' | 'package' | 'external' | 'system' {
     switch (category) {
-      case 'filesystem': return 'filesystem';
-      case 'versionControl': return 'git';
-      case 'development': return 'package';
-      case 'system': return 'terminal';
-      case 'external': return 'external';
-      default: return 'system';
+      case 'filesystem':
+        return 'filesystem';
+      case 'versionControl':
+        return 'git';
+      case 'development':
+        return 'package';
+      case 'system':
+        return 'terminal';
+      case 'external':
+        return 'external';
+      default:
+        return 'system';
     }
   }
 
@@ -174,10 +180,10 @@ export class ToolRegistrationService {
         return {
           ...baseSchema,
           properties: {
-            files: { 
-              type: 'array', 
+            files: {
+              type: 'array',
               items: { type: 'string' },
-              description: 'Files to add' 
+              description: 'Files to add',
             },
             path: { type: 'string', description: 'Repository path (optional)' },
           },
@@ -199,10 +205,10 @@ export class ToolRegistrationService {
           ...baseSchema,
           properties: {
             command: { type: 'string', description: 'Command to execute' },
-            args: { 
-              type: 'array', 
+            args: {
+              type: 'array',
               items: { type: 'string' },
-              description: 'Command arguments' 
+              description: 'Command arguments',
             },
             working_directory: { type: 'string', description: 'Working directory' },
           },
@@ -213,10 +219,10 @@ export class ToolRegistrationService {
         return {
           ...baseSchema,
           properties: {
-            packages: { 
-              type: 'array', 
+            packages: {
+              type: 'array',
               items: { type: 'string' },
-              description: 'Packages to install' 
+              description: 'Packages to install',
             },
             dev: { type: 'boolean', description: 'Install as dev dependencies' },
             path: { type: 'string', description: 'Project path' },
@@ -247,7 +253,7 @@ export class ToolRegistrationService {
    */
   private createHandlerForTool(toolKey: ToolRegistryKey) {
     return async (
-      args: Readonly<Record<string, unknown>>, 
+      args: Readonly<Record<string, unknown>>,
       context?: ToolExecutionContext
     ): Promise<unknown> => {
       if (!this.mcpManager) {
@@ -265,11 +271,12 @@ export class ToolRegistrationService {
 
       // Call the MCP server through the manager
       const result = await this.mcpManager.executeTool(mcpToolName, mcpArgs, context || {});
-      
+
       if (!result.success) {
-        const errorMessage = typeof result.error === 'string'
-          ? result.error
-          : (result.error as any)?.message || `Tool execution failed: ${mcpToolName}`;
+        const errorMessage =
+          typeof result.error === 'string'
+            ? result.error
+            : (result.error as any)?.message || `Tool execution failed: ${mcpToolName}`;
         throw new Error(errorMessage);
       }
 
@@ -282,19 +289,32 @@ export class ToolRegistrationService {
    */
   private mapToMcpToolName(toolKey: ToolRegistryKey): string {
     switch (toolKey) {
-      case 'filesystem_list': return 'list_directory';
-      case 'filesystem_read': return 'read_file';
-      case 'filesystem_write': return 'write_file';
-      case 'filesystem_stats': return 'file_stats';
-      case 'git_status': return 'git_status';
-      case 'git_add': return 'git_add';
-      case 'git_commit': return 'git_commit';
-      case 'execute_command': return 'execute_command';
-      case 'npm_install': return 'npm_install';
-      case 'npm_run': return 'npm_run';
-      case 'smithery_status': return 'smithery_status';
-      case 'smithery_refresh': return 'smithery_refresh';
-      default: return toolKey;
+      case 'filesystem_list':
+        return 'list_directory';
+      case 'filesystem_read':
+        return 'read_file';
+      case 'filesystem_write':
+        return 'write_file';
+      case 'filesystem_stats':
+        return 'file_stats';
+      case 'git_status':
+        return 'git_status';
+      case 'git_add':
+        return 'git_add';
+      case 'git_commit':
+        return 'git_commit';
+      case 'execute_command':
+        return 'execute_command';
+      case 'npm_install':
+        return 'npm_install';
+      case 'npm_run':
+        return 'npm_run';
+      case 'smithery_status':
+        return 'smithery_status';
+      case 'smithery_refresh':
+        return 'smithery_refresh';
+      default:
+        return toolKey;
     }
   }
 
@@ -302,7 +322,7 @@ export class ToolRegistrationService {
    * Map arguments to MCP server format
    */
   private mapArgsToMcpFormat(
-    toolKey: ToolRegistryKey, 
+    toolKey: ToolRegistryKey,
     args: Readonly<Record<string, unknown>>
   ): Record<string, unknown> {
     const mapped: Record<string, unknown> = { ...args };
@@ -318,7 +338,7 @@ export class ToolRegistrationService {
           delete mapped.file_path;
         }
         break;
-        
+
       // Other tools use args as-is
       default:
         break;
@@ -332,19 +352,32 @@ export class ToolRegistrationService {
    */
   private getEstimatedDuration(toolKey: ToolRegistryKey): number {
     switch (toolKey) {
-      case 'filesystem_read': return 500;
-      case 'filesystem_write': return 1000;
-      case 'filesystem_list': return 300;
-      case 'filesystem_stats': return 200;
-      case 'git_status': return 1000;
-      case 'git_add': return 1500;
-      case 'git_commit': return 2000;
-      case 'execute_command': return 5000;
-      case 'npm_install': return 30000;
-      case 'npm_run': return 10000;
-      case 'smithery_status': return 2000;
-      case 'smithery_refresh': return 3000;
-      default: return 1000;
+      case 'filesystem_read':
+        return 500;
+      case 'filesystem_write':
+        return 1000;
+      case 'filesystem_list':
+        return 300;
+      case 'filesystem_stats':
+        return 200;
+      case 'git_status':
+        return 1000;
+      case 'git_add':
+        return 1500;
+      case 'git_commit':
+        return 2000;
+      case 'execute_command':
+        return 5000;
+      case 'npm_install':
+        return 30000;
+      case 'npm_run':
+        return 10000;
+      case 'smithery_status':
+        return 2000;
+      case 'smithery_refresh':
+        return 3000;
+      default:
+        return 1000;
     }
   }
 

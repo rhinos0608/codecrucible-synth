@@ -17,11 +17,7 @@ import { createServer, Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { IEventBus } from '../interfaces/event-bus.js';
 import { IUserInteraction } from '../interfaces/user-interaction.js';
-import {
-  UnifiedConfiguration,
-  ServerRequest,
-  ServerResponse,
-} from '../types/unified-types.js';
+import { UnifiedConfiguration, ServerRequest, ServerResponse } from '../types/unified-types.js';
 import { SecurityValidationContext as MainSecurityContext } from './unified-security-validator.js';
 import { UnifiedSecurityValidator } from './unified-security-validator.js';
 import { UnifiedPerformanceSystem } from './unified-performance-system.js';

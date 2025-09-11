@@ -44,8 +44,12 @@ const warnDeprecated = (importPath: string) => {
 
 // Export legacy compatibility if needed
 export const LEGACY_IMPORT_WARNING = {
-  'core/types': (): void => { warnDeprecated('src/core/types.ts'); },
-  types: (): void => { warnDeprecated('src/types.ts'); },
+  'core/types': (): void => {
+    warnDeprecated('src/core/types.ts');
+  },
+  types: (): void => {
+    warnDeprecated('src/types.ts');
+  },
   'infrastructure/config/config-types': (): void => {
     warnDeprecated('src/infrastructure/config/config-types.ts');
   },

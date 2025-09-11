@@ -260,7 +260,9 @@ export class OllamaClient extends EventEmitter {
   /**
    * Chat streaming with specified model
    */
-  public async chatStream(request: Readonly<OllamaChatRequest>): Promise<AsyncIterable<OllamaChatResponse>> {
+  public async chatStream(
+    request: Readonly<OllamaChatRequest>
+  ): Promise<AsyncIterable<OllamaChatResponse>> {
     const operation = async (): Promise<AsyncIterable<OllamaChatResponse>> => {
       return this.client.chat({
         model: request.model,
@@ -392,7 +394,9 @@ export class OllamaClient extends EventEmitter {
 
   private async withTimeout<T>(promise: Readonly<Promise<T>>, timeoutMs: number): Promise<T> {
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => { reject(new Error(`Operation timed out after ${timeoutMs}ms`)); }, timeoutMs);
+      setTimeout(() => {
+        reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
     });
 
     return Promise.race([promise, timeoutPromise]);
@@ -411,7 +415,9 @@ export class OllamaClient extends EventEmitter {
 }
 
 // Factory function for creating configured Ollama clients
-export function createOllamaClient(config: Readonly<Partial<OllamaConnectionConfig>> = {}): OllamaClient {
+export function createOllamaClient(
+  config: Readonly<Partial<OllamaConnectionConfig>> = {}
+): OllamaClient {
   const defaultConfig: OllamaConnectionConfig = {
     endpoint: 'http://localhost:11434',
     timeout: 30000,

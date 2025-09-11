@@ -7,16 +7,14 @@
  * @deprecated Use UnifiedServerSystem from domain/services instead
  */
 
-import {
-  ServerConfiguration,
-  ServerStatus,
-  UnifiedServerSystem,
-} from '../domain/services/unified-server-system.js';
+import type { ServerConfiguration, ServerStatus } from '../domain/services/unified-server-system.js';
+import { UnifiedServerSystem } from '../domain/services/unified-server-system.js';
 import { UnifiedConfigurationManager } from '../domain/config/config-manager.js';
 import { createEventBus } from '../infrastructure/messaging/event-bus-factory.js';
-import { UnifiedSecurityValidator } from '../domain/services/unified-security-validator.js';
+// Removed unused IUnifiedSecurityValidator import
+import { UnifiedSecurityValidator } from '../infrastructure/security/unified-security-validator.js';
 import { UnifiedPerformanceSystem } from '../domain/services/unified-performance-system.js';
-import { CLIContext } from '../application/cli/cli-types.js';
+import type { CLIContext } from '../application/cli/cli-types.js';
 import { createLogger } from '../infrastructure/logging/logger-adapter.js';
 import chalk from 'chalk';
 
@@ -76,36 +74,244 @@ export class ServerMode implements ServerModeInterface {
       const securityValidator = new UnifiedSecurityValidator(securityLogger);
       const performanceSystem = new UnifiedPerformanceSystem(performanceLogger, eventBus);
 
-      // Create mock user interaction for server mode
-      const mockUserInteraction = {
-        async display(message: string): Promise<void> {
-          logger.info(`[Server] ${message}`);
-        },
-        async warn(message: string): Promise<void> {
-          logger.warn(`[Server] ${message}`);
-        },
-        async error(message: string): Promise<void> {
-          logger.error(`[Server] ${message}`);
-        },
-        async success(message: string): Promise<void> {
-          logger.info(`[Server] Success: ${message}`);
-        },
-        async progress(message: string, progress?: number): Promise<void> {
-          logger.info(`[Server] Progress: ${message}${progress ? ` (${progress}%)` : ''}`);
-        },
-        async prompt(question: string): Promise<string> {
-          logger.info(`[Server] Prompt: ${question} (auto-responding: yes)`);
-          return 'yes'; // Default response for server mode
-        },
-        async confirm(question: string): Promise<boolean> {
-          logger.info(`[Server] Confirm: ${question} (auto-responding: true)`);
-          return true; // Default response for server mode
-        },
-        async select(question: string, choices: readonly string[]): Promise<string> {
-          logger.info(`[Server] Select: ${question} (auto-responding: ${choices[0]})`);
-          return Promise.resolve(choices[0] || 'default'); // Default to first choice
-        },
-      };
+      // Full user-interaction implementation for server mode (replaces lightweight mock)
+      // - Integrates with provided CLIContext when available (non-breaking: uses optional chaining)
+      // - Emits events on the eventBus (if it supports publish or emit)
+      // - Respects an interactive flag from context when present, otherwise falls back to safe defaults
+      // - Provides timeouts and sanitization for prompt/confirm/select
+      const mockUserInteraction = (() => {
+        const DEFAULT_PROMPT_TIMEOUT_MS = 15_000;
+
+        interface EventBusLike {
+          publish?: (name: string, payload: unknown) => void;
+          emit?: (name: string, payload: unknown) => void;
+        }
+
+        function publishEvent(name: string, payload: unknown): void {
+          try {
+            const bus = eventBus as EventBusLike;
+            if (typeof bus.publish === 'function') {
+              bus.publish(name, payload);
+            } else if (typeof bus.emit === 'function') {
+              bus.emit(name, payload);
+            }
+          } catch (err) {
+            // Non-fatal - log and continue
+            logger.debug(`Failed to publish interaction event: ${String(err)}`);
+          }
+        }
+
+        function isInteractiveContext(): boolean {
+          try {
+            if (
+              typeof context === 'object' &&
+              context !== null &&
+              ('interactive' in context || 'isInteractive' in context)
+            ) {
+              return Boolean((context as { interactive?: boolean; isInteractive?: boolean }).interactive ??
+                (context as { isInteractive?: boolean }).isInteractive ??
+                false);
+            }
+            return false;
+          } catch {
+            return false;
+          }
+        }
+
+        async function callExternalPromptIfAvailable(
+          question: string,
+          timeoutMs = DEFAULT_PROMPT_TIMEOUT_MS
+        ): Promise<string | undefined> {
+          try {
+            if (
+              typeof context === 'object' &&
+              context !== null &&
+              typeof (context as { prompt?: unknown }).prompt === 'function'
+            ) {
+              const promptFn = ((context as unknown) as { prompt: (q: string) => Promise<string> | string }).prompt;
+              const result = promptFn(question);
+              if (result instanceof Promise) {
+                return await Promise.race([
+                  result,
+                  new Promise<string | undefined>((res) => { setTimeout(() => { res(undefined); }, timeoutMs); }),
+                ]);
+              }
+              return String(result);
+            }
+          } catch (err) {
+            logger.debug(`External prompt failed: ${String(err)}`);
+          }
+          return undefined;
+        }
+
+        interface UserInteraction {
+          display: (message: string) => Promise<void>;
+          warn: (message: string) => Promise<void>;
+          error: (message: string) => Promise<void>;
+          success: (message: string) => Promise<void>;
+          progress: (message: string, progress?: number) => Promise<void>;
+          prompt: (question: string) => Promise<string>;
+          confirm: (question: string) => Promise<boolean>;
+          select: (question: string, choices: readonly string[]) => Promise<string>;
+        }
+
+        const userInteraction: UserInteraction = {
+          async display(message: string): Promise<void> {
+            logger.info(`[Server] ${message}`);
+            console.log(`[Server] ${message}`);
+            publishEvent('user.interaction.display', { message });
+          },
+
+          async warn(message: string): Promise<void> {
+            logger.warn(`[Server] ${message}`);
+            console.warn(`[Server] ${message}`);
+            publishEvent('user.interaction.warn', { message });
+          },
+
+          async error(message: string): Promise<void> {
+            logger.error(`[Server] ${message}`);
+            console.error(`[Server] ${message}`);
+            publishEvent('user.interaction.error', { message });
+          },
+
+          async success(message: string): Promise<void> {
+            logger.info(`[Server] Success: ${message}`);
+            console.log(`[Server] Success: ${message}`);
+            publishEvent('user.interaction.success', { message });
+          },
+
+          async progress(message: string, progress?: number): Promise<void> {
+            const pct = typeof progress === 'number' ? ` (${Math.max(0, Math.min(100, progress))}%)` : '';
+            logger.info(`[Server] Progress: ${message}${pct}`);
+            console.log(`[Server] Progress: ${message}${pct}`);
+            publishEvent('user.interaction.progress', { message, progress });
+          },
+
+          async prompt(question: string): Promise<string> {
+            logger.info(`[Server] Prompt requested: ${question}`);
+            publishEvent('user.interaction.request', { type: 'prompt', question });
+
+            try {
+              if (
+                typeof context === 'object' &&
+                context !== null &&
+                'prompt' in context &&
+                typeof (context as { prompt?: unknown }).prompt === 'function'
+              ) {
+                const promptFn = (context as { prompt: (q: string) => string | Promise<string> }).prompt;
+                const resp = promptFn(question);
+                if (resp instanceof Promise) {
+                  const result = await Promise.race([
+                    resp,
+                    new Promise<string>((res) => { setTimeout(() => { res('yes'); }, 15000); }),
+                  ]);
+                  publishEvent('user.interaction.response', { type: 'prompt', response: result });
+                  return result;
+                }
+                if (typeof resp === 'string') {
+                  publishEvent('user.interaction.response', { type: 'prompt', response: resp });
+                  return resp;
+                }
+              }
+            } catch (err) {
+              logger.debug(`Synchronous external prompt failed: ${String(err)}`);
+            }
+
+            const defaultResp = 'yes';
+            logger.info(`[Server] Prompt fallback auto-responding: ${defaultResp}`);
+            publishEvent('user.interaction.response', { type: 'prompt', response: defaultResp, fallback: true });
+            return defaultResp;
+          },
+
+          async confirm(question: string): Promise<boolean> {
+            logger.info(`[Server] Confirm requested: ${question}`);
+            publishEvent('user.interaction.request', { type: 'confirm', question });
+
+            try {
+              const ctxWithConfirm = context as { confirm?: (q: string) => boolean | Promise<boolean> };
+              if (typeof ctxWithConfirm.confirm === 'function') {
+                const resp = ctxWithConfirm.confirm(question);
+                if (resp instanceof Promise) {
+                  const result = await Promise.race([
+                    resp.then((v) => typeof v === 'boolean' ? v : true),
+                    new Promise<boolean>((res) => { setTimeout(() => { res(true); }, 15000); }),
+                  ]);
+                  publishEvent('user.interaction.response', { type: 'confirm', response: result });
+                  return result as boolean;
+                }
+                if (typeof resp === 'boolean') {
+                  publishEvent('user.interaction.response', { type: 'confirm', response: resp });
+                  return resp;
+                }
+              }
+            } catch (err) {
+              logger.debug(`Synchronous external confirm failed: ${String(err)}`);
+            }
+
+            const fallback = true;
+            logger.info(`[Server] Confirm fallback auto-responding: ${fallback}`);
+            publishEvent('user.interaction.response', { type: 'confirm', response: fallback, fallback: true });
+            return fallback;
+          },
+
+          async select(question: string, choices: readonly string[]): Promise<string> {
+            logger.info(`[Server] Select requested: ${question} (choices: ${choices.join(', ')})`);
+            publishEvent('user.interaction.request', { type: 'select', question, choices });
+
+            const normalizedChoices: string[] = Array.isArray(choices)
+              ? choices.filter((c): c is string => typeof c === 'string' && Boolean(c))
+              : [];
+            if (normalizedChoices.length === 0) {
+              const fallbackChoice = 'default';
+              logger.warn(`[Server] Select called with no choices; returning fallback '${fallbackChoice}'`);
+              publishEvent('user.interaction.response', { type: 'select', response: fallbackChoice, fallback: true });
+              return fallbackChoice;
+            }
+
+            try {
+              if (isInteractiveContext()) {
+                const external = await callExternalPromptIfAvailable(
+                  `${question}\nChoices: ${normalizedChoices.join(', ')}`,
+                  DEFAULT_PROMPT_TIMEOUT_MS
+                );
+                if (typeof external === 'string') {
+                  const match = normalizedChoices.find((c) => typeof c === 'string' && c.toLowerCase() === external.toLowerCase());
+                  const response: string = match ?? normalizedChoices[0];
+                  publishEvent('user.interaction.response', { type: 'select', response, external });
+                  return response;
+                }
+              } else {
+                const ctx = context as { select?: (q: string, choices: readonly string[]) => Promise<string> | string };
+                if (ctx && typeof ctx.select === 'function') {
+                  const resp = ctx.select(question, normalizedChoices);
+                  const resolved: string =
+                    resp instanceof Promise
+                      ? await Promise.race([
+                          resp,
+                          new Promise<string>((res) => { setTimeout(() => { res(''); }, DEFAULT_PROMPT_TIMEOUT_MS); }),
+                        ])
+                      : String(resp);
+                  if (resolved) {
+                    const match = normalizedChoices.find((c) => typeof c === 'string' && c.toLowerCase() === resolved.toLowerCase());
+                    const response: string = match ?? normalizedChoices[0];
+                    publishEvent('user.interaction.response', { type: 'select', response, external: resolved });
+                    return response;
+                  }
+                }
+              }
+            } catch (err) {
+              logger.debug(`Async select failed: ${String(err)}`);
+            }
+
+            const [fallback]: string[] = normalizedChoices;
+            logger.info(`[Server] Select fallback auto-responding: ${fallback}`);
+            publishEvent('user.interaction.response', { type: 'select', response: fallback, fallback: true });
+            return fallback;
+          },
+        };
+
+        return userInteraction;
+      })();
 
       // Initialize systems
       await securityValidator.initialize();
@@ -188,7 +394,10 @@ export class ServerMode implements ServerModeInterface {
         logger.info('Server shutdown initiated via SIGINT');
         console.log(chalk.yellow('\n🛑 Shutting down server...'));
         if (this.unifiedServer) {
-          void this.unifiedServer.stopAllServers()
+          this.unifiedServer.stopAllServers()
+            .catch((err: unknown) => {
+              logger.error('Error during server shutdown', { error: err });
+            })
             .finally(() => process.exit(0));
         } else {
           process.exit(0);
@@ -200,6 +409,9 @@ export class ServerMode implements ServerModeInterface {
         console.log(chalk.yellow('\n🛑 Received SIGTERM, shutting down server...'));
         if (this.unifiedServer) {
           this.unifiedServer.stopAllServers()
+            .catch((err: unknown) => {
+              logger.error('Error during server shutdown', { error: err });
+            })
             .finally(() => process.exit(0));
         } else {
           process.exit(0);

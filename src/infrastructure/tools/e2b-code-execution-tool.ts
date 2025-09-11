@@ -11,10 +11,7 @@ const E2BExecuteCodeSchema = z.object({
     .default('python')
     .describe('Programming language'),
   sessionId: z.string().optional().describe('Session ID for maintaining state (optional)'),
-  installPackages: z
-    .array(z.string())
-    .optional()
-    .describe('Packages to install before execution'),
+  installPackages: z.array(z.string()).optional().describe('Packages to install before execution'),
   files: z
     .array(
       z.object({
@@ -126,11 +123,7 @@ export class E2BCodeExecutionTool extends BaseTool<typeof E2BExecuteCodeSchema.s
       // Upload files if specified
       if (files && Array.isArray(files) && files.length > 0) {
         for (const file of files) {
-          await this.e2bService.uploadFile(
-            actualSessionId,
-            file.path,
-            file.content
-          );
+          await this.e2bService.uploadFile(actualSessionId, file.path, file.content);
           this.logger.info(`📁 Uploaded file to sandbox: ${file.path}`);
         }
       }

@@ -181,7 +181,10 @@ export class SecurityValidator {
     }
 
     // Additional context-based validation
-    if (context && (context as { riskLevel?: string }).riskLevel === 'high' || (context as { riskLevel?: string }).riskLevel === 'critical') {
+    if (
+      (context && (context as { riskLevel?: string }).riskLevel === 'high') ||
+      (context as { riskLevel?: string }).riskLevel === 'critical'
+    ) {
       return false;
     }
 

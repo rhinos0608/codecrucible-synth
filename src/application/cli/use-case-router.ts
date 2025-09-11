@@ -158,9 +158,8 @@ export class UseCaseRouter {
     // const codebaseAnalysis: CodebaseAnalysisResult | null = null;
 
     // Ensure processedInput is a string for downstream processing
-    const stringInput = typeof processedInput === 'string' 
-      ? processedInput 
-      : JSON.stringify(processedInput);
+    const stringInput =
+      typeof processedInput === 'string' ? processedInput : JSON.stringify(processedInput);
 
     // Enhance input with project context if available
     let contextEnhancedInput = stringInput;
@@ -344,9 +343,8 @@ export class UseCaseRouter {
     }
 
     // Check if this is a code generation request using ORIGINAL user input, not enhanced context
-    const originalInput = typeof request.input === 'string' 
-      ? request.input 
-      : JSON.stringify(request.input);
+    const originalInput =
+      typeof request.input === 'string' ? request.input : JSON.stringify(request.input);
     if (this.isCodeGenerationRequest(originalInput)) {
       const generationRequest: GenerationRequest = {
         prompt: enhancedInput as string,

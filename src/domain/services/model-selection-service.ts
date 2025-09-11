@@ -377,7 +377,10 @@ export class ModelSelectionService implements IModelSelectionService {
     return scoredModels[0];
   }
 
-  private determineRoutingStrategy(request: Readonly<ProcessingRequest>, model: Model): RoutingStrategy {
+  private determineRoutingStrategy(
+    request: Readonly<ProcessingRequest>,
+    model: Model
+  ): RoutingStrategy {
     const complexity = request.calculateComplexity();
 
     if (complexity > 0.8) {
@@ -466,7 +469,9 @@ export class ModelSelectionService implements IModelSelectionService {
     return Math.max(0, Math.min(1, qualityDifference));
   }
 
-  private groupRequestsByComplexity(requests: ReadonlyArray<Readonly<ProcessingRequest>>): RequestGroup[] {
+  private groupRequestsByComplexity(
+    requests: ReadonlyArray<Readonly<ProcessingRequest>>
+  ): RequestGroup[] {
     const groups: Map<string, Readonly<ProcessingRequest>[]> = new Map();
 
     requests.forEach(request => {

@@ -74,8 +74,7 @@ export class E2BTerminalTool {
 
     try {
       // Validate the working directory
-      const validationResult =
-        this.securityValidator.validateEnvironment(effectiveWorkingDir);
+      const validationResult = this.securityValidator.validateEnvironment(effectiveWorkingDir);
 
       if (!validationResult.isValid) {
         throw new Error(`Invalid working directory: ${validationResult.reason}`);
@@ -175,7 +174,8 @@ export class E2BTerminalTool {
           stderr: '',
           exitCode: 0,
           executionTime: Date.now() - startTime,
-          sessionId: 'sessionId' in processResult ? (processResult.sessionId || undefined) : undefined,
+          sessionId:
+            'sessionId' in processResult ? processResult.sessionId || undefined : undefined,
         };
       }
 
@@ -299,7 +299,11 @@ export class E2BTerminalTool {
     }
   }
 
-  public async setEnvironmentVariable(sessionId: string, key: string, value: string): Promise<boolean> {
+  public async setEnvironmentVariable(
+    sessionId: string,
+    key: string,
+    value: string
+  ): Promise<boolean> {
     const session = this.sessions.get(sessionId);
     if (!session || !session.isActive) {
       return false;
@@ -457,7 +461,9 @@ export class E2BTerminalTool {
   }
 
   public getActiveSessions(): ReadonlyArray<TerminalSession> {
-    return Array.from(this.sessions.values()).filter((session: TerminalSession) => session.isActive);
+    return Array.from(this.sessions.values()).filter(
+      (session: TerminalSession) => session.isActive
+    );
   }
 
   public async cleanup(): Promise<void> {
@@ -490,9 +496,11 @@ export class E2BTerminalTool {
     // Clean up stale sessions
     if (staleSessions.length > 0) {
       this.logger.info(`Cleaning up ${staleSessions.length} stale sessions`);
-      await Promise.allSettled(staleSessions.map(async (session: TerminalSession) => {
-        await this.closeSession(session.id);
-      }));
+      await Promise.allSettled(
+        staleSessions.map(async (session: TerminalSession) => {
+          await this.closeSession(session.id);
+        })
+      );
     }
 
     return {

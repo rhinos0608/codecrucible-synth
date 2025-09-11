@@ -32,7 +32,7 @@ export class ExpertiseMatcher {
   private readonly defaultWeights = {
     domain: 0.55,
     proficiency: 0.18,
-    recency: 0.10,
+    recency: 0.1,
     availability: 0.08,
     load: 0.05,
     performance: 0.04,
@@ -40,39 +40,51 @@ export class ExpertiseMatcher {
 
   private readonly weights: typeof this.defaultWeights;
 
-  public constructor(weights?: Readonly<Partial<typeof ExpertiseMatcher.prototype.defaultWeights>>) {
+  public constructor(
+    weights?: Readonly<Partial<typeof ExpertiseMatcher.prototype.defaultWeights>>
+  ) {
     // Allow override of weights, but keep defaults if keys missing
     this.weights = { ...this.defaultWeights, ...(weights ?? {}) };
   }
 
   /**
-     * Primary public matcher. This implementation is written to serve as a robust fallback:
-     * - Validates input
-     * - Produces ranked agents with scores
-     * - Returns topN agents above threshold
-     *
-     * Options:
-     * - threshold: minimum score (0..1) to include
-     */
+   * Primary public matcher. This implementation is written to serve as a robust fallback:
+   * - Validates input
+   * - Produces ranked agents with scores
+   * - Returns topN agents above threshold
+   *
+   * Options:
+   * - threshold: minimum score (0..1) to include
+   */
   public matchAgents(
     task: Readonly<AgentTask>,
     agents: ReadonlyArray<Readonly<IAgent>>,
     options?: Readonly<{ threshold?: number; maxResults?: number }>
   ): IAgent[] {
     if (!task || !Array.isArray(task.expertiseDomains) || task.expertiseDomains.length === 0) {
-      throw new Error('Task must specify expertiseDomains (non-empty array). Fallback expertise matching cannot be performed otherwise.');
+      throw new Error(
+        'Task must specify expertiseDomains (non-empty array). Fallback expertise matching cannot be performed otherwise.'
+      );
     }
     const threshold: number = typeof options?.threshold === 'number' ? options.threshold : 0.35; // relaxed threshold for fallback
     const maxResults: number = typeof options?.maxResults === 'number' ? options.maxResults : 10;
 
-    const required: string[] = task.expertiseDomains.map((d: string) => this.normalizeDomain(String(d)));
+    const required: string[] = task.expertiseDomains.map((d: string) =>
+      this.normalizeDomain(String(d))
+    );
 
     const scored = agents
       .map((agent: Readonly<IAgent>) => ({ agent, score: this.calculateScore(agent, required) }))
-      .filter((item: { agent: Readonly<IAgent>; score: number }) => Number.isFinite(item.score) && item.score > 0) // drop NaN or zero scorers early
+      .filter(
+        (item: { agent: Readonly<IAgent>; score: number }) =>
+          Number.isFinite(item.score) && item.score > 0
+      ) // drop NaN or zero scorers early
       .sort((a: { score: number }, b: { score: number }) => b.score - a.score);
 
-    return scored.filter((s: { score: number }) => s.score >= threshold).slice(0, maxResults).map((s: { agent: Readonly<IAgent> }) => s.agent);
+    return scored
+      .filter((s: { score: number }) => s.score >= threshold)
+      .slice(0, maxResults)
+      .map((s: { agent: Readonly<IAgent> }) => s.agent);
   }
 
   // -------------------------
@@ -80,7 +92,9 @@ export class ExpertiseMatcher {
   // -------------------------
 
   private calculateScore(agent: IAgent, requiredDomains: string[]): number {
-    const agentDomainsRaw = Array.isArray(agent.expertiseDomains) ? agent.expertiseDomains.map(d => String(d)) : [];
+    const agentDomainsRaw = Array.isArray(agent.expertiseDomains)
+      ? agent.expertiseDomains.map(d => String(d))
+      : [];
     if (agentDomainsRaw.length === 0) {
       // still compute some score using availability/performance if available,
       // but domain score will be zero and likely below threshold.
@@ -102,12 +116,12 @@ export class ExpertiseMatcher {
     // Weighted sum
     const w: typeof this.defaultWeights = this.weights;
     const total = clamp01(
-      (w.domain * domainScore) +
-      (w.proficiency * proficiencyScore) +
-      (w.recency * recencyScore) +
-      (w.availability * availabilityScore) +
-      (w.load * loadScore) +
-      (w.performance * performanceScore)
+      w.domain * domainScore +
+        w.proficiency * proficiencyScore +
+        w.recency * recencyScore +
+        w.availability * availabilityScore +
+        w.load * loadScore +
+        w.performance * performanceScore
     );
 
     return total;
@@ -122,7 +136,10 @@ export class ExpertiseMatcher {
       // synonym match (agent domain is in synonym group of req)
       for (const [_canon, aliases] of Object.entries(this.synonyms)) {
         const normalizedAliases = aliases.map(a => this.normalizeDomain(a));
-        if (normalizedAliases.includes(req) && agentDomains.some(d => normalizedAliases.includes(d))) {
+        if (
+          normalizedAliases.includes(req) &&
+          agentDomains.some(d => normalizedAliases.includes(d))
+        ) {
           return 0.85;
         }
       }
@@ -202,11 +219,14 @@ export class ExpertiseMatcher {
     // prefer agents active recently
     const { lastActive } = agent as { lastActive?: string | number };
     if (!lastActive) return 0.4; // unknown -> neutral
-    const ts = (typeof lastActive === 'string' || typeof lastActive === 'number') ? Date.parse(String(lastActive)) || Number(lastActive) : undefined;
+    const ts =
+      typeof lastActive === 'string' || typeof lastActive === 'number'
+        ? Date.parse(String(lastActive)) || Number(lastActive)
+        : undefined;
     if (!ts || Number.isNaN(ts)) return 0.4;
     const days = (Date.now() - ts) / (1000 * 60 * 60 * 24);
     // linear decay over a year, clamp
-    const score = clamp01(1 - (days / 365));
+    const score = clamp01(1 - days / 365);
     return score;
   }
 
@@ -221,7 +241,7 @@ export class ExpertiseMatcher {
     }
     if (typeof a === 'number') {
       // days until free: sooner is better
-      return clamp01(1 - (a / 30));
+      return clamp01(1 - a / 30);
     }
     // fallback to explicit flag or undefined
     return 0.5;
@@ -287,7 +307,10 @@ export class ExpertiseMatcher {
 // -------------------------
 
 function tokenize(text: string): string[] {
-  return (text || '').toLowerCase().split(/[\s\-_/]+/).filter(Boolean);
+  return (text || '')
+    .toLowerCase()
+    .split(/[\s\-_/]+/)
+    .filter(Boolean);
 }
 
 function tokenOverlapScore(a: ReadonlyArray<string>, b: ReadonlyArray<string>): number {

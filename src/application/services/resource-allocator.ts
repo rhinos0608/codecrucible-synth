@@ -20,7 +20,7 @@ export class ResourceAllocator {
     // For now, just return a stub allocation result
     return {
       success: true,
-      allocated: amount
+      allocated: amount,
     };
   }
 

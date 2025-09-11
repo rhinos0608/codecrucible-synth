@@ -144,35 +144,45 @@ export class MCPServerLifecycle extends EventEmitter {
 
     // Check for critical server failures
     const failures = results
-      .map((result: Readonly<PromiseSettledResult<void>>, index: number) => ({ result, serverId: sortedIds[index] }))
-      .filter((entry: Readonly<{ result: Readonly<PromiseSettledResult<void>>; serverId: string }>) => entry.result.status === 'rejected');
+      .map((result: Readonly<PromiseSettledResult<void>>, index: number) => ({
+        result,
+        serverId: sortedIds[index],
+      }))
+      .filter(
+        (entry: Readonly<{ result: Readonly<PromiseSettledResult<void>>; serverId: string }>) =>
+          entry.result.status === 'rejected'
+      );
 
     if (failures.length > 0) {
-      const failedServerIds = failures.map((entry: Readonly<{ result: Readonly<PromiseSettledResult<void>>; serverId: string }>) => entry.serverId);
-      const errorMessages = failures.map((entry: Readonly<{ result: Readonly<PromiseSettledResult<void>>; serverId: string }>) => {
-        const { result } = entry;
-        if (result.status === 'rejected') {
-          const { reason }: { reason: unknown } = result as PromiseRejectedResult;
-          if (
-            reason &&
-            typeof reason === 'object' &&
-            'message' in reason &&
-            typeof (reason as { message?: unknown }).message === 'string'
-          ) {
-            return (reason as { message: string }).message;
+      const failedServerIds = failures.map(
+        (entry: Readonly<{ result: Readonly<PromiseSettledResult<void>>; serverId: string }>) =>
+          entry.serverId
+      );
+      const errorMessages = failures.map(
+        (entry: Readonly<{ result: Readonly<PromiseSettledResult<void>>; serverId: string }>) => {
+          const { result } = entry;
+          if (result.status === 'rejected') {
+            const { reason }: { reason: unknown } = result as PromiseRejectedResult;
+            if (
+              reason &&
+              typeof reason === 'object' &&
+              'message' in reason &&
+              typeof (reason as { message?: unknown }).message === 'string'
+            ) {
+              return (reason as { message: string }).message;
+            }
+            return String(reason);
           }
-          return String(reason);
+          return 'Unknown error';
         }
-        return 'Unknown error';
-      });
+      );
 
-  const errorMsg = `Critical MCP servers failed to start: ${failedServerIds.join(', ')}. Errors: ${errorMessages.join('; ')}`;
-  logger.error(`🚨 ${errorMsg}`);
+      const errorMsg = `Critical MCP servers failed to start: ${failedServerIds.join(', ')}. Errors: ${errorMessages.join('; ')}`;
+      logger.error(`🚨 ${errorMsg}`);
 
-  // Fail fast - don't allow partial initialization
+      // Fail fast - don't allow partial initialization
       throw new Error(errorMsg);
     }
-  
   }
 
   /**
@@ -188,17 +198,16 @@ export class MCPServerLifecycle extends EventEmitter {
     }
   }
 
-    /**
-     * Start health monitoring for all servers
-     */
-    private startHealthMonitoring(): void {
+  /**
+   * Start health monitoring for all servers
+   */
+  private startHealthMonitoring(): void {
     if (!this.config.healthCheckInterval) return;
 
     for (const serverId of this.healthStatuses.keys()) {
-      const interval = setInterval(
-        () => { void this.performHealthCheck(serverId); },
-        this.config.healthCheckInterval
-      );
+      const interval = setInterval(() => {
+        void this.performHealthCheck(serverId);
+      }, this.config.healthCheckInterval);
 
       this.healthCheckIntervals.set(serverId, interval);
     }
@@ -241,12 +250,14 @@ export class MCPServerLifecycle extends EventEmitter {
     try {
       let healthResult: boolean | { status?: string } = true;
       if (typeof server.healthCheck === 'function') {
-        healthResult = await Promise.race([
+        healthResult = (await Promise.race([
           server.healthCheck(),
           new Promise<never>((_, reject) => {
-            setTimeout(() => { reject(new Error('Health check timeout')); }, 5000);
+            setTimeout(() => {
+              reject(new Error('Health check timeout'));
+            }, 5000);
           }),
-        ]) as boolean | { status?: string };
+        ])) as boolean | { status?: string };
         isHealthy =
           healthResult === true ||
           (typeof healthResult === 'object' &&

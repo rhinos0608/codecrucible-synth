@@ -87,15 +87,13 @@ export class ExecutionStatus {
 
   private constructor(private readonly _value: (typeof ExecutionStatus.VALID_STATUSES)[number]) {}
 
-  public static create(
-    value: string
-  ): ExecutionStatus {
-    if (!this.VALID_STATUSES.includes(value as typeof ExecutionStatus.VALID_STATUSES[number])) {
+  public static create(value: string): ExecutionStatus {
+    if (!this.VALID_STATUSES.includes(value as (typeof ExecutionStatus.VALID_STATUSES)[number])) {
       throw new Error(
         `Invalid execution status: ${value}. Must be one of: ${this.VALID_STATUSES.join(', ')}`
       );
     }
-    return new ExecutionStatus(value as typeof ExecutionStatus.VALID_STATUSES[number]);
+    return new ExecutionStatus(value as (typeof ExecutionStatus.VALID_STATUSES)[number]);
   }
 
   public static pending(): ExecutionStatus {
@@ -588,7 +586,10 @@ export class ToolExecution {
 
   // Factory methods
 
-  public static createPending(toolName: string, arguments_: Readonly<Record<string, unknown>>): ToolExecution {
+  public static createPending(
+    toolName: string,
+    arguments_: Readonly<Record<string, unknown>>
+  ): ToolExecution {
     const executionId = `exec_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     return new ToolExecution(
       executionId,

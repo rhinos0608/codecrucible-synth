@@ -117,24 +117,24 @@ export class HuggingFaceTool {
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
       if (options.filter) params.append('filter', options.filter);
 
-      const response = await this.makeRequest<{ 
-        id: string;
-        name?: string;
-        description?: string;
-        downloads?: number;
-        likes?: number;
-        tags?: string[];
-        pipeline_tag?: string;
-        library_name?: string;
-        language?: string[];
-        license?: string;
-      }[]>(`${this.config.baseUrl}/models?${params.toString()}`);
+      const response = await this.makeRequest<
+        {
+          id: string;
+          name?: string;
+          description?: string;
+          downloads?: number;
+          likes?: number;
+          tags?: string[];
+          pipeline_tag?: string;
+          library_name?: string;
+          language?: string[];
+          license?: string;
+        }[]
+      >(`${this.config.baseUrl}/models?${params.toString()}`);
 
       this.requestCount++;
 
-      return Array.isArray(response)
-        ? response.map((model) => this.processModelInfo(model))
-        : [];
+      return Array.isArray(response) ? response.map(model => this.processModelInfo(model)) : [];
     } catch (error) {
       logger.error('Hugging Face model search failed', toErrorOrUndefined(error));
       this.handleError(error);
@@ -205,22 +205,24 @@ export class HuggingFaceTool {
       if (options.direction) params.append('direction', options.direction);
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
 
-      const response = await this.makeRequest<Array<{
-        id: string;
-        name?: string;
-        description?: string;
-        downloads?: number;
-        likes?: number;
-        tags?: string[];
-        size_categories?: string[];
-        language?: string[];
-        license?: string;
-      }>>(`${this.config.baseUrl}/datasets?${params.toString()}`);
+      const response = await this.makeRequest<
+        Array<{
+          id: string;
+          name?: string;
+          description?: string;
+          downloads?: number;
+          likes?: number;
+          tags?: string[];
+          size_categories?: string[];
+          language?: string[];
+          license?: string;
+        }>
+      >(`${this.config.baseUrl}/datasets?${params.toString()}`);
 
       this.requestCount++;
 
       return Array.isArray(response)
-        ? response.map((dataset) => this.processDatasetInfo(dataset))
+        ? response.map(dataset => this.processDatasetInfo(dataset))
         : [];
     } catch (error) {
       logger.error('Hugging Face dataset search failed', toErrorOrUndefined(error));
@@ -254,21 +256,21 @@ export class HuggingFaceTool {
       if (options.direction) params.append('direction', options.direction);
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
 
-      const response = await this.makeRequest<Array<{
-        id: string;
-        name?: string;
-        description?: string;
-        likes?: number;
-        sdk?: string;
-        tags?: string[];
-        runtime?: string;
-      }>>(`${this.config.baseUrl}/spaces?${params.toString()}`);
+      const response = await this.makeRequest<
+        Array<{
+          id: string;
+          name?: string;
+          description?: string;
+          likes?: number;
+          sdk?: string;
+          tags?: string[];
+          runtime?: string;
+        }>
+      >(`${this.config.baseUrl}/spaces?${params.toString()}`);
 
       this.requestCount++;
 
-      return Array.isArray(response)
-        ? response.map((space) => this.processSpaceInfo(space))
-        : [];
+      return Array.isArray(response) ? response.map(space => this.processSpaceInfo(space)) : [];
     } catch (error) {
       logger.error('Hugging Face spaces search failed', toErrorOrUndefined(error));
       this.handleError(error);
@@ -310,9 +312,7 @@ export class HuggingFaceTool {
   /**
    * Get trending models in a specific category
    */
-  public async getTrendingModels(
-    category: string = 'text-generation'
-  ): Promise<ModelInfo[]> {
+  public async getTrendingModels(category: string = 'text-generation'): Promise<ModelInfo[]> {
     return this.searchModels('', {
       task: category,
       sort: 'downloads',
@@ -419,19 +419,21 @@ export class HuggingFaceTool {
   /**
    * Private helper methods
    */
-  private processModelInfo(data: Readonly<{
-    id?: string;
-    modelId?: string;
-    name?: string;
-    description?: string;
-    downloads?: number;
-    likes?: number;
-    tags?: string[];
-    pipeline_tag?: string;
-    library_name?: string;
-    language?: string[];
-    license?: string;
-  }>): ModelInfo {
+  private processModelInfo(
+    data: Readonly<{
+      id?: string;
+      modelId?: string;
+      name?: string;
+      description?: string;
+      downloads?: number;
+      likes?: number;
+      tags?: string[];
+      pipeline_tag?: string;
+      library_name?: string;
+      language?: string[];
+      license?: string;
+    }>
+  ): ModelInfo {
     return {
       id: data.id ?? data.modelId ?? '',
       name: data.name ?? data.id ?? '',
@@ -447,17 +449,19 @@ export class HuggingFaceTool {
     };
   }
 
-  private processDatasetInfo(data: Readonly<{
-    id?: string;
-    name?: string;
-    description?: string;
-    downloads?: number;
-    likes?: number;
-    tags?: string[];
-    size_categories?: string[];
-    language?: string[];
-    license?: string;
-  }>): DatasetInfo {
+  private processDatasetInfo(
+    data: Readonly<{
+      id?: string;
+      name?: string;
+      description?: string;
+      downloads?: number;
+      likes?: number;
+      tags?: string[];
+      size_categories?: string[];
+      language?: string[];
+      license?: string;
+    }>
+  ): DatasetInfo {
     return {
       id: data.id ?? '',
       name: data.name ?? data.id ?? '',
@@ -562,7 +566,7 @@ export class HuggingFaceTool {
         if (constraints.maxSize) {
           const modelSize = this.extractModelSize(model);
           const maxSizeBytes = this.parseModelSize(constraints.maxSize);
-          
+
           if (modelSize !== null && maxSizeBytes !== null && modelSize > maxSizeBytes) {
             return false;
           }
@@ -578,16 +582,15 @@ export class HuggingFaceTool {
             'cc0-1.0',
             'unlicense',
             'apache',
-            'bsd'
+            'bsd',
           ];
-          
+
           if (model.license) {
             const normalizedLicense = model.license.toLowerCase().trim();
-            const isCommercial = commercialLicenses.some(license => 
-              normalizedLicense.includes(license) || 
-              normalizedLicense === license
+            const isCommercial = commercialLicenses.some(
+              license => normalizedLicense.includes(license) || normalizedLicense === license
             );
-            
+
             if (!isCommercial) {
               return false;
             }
@@ -601,13 +604,11 @@ export class HuggingFaceTool {
         if (constraints.preferredLibrary) {
           const preferredLib = constraints.preferredLibrary.toLowerCase();
           const modelLibrary = model.library_name?.toLowerCase();
-          
+
           if (modelLibrary && modelLibrary !== preferredLib) {
             // Allow if library is mentioned in tags as fallback
-            const hasLibraryTag = model.tags.some(tag => 
-              tag.toLowerCase().includes(preferredLib)
-            );
-            
+            const hasLibraryTag = model.tags.some(tag => tag.toLowerCase().includes(preferredLib));
+
             if (!hasLibraryTag) {
               return false;
             }
@@ -623,20 +624,21 @@ export class HuggingFaceTool {
           const aSize = this.extractModelSize(a) ?? 0;
           const bSize = this.extractModelSize(b) ?? 0;
           const sizeDiff = aSize - bSize;
-          
-          if (Math.abs(sizeDiff) > 1e9) { // 1B parameter difference
+
+          if (Math.abs(sizeDiff) > 1e9) {
+            // 1B parameter difference
             return sizeDiff;
           }
-          
+
           return b.downloads - a.downloads;
         } else if (constraints.performanceRequirement === 'quality') {
           // Prioritize models with more likes and larger sizes
           const likeDiff = b.likes - a.likes;
-          
+
           if (Math.abs(likeDiff) > 100) {
             return likeDiff;
           }
-          
+
           const aSize = this.extractModelSize(a) ?? 0;
           const bSize = this.extractModelSize(b) ?? 0;
           return bSize - aSize;
@@ -683,35 +685,35 @@ export class HuggingFaceTool {
     if (!text) return null;
 
     const normalizedText = text.toLowerCase();
-    
+
     // Patterns to match parameter counts
     const patterns = [
       // Exact patterns: "7b", "13b", "70b", etc.
       /(\d+(?:\.\d+)?)\s*b(?:illion)?(?:\s*param(?:eter)?s?)?/g,
       /(\d+(?:\.\d+)?)\s*m(?:illion)?(?:\s*param(?:eter)?s?)?/g,
       /(\d+(?:\.\d+)?)\s*k(?:ilo)?(?:\s*param(?:eter)?s?)?/g,
-      
+
       // Hyphenated patterns: "llama-7b", "gpt-3.5"
       /-(\d+(?:\.\d+)?)\s*b/g,
       /-(\d+(?:\.\d+)?)\s*m/g,
-      
+
       // Parameter patterns: "7 billion parameters"
       /(\d+(?:\.\d+)?)\s*billion\s*param/g,
       /(\d+(?:\.\d+)?)\s*million\s*param/g,
       /(\d+(?:\.\d+)?)\s*thousand\s*param/g,
-      
+
       // Model size patterns: "small", "base", "large", "xl"
-      /\b(tiny|small|mini|base|medium|large|xl|xxl|3xl)\b/g
+      /\b(tiny|small|mini|base|medium|large|xl|xxl|3xl)\b/g,
     ];
 
     for (const pattern of patterns) {
       const matches = [...normalizedText.matchAll(pattern)];
-      
+
       for (const match of matches) {
         if (match[1] && !isNaN(Number(match[1]))) {
           const value = parseFloat(match[1]);
           const unit = match[0].toLowerCase();
-          
+
           if (unit.includes('b')) {
             return value * 1e9; // billion parameters
           } else if (unit.includes('m')) {
@@ -732,7 +734,7 @@ export class HuggingFaceTool {
             xxl: 30e9, // 30B
             '3xl': 70e9, // 70B
           };
-          
+
           const size = sizeMap[match[1]];
           if (size) return size;
         }
@@ -747,7 +749,7 @@ export class HuggingFaceTool {
    */
   private parseModelSize(sizeConstraint: string): number | null {
     const normalizedConstraint = sizeConstraint.toLowerCase().trim();
-    
+
     // Handle size categories
     const categorySizes: Record<string, number> = {
       tiny: 100e6,
@@ -756,7 +758,7 @@ export class HuggingFaceTool {
       large: 50e9,
       huge: 100e9,
       xl: 100e9,
-      xxl: 500e9
+      xxl: 500e9,
     };
 
     if (categorySizes[normalizedConstraint]) {
@@ -768,7 +770,7 @@ export class HuggingFaceTool {
       /(\d+(?:\.\d+)?)\s*b(?:illion)?/,
       /(\d+(?:\.\d+)?)\s*m(?:illion)?/,
       /(\d+(?:\.\d+)?)\s*k(?:ilo)?/,
-      /(\d+(?:\.\d+)?)\s*param/
+      /(\d+(?:\.\d+)?)\s*param/,
     ];
 
     for (const pattern of sizePatterns) {
@@ -776,7 +778,7 @@ export class HuggingFaceTool {
       if (match?.[1]) {
         const [unit, valueStr] = match;
         const value = parseFloat(valueStr);
-        
+
         if (unit.includes('b')) {
           return value * 1e9;
         } else if (unit.includes('m')) {
@@ -842,7 +844,7 @@ export class HuggingFaceTool {
 
   private handleError(error: unknown): void {
     // Type guard for AxiosError
-    const err = error as { response?: { status?: number }, code?: string };
+    const err = error as { response?: { status?: number }; code?: string };
     if (err.response?.status === 401) {
       logger.error('Hugging Face API authentication failed');
     } else if (err.response?.status === 429) {

@@ -484,8 +484,13 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
       content: results.map(r => r.content).join('\n\n--- MERGED RESULT ---\n\n'),
       metadata: {
         model: 'collaborative',
-        tokens: results.reduce((sum, r) => sum + (typeof r.metadata?.tokens === 'number' ? r.metadata.tokens : 0), 0),
-        latency: Math.max(...results.map(r => typeof r.metadata?.latency === 'number' ? r.metadata.latency : 0)),
+        tokens: results.reduce(
+          (sum, r) => sum + (typeof r.metadata?.tokens === 'number' ? r.metadata.tokens : 0),
+          0
+        ),
+        latency: Math.max(
+          ...results.map(r => (typeof r.metadata?.latency === 'number' ? r.metadata.latency : 0))
+        ),
       },
       executionTime: results.reduce((sum, r) => sum + r.executionTime, 0),
       resourcesUsed: [...new Set(results.flatMap(r => r.resourcesUsed))],
@@ -639,7 +644,12 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
 export class ExplorerAgent extends BaseAgent {
   async initialize(): Promise<void> {
     this.status = 'initializing';
-    this.expertiseDomains = ['code-discovery', 'innovation-research', 'technology-exploration', 'pattern-recognition'];
+    this.expertiseDomains = [
+      'code-discovery',
+      'innovation-research',
+      'technology-exploration',
+      'pattern-recognition',
+    ];
 
     // Register exploration capabilities
     this.registerCapability({
@@ -716,7 +726,12 @@ export class ExplorerAgent extends BaseAgent {
 export class SecurityAgent extends BaseAgent {
   async initialize(): Promise<void> {
     this.status = 'initializing';
-    this.expertiseDomains = ['security-analysis', 'vulnerability-assessment', 'threat-detection', 'code-security'];
+    this.expertiseDomains = [
+      'security-analysis',
+      'vulnerability-assessment',
+      'threat-detection',
+      'code-security',
+    ];
 
     this.registerCapability({
       name: 'vulnerability-analysis',
@@ -797,7 +812,12 @@ export class SecurityAgent extends BaseAgent {
 export class ArchitectAgent extends BaseAgent {
   async initialize(): Promise<void> {
     this.status = 'initializing';
-    this.expertiseDomains = ['system-design', 'architecture-patterns', 'scalability', 'technical-planning'];
+    this.expertiseDomains = [
+      'system-design',
+      'architecture-patterns',
+      'scalability',
+      'technical-planning',
+    ];
 
     this.registerCapability({
       name: 'system-design',

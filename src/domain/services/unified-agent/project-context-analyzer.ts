@@ -13,20 +13,34 @@ export class ProjectContextAnalyzer {
 
     function getLanguageFromExtension(ext: string): string | null {
       switch (ext) {
-        case '.js': return 'JavaScript';
-        case '.ts': return 'TypeScript';
-        case '.py': return 'Python';
-        case '.java': return 'Java';
-        case '.rb': return 'Ruby';
-        case '.go': return 'Go';
-        case '.cs': return 'C#';
-        case '.cpp': return 'C++';
-        case '.c': return 'C';
-        case '.php': return 'PHP';
-        case '.rs': return 'Rust';
-        case '.kt': return 'Kotlin';
-        case '.swift': return 'Swift';
-        default: return null;
+        case '.js':
+          return 'JavaScript';
+        case '.ts':
+          return 'TypeScript';
+        case '.py':
+          return 'Python';
+        case '.java':
+          return 'Java';
+        case '.rb':
+          return 'Ruby';
+        case '.go':
+          return 'Go';
+        case '.cs':
+          return 'C#';
+        case '.cpp':
+          return 'C++';
+        case '.c':
+          return 'C';
+        case '.php':
+          return 'PHP';
+        case '.rs':
+          return 'Rust';
+        case '.kt':
+          return 'Kotlin';
+        case '.swift':
+          return 'Swift';
+        default:
+          return null;
       }
     }
 

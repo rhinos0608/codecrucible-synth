@@ -1,12 +1,12 @@
 import { performance } from 'perf_hooks';
 import { randomUUID } from 'crypto';
-import { EnterpriseSecurityFramework } from '../../../infrastructure/security/enterprise-security-framework.js';
-import { ResilientCLIWrapper } from '../../../infrastructure/resilience/resilient-cli-wrapper.js';
-import { MetricsCollector } from '../../cli/metrics-collector.js';
-import { UseCaseRouter } from '../../cli/use-case-router.js';
-import { SessionManager } from '../../cli/session-manager.js';
+import type { EnterpriseSecurityFramework } from '../../../infrastructure/security/enterprise-security-framework.js';
+import type { ResilientCLIWrapper } from '../../../infrastructure/resilience/resilient-cli-wrapper.js';
+import type { MetricsCollector } from '../../cli/metrics-collector.js';
+import type { UseCaseRouter } from '../../cli/use-case-router.js';
+import type { SessionManager } from '../../cli/session-manager.js';
 import { logger } from '../../../infrastructure/logging/unified-logger.js';
-import { toErrorOrUndefined, stringArrayToRecord } from '../../../utils/type-guards.js';
+import { stringArrayToRecord, toErrorOrUndefined } from '../../../utils/type-guards.js';
 import type {
   CLIOperationRequest,
   CLIOperationResponse,
@@ -89,23 +89,27 @@ export class CLIOrchestrator implements ICLIOrchestrator {
             // Primary operation - convert request to match UseCaseRouter interface
             const adaptedRequest = {
               ...request,
-              input: (typeof request.input === 'string' || (typeof request.input === 'object' && request.input !== null)) 
-                ? request.input 
-                : String(request.input || ''),
+              input:
+                typeof request.input === 'string' ||
+                (typeof request.input === 'object' && request.input !== null)
+                  ? request.input
+                  : String(request.input || ''),
             };
             return await useCaseRouter.executeOperation(adaptedRequest);
           } catch (error) {
             // Fallback operation - adapt session format and try again
-            const adaptedSession = request.session ? {
-              id: request.session.id,
-              workingDirectory: request.session.workingDirectory || process.cwd(),
-              context: request.session.context || {
-                sessionId: request.session.id,
-                workingDirectory: request.session.workingDirectory || process.cwd(),
-                permissions: ['read', 'write'],
-                securityLevel: 'medium' as const,
-              },
-            } : undefined;
+            const adaptedSession = request.session
+              ? {
+                  id: request.session.id,
+                  workingDirectory: request.session.workingDirectory || process.cwd(),
+                  context: request.session.context || {
+                    sessionId: request.session.id,
+                    workingDirectory: request.session.workingDirectory || process.cwd(),
+                    permissions: ['read', 'write'],
+                    securityLevel: 'medium' as const,
+                  },
+                }
+              : undefined;
 
             const routerRequest = {
               ...request,

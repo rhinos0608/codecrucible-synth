@@ -240,10 +240,10 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
           totalTokens: content.length,
         },
       };
-      
+
       session.chunks.push(finishChunk);
       onChunk(finishChunk);
-      
+
       session.status = 'completed';
       session.isActive = false;
 
@@ -312,8 +312,8 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       index: 0,
       metadata: {
         provider: adapter.name,
-        complete: true
-      }
+        complete: true,
+      },
     };
   }
 
@@ -343,7 +343,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       session.tokens.push(token);
       this.updateStreamMetrics(sessionId, token);
       onToken(token);
-      
+
       session.isActive = false;
       return content;
     } catch (error) {
@@ -454,14 +454,10 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     this.removeAllListeners();
   }
 
-
   /**
    * Private: Update metrics for a streaming session
    */
-  private updateStreamMetrics(
-    sessionId: string,
-    _token: Readonly<StreamToken>
-  ): void {
+  private updateStreamMetrics(sessionId: string, _token: Readonly<StreamToken>): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
@@ -474,8 +470,6 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       metrics.throughput = (metrics.tokensStreamed / metrics.streamDuration) * 1000; // tokens per second
     }
   }
-
-
 
   /**
    * Enhanced: Generate unique stream ID for AI SDK v5.0 compatibility

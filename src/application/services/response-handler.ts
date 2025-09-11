@@ -22,12 +22,7 @@ export class BasicResponseHandler implements ResponseHandler {
     });
 
     // Handle direct ModelResponse objects
-    if (
-      raw &&
-      typeof raw === 'object' &&
-      hasProp(raw, 'content') &&
-      hasProp(raw, 'model')
-    ) {
+    if (raw && typeof raw === 'object' && hasProp(raw, 'content') && hasProp(raw, 'model')) {
       const contentVal =
         typeof (raw as { content?: unknown }).content === 'string'
           ? (raw as { content?: string }).content
@@ -43,9 +38,11 @@ export class BasicResponseHandler implements ResponseHandler {
           hasToolCalls: (() => {
             const rawWithTools = raw as { toolCalls?: unknown[]; tool_calls?: unknown[] };
             const toolCallsArray = rawWithTools.toolCalls || rawWithTools.tool_calls;
-            return typeof toolCallsArray !== 'undefined' &&
-                   Array.isArray(toolCallsArray) &&
-                   (toolCallsArray?.length ?? 0) > 0;
+            return (
+              typeof toolCallsArray !== 'undefined' &&
+              Array.isArray(toolCallsArray) &&
+              (toolCallsArray?.length ?? 0) > 0
+            );
           })(),
           responseKeys: Object.keys(raw),
         });
@@ -78,10 +75,7 @@ export class BasicResponseHandler implements ResponseHandler {
       const rawObj = raw as Record<string, unknown>;
 
       // Handle nested message objects
-      if (
-        typeof rawObj.message === 'object' &&
-        rawObj.message !== null
-      ) {
+      if (typeof rawObj.message === 'object' && rawObj.message !== null) {
         const msg = rawObj.message as Record<string, unknown>;
         content =
           (typeof msg.content === 'string' && msg.content) ||
@@ -117,10 +111,7 @@ export class BasicResponseHandler implements ResponseHandler {
         const rawObj = raw as Record<string, unknown>;
         // Check both toolCalls (camelCase) and tool_calls (snake_case)
         const toolCallsArray = rawObj.toolCalls || rawObj.tool_calls;
-        if (
-          Array.isArray(toolCallsArray) &&
-          toolCallsArray.length > 0
-        ) {
+        if (Array.isArray(toolCallsArray) && toolCallsArray.length > 0) {
           hasToolCalls = true;
         }
       }

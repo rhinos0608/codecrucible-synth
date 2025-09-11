@@ -45,16 +45,12 @@ export interface RustModule {
     content?: string,
     options?: Record<string, unknown>
   ) => Promise<unknown>;
-  execute?: (
-    type: string,
-    args: string,
-    options?: Record<string, unknown>
-  ) => Promise<unknown>;
+  execute?: (type: string, args: string, options?: Record<string, unknown>) => Promise<unknown>;
 }
 
- /**
-  * Client for interacting with Rust-based provider services
-  */
+/**
+ * Client for interacting with Rust-based provider services
+ */
 export class RustProviderClient {
   private readonly config: RustProviderConfig;
   private readonly bridgeManager: RustBridgeManager;
@@ -169,7 +165,10 @@ export class RustProviderClient {
 
   // Private methods
 
-  private async executeRequest(rustModule: Readonly<RustModule>, request: Readonly<RustProviderRequest>): Promise<unknown> {
+  private async executeRequest(
+    rustModule: Readonly<RustModule>,
+    request: Readonly<RustProviderRequest>
+  ): Promise<unknown> {
     // Route request based on type
     switch (request.type) {
       case 'file-operation':
@@ -213,7 +212,11 @@ export class RustProviderClient {
     }
 
     const args = JSON.stringify(request);
-    return rustModule.execute('code-analysis', args, typeof request.options === 'object' && request.options !== null ? request.options : undefined);
+    return rustModule.execute(
+      'code-analysis',
+      args,
+      typeof request.options === 'object' && request.options !== null ? request.options : undefined
+    );
   }
 
   private async executeComputeTask(
@@ -225,7 +228,8 @@ export class RustProviderClient {
     }
 
     const args = JSON.stringify(request);
-    const options = typeof request.options === 'object' && request.options !== null ? request.options : undefined;
+    const options =
+      typeof request.options === 'object' && request.options !== null ? request.options : undefined;
     return rustModule.execute('compute-task', args, options);
   }
 
@@ -234,11 +238,7 @@ export class RustProviderClient {
     request: Readonly<RustProviderRequest>
   ): Promise<unknown> {
     if (typeof rustModule.execute === 'function') {
-      const result = await rustModule.execute(
-        'generic',
-        JSON.stringify(request),
-        request.options
-      );
+      const result = await rustModule.execute('generic', JSON.stringify(request), request.options);
       // If result is a string, try to parse as JSON, otherwise return as is
       if (typeof result === 'string') {
         try {

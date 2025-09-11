@@ -492,4 +492,3 @@ export class UnifiedCLICoordinator extends EventEmitter {
 }
 
 export default UnifiedCLICoordinator;
-

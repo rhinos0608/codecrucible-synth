@@ -70,7 +70,8 @@ export class FilesystemTools {
           async onCompleted(session: Readonly<StreamSession>): Promise<void> {
             await Promise.resolve(); // Dummy await to suppress no-await warning
             const duration =
-              typeof session.stats.endTime === 'number' && typeof session.stats.startTime === 'number'
+              typeof session.stats.endTime === 'number' &&
+              typeof session.stats.startTime === 'number'
                 ? `${session.stats.endTime - session.stats.startTime}ms`
                 : 'unknown';
             logger.info(`✅ File read completed via Rust streaming: ${path}`, {
@@ -376,7 +377,9 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
+          _context: Readonly<
+            import('../../domain/interfaces/tool-execution.js').ToolExecutionContext
+          >
         ): Promise<{ success: boolean; data: string; metadata: { executionTime: number } }> => {
           const startTime = Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
@@ -408,7 +411,9 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
+          _context: Readonly<
+            import('../../domain/interfaces/tool-execution.js').ToolExecutionContext
+          >
         ): Promise<{ success: boolean; data: string; metadata: { executionTime: number } }> => {
           const startTime = Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
@@ -437,7 +442,9 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
+          _context: Readonly<
+            import('../../domain/interfaces/tool-execution.js').ToolExecutionContext
+          >
         ): Promise<{ success: boolean; data: string[]; metadata: { executionTime: number } }> => {
           const startTime = Date.now();
           const dirPath = typeof args.path === 'string' ? args.path : '';
@@ -465,8 +472,14 @@ export class FilesystemTools {
         },
         execute: async (
           args: Readonly<Record<string, unknown>>,
-          _context: Readonly<import('../../domain/interfaces/tool-execution.js').ToolExecutionContext>
-        ): Promise<{ success: boolean; data: { exists: boolean; path: string }; metadata: { executionTime: number } }> => {
+          _context: Readonly<
+            import('../../domain/interfaces/tool-execution.js').ToolExecutionContext
+          >
+        ): Promise<{
+          success: boolean;
+          data: { exists: boolean; path: string };
+          metadata: { executionTime: number };
+        }> => {
           const startTime = Date.now();
           const filePath = typeof args.file_path === 'string' ? args.file_path : '';
           const exists = await this.exists(filePath);
@@ -480,4 +493,3 @@ export class FilesystemTools {
     ];
   }
 }
-

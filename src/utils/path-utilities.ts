@@ -71,16 +71,15 @@ export class PathUtilities {
   /**
    * Intelligently normalize AI-generated paths without over-sanitization
    */
-  public static normalizeAIPath(filePath: Readonly<string>, options: PathNormalizationOptions = {}): string {
+  public static normalizeAIPath(
+    filePath: Readonly<string>,
+    options: PathNormalizationOptions = {}
+  ): string {
     if (!filePath || typeof filePath !== 'string') {
       return filePath || '.';
     }
 
-    const {
-      allowAbsolute = true,
-      allowRelative = true,
-      basePath = process.cwd(),
-    } = options;
+    const { allowAbsolute = true, allowRelative = true, basePath = process.cwd() } = options;
 
     let normalized = filePath.trim();
 
@@ -234,7 +233,9 @@ export class PathUtilities {
       const normalizedTo = this.normalizeAIPath(to);
       return path.relative(normalizedFrom, normalizedTo);
     } catch (error) {
-      logger.warn(`Error calculating relative path from ${from} to ${to}`, { error: toReadonlyRecord(error) });
+      logger.warn(`Error calculating relative path from ${from} to ${to}`, {
+        error: toReadonlyRecord(error),
+      });
       return to; // Fallback to original path
     }
   }
@@ -318,7 +319,9 @@ export class PathUtilities {
         return isSubdirectory;
       });
     } catch (error) {
-      logger.warn(`Error checking path boundaries for ${filePath}`, { error: toReadonlyRecord(error) });
+      logger.warn(`Error checking path boundaries for ${filePath}`, {
+        error: toReadonlyRecord(error),
+      });
       return false;
     }
   }
@@ -347,7 +350,9 @@ export class PathUtilities {
 
       return path.join(...normalizedSegments);
     } catch (error) {
-      logger.warn(`Error joining paths [${pathSegments.join(', ')}]`, { error: toReadonlyRecord(error) });
+      logger.warn(`Error joining paths [${pathSegments.join(', ')}]`, {
+        error: toReadonlyRecord(error),
+      });
       return pathSegments[pathSegments.length - 1] || '.';
     }
   }
@@ -381,7 +386,9 @@ export class PathUtilities {
 
       return null;
     } catch (error) {
-      logger.warn(`Error resolving case-insensitive path for ${targetDir}`, { error: toReadonlyRecord(error) });
+      logger.warn(`Error resolving case-insensitive path for ${targetDir}`, {
+        error: toReadonlyRecord(error),
+      });
       return null;
     }
   }
@@ -399,10 +406,7 @@ export class PathUtilities {
 }
 
 // Export convenient functions for common operations as arrow functions to avoid unbound method issues
-export const normalizeAIPath = (
-  filePath: string,
-  options?: PathNormalizationOptions
-): string =>
+export const normalizeAIPath = (filePath: string, options?: PathNormalizationOptions): string =>
   PathUtilities.normalizeAIPath(filePath, options);
 
 export const normalizePathSeparators = (filePath: string): string =>
@@ -414,8 +418,7 @@ export const resolveSafePath = (filePath: string, basePath?: string): string =>
 export const validatePath = async (
   filePath: string,
   options?: Readonly<PathNormalizationOptions>
-): Promise<PathValidationResult> =>
-  PathUtilities.validatePath(filePath, options);
+): Promise<PathValidationResult> => PathUtilities.validatePath(filePath, options);
 
 export const hasPathTraversal = (filePath: string): boolean =>
   PathUtilities.hasPathTraversal(filePath);
@@ -426,14 +429,10 @@ export const getRelativePath = (from: string, to: string): string =>
 export const sanitizeFilename = (filename: string): string =>
   PathUtilities.sanitizeFilename(filename);
 
-export const isWithinBoundaries = (
-  filePath: string,
-  allowedPaths: readonly string[]
-): boolean =>
+export const isWithinBoundaries = (filePath: string, allowedPaths: readonly string[]): boolean =>
   PathUtilities.isWithinBoundaries(filePath, allowedPaths);
 
-export const getDirname = (filePath: string): string =>
-  PathUtilities.getDirname(filePath);
+export const getDirname = (filePath: string): string => PathUtilities.getDirname(filePath);
 
 export const joinPaths = (...pathSegments: readonly string[]): string =>
   PathUtilities.joinPaths(...pathSegments);

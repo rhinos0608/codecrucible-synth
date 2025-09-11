@@ -36,16 +36,18 @@ export class OllamaAdapter implements ProviderAdapter {
           }))
         : [];
 
-      const providerResponse = await this.provider.generateCode(prompt, {
+      const providerResponse = (await this.provider.generateCode(prompt, {
         model: req.model || cfg.defaultModel,
         // Encourage tool use when tools are available
         tool_choice: mappedTools.length > 0 ? 'auto' : undefined,
         tools: mappedTools,
         availableTools: mappedTools.map(t => t.function.name),
-        onStreamingToken: req.stream ? (token: any) => {
-          // Handle streaming if needed
-        } : undefined,
-      }) as any;  // Provider response type varies
+        onStreamingToken: req.stream
+          ? (token: any) => {
+              // Handle streaming if needed
+            }
+          : undefined,
+      })) as any; // Provider response type varies
 
       let content = '';
       if (typeof providerResponse === 'string') {
@@ -146,4 +148,3 @@ export class OllamaAdapter implements ProviderAdapter {
     return [];
   }
 }
-

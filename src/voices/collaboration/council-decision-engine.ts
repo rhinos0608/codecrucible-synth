@@ -5,7 +5,6 @@
  */
 
 import { VoiceArchetypeSystemInterface } from '../../domain/interfaces/voice-system.js';
-import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 import { EventEmitter } from 'events';
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 
@@ -60,7 +59,7 @@ export class CouncilDecisionEngine extends EventEmitter {
   private readonly voiceSystem: VoiceArchetypeSystemInterface;
   private readonly logger = createLogger('CouncilDecision');
 
-  public constructor(voiceSystem: Readonly<VoiceArchetypeSystem>) {
+  public constructor(voiceSystem: Readonly<VoiceArchetypeSystemInterface>) {
     super();
     this.voiceSystem = voiceSystem;
   }
@@ -92,10 +91,11 @@ export class CouncilDecisionEngine extends EventEmitter {
 
       const perspectivePromises = voices.map(async (voiceId: Readonly<string>) =>
         Promise.race([
-          this.voiceSystem
-            .getVoicePerspective(voiceId, prompt),
+          this.voiceSystem.getVoicePerspective(voiceId, prompt),
           new Promise<null>((_, reject) => {
-            setTimeout(() => { reject(new Error(`Voice ${voiceId} timed out`)); }, config.timeoutMs / voices.length);
+            setTimeout(() => {
+              reject(new Error(`Voice ${voiceId} timed out`));
+            }, config.timeoutMs / voices.length);
           }),
         ]).catch(error => {
           this.logger.warn(`Failed to get perspective from voice ${voiceId}:`, error);
@@ -189,8 +189,10 @@ export class CouncilDecisionEngine extends EventEmitter {
     const consensusViews = perspectives.filter(p => p.confidence >= threshold);
 
     if (consensusViews.length === 0) {
-      const [fallback] = perspectives
-        .sort((a: Readonly<VoicePerspective>, b: Readonly<VoicePerspective>) => b.confidence - a.confidence);
+      const [fallback] = perspectives.sort(
+        (a: Readonly<VoicePerspective>, b: Readonly<VoicePerspective>) =>
+          b.confidence - a.confidence
+      );
       return `No consensus reached (threshold: ${threshold}). Highest confidence perspective from ${fallback?.voiceId || 'unknown'}: ${fallback?.position || 'No perspectives available'}`;
     }
 

@@ -19,7 +19,10 @@ export interface RateLimitConfig {
   standardHeaders?: boolean;
   legacyHeaders?: boolean;
   store?: RateLimitStore;
-  onLimitReached?: (req: Readonly<{ ip?: string }>, res: { status: (code: number) => void }) => void;
+  onLimitReached?: (
+    req: Readonly<{ ip?: string }>,
+    res: { status: (code: number) => void }
+  ) => void;
 }
 
 export interface RateLimitInfo {
@@ -247,7 +250,8 @@ export class RateLimiter extends EventEmitter {
     super();
 
     this.config = {
-      keyGenerator: (req: Readonly<{ ip?: string }>): string => RateLimiter.defaultKeyGenerator(req),
+      keyGenerator: (req: Readonly<{ ip?: string }>): string =>
+        RateLimiter.defaultKeyGenerator(req),
       skipSuccessfulRequests: false,
       skipFailedRequests: false,
       message: 'Too many requests, please try again later',
@@ -269,65 +273,84 @@ export class RateLimiter extends EventEmitter {
    * Express middleware for rate limiting
    */
   public middleware(): (
-    req: Readonly<{ ip?: string; get: (header: string) => string | undefined; path: string; method: string }>,
-    res: Readonly<{ setHeader: (name: string, value: string | number) => void; status: (code: number) => { json: (body: object) => void } }>,
+    req: Readonly<{
+      ip?: string;
+      get: (header: string) => string | undefined;
+      path: string;
+      method: string;
+    }>,
+    res: Readonly<{
+      setHeader: (name: string, value: string | number) => void;
+      status: (code: number) => { json: (body: object) => void };
+    }>,
     next: () => void
   ) => Promise<void> {
     return async (req, res, next) => {
-      const key = this.config.keyGenerator ? this.config.keyGenerator(req) : `rate_limit:${req.ip ?? 'unknown'}`;
+      const key = this.config.keyGenerator
+        ? this.config.keyGenerator(req)
+        : `rate_limit:${req.ip ?? 'unknown'}`;
       try {
         const allowedResult = await this.checkLimit(key, req);
 
         if (!allowedResult.allowed) {
           res.setHeader('X-RateLimit-Limit', this.config.maxRequests);
           res.setHeader('X-RateLimit-Remaining', allowedResult.info.remainingHits);
-          res.setHeader('X-RateLimit-Reset', Math.ceil(allowedResult.info.resetTime.getTime() / 1000) || 0);
+          res.setHeader(
+            'X-RateLimit-Reset',
+            Math.ceil(allowedResult.info.resetTime.getTime() / 1000) || 0
+          );
 
           if (this.config.legacyHeaders) {
             res.setHeader('X-Rate-Limit-Limit', this.config.maxRequests);
             res.setHeader('X-Rate-Limit-Remaining', allowedResult.info.remainingHits);
-            res.setHeader('X-Rate-Limit-Reset', Math.ceil(allowedResult.info.resetTime.getTime() / 1000) || 0);
+            res.setHeader(
+              'X-Rate-Limit-Reset',
+              Math.ceil(allowedResult.info.resetTime.getTime() / 1000) || 0
+            );
           }
 
-        if (this.config.onLimitReached) {
-          this.config.onLimitReached(req, res);
+          if (this.config.onLimitReached) {
+            this.config.onLimitReached(req, res);
+            return;
+          }
+
+          this.emit('limit-reached', { key, ip: req.ip, info: allowedResult.info });
+
+          logger.warn('Rate limit exceeded', {
+            key,
+            ip: req.ip,
+            userAgent: req.get('User-Agent'),
+            path: req.path,
+            method: req.method,
+            limit: this.config.maxRequests,
+            window: this.config.windowMs,
+          });
+
+          res.status(429).json({
+            error: this.config.message,
+            retryAfter: Math.ceil(allowedResult.info.msBeforeNext / 1000),
+            limit: this.config.maxRequests,
+            remaining: allowedResult.info.remainingHits,
+            resetTime: allowedResult.info.resetTime.toISOString(),
+          });
           return;
         }
 
-        this.emit('limit-reached', { key, ip: req.ip, info: allowedResult.info });
-
-        logger.warn('Rate limit exceeded', {
-          key,
-          ip: req.ip,
-          userAgent: req.get('User-Agent'),
-          path: req.path,
-          method: req.method,
-          limit: this.config.maxRequests,
-          window: this.config.windowMs,
-        });
-
-        res.status(429).json({
-          error: this.config.message,
-          retryAfter: Math.ceil(allowedResult.info.msBeforeNext / 1000),
-          limit: this.config.maxRequests,
-          remaining: allowedResult.info.remainingHits,
-          resetTime: allowedResult.info.resetTime.toISOString(),
-        });
-        return;
+        next();
+      } catch (error) {
+        logger.error('Rate limiter error', error as Error);
+        next();
       }
-
-      next();
-    } catch (error) {
-      logger.error('Rate limiter error', error as Error);
-      next();
-    }
-  };
-}
+    };
+  }
 
   /**
    * Check if a request is allowed under the current rate limit.
    */
-  public async checkLimit(key: string, req?: { ip?: string }): Promise<{ allowed: boolean; info: RateLimitInfo }> {
+  public async checkLimit(
+    key: string,
+    req?: { ip?: string }
+  ): Promise<{ allowed: boolean; info: RateLimitInfo }> {
     // Check skip conditions
     if (req && this.config.skipIf && this.config.skipIf(req)) {
       return {
@@ -384,9 +407,7 @@ export class RateLimiter extends EventEmitter {
   /**
    * Check sliding window rate limit
    */
-  private checkSlidingWindow(
-    key: string
-  ): { allowed: boolean; info: RateLimitInfo } {
+  private checkSlidingWindow(key: string): { allowed: boolean; info: RateLimitInfo } {
     let window = this.slidingWindows.get(key);
 
     if (!window) {
@@ -527,9 +548,9 @@ export class RateLimiter extends EventEmitter {
   /**
    * Supported key generator fields
    */
-  }
+}
 
-  // --- Type and function declarations moved outside the class ---
+// --- Type and function declarations moved outside the class ---
 
 /**
  * Supported key generator fields

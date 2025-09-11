@@ -399,8 +399,13 @@ export class HealthMonitor extends EventEmitter {
         packageManager: { enabled: false, autoInstall: false, securityScan: true },
       });
 
-      const health = await mcpManager.healthCheck() as unknown as Record<string, HealthCheckResult>;
-      const unhealthyServers = Object.values(health).filter((s: Readonly<HealthCheckResult>) => s.status === 'unhealthy');
+      const health = (await mcpManager.healthCheck()) as unknown as Record<
+        string,
+        HealthCheckResult
+      >;
+      const unhealthyServers = Object.values(health).filter(
+        (s: Readonly<HealthCheckResult>) => s.status === 'unhealthy'
+      );
 
       const status =
         unhealthyServers.length === 0
@@ -496,7 +501,16 @@ export class HealthMonitor extends EventEmitter {
       const { EnterpriseSecurityFramework } = await import(
         '../../infrastructure/security/enterprise-security-framework.js'
       );
-      const security = new EnterpriseSecurityFramework();
+      const { UnifiedSecurityValidator } = await import(
+        '../security/unified-security-validator.js'
+      );
+      const { createLogger } = await import(
+        '../logging/logger-adapter.js'
+      );
+      
+      const securityLogger = createLogger('HealthCheckSecurity');
+      const securityValidator = new UnifiedSecurityValidator(securityLogger);
+      const security = new EnterpriseSecurityFramework(securityValidator, securityLogger);
 
       // Test validation
       const testResult = await security.validateAgentAction(

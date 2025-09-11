@@ -389,7 +389,10 @@ export class FileSystemClient extends EventEmitter {
   /**
    * List directory contents
    */
-  public async listDirectory(dirPath: string, recursive: boolean = false): Promise<DirectoryListing> {
+  public async listDirectory(
+    dirPath: string,
+    recursive: boolean = false
+  ): Promise<DirectoryListing> {
     const absolutePath = this.resolveAbsolutePath(dirPath);
 
     try {
@@ -518,7 +521,10 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Create write stream for large files
    */
-  public createWriteStream(filePath: Readonly<string>, options?: { flags?: string }): NodeJS.WritableStream {
+  public createWriteStream(
+    filePath: Readonly<string>,
+    options?: { flags?: string }
+  ): NodeJS.WritableStream {
     const absolutePath = this.resolveAbsolutePath(filePath);
     return createWriteStream(absolutePath, options);
   }
@@ -637,7 +643,9 @@ export class FileSystemClient extends EventEmitter {
     activeWatchers: number;
   } {
     const totalOperations = this.operationHistory.length;
-    const successfulOperations = this.operationHistory.filter((op: Readonly<FileOperation>) => op.success).length;
+    const successfulOperations = this.operationHistory.filter(
+      (op: Readonly<FileOperation>) => op.success
+    ).length;
     const failedOperations = totalOperations - successfulOperations;
 
     return {
@@ -682,7 +690,10 @@ export class FileSystemClient extends EventEmitter {
     }
   }
 
-  private async createFileMetadata(filePath: Readonly<string>, stats: Stats): Promise<FileMetadata> {
+  private async createFileMetadata(
+    filePath: Readonly<string>,
+    stats: Stats
+  ): Promise<FileMetadata> {
     const relativePath = relative(this.config.rootPath, filePath);
 
     // Check permissions

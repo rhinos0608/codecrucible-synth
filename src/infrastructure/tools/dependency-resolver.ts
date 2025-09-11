@@ -31,7 +31,9 @@ export class DependencyResolver {
       order.push(id);
     };
 
-    toolIds.forEach((id) => { visit(id, []); });
+    toolIds.forEach(id => {
+      visit(id, []);
+    });
     logger.debug('Resolved dependency order', { order });
     return order;
   }

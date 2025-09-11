@@ -148,7 +148,10 @@ export function mergeConfigurations<T extends object>(base: T, override: Partial
     if (Array.isArray(value)) {
       (base as Record<string, unknown>)[key] = value;
     } else if (value && typeof value === 'object') {
-      (base as Record<string, unknown>)[key] = mergeConfigurations((base as Record<string, unknown>)[key] as object || {}, value);
+      (base as Record<string, unknown>)[key] = mergeConfigurations(
+        ((base as Record<string, unknown>)[key] as object) || {},
+        value
+      );
     } else if (value !== undefined) {
       (base as Record<string, unknown>)[key] = value as unknown;
     }
@@ -159,15 +162,36 @@ export function mergeConfigurations<T extends object>(base: T, override: Partial
 function loadEnvConfig(): Partial<UnifiedConfiguration> {
   const env: Partial<UnifiedConfiguration> = {};
   if (process.env.NODE_ENV) {
-    env.application = env.application ?? { name: '', version: '', environment: 'development', logLevel: 'info', features: [] };
-    env.application.environment = process.env.NODE_ENV as 'development' | 'testing' | 'staging' | 'production' || 'development';
+    env.application = env.application ?? {
+      name: '',
+      version: '',
+      environment: 'development',
+      logLevel: 'info',
+      features: [],
+    };
+    env.application.environment =
+      (process.env.NODE_ENV as 'development' | 'testing' | 'staging' | 'production') ||
+      'development';
   }
   if (process.env.LOG_LEVEL) {
-    env.application = env.application ?? { name: '', version: '', environment: 'development', logLevel: 'info', features: [] };
-    env.application.logLevel = process.env.LOG_LEVEL as 'info' | 'debug' | 'warn' | 'error' || 'info';
+    env.application = env.application ?? {
+      name: '',
+      version: '',
+      environment: 'development',
+      logLevel: 'info',
+      features: [],
+    };
+    env.application.logLevel =
+      (process.env.LOG_LEVEL as 'info' | 'debug' | 'warn' | 'error') || 'info';
   }
   if (process.env.MODEL_DEFAULT_NAME) {
-    env.model = env.model || { defaultProvider: '', defaultModel: '', providers: [], routing: { strategy: 'round_robin', healthCheckInterval: 30000, failoverThreshold: 3 }, fallback: { enabled: true, chain: [], maxRetries: 3, backoffMs: 1000 } };
+    env.model = env.model || {
+      defaultProvider: '',
+      defaultModel: '',
+      providers: [],
+      routing: { strategy: 'round_robin', healthCheckInterval: 30000, failoverThreshold: 3 },
+      fallback: { enabled: true, chain: [], maxRetries: 3, backoffMs: 1000 },
+    };
     if (env.model) {
       env.model.defaultModel = process.env.MODEL_DEFAULT_NAME || '';
     }
@@ -177,11 +201,17 @@ function loadEnvConfig(): Partial<UnifiedConfiguration> {
 
 function loadCliConfig(): Partial<UnifiedConfiguration> {
   const cli: Partial<UnifiedConfiguration> = {};
-  cli.application = { name: '', version: '', environment: 'development', logLevel: 'info', features: [] };
+  cli.application = {
+    name: '',
+    version: '',
+    environment: 'development',
+    logLevel: 'info',
+    features: [],
+  };
   for (const arg of process.argv.slice(2)) {
     const [key, value] = arg.split('=');
     if (key === 'logLevel') {
-      cli.application.logLevel = value as 'info' | 'debug' | 'warn' | 'error' || 'info';
+      cli.application.logLevel = (value as 'info' | 'debug' | 'warn' | 'error') || 'info';
     }
   }
   return cli;

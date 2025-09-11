@@ -58,10 +58,9 @@ export class ModelDiscoveryService {
         const models = await this.discoverModelsFromProvider(provider, { timeout, cache });
         allModels.push(...models);
       } catch (error: unknown) {
-        logger.warn(
-          `Failed to discover models from ${provider}:`,
-          { error: error instanceof Error ? error.message : String(error) }
-        );
+        logger.warn(`Failed to discover models from ${provider}:`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
         // Add fallback models for failed providers
         allModels.push(...this.getFallbackModels(provider));
       }
@@ -161,11 +160,7 @@ export class ModelDiscoveryService {
         Array.isArray((data as { models: unknown }).models)
       ) {
         for (const modelRaw of (data as { models: unknown[] }).models) {
-          if (
-            typeof modelRaw === 'object' &&
-            modelRaw !== null &&
-            'name' in modelRaw
-          ) {
+          if (typeof modelRaw === 'object' && modelRaw !== null && 'name' in modelRaw) {
             const model = modelRaw as {
               name: string;
               size?: string;
@@ -189,16 +184,14 @@ export class ModelDiscoveryService {
                 quantization: model.details?.quantization_level,
                 createdAt: model.created_at
                   ? new Date(
-                      typeof model.created_at === 'string' ||
-                        typeof model.created_at === 'number'
+                      typeof model.created_at === 'string' || typeof model.created_at === 'number'
                         ? model.created_at
                         : Date.now()
                     )
                   : undefined,
                 modifiedAt: model.modified_at
                   ? new Date(
-                      typeof model.modified_at === 'string' ||
-                        typeof model.modified_at === 'number'
+                      typeof model.modified_at === 'string' || typeof model.modified_at === 'number'
                         ? model.modified_at
                         : Date.now()
                     )
@@ -211,10 +204,9 @@ export class ModelDiscoveryService {
 
       return models;
     } catch (error: unknown) {
-      logger.warn(
-        'Ollama not available or models not accessible:',
-        { error: error instanceof Error ? error.message : String(error) }
-      );
+      logger.warn('Ollama not available or models not accessible:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -245,11 +237,7 @@ export class ModelDiscoveryService {
       ) {
         const dataArr = (dataUnknown as { data: unknown[] }).data;
         for (const modelRaw of dataArr) {
-          if (
-            typeof modelRaw === 'object' &&
-            modelRaw !== null &&
-            'id' in modelRaw
-          ) {
+          if (typeof modelRaw === 'object' && modelRaw !== null && 'id' in modelRaw) {
             const model = modelRaw as { id: string; created?: number };
             models.push({
               name: model.id,
@@ -259,9 +247,7 @@ export class ModelDiscoveryService {
               capabilities: ['chat', 'completion'],
               metadata: {
                 createdAt:
-                  typeof model.created === 'number'
-                    ? new Date(model.created * 1000)
-                    : undefined,
+                  typeof model.created === 'number' ? new Date(model.created * 1000) : undefined,
               },
             });
           }
@@ -270,10 +256,9 @@ export class ModelDiscoveryService {
 
       return models;
     } catch (error: unknown) {
-      logger.warn(
-        'LM Studio not available or models not accessible:',
-        { error: error instanceof Error ? error.message : String(error) }
-      );
+      logger.warn('LM Studio not available or models not accessible:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -320,10 +305,9 @@ export class ModelDiscoveryService {
             }))
           );
         } catch (searchError) {
-          logger.debug(
-            `HF search failed for query "${searchQuery.query}":`,
-            { error: searchError instanceof Error ? searchError.message : String(searchError) }
-          );
+          logger.debug(`HF search failed for query "${searchQuery.query}":`, {
+            error: searchError instanceof Error ? searchError.message : String(searchError),
+          });
         }
       }
 
@@ -338,10 +322,9 @@ export class ModelDiscoveryService {
       logger.info(`Discovered ${uniqueModels.length} HuggingFace models dynamically`);
       return uniqueModels;
     } catch (error) {
-      logger.warn(
-        'Dynamic HuggingFace discovery failed, using fallback models:',
-        { error: error instanceof Error ? error.message : String(error) }
-      );
+      logger.warn('Dynamic HuggingFace discovery failed, using fallback models:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       // Fallback to curated list if API fails
       return [

@@ -256,7 +256,9 @@ export class MCPConnectionClient extends EventEmitter {
   /**
    * Initialize MCP connection
    */
-  public async initialize(clientInfo: Readonly<{ name: string; version: string }>): Promise<unknown> {
+  public async initialize(
+    clientInfo: Readonly<{ name: string; version: string }>
+  ): Promise<unknown> {
     return this.sendRequest('initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {
@@ -281,7 +283,10 @@ export class MCPConnectionClient extends EventEmitter {
   /**
    * Call a tool
    */
-  public async callTool(name: string, arguments_: Readonly<Record<string, unknown>>): Promise<unknown> {
+  public async callTool(
+    name: string,
+    arguments_: Readonly<Record<string, unknown>>
+  ): Promise<unknown> {
     return this.sendRequest('tools/call', {
       name,
       arguments: arguments_,
@@ -322,14 +327,17 @@ export class MCPConnectionClient extends EventEmitter {
   }
 
   /**
-     * Get a prompt
-     */
-    public async getPrompt(name: string, arguments_?: Readonly<Record<string, unknown>>): Promise<unknown> {
-      return this.sendRequest('prompts/get', {
-        name,
-        arguments: arguments_ ?? {},
-      });
-    }
+   * Get a prompt
+   */
+  public async getPrompt(
+    name: string,
+    arguments_?: Readonly<Record<string, unknown>>
+  ): Promise<unknown> {
+    return this.sendRequest('prompts/get', {
+      name,
+      arguments: arguments_ ?? {},
+    });
+  }
 
   /**
    * Set logging level
@@ -525,10 +533,11 @@ export class MCPConnectionClient extends EventEmitter {
       });
 
       // Extract server capabilities
-      const result = initResult as { capabilities?: Record<string, unknown>; serverInfo?: { version?: string } };
-      this.serverInfo.capabilities = result.capabilities
-        ? Object.keys(result.capabilities)
-        : [];
+      const result = initResult as {
+        capabilities?: Record<string, unknown>;
+        serverInfo?: { version?: string };
+      };
+      this.serverInfo.capabilities = result.capabilities ? Object.keys(result.capabilities) : [];
       this.serverInfo.version = result.serverInfo?.version;
 
       // Send initialized notification

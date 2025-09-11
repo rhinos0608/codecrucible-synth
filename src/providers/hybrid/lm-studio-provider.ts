@@ -136,7 +136,9 @@ export class LMStudioProvider implements LLMProvider {
   public async isAvailable(): Promise<boolean> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => { controller.abort(); }, 5000);
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 5000);
 
       const response = await fetch(`${this.endpoint}/v1/models`, {
         method: 'GET',
@@ -154,7 +156,10 @@ export class LMStudioProvider implements LLMProvider {
   /**
    * Generate code using LM Studio
    */
-  public async generateCode(prompt: Readonly<string>, options: Readonly<LMStudioOptions> = {}): Promise<LLMResponse> {
+  public async generateCode(
+    prompt: Readonly<string>,
+    options: Readonly<LMStudioOptions> = {}
+  ): Promise<LLMResponse> {
     const startTime = Date.now();
     this.currentLoad++;
     this.requestCount++;
@@ -252,22 +257,21 @@ export class LMStudioProvider implements LLMProvider {
         messages,
         temperature:
           typedRequest.temperature ?? this.getTemperature(typedRequest.taskType ?? 'default'),
-        max_tokens:
-          typedRequest.maxTokens ?? this.getMaxTokens(typedRequest.taskType ?? 'default'),
+        max_tokens: typedRequest.maxTokens ?? this.getMaxTokens(typedRequest.taskType ?? 'default'),
         stream: false,
       };
 
       // Add tools to payload if provided
-      if (
-        Array.isArray(typedRequest.tools) &&
-        typedRequest.tools.length > 0
-      ) {
+      if (Array.isArray(typedRequest.tools) && typedRequest.tools.length > 0) {
         payload.tools = typedRequest.tools;
         payload.tool_choice = typedRequest.tool_choice ?? 'auto';
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => { controller.abort(); },
+      const timeout = setTimeout(
+        () => {
+          controller.abort();
+        },
         typedRequest.timeout ?? this.config.timeout ?? 60000
       );
 
@@ -369,7 +373,9 @@ export class LMStudioProvider implements LLMProvider {
     };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => { controller.abort(); }, options.timeout ?? this.config.timeout);
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, options.timeout ?? this.config.timeout);
 
     try {
       const response = await fetch(`${this.endpoint}/v1/chat/completions`, {
@@ -385,7 +391,7 @@ export class LMStudioProvider implements LLMProvider {
         throw new Error(`LM Studio API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as LMStudioResponse;
+      const data = (await response.json()) as LMStudioResponse;
 
       if (!Array.isArray(data.choices) || data.choices.length === 0) {
         throw new Error('No response choices returned from LM Studio');

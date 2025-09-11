@@ -20,10 +20,11 @@ export async function initialize(
     const startTime = Date.now();
 
     const { ServiceFactory } = await import('../services/service-factory.js');
-    const serviceFactory: import('../services/service-factory.js').ServiceFactory = new ServiceFactory({
-      correlationId: `cli-${Date.now()}`,
-      logLevel: cliOptions.verbose ? 'debug' : 'info',
-    });
+    const serviceFactory: import('../services/service-factory.js').ServiceFactory =
+      new ServiceFactory({
+        correlationId: `cli-${Date.now()}`,
+        logLevel: cliOptions.verbose ? 'debug' : 'info',
+      });
 
     // Get runtime context and set global event bus for legacy consumers
     const runtimeContext = serviceFactory.getRuntimeContext();
@@ -68,7 +69,10 @@ export async function initialize(
         const modelSelector = new ModelSelector();
         selectedModelInfo = await modelSelector.selectModel();
       } catch (error) {
-        logger.warn('Interactive model selection failed, using quick select:', toReadonlyRecord(error));
+        logger.warn(
+          'Interactive model selection failed, using quick select:',
+          toReadonlyRecord(error)
+        );
         selectedModelInfo = await quickSelectModel();
       }
     } else {
@@ -133,15 +137,21 @@ export async function initialize(
     }
 
     // Orchestrator
-    const { ConcreteWorkflowOrchestrator } = await import('../services/concrete-workflow-orchestrator.js');
+    const { ConcreteWorkflowOrchestrator } = await import(
+      '../services/concrete-workflow-orchestrator.js'
+    );
     const { StreamingManager } = await import('../services/orchestrator/streaming-manager.js');
-    const { ToolExecutionRouter } = await import('../services/orchestrator/tool-execution-router.js');
-    const { ProviderCapabilityRegistry } = await import('../services/provider-capability-registry.js');
+    const { ToolExecutionRouter } = await import(
+      '../services/orchestrator/tool-execution-router.js'
+    );
+    const { ProviderCapabilityRegistry } = await import(
+      '../services/provider-capability-registry.js'
+    );
 
     const streamingManager = new StreamingManager();
     const capabilityRegistry = new ProviderCapabilityRegistry();
     const toolExecutionRouter = new ToolExecutionRouter(
-      (mcpServerManager as unknown) as import('../../domain/interfaces/mcp-manager.js').IMcpManager
+      mcpServerManager as unknown as import('../../domain/interfaces/mcp-manager.js').IMcpManager
     );
     const orchestrator = new ConcreteWorkflowOrchestrator(
       streamingManager,
@@ -150,10 +160,12 @@ export async function initialize(
     ) as unknown as import('../../domain/interfaces/workflow-orchestrator.js').IWorkflowOrchestrator;
 
     await orchestrator.initialize({
-      userInteraction: (userInteraction as unknown) as import('../../domain/interfaces/user-interaction.js').IUserInteraction,
+      userInteraction:
+        userInteraction as unknown as import('../../domain/interfaces/user-interaction.js').IUserInteraction,
       eventBus,
       modelClient,
-      mcpManager: (mcpServerManager as unknown) as import('../../domain/interfaces/mcp-manager.js').IMcpManager,
+      mcpManager:
+        mcpServerManager as unknown as import('../../domain/interfaces/mcp-manager.js').IMcpManager,
       runtimeContext,
     });
 
@@ -164,11 +176,13 @@ export async function initialize(
     logger.info(`Unified system initialized in ${initTime}ms`);
     return { cli, serviceFactory };
   } catch (error) {
-    logger.error('Failed to initialize system:', error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      'Failed to initialize system:',
+      error instanceof Error ? error : new Error(String(error))
+    );
     // rethrow to outer runCLI handler to keep behavior identical
     throw error;
   }
 }
 
 export default initialize;
-

@@ -49,8 +49,10 @@ export class TimeoutError extends Error {
 export class TimeoutManager {
   private static instance: TimeoutManager;
   private readonly timeouts: Map<string, NodeJS.Timeout> = new Map();
-  private readonly timeoutStats: Map<string, { startTime: number; level: TimeoutLevel; duration: number }> =
-    new Map();
+  private readonly timeoutStats: Map<
+    string,
+    { startTime: number; level: TimeoutLevel; duration: number }
+  > = new Map();
 
   // Default timeout configurations by level
   private defaultTimeouts: Record<TimeoutLevel, number> = {
@@ -144,10 +146,14 @@ export class TimeoutManager {
       // Handle promise resolution/rejection
       promise
         .then(result => {
-          settlePromise(() => { resolve(result); });
+          settlePromise(() => {
+            resolve(result);
+          });
         })
         .catch(error => {
-          settlePromise(() => { reject(error); });
+          settlePromise(() => {
+            reject(error);
+          });
         });
     });
   }

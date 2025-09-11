@@ -65,7 +65,7 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tseslint,
-      'import': importPlugin,
+      import: importPlugin,
     },
     rules: {
       ...eslint.configs.recommended.rules,
@@ -219,19 +219,52 @@ export default [
       // Import/Export Rules
       'no-duplicate-imports': 'error',
       'no-useless-rename': 'error',
-      
+
       // Enforce .js extensions for relative imports (ESM compliance)
       'import/extensions': [
         'error',
         'ignorePackages',
         {
-          'js': 'always',
-          'ts': 'never'
-        }
+          js: 'always',
+          ts: 'never',
+        },
       ],
       'import/no-unresolved': 'off', // TypeScript handles this
       'import/no-relative-parent-imports': 'off', // Allow relative imports
-      
+
+      // Clean Architecture Enforcement Rules
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '../../domain/services/**',
+              message: 'Infrastructure layer cannot import domain services directly. Use dependency injection with domain interfaces instead.',
+              allowTypeImports: false,
+            },
+            {
+              name: '../../../infrastructure/**',
+              message: 'Domain layer cannot import infrastructure. Domain must remain pure and infrastructure-agnostic.',
+              allowTypeImports: false,
+            },
+          ],
+          patterns: [
+            {
+              group: ['**/infrastructure/**'],
+              importNames: ['*'],
+              message: 'Domain layer cannot import from infrastructure layer. Use interfaces and dependency injection.',
+              allowTypeImports: false,
+            },
+            {
+              group: ['**/domain/services/**'],
+              importNames: ['*'],
+              message: 'Infrastructure should not import domain services directly. Use interfaces with dependency injection.',
+              allowTypeImports: false,
+            },
+          ],
+        },
+      ],
+
       '@typescript-eslint/consistent-type-imports': [
         'error',
         {
@@ -239,7 +272,7 @@ export default [
           disallowTypeAnnotations: false,
         },
       ],
-      
+
       'sort-imports': [
         'error',
         {

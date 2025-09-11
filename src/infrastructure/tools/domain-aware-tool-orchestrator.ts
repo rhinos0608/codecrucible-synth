@@ -95,12 +95,19 @@ export class DomainAwareToolOrchestrator {
           'dependency',
         ],
         tools: [
+          // New core tool suite
+          'file_read',
+          'file_write',
+          'grep_search',
+          'glob_search',
+          'bash_run',
+          // Legacy/internal tools kept for compatibility and broader coverage
           'filesystem_read_file',
           'filesystem_write_file',
           'filesystem_list_directory',
-          'filesystem_file_stats',
+          'filesystem_get_stats',
           'filesystem_find_files',
-          'mcp_execute_command', // For build commands
+          'mcp_execute_command',
           'mcp_read_file',
           'mcp_write_file',
         ],
@@ -343,12 +350,15 @@ export class DomainAwareToolOrchestrator {
 
     // Determine primary and secondary domains
     const sortedDomains = Array.from(domainScores.entries()).sort(
-      ([, scoreA]: readonly [string, number], [, scoreB]: readonly [string, number]) => scoreB - scoreA
+      ([, scoreA]: readonly [string, number], [, scoreB]: readonly [string, number]) =>
+        scoreB - scoreA
     );
 
     const primaryDomain = sortedDomains.length > 0 ? sortedDomains[0][0] : 'mixed';
     const primaryScore = sortedDomains.length > 0 ? sortedDomains[0][1] : 0;
-    const secondaryDomains = sortedDomains.slice(1, 3).map(([domain]: readonly [string, number]) => domain);
+    const secondaryDomains = sortedDomains
+      .slice(1, 3)
+      .map(([domain]: readonly [string, number]) => domain);
 
     // Calculate confidence based on score distribution
     const totalScore = Array.from(domainScores.values()).reduce((sum, score) => sum + score, 0);
@@ -439,7 +449,9 @@ export class DomainAwareToolOrchestrator {
       selectedToolCount: selectedTools.length,
       primaryDomain: analysis.primaryDomain,
       confidence: analysis.confidence.toFixed(2),
-      toolNames: selectedTools.map((t: { name: string; function?: { name: string } }) => t.function?.name ?? t.name),
+      toolNames: selectedTools.map(
+        (t: { name: string; function?: { name: string } }) => t.function?.name ?? t.name
+      ),
     });
 
     return {

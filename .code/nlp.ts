@@ -405,4 +405,3 @@ export class NaturalLanguageProcessor {
 export const naturalLanguageProcessor = new NaturalLanguageProcessor();
 
 export default NaturalLanguageProcessor;
-

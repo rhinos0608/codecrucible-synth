@@ -3,7 +3,12 @@
  * Advanced tool integration with performance monitoring, caching, and intelligent routing
  */
 
-import { LLMFunction, RustExecutionBackend, ToolCall, ToolIntegration } from './tool-integration.js';
+import {
+  LLMFunction,
+  RustExecutionBackend,
+  ToolCall,
+  ToolIntegration,
+} from './tool-integration.js';
 import { DomainAwareToolOrchestrator } from './domain-aware-tool-orchestrator.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { logger } from '../../infrastructure/logging/logger.js';
@@ -41,7 +46,10 @@ export class EnhancedToolIntegration extends EventEmitter {
   private readonly baseToolIntegration: ToolIntegration;
   private readonly orchestrator: DomainAwareToolOrchestrator;
   private config: EnhancedToolConfig;
-  private readonly executionCache: Map<string, { result: unknown; timestamp: number; ttl: number }> = new Map();
+  private readonly executionCache: Map<
+    string,
+    { result: unknown; timestamp: number; ttl: number }
+  > = new Map();
   private readonly metrics: ToolExecutionMetrics[] = [];
   private readonly activeExecutions: Set<string> = new Set();
   private cacheCleanupInterval?: NodeJS.Timeout;
@@ -90,14 +98,14 @@ export class EnhancedToolIntegration extends EventEmitter {
         autoDiscovery: true,
       },
     };
-  const mcpManager = new MCPServerManager(mcpConfig);
-  this.baseToolIntegration = new ToolIntegration(
-    mcpManager,
-    rustBackend as Readonly<RustExecutionBackend> | undefined
-  );
-  this.orchestrator = new DomainAwareToolOrchestrator();
+    const mcpManager = new MCPServerManager(mcpConfig);
+    this.baseToolIntegration = new ToolIntegration(
+      mcpManager,
+      rustBackend as Readonly<RustExecutionBackend> | undefined
+    );
+    this.orchestrator = new DomainAwareToolOrchestrator();
 
-  this.setupCacheCleanup();
+    this.setupCacheCleanup();
   }
 
   public async executeToolCall(
@@ -132,12 +140,9 @@ export class EnhancedToolIntegration extends EventEmitter {
         // Map LLMFunction[] to expected tool shape
         const availableTools = (await this.baseToolIntegration.getLLMFunctions()).map(fn => ({
           name: fn.function.name,
-          function: { name: fn.function.name }
+          function: { name: fn.function.name },
         }));
-        const domainAnalysis = this.orchestrator.getToolsForPrompt(
-          toolPrompt,
-          availableTools
-        );
+        const domainAnalysis = this.orchestrator.getToolsForPrompt(toolPrompt, availableTools);
         // Log domain analysis for debugging
         console.log('Domain analysis:', domainAnalysis);
         result = await this.executeWithRetry(toolCall, context);
@@ -171,7 +176,7 @@ export class EnhancedToolIntegration extends EventEmitter {
       // Map LLMFunction[] to expected tool shape
       const availableTools = baseFunctions.map(fn => ({
         name: fn.function.name,
-        function: { name: fn.function.name }
+        function: { name: fn.function.name },
       }));
       const domainPrompt = `Tools needed for ${domain} domain`;
       const domainTools = this.orchestrator.getToolsForPrompt(domainPrompt, availableTools);
@@ -193,14 +198,19 @@ export class EnhancedToolIntegration extends EventEmitter {
 
     for (let i = 0; i < toolCalls.length; i += batchSize) {
       const batch = toolCalls.slice(i, i + batchSize);
-      const batchPromises = batch.map(async (toolCall: Readonly<ToolCall>) => this.executeToolCall(toolCall, context));
+      const batchPromises = batch.map(async (toolCall: Readonly<ToolCall>) =>
+        this.executeToolCall(toolCall, context)
+      );
 
       const batchResults = await Promise.allSettled(batchPromises);
       results.push(
         ...batchResults.map((result: PromiseSettledResult<unknown>) =>
           result.status === 'fulfilled'
             ? result.value
-            : { error: result.reason instanceof Error ? result.reason.message : String(result.reason) }
+            : {
+                error:
+                  result.reason instanceof Error ? result.reason.message : String(result.reason),
+              }
         )
       );
     }
@@ -231,17 +241,22 @@ export class EnhancedToolIntegration extends EventEmitter {
 
     const successRate =
       recentMetrics.length > 0
-        ? recentMetrics.filter((m: Readonly<ToolExecutionMetrics>) => m.success).length / recentMetrics.length
+        ? recentMetrics.filter((m: Readonly<ToolExecutionMetrics>) => m.success).length /
+          recentMetrics.length
         : 0;
 
     const avgExecutionTime =
       recentMetrics.length > 0
-        ? recentMetrics.reduce((sum: number, m: Readonly<ToolExecutionMetrics>) => sum + m.executionTime, 0) / recentMetrics.length
+        ? recentMetrics.reduce(
+            (sum: number, m: Readonly<ToolExecutionMetrics>) => sum + m.executionTime,
+            0
+          ) / recentMetrics.length
         : 0;
 
     const cacheHitRate =
       recentMetrics.length > 0
-        ? recentMetrics.filter((m: Readonly<ToolExecutionMetrics>) => m.cacheHit).length / recentMetrics.length
+        ? recentMetrics.filter((m: Readonly<ToolExecutionMetrics>) => m.cacheHit).length /
+          recentMetrics.length
         : 0;
 
     return {
@@ -296,7 +311,10 @@ export class EnhancedToolIntegration extends EventEmitter {
     throw lastError;
   }
 
-  private generateExecutionId(toolCall: Readonly<ToolCall>, _context: Readonly<ToolExecutionContext>): string {
+  private generateExecutionId(
+    toolCall: Readonly<ToolCall>,
+    _context: Readonly<ToolExecutionContext>
+  ): string {
     return `${toolCall.function.name}_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   }
 
@@ -410,7 +428,9 @@ export class EnhancedToolIntegration extends EventEmitter {
 
   private async createTimeoutPromise(): Promise<never> {
     return new Promise((_, reject) => {
-      setTimeout(() => { reject(new Error('Tool execution timeout')); }, this.config.timeout);
+      setTimeout(() => {
+        reject(new Error('Tool execution timeout'));
+      }, this.config.timeout);
     });
   }
 
@@ -439,4 +459,3 @@ export function getGlobalEnhancedToolIntegration(): EnhancedToolIntegration | nu
 export function setGlobalEnhancedToolIntegration(integration: EnhancedToolIntegration): void {
   globalEnhancedToolIntegration = integration;
 }
-

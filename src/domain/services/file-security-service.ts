@@ -128,7 +128,10 @@ export class FileSecurityService {
   /**
    * Validate file path for security violations
    */
-  public validatePath(path: string, policy?: Readonly<Partial<FileSecurityPolicy>>): PathValidationResult {
+  public validatePath(
+    path: string,
+    policy?: Readonly<Partial<FileSecurityPolicy>>
+  ): PathValidationResult {
     const effectivePolicy = { ...this.defaultPolicy, ...policy };
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
@@ -364,7 +367,10 @@ export class FileSecurityService {
   /**
    * Check if file content appears malicious (basic heuristics)
    */
-  public scanFileContent(content: Readonly<string> | Readonly<Buffer>, filename: Readonly<string>): FileValidationResult {
+  public scanFileContent(
+    content: Readonly<string> | Readonly<Buffer>,
+    filename: Readonly<string>
+  ): FileValidationResult {
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
 
@@ -574,7 +580,10 @@ export class FileSecurityService {
     return path.replace(new RegExp('[<>:"|?*\\x00-\\x1f\\x7f]', 'g'), '');
   }
 
-  private findForbiddenDirectory(path: string, forbiddenDirs: ReadonlyArray<string>): string | null {
+  private findForbiddenDirectory(
+    path: string,
+    forbiddenDirs: ReadonlyArray<string>
+  ): string | null {
     const normalizedPath = path.toLowerCase().replace(/\\/g, '/');
 
     for (const forbiddenDir of forbiddenDirs) {

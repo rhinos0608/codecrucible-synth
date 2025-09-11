@@ -309,7 +309,7 @@ export class EnterpriseAuthManager {
         sessionId: session.id,
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(session.expiresAt.getTime() / 1000),
-        jti: crypto.randomUUID()
+        jti: crypto.randomUUID(),
       };
       const jwtSecret = await this.secretsManager.getSecret('JWT_SECRET');
       if (!jwtSecret) {

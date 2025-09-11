@@ -20,9 +20,7 @@ import {
   ActiveProcess,
   ActiveProcessManager,
 } from '../../infrastructure/performance/active-process-manager.js';
-import {
-  getGlobalEnhancedToolIntegration,
-} from '../../infrastructure/tools/enhanced-tool-integration.js';
+import { getGlobalEnhancedToolIntegration } from '../../infrastructure/tools/enhanced-tool-integration.js';
 import { getGlobalToolIntegration } from '../../infrastructure/tools/tool-integration.js';
 import { DomainAwareToolOrchestrator } from '../tools/domain-aware-tool-orchestrator.js';
 import { requestBatcher } from '../performance/intelligent-request-batcher.js';
@@ -131,9 +129,21 @@ export interface ExecutionConfig {
   };
 }
 
+export interface ExecutionStats {
+  activeRequests: number;
+  queuedRequests: number;
+  maxConcurrent: number;
+  rustBackendAvailable: boolean;
+  rustBackendStats?: unknown;
+  config: ExecutionConfig;
+}
+
 export interface Provider {
   getModelName?: () => string;
-  processRequest: (request: Readonly<ModelRequest>, context?: Readonly<ProjectContext>) => Promise<ModelResponse>;
+  processRequest: (
+    request: Readonly<ModelRequest>,
+    context?: Readonly<ProjectContext>
+  ) => Promise<ModelResponse>;
 }
 
 export interface IRequestExecutionManager {
@@ -170,13 +180,17 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   // Add missing property declarations
   private readonly config: Readonly<ExecutionConfig>;
   private readonly processManager: Readonly<ActiveProcessManager>;
-  private readonly providerRepository: Readonly<{ getProvider: (providerType: ProviderType) => Provider | undefined }>;
+  private readonly providerRepository: Readonly<{
+    getProvider: (providerType: ProviderType) => Provider | undefined;
+  }>;
   private _rustBackend: RustExecutionBackend | null;
 
   public constructor(
     config: Readonly<ExecutionConfig>,
     processManager: Readonly<ActiveProcessManager>,
-    providerRepository: Readonly<{ getProvider: (providerType: ProviderType) => Provider | undefined }>,
+    providerRepository: Readonly<{
+      getProvider: (providerType: ProviderType) => Provider | undefined;
+    }>,
     rustBackend: RustExecutionBackend | null = null
   ) {
     super();
@@ -189,23 +203,29 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     // If no injected backend, lazily create one
     if (!this._rustBackend) {
       try {
-        import('./rust-executor/index.js').then(async ({ RustExecutionBackend }) => {
-          this._rustBackend = new RustExecutionBackend({
-            enableProfiling: true,
-            maxConcurrency: 4,
-            timeoutMs: config.defaultTimeout,
-            logLevel: 'info',
+        import('./rust-executor/index.js')
+          .then(async ({ RustExecutionBackend }) => {
+            this._rustBackend = new RustExecutionBackend({
+              enableProfiling: true,
+              maxConcurrency: 4,
+              timeoutMs: config.defaultTimeout,
+              logLevel: 'info',
+            });
+            // Initialize asynchronously
+            // Fire-and-forget async initialization of Rust backend
+            await this.initializeRustBackend();
+          })
+          .catch(e => {
+            // If import fails, leave rustBackend null and continue
+            logger.warn('RequestExecutionManager: Rust backend not available at construction', {
+              error: e instanceof Error ? e.message : String(e),
+            });
+            this._rustBackend = null;
           });
-          // Initialize asynchronously
-          // Fire-and-forget async initialization of Rust backend
-          await this.initializeRustBackend();
-        }).catch((e) => {
-          // If import fails, leave rustBackend null and continue
-          logger.warn('RequestExecutionManager: Rust backend not available at construction', { error: e instanceof Error ? e.message : String(e) });
-          this._rustBackend = null;
-        });
       } catch (e) {
-        logger.warn('RequestExecutionManager: Rust backend initialization error', { error: e instanceof Error ? e.message : String(e) });
+        logger.warn('RequestExecutionManager: Rust backend initialization error', {
+          error: e instanceof Error ? e.message : String(e),
+        });
       }
     } else {
       // If an injected backend exists, we may optionally initialize/verify it
@@ -213,11 +233,15 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         if (typeof this._rustBackend.initialize === 'function') {
           // Fire-and-forget initialization
           this._rustBackend.initialize().catch((err: unknown) => {
-            logger.warn('Injected rustBackend failed to initialize', { error: err instanceof Error ? err.message : String(err) });
+            logger.warn('Injected rustBackend failed to initialize', {
+              error: err instanceof Error ? err.message : String(err),
+            });
           });
         }
       } catch (err) {
-        logger.warn('Error while initializing injected rustBackend', { error: err instanceof Error ? err.message : String(err) });
+        logger.warn('Error while initializing injected rustBackend', {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
@@ -252,7 +276,10 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         );
       }
     } catch (error) {
-      logger.error('❌ RequestExecutionManager: Rust backend initialization failed', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        '❌ RequestExecutionManager: Rust backend initialization failed',
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }
 
@@ -286,9 +313,11 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           usage?: { totalTokens?: number };
         }
 
-        const batchResult = await requestBatcher.batchRequest(
+        const batchModel =
+          request.model || (strategy.provider === 'ollama' ? 'llama3.1:8b' : 'local-model');
+        const batchResult = (await requestBatcher.batchRequest(
           request.prompt,
-          strategy.provider,
+          batchModel,
           strategy.provider,
           {
             temperature: request.temperature,
@@ -297,7 +326,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
             priority: this.getRequestPriority(request),
             tools: request.tools,
           }
-        ) as BatchResult;
+        )) as BatchResult;
 
         // Record performance metrics for adaptive tuning
         const responseTime = Date.now() - startTime;
@@ -422,13 +451,15 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           usingEnhanced: toolIntegration === enhancedToolIntegration,
           toolIntegrationType: toolIntegration?.constructor?.name,
         });
-        const supportsTools = this.modelSupportsTools(
-          providerType as ProviderType,
-          provider.getModelName?.()
-        );
+        // Use the requested model for capability checks; fall back to provider hint if absent
+        const modelForTools = request.model || provider.getModelName?.();
+        const supportsTools = this.modelSupportsTools(providerType as ProviderType, modelForTools);
 
         // DOMAIN-AWARE TOOL SELECTION: Smart filtering based on request analysis
-        interface Tool { function?: { name?: string }; name?: string }
+        interface Tool {
+          function?: { name?: string };
+          name?: string;
+        }
         let tools: Tool[] = [];
         let domainInfo = '';
 
@@ -438,12 +469,13 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           // Use domain orchestrator to select relevant tools only
           const mappedTools = allTools.map(tool => ({
             name: tool.function.name,
-            function: { name: tool.function.name }
+            function: { name: tool.function.name },
           }));
-          const { tools: selectedTools, analysis, reasoning } = this.domainOrchestrator.getToolsForPrompt(
-            request.prompt || '',
-            mappedTools
-          );
+          const {
+            tools: selectedTools,
+            analysis,
+            reasoning,
+          } = this.domainOrchestrator.getToolsForPrompt(request.prompt || '', mappedTools);
 
           tools = (selectedTools ?? []) as Tool[];
           domainInfo = `${analysis.primaryDomain} (${(analysis.confidence * 100).toFixed(1)}%)`;
@@ -454,7 +486,11 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
             confidence: analysis.confidence.toFixed(2),
             originalToolCount: allTools.length,
             selectedToolCount: tools.length,
-            toolNames: tools.map((t: Readonly<Tool>) => (t.function && typeof t.function.name === 'string' ? t.function.name : t.name ?? 'unknown')),
+            toolNames: tools.map((t: Readonly<Tool>) =>
+              t.function && typeof t.function.name === 'string'
+                ? t.function.name
+                : (t.name ?? 'unknown')
+            ),
             reasoning,
           });
         }
@@ -489,33 +525,44 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
             (t): t is { function: { name: string; description?: string; parameters?: object } } =>
               !!t.function && typeof t.function.name === 'string'
           )
-          .map((t: Readonly<{ readonly function: { readonly name: string; readonly description?: string; readonly parameters?: object } }>) => {
-            // Use object destructuring and type guard for parameters
-            const { parameters } = t.function;
-            // Always set type: "object" as required by ModelTool
-            const safeProperties: Record<string, unknown> =
-              typeof parameters === 'object' &&
-              parameters !== null &&
-              'properties' in parameters &&
-              typeof (parameters as { properties: unknown }).properties === 'object' &&
-              (parameters as { properties: unknown }).properties !== null
-                ? (parameters as { properties: Record<string, unknown> }).properties
-                : {};
+          .map(
+            (
+              t: Readonly<{
+                readonly function: {
+                  readonly name: string;
+                  readonly description?: string;
+                  readonly parameters?: object;
+                };
+              }>
+            ) => {
+              // Use object destructuring and type guard for parameters
+              const { parameters } = t.function;
+              // Always set type: "object" as required by ModelTool
+              const safeProperties: Record<string, unknown> =
+                typeof parameters === 'object' &&
+                parameters !== null &&
+                'properties' in parameters &&
+                typeof (parameters as { properties: unknown }).properties === 'object' &&
+                (parameters as { properties: unknown }).properties !== null
+                  ? (parameters as { properties: Record<string, unknown> }).properties
+                  : {};
 
-            const safeParameters: { type: "object"; properties: Record<string, unknown> } = {
-              type: "object",
-              properties: safeProperties,
-            };
+              const safeParameters: { type: 'object'; properties: Record<string, unknown> } = {
+                type: 'object',
+                properties: safeProperties,
+              };
 
-            return {
-              type: "function" as const,
-              function: {
-                name: t.function.name,
-                description: typeof t.function.description === 'string' ? t.function.description : '',
-                parameters: safeParameters,
-              },
-            };
-          });
+              return {
+                type: 'function' as const,
+                function: {
+                  name: t.function.name,
+                  description:
+                    typeof t.function.description === 'string' ? t.function.description : '',
+                  parameters: safeParameters,
+                },
+              };
+            }
+          );
 
         // Add tools to request before calling provider
         const requestWithTools = {
@@ -571,9 +618,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
                 const formattedToolCall = {
                   function: {
                     name: toolCall.function?.name,
-                    arguments: JSON.stringify(
-                      toolCall.function?.arguments || {}
-                    ),
+                    arguments: JSON.stringify(toolCall.function?.arguments || {}),
                   },
                 };
 
@@ -583,7 +628,9 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
                 logger.info(
                   `🔥 REQUEST-EXECUTION-MANAGER: toolIntegration type: ${toolIntegration?.constructor?.name}`
                 );
-                const result = await toolIntegration.executeToolCall(formattedToolCall) as ToolResult;
+                const result = (await toolIntegration.executeToolCall(
+                  formattedToolCall
+                )) as ToolResult;
                 logger.debug('Tool execution result in request execution', { result });
                 toolResults.push(result);
 
@@ -599,7 +646,9 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
                 if (firstResult?.success && firstResult.output !== undefined) {
                   // Return the actual tool result as the content
                   const content =
-                    typeof firstResult.output === 'object' && firstResult.output !== null && Object.prototype.hasOwnProperty.call(firstResult.output, 'content')
+                    typeof firstResult.output === 'object' &&
+                    firstResult.output !== null &&
+                    Object.prototype.hasOwnProperty.call(firstResult.output, 'content')
                       ? (firstResult.output as { content: string }).content
                       : firstResult.output;
                   response.content = content as string;
@@ -612,8 +661,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
                   logger.info(
                     '🔧 TOOL EXECUTION: Tool successfully executed in request execution',
                     {
-                      toolName:
-                        response.toolCalls[0]?.function?.name,
+                      toolName: response.toolCalls[0]?.function?.name,
                       resultContent: content,
                     }
                   );
@@ -886,7 +934,10 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   /**
    * Queue request if at capacity
    */
-  public async queueRequest(request: Readonly<ModelRequest>, context?: Readonly<ProjectContext>): Promise<ModelResponse> {
+  public async queueRequest(
+    request: Readonly<ModelRequest>,
+    context?: Readonly<ProjectContext>
+  ): Promise<ModelResponse> {
     if (this.activeRequests.size < this.config.maxConcurrentRequests) {
       return this.processRequest(request, context);
     }
@@ -983,7 +1034,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   /**
    * Get execution statistics
    */
-  getExecutionStats(): any {
+  getExecutionStats(): ExecutionStats {
     return {
       activeRequests: this.activeRequests.size,
       queuedRequests: this.requestQueue.length,

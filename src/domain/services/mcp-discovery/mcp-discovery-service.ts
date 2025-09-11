@@ -68,7 +68,7 @@ export class MCPDiscoveryService {
   }
 
   async selectServers(
-    servers: MCPServerProfile[], 
+    servers: MCPServerProfile[],
     query: ServerDiscoveryQuery
   ): Promise<ServerSelectionResult> {
     return this.select(query);

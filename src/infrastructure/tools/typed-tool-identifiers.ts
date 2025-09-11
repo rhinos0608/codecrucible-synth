@@ -262,13 +262,17 @@ export class TypedToolIdentifiers {
    * Get all available function names
    */
   public static getAllFunctionNames(): ToolFunctionName[] {
-    return Object.values(TYPED_TOOL_CATALOG).map((tool: Readonly<TypedToolDefinition>) => tool.functionName);
+    return Object.values(TYPED_TOOL_CATALOG).map(
+      (tool: Readonly<TypedToolDefinition>) => tool.functionName
+    );
   }
 
   /**
    * Get function name from registry key (type-safe)
    */
-  public static getFunctionName<K extends ToolRegistryKey>(registryKey: K): RegistryToFunctionMap[K] {
+  public static getFunctionName<K extends ToolRegistryKey>(
+    registryKey: K
+  ): RegistryToFunctionMap[K] {
     const tool = TYPED_TOOL_CATALOG[registryKey];
     return tool.functionName as RegistryToFunctionMap[K];
   }
@@ -284,21 +288,27 @@ export class TypedToolIdentifiers {
    * Get tools by category (type-safe)
    */
   public static getToolsByCategory(category: ToolCategory): TypedToolDefinition[] {
-    return Object.values(TYPED_TOOL_CATALOG).filter((tool: Readonly<TypedToolDefinition>) => tool.category === category);
+    return Object.values(TYPED_TOOL_CATALOG).filter(
+      (tool: Readonly<TypedToolDefinition>) => tool.category === category
+    );
   }
 
   /**
    * Get core tools (type-safe)
    */
   public static getCoreTools(): TypedToolDefinition[] {
-    return Object.values(TYPED_TOOL_CATALOG).filter((tool: Readonly<TypedToolDefinition>) => tool.isCore);
+    return Object.values(TYPED_TOOL_CATALOG).filter(
+      (tool: Readonly<TypedToolDefinition>) => tool.isCore
+    );
   }
 
   /**
    * Get tools by risk level (type-safe)
    */
   public static getToolsByRiskLevel(riskLevel: 'low' | 'medium' | 'high'): TypedToolDefinition[] {
-    return Object.values(TYPED_TOOL_CATALOG).filter((tool: Readonly<TypedToolDefinition>) => tool.riskLevel === riskLevel);
+    return Object.values(TYPED_TOOL_CATALOG).filter(
+      (tool: Readonly<TypedToolDefinition>) => tool.riskLevel === riskLevel
+    );
   }
 
   /**
@@ -312,14 +322,18 @@ export class TypedToolIdentifiers {
    * Validate function name at runtime (with type guard)
    */
   public static isValidFunctionName(name: string): name is ToolFunctionName {
-    return Object.values(TYPED_TOOL_CATALOG).some((tool: Readonly<TypedToolDefinition>) => tool.functionName === name);
+    return Object.values(TYPED_TOOL_CATALOG).some(
+      (tool: Readonly<TypedToolDefinition>) => tool.functionName === name
+    );
   }
 
   /**
    * Find registry key by alias (type-safe)
    */
   public static findRegistryKeyByAlias(alias: string): ToolRegistryKey | null {
-    const tool = Object.values(TYPED_TOOL_CATALOG).find((tool: Readonly<TypedToolDefinition>) => tool.aliases.includes(alias));
+    const tool = Object.values(TYPED_TOOL_CATALOG).find((tool: Readonly<TypedToolDefinition>) =>
+      tool.aliases.includes(alias)
+    );
     return tool ? tool.registryKey : null;
   }
 

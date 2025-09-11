@@ -19,7 +19,7 @@ export const DEFAULT_METRICS_CONFIG = {
   bufferSize: 300,
   enableGCMonitoring: true,
   enableNetworkEstimation: true,
-  enableDiskEstimation: true
+  enableDiskEstimation: true,
 };
 
 export const DEFAULT_PERFORMANCE_SYSTEM_CONFIG = {
@@ -31,8 +31,8 @@ export const DEFAULT_PERFORMANCE_SYSTEM_CONFIG = {
     'routing-coordinator': { threshold: 5, timeout: 60000, resetTimeout: 30000 },
     'cli-processing': { threshold: 3, timeout: 45000, resetTimeout: 20000 },
     'spiral-processing': { threshold: 4, timeout: 50000, resetTimeout: 25000 },
-    'analytics': { threshold: 6, timeout: 70000, resetTimeout: 35000 },
-    'external-api': { threshold: 5, timeout: 60000, resetTimeout: 30000 }
+    analytics: { threshold: 6, timeout: 70000, resetTimeout: 35000 },
+    'external-api': { threshold: 5, timeout: 60000, resetTimeout: 30000 },
   },
   thresholds: {
     cpu: { warning: 70, critical: 90 },
@@ -40,8 +40,8 @@ export const DEFAULT_PERFORMANCE_SYSTEM_CONFIG = {
     latency: { warning: 1000, critical: 5000 },
     errorRate: { warning: 5, critical: 15 },
     throughput: { warning: 100, critical: 50 },
-    gcPause: { warning: 50, critical: 200 }
-  }
+    gcPause: { warning: 50, critical: 200 },
+  },
 };
 
 export const DEFAULT_ANOMALY_DETECTION_CONFIG = {
@@ -49,7 +49,7 @@ export const DEFAULT_ANOMALY_DETECTION_CONFIG = {
   trendWindowSize: 20,
   baselineWindowSize: 100,
   sensitivityFactor: 2.0,
-  autoRemediationEnabled: true
+  autoRemediationEnabled: true,
 };
 
 export const DEFAULT_PREDICTIVE_CONFIG = {
@@ -58,7 +58,7 @@ export const DEFAULT_PREDICTIVE_CONFIG = {
   trainingWindowSize: 100,
   predictionHorizons: [1, 60, 1440],
   enableSeasonalDetection: true,
-  accuracyThreshold: 0.7
+  accuracyThreshold: 0.7,
 };
 
 export const DEFAULT_OPTIMIZATION_CONFIG = {
@@ -68,6 +68,6 @@ export const DEFAULT_OPTIMIZATION_CONFIG = {
   emergencyThresholds: {
     cpu: 95,
     memory: 98,
-    latency: 10000
-  }
+    latency: 10000,
+  },
 };

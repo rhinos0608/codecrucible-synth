@@ -32,15 +32,15 @@ class CircuitBreaker {
   private failures = 0;
   private lastFailureTime = 0;
   private state: 'closed' | 'open' | 'half-open' = 'closed';
-  
+
   constructor(
     private readonly failureThreshold: number = 5,
     private readonly recoveryTimeMs: number = 60000
   ) {}
-  
+
   public canExecute(): boolean {
     if (this.state === 'closed') return true;
-    
+
     if (this.state === 'open') {
       if (Date.now() - this.lastFailureTime >= this.recoveryTimeMs) {
         this.state = 'half-open';
@@ -48,24 +48,24 @@ class CircuitBreaker {
       }
       return false;
     }
-    
+
     return this.state === 'half-open';
   }
-  
+
   public recordSuccess(): void {
     this.failures = 0;
     this.state = 'closed';
   }
-  
+
   public recordFailure(): void {
     this.failures++;
     this.lastFailureTime = Date.now();
-    
+
     if (this.failures >= this.failureThreshold) {
       this.state = 'open';
     }
   }
-  
+
   public getState(): string {
     return this.state;
   }
@@ -81,7 +81,7 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
   private readonly maxRetries = 3;
   private readonly baseDelayMs = 1000;
   private readonly maxDelayMs = 10000;
-  
+
   public constructor(private readonly mcpManager: IMcpManager) {}
 
   public async handleToolCalls(
@@ -96,9 +96,9 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
 
     logger.info(`Processing ${response.toolCalls.length} tool calls`, {
       requestId: request.id,
-      toolNames: response.toolCalls.map(tc => tc.function.name)
+      toolNames: response.toolCalls.map(tc => tc.function.name),
     });
-    
+
     const toolResults: Array<{ id: string; result: unknown; error?: string }> = [];
     const errors: ToolExecutionError[] = [];
 
@@ -107,11 +107,15 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
       const toolName = toolCall.function.name;
       const toolCallId = toolCall.id || `${toolName}_${Date.now()}`;
       const startTime = Date.now();
-      
+
       try {
         // Parse and validate arguments
-        const parsedArgs = this.parseToolArguments(toolCall.function.arguments, toolName, toolCallId);
-        
+        const parsedArgs = this.parseToolArguments(
+          toolCall.function.arguments,
+          toolName,
+          toolCallId
+        );
+
         // Execute tool with retry logic and circuit breaker
         const toolResult = await this.executeToolWithResilience(
           toolName,
@@ -120,25 +124,24 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
           request,
           startTime
         );
-        
+
         toolResults.push({ id: toolCallId, result: toolResult });
         this.updateMetrics(toolName, true, Date.now() - startTime);
-        
       } catch (error) {
         const toolError = this.createToolExecutionError(error, toolName, toolCallId);
         errors.push(toolError);
-        
+
         toolResults.push({
           id: toolCallId,
           result: null,
           error: toolError.message,
         });
-        
+
         this.updateMetrics(toolName, false, Date.now() - startTime);
         this.logToolError(toolError);
       }
     }
-    
+
     // Log aggregated error summary if there were failures
     if (errors.length > 0) {
       this.logErrorSummary(errors, request.id);
@@ -168,23 +171,24 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
           function: {
             name: tc.function.name,
             // Parse arguments back to object for Ollama - it expects objects, not strings
-            arguments: typeof tc.function.arguments === 'string' 
-              ? (() => {
-                  try {
-                    return JSON.parse(tc.function.arguments);
-                  } catch {
-                    // If parsing fails, create a simple object
-                    return { raw_arguments: tc.function.arguments };
-                  }
-                })()
-              : tc.function.arguments,
+            arguments:
+              typeof tc.function.arguments === 'string'
+                ? (() => {
+                    try {
+                      return JSON.parse(tc.function.arguments);
+                    } catch {
+                      // If parsing fails, create a simple object
+                      return { raw_arguments: tc.function.arguments };
+                    }
+                  })()
+                : tc.function.arguments,
           },
         })),
       },
       // Create individual tool messages with matching IDs
       ...toolResults.map(toolResult => ({
         role: 'tool' as const,
-        content: toolResult.error 
+        content: toolResult.error
           ? JSON.stringify({ error: toolResult.error }, null, 2)
           : JSON.stringify(toolResult.result, null, 2),
         tool_call_id: toolResult.id,
@@ -206,9 +210,9 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
       requestId: request.id,
       toolResultCount: toolResults.length,
       successCount: toolResults.filter(r => !r.error).length,
-      errorCount: toolResults.filter(r => r.error).length
+      errorCount: toolResults.filter(r => r.error).length,
     });
-    
+
     return processModelRequest(followUpRequest);
   }
 
@@ -219,12 +223,12 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
   ): Record<string, unknown> {
     try {
       const parsed = JSON.parse(argumentsStr) as Record<string, unknown>;
-      
+
       // Basic validation
       if (typeof parsed !== 'object' || parsed === null) {
         throw new Error('Tool arguments must be a valid object');
       }
-      
+
       return parsed;
     } catch (error) {
       throw this.createToolExecutionError(
@@ -251,60 +255,59 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
     }
 
     let lastError: unknown;
-    
+
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         // Add timeout protection
         const timeoutMs = 30000; // 30 second timeout
         const executionPromise = this.executeTool(toolName, args, request);
-        
+
         const result = await Promise.race([
           executionPromise,
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Tool execution timeout')), timeoutMs)
-          )
+          ),
         ]);
-        
+
         circuitBreaker.recordSuccess();
-        
+
         logger.debug('Tool executed successfully', {
           toolName,
           toolCallId,
           attempt,
-          executionTime: Date.now() - startTime
+          executionTime: Date.now() - startTime,
         });
-        
+
         return result;
-        
       } catch (error) {
         lastError = error;
-        
+
         // Check if error is retryable
         const isRetryable = this.isRetryableError(error);
         if (!isRetryable || attempt === this.maxRetries) {
           circuitBreaker.recordFailure();
           throw error;
         }
-        
+
         // Exponential backoff with jitter
         const delay = Math.min(
           this.baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 1000,
           this.maxDelayMs
         );
-        
+
         logger.warn('Tool execution failed, retrying', {
           toolName,
           toolCallId,
           attempt,
           maxRetries: this.maxRetries,
           delayMs: delay,
-          error: getErrorMessage(error)
+          error: getErrorMessage(error),
         });
-        
+
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-    
+
     circuitBreaker.recordFailure();
     throw lastError;
   }
@@ -316,7 +319,7 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
   ): Promise<unknown> {
     // Try enhanced integration first
     const enhancedIntegration = getGlobalEnhancedToolIntegration();
-    
+
     if (enhancedIntegration) {
       const toolCallObj = {
         id: `${toolName}_${Date.now()}`,
@@ -337,18 +340,19 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
 
       return await enhancedIntegration.executeToolCall(toolCallObj, context);
     }
-    
+
     // Fallback to MCP manager
     const mcpResult = await this.mcpManager.executeTool(toolName, args, request.context);
-    
+
     // Check success flag and propagate errors properly
     if (!mcpResult.success) {
-      const errorMessage = typeof mcpResult.error === 'string' 
-        ? mcpResult.error 
-        : (mcpResult.error as any)?.message || `Tool execution failed: ${toolName}`;
+      const errorMessage =
+        typeof mcpResult.error === 'string'
+          ? mcpResult.error
+          : (mcpResult.error as any)?.message || `Tool execution failed: ${toolName}`;
       throw new Error(errorMessage);
     }
-    
+
     return mcpResult.data;
   }
 
@@ -361,7 +365,7 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
   ): ToolExecutionError {
     const message = customMessage || getErrorMessage(error);
     const originalError = error instanceof Error ? error : undefined;
-    
+
     return {
       type,
       toolName,
@@ -369,13 +373,13 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
       message,
       originalError,
       retryable: this.isRetryableError(error),
-      severity: this.getErrorSeverity(error, type)
+      severity: this.getErrorSeverity(error, type),
     };
   }
 
   private isRetryableError(error: unknown): boolean {
     const message = getErrorMessage(error).toLowerCase();
-    
+
     // Network and temporary failures are retryable
     const retryablePatterns = [
       'timeout',
@@ -384,32 +388,35 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
       'temporary',
       'unavailable',
       'rate limit',
-      'too many requests'
+      'too many requests',
     ];
-    
+
     return retryablePatterns.some(pattern => message.includes(pattern));
   }
 
-  private getErrorSeverity(error: unknown, type: ToolExecutionError['type']): ToolExecutionError['severity'] {
+  private getErrorSeverity(
+    error: unknown,
+    type: ToolExecutionError['type']
+  ): ToolExecutionError['severity'] {
     if (type === 'parse_error' || type === 'validation_error') {
       return 'medium';
     }
-    
+
     if (type === 'timeout_error') {
       return 'high';
     }
-    
+
     // Check error patterns for severity
     const message = getErrorMessage(error).toLowerCase();
-    
+
     if (message.includes('security') || message.includes('unauthorized')) {
       return 'critical';
     }
-    
+
     if (message.includes('not found') || message.includes('permission')) {
       return 'medium';
     }
-    
+
     return 'low';
   }
 
@@ -426,11 +433,11 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
       successCount: 0,
       failureCount: 0,
       averageExecutionTime: 0,
-      consecutiveFailures: 0
+      consecutiveFailures: 0,
     };
 
     metrics.totalCalls++;
-    
+
     if (success) {
       metrics.successCount++;
       metrics.consecutiveFailures = 0;
@@ -439,11 +446,11 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
       metrics.consecutiveFailures++;
       metrics.lastFailureTime = Date.now();
     }
-    
+
     // Update rolling average
     const totalTime = metrics.averageExecutionTime * (metrics.totalCalls - 1) + executionTime;
     metrics.averageExecutionTime = totalTime / metrics.totalCalls;
-    
+
     this.toolMetrics.set(toolName, metrics);
   }
 
@@ -455,26 +462,26 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
       message: error.message,
       retryable: error.retryable,
       severity: error.severity,
-      stack: error.originalError?.stack
+      stack: error.originalError?.stack,
     });
   }
 
   private logErrorSummary(errors: ToolExecutionError[], requestId: string): void {
     const errorsByTool = new Map<string, number>();
     const errorsByType = new Map<string, number>();
-    
+
     for (const error of errors) {
       errorsByTool.set(error.toolName, (errorsByTool.get(error.toolName) || 0) + 1);
       errorsByType.set(error.type, (errorsByType.get(error.type) || 0) + 1);
     }
-    
+
     logger.warn('Tool execution summary', {
       requestId,
       totalErrors: errors.length,
       errorsByTool: Object.fromEntries(errorsByTool),
       errorsByType: Object.fromEntries(errorsByType),
       criticalErrors: errors.filter(e => e.severity === 'critical').length,
-      retryableErrors: errors.filter(e => e.retryable).length
+      retryableErrors: errors.filter(e => e.retryable).length,
     });
   }
 

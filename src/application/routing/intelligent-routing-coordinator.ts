@@ -24,7 +24,7 @@ import {
   IVoiceOrchestrationService,
   SynthesisMode,
 } from '../../domain/services/voice-orchestration-service.js';
-import { 
+import {
   IProviderSelectionStrategy,
   ProviderType as ProviderStrategyType,
 } from '../../providers/provider-selection-strategy.js';
@@ -82,7 +82,10 @@ export class IntelligentRoutingCoordinator
       this.emit('routingDecision', decision);
       return decision;
     } catch (error) {
-      logger.error('Routing decision failed, returning failsafe decision', toErrorOrUndefined(error));
+      logger.error(
+        'Routing decision failed, returning failsafe decision',
+        toErrorOrUndefined(error)
+      );
       // Create a proper fallback Model instance
       const fallbackParams: ModelParameters = {
         maxTokens: 4096,
@@ -91,7 +94,7 @@ export class IntelligentRoutingCoordinator
         estimatedLatency: 1000,
         qualityRating: 0.5,
       };
-      
+
       const fallbackModel = new Model(
         ModelName.create('fallback-model'),
         ProviderType.create('lm-studio'),

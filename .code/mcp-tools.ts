@@ -96,8 +96,7 @@ async function basicWebSearch(
       ? [
           {
             title: `Search Results for: ${query}`,
-            url:
-              data.AbstractURL ?? `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
+            url: data.AbstractURL ?? `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
             snippet: data.AbstractText,
             type: 'web',
           },
@@ -122,7 +121,7 @@ async function basicWebSearch(
         source: 'duckduckgo-fallback',
       };
     }
-    
+
     logger.warn('Basic web search fallback failed:', toReadonlyRecord(error));
     return {
       success: false,
@@ -145,15 +144,18 @@ export class RefDocumentationTool extends BaseTool<typeof RefDocumentationSchema
     });
   }
 
-  public async execute(params: Readonly<{ query: string }>): Promise<{
-    success: true;
-    query: string;
-    results: Array<{ title: string; url: string; snippet: string; type: string }>;
-    source: string;
-  } | {
-    error: string;
-    query: string;
-  }> {
+  public async execute(params: Readonly<{ query: string }>): Promise<
+    | {
+        success: true;
+        query: string;
+        results: Array<{ title: string; url: string; snippet: string; type: string }>;
+        source: string;
+      }
+    | {
+        error: string;
+        query: string;
+      }
+  > {
     try {
       logger.info(`📚 MCP Ref Documentation Search: ${params.query}`);
 
@@ -224,20 +226,24 @@ export class ExaWebSearchTool extends BaseTool<typeof ExaWebSearchSchema.shape> 
           return {
             success: true,
             query: searchResult.query,
-            results: searchResult.results.map((result: Readonly<{
-              title: string;
-              url: string;
-              content: string;
-              score?: number;
-              publishedDate?: string;
-            }>) => ({
-              title: result.title,
-              url: result.url,
-              snippet: `${result.content.substring(0, 300)}...`,
-              type: 'web',
-              score: result.score,
-              publishedDate: result.publishedDate,
-            })),
+            results: searchResult.results.map(
+              (
+                result: Readonly<{
+                  title: string;
+                  url: string;
+                  content: string;
+                  score?: number;
+                  publishedDate?: string;
+                }>
+              ) => ({
+                title: result.title,
+                url: result.url,
+                snippet: `${result.content.substring(0, 300)}...`,
+                type: 'web',
+                score: result.score,
+                publishedDate: result.publishedDate,
+              })
+            ),
             totalResults: searchResult.totalResults,
             searchTime: searchResult.searchTime,
             source: 'exa-ai',
@@ -287,7 +293,9 @@ export class ExaDeepResearchTool extends BaseTool<typeof ExaDeepResearchSchema.s
     });
   }
 
-  public async execute(params: Readonly<{ topic: string; depth?: 'basic' | 'detailed' | 'comprehensive' }>): Promise<{
+  public async execute(
+    params: Readonly<{ topic: string; depth?: 'basic' | 'detailed' | 'comprehensive' }>
+  ): Promise<{
     success: boolean;
     topic: string;
     depth?: string;
@@ -339,7 +347,7 @@ export class ExaDeepResearchTool extends BaseTool<typeof ExaDeepResearchSchema.s
 
           // Process general search results
           if (generalSearch.status === 'fulfilled') {
-            (generalSearch.value.results as ExaResearchResult[]).forEach((result) => {
+            (generalSearch.value.results as ExaResearchResult[]).forEach(result => {
               allResults.push(result);
               if (typeof result.url === 'string') {
                 sources.push(result.url);
@@ -352,28 +360,32 @@ export class ExaDeepResearchTool extends BaseTool<typeof ExaDeepResearchSchema.s
 
           // Process academic results
           if (academicSearch.status === 'fulfilled') {
-            (academicSearch.value.results as ExaResearchResult[]).forEach((result: ExaResearchResult) => {
-              allResults.push(result);
-              if (typeof result.url === 'string') {
-                sources.push(result.url);
+            (academicSearch.value.results as ExaResearchResult[]).forEach(
+              (result: ExaResearchResult) => {
+                allResults.push(result);
+                if (typeof result.url === 'string') {
+                  sources.push(result.url);
+                }
+                if (typeof result.content === 'string') {
+                  findings.push(`Academic Research: ${result.content.substring(0, 200)}...`);
+                }
               }
-              if (typeof result.content === 'string') {
-                findings.push(`Academic Research: ${result.content.substring(0, 200)}...`);
-              }
-            });
+            );
           }
 
           // Process news results
           if (newsSearch.status === 'fulfilled') {
-            (newsSearch.value.results as ExaResearchResult[]).forEach((result: ExaResearchResult) => {
-              allResults.push(result);
-              if (typeof result.url === 'string') {
-                sources.push(result.url);
+            (newsSearch.value.results as ExaResearchResult[]).forEach(
+              (result: ExaResearchResult) => {
+                allResults.push(result);
+                if (typeof result.url === 'string') {
+                  sources.push(result.url);
+                }
+                if (typeof result.content === 'string') {
+                  findings.push(`Recent Development: ${result.content.substring(0, 200)}...`);
+                }
               }
-              if (typeof result.content === 'string') {
-                findings.push(`Recent Development: ${result.content.substring(0, 200)}...`);
-              }
-            });
+            );
           }
 
           return {
@@ -387,7 +399,10 @@ export class ExaDeepResearchTool extends BaseTool<typeof ExaDeepResearchSchema.s
             source: 'exa-deep-research',
           };
         } catch (exaError) {
-          logger.warn('Exa deep research failed, using basic approach:', toReadonlyRecord(exaError));
+          logger.warn(
+            'Exa deep research failed, using basic approach:',
+            toReadonlyRecord(exaError)
+          );
         }
       }
 
@@ -406,7 +421,9 @@ export class ExaDeepResearchTool extends BaseTool<typeof ExaDeepResearchSchema.s
           success: true,
           topic: params.topic,
           depth: params.depth || 'basic',
-          findings: basicResult.results.map((r: BasicSearchResult) => `Research Finding: ${r.snippet}`),
+          findings: basicResult.results.map(
+            (r: BasicSearchResult) => `Research Finding: ${r.snippet}`
+          ),
           sources: basicResult.results.map((r: BasicSearchResult) => r.url),
           totalResults: basicResult.results.length,
           researchStrategy: 'basic-web-search',
@@ -533,7 +550,6 @@ export class ExaCompanyResearchTool extends BaseTool<typeof ExaCompanyResearchSc
             publishedDate?: string;
           }
 
-
           const research: {
             overview: string;
             financials: string;
@@ -552,10 +568,11 @@ export class ExaCompanyResearchTool extends BaseTool<typeof ExaCompanyResearchSc
           // Process overview results
           if (searchResults[0].status === 'fulfilled') {
             const overviewResults = searchResults[0].value.results as ResearchResult[];
-            research.overview = overviewResults
-              .map((r: ResearchResult) => r.content?.substring(0, 300))
-              .filter((snippet): snippet is string => Boolean(snippet))
-              .join(' ') || '';
+            research.overview =
+              overviewResults
+                .map((r: ResearchResult) => r.content?.substring(0, 300))
+                .filter((snippet): snippet is string => Boolean(snippet))
+                .join(' ') || '';
             overviewResults.forEach((r: ResearchResult) => sources.push(r.url));
           } else {
             research.overview = '';
@@ -564,10 +581,11 @@ export class ExaCompanyResearchTool extends BaseTool<typeof ExaCompanyResearchSc
           // Process financial results
           if (searchResults[1].status === 'fulfilled') {
             const financialResults = searchResults[1].value.results as ResearchResult[];
-            research.financials = financialResults
-              .map((r: ResearchResult) => r.content?.substring(0, 300))
-              .filter((snippet): snippet is string => Boolean(snippet))
-              .join(' ') || '';
+            research.financials =
+              financialResults
+                .map((r: ResearchResult) => r.content?.substring(0, 300))
+                .filter((snippet): snippet is string => Boolean(snippet))
+                .join(' ') || '';
             financialResults.forEach((r: ResearchResult) => sources.push(r.url));
           } else {
             research.financials = '';
@@ -576,10 +594,11 @@ export class ExaCompanyResearchTool extends BaseTool<typeof ExaCompanyResearchSc
           // Process products results
           if (searchResults[2].status === 'fulfilled') {
             const productResults = searchResults[2].value.results as ResearchResult[];
-            research.products = productResults
-              .map((r: ResearchResult) => r.content?.substring(0, 300))
-              .filter((snippet): snippet is string => Boolean(snippet))
-              .join(' ') || '';
+            research.products =
+              productResults
+                .map((r: ResearchResult) => r.content?.substring(0, 300))
+                .filter((snippet): snippet is string => Boolean(snippet))
+                .join(' ') || '';
             productResults.forEach((r: ResearchResult) => sources.push(r.url));
           } else {
             research.products = '';
@@ -588,10 +607,11 @@ export class ExaCompanyResearchTool extends BaseTool<typeof ExaCompanyResearchSc
           // Process news results
           if (searchResults[3].status === 'fulfilled') {
             const newsResults = searchResults[3].value.results as ResearchResult[];
-            research.news = newsResults
-              .map((r: ResearchResult) => r.content?.substring(0, 200))
-              .filter((snippet): snippet is string => Boolean(snippet))
-              .join(' ') || '';
+            research.news =
+              newsResults
+                .map((r: ResearchResult) => r.content?.substring(0, 200))
+                .filter((snippet): snippet is string => Boolean(snippet))
+                .join(' ') || '';
             newsResults.forEach((r: ResearchResult) => sources.push(r.url));
           } else {
             research.news = '';
@@ -611,7 +631,10 @@ export class ExaCompanyResearchTool extends BaseTool<typeof ExaCompanyResearchSc
             source: 'exa-company-research',
           };
         } catch (exaError) {
-          logger.warn('Exa company research failed, using basic approach:', toReadonlyRecord(exaError));
+          logger.warn(
+            'Exa company research failed, using basic approach:',
+            toReadonlyRecord(exaError)
+          );
         }
       }
 
@@ -619,7 +642,12 @@ export class ExaCompanyResearchTool extends BaseTool<typeof ExaCompanyResearchSc
       try {
         const basicResult = await basicWebSearch(`${params.company} company information`, 5);
 
-        interface BasicSearchResult { title: string; url: string; snippet: string; type: string }
+        interface BasicSearchResult {
+          title: string;
+          url: string;
+          snippet: string;
+          type: string;
+        }
 
         const sources: string[] = Array.isArray(basicResult.results)
           ? basicResult.results
@@ -697,12 +725,14 @@ export class MCPServerTool extends BaseTool<typeof MCPServerSchema.shape> {
     });
   }
 
-  public async execute(params: Readonly<{
-    action: string;
-    server?: string;
-    method?: string;
-    params?: Readonly<Record<string, unknown>>;
-  }>): Promise<{
+  public async execute(
+    params: Readonly<{
+      action: string;
+      server?: string;
+      method?: string;
+      params?: Readonly<Record<string, unknown>>;
+    }>
+  ): Promise<{
     success?: boolean;
     servers?: Array<{ name: string; status: string; description: string }>;
     server?: string;
@@ -775,4 +805,3 @@ export class MCPServerTool extends BaseTool<typeof MCPServerSchema.shape> {
     }
   }
 }
-

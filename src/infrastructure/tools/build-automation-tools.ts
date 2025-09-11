@@ -106,7 +106,12 @@ export class BuildAutomatorTool extends BaseTool<typeof BuildProjectSchema.shape
       return result;
     } catch (error) {
       let duration = 'failed';
-      if (typeof error === 'object' && error !== null && 'signal' in error && (error as { signal?: unknown }).signal === 'SIGTERM') {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'signal' in error &&
+        (error as { signal?: unknown }).signal === 'SIGTERM'
+      ) {
         duration = 'timed out';
       }
 
@@ -116,18 +121,22 @@ export class BuildAutomatorTool extends BaseTool<typeof BuildProjectSchema.shape
           : String(error);
 
       const stdout =
-        typeof error === 'object' && error !== null && 'stdout' in error && (error as { stdout?: unknown }).stdout
+        typeof error === 'object' &&
+        error !== null &&
+        'stdout' in error &&
+        (error as { stdout?: unknown }).stdout
           ? `STDOUT:\n${String((error as { stdout?: unknown }).stdout)}\n`
           : '';
 
       const stderr =
-        typeof error === 'object' && error !== null && 'stderr' in error && (error as { stderr?: unknown }).stderr
+        typeof error === 'object' &&
+        error !== null &&
+        'stderr' in error &&
+        (error as { stderr?: unknown }).stderr
           ? `STDERR:\n${String((error as { stderr?: unknown }).stderr)}\n`
           : '';
 
-      return (
-        `❌ Build ${duration}:\nError: ${message}\n${stdout}${stderr}`
-      );
+      return `❌ Build ${duration}:\nError: ${message}\n${stdout}${stderr}`;
     }
   }
 
@@ -146,9 +155,14 @@ export class BuildAutomatorTool extends BaseTool<typeof BuildProjectSchema.shape
     }
 
     // Check package.json scripts
-    const scripts = packageJson && typeof packageJson === 'object' && 'scripts' in packageJson && packageJson.scripts && typeof packageJson.scripts === 'object'
-      ? packageJson.scripts
-      : {};
+    const scripts =
+      packageJson &&
+      typeof packageJson === 'object' &&
+      'scripts' in packageJson &&
+      packageJson.scripts &&
+      typeof packageJson.scripts === 'object'
+        ? packageJson.scripts
+        : {};
 
     switch (buildTool) {
       case 'npm': {
@@ -355,10 +369,7 @@ export class PackageManagerTool extends BaseTool<typeof PackageManagerSchema.sha
         message = error;
       }
       return (
-        `❌ Package ${args.action} failed:\n` +
-        `Error: ${message}\n` +
-        `${stdout}` +
-        `${stderr}`
+        `❌ Package ${args.action} failed:\n` + `Error: ${message}\n` + `${stdout}` + `${stderr}`
       );
     }
   }
@@ -404,37 +415,38 @@ export class PackageManagerTool extends BaseTool<typeof PackageManagerSchema.sha
           break;
         default:
           // No action, or unknown action
-      switch (action) {
-        case 'install':
-          command += packages && packages.length > 0 ? ` add ${packages.join(' ')}` : ' install';
-          break;
-        case 'update':
-          command +=
-            packages && packages.length > 0 ? ` upgrade ${packages.join(' ')}` : ' upgrade';
-          break;
-        case 'remove':
-          command += ` remove ${packages?.join(' ') ?? ''}`;
-          break;
-        case 'list':
-          command += ' list';
-          break;
-        case 'audit':
-          command += ' audit';
-          break;
-        case 'outdated':
-          command += ' outdated';
-          break;
-        case 'init':
-          command += ' init';
-          if (force) command += ' -y';
-          break;
-        case 'publish':
-          command += ' publish';
-          break;
-        default:
-          // No action, or unknown action
-          break;
-      }
+          switch (action) {
+            case 'install':
+              command +=
+                packages && packages.length > 0 ? ` add ${packages.join(' ')}` : ' install';
+              break;
+            case 'update':
+              command +=
+                packages && packages.length > 0 ? ` upgrade ${packages.join(' ')}` : ' upgrade';
+              break;
+            case 'remove':
+              command += ` remove ${packages?.join(' ') ?? ''}`;
+              break;
+            case 'list':
+              command += ' list';
+              break;
+            case 'audit':
+              command += ' audit';
+              break;
+            case 'outdated':
+              command += ' outdated';
+              break;
+            case 'init':
+              command += ' init';
+              if (force) command += ' -y';
+              break;
+            case 'publish':
+              command += ' publish';
+              break;
+            default:
+              // No action, or unknown action
+              break;
+          }
           command += ' publish';
           break;
       }
@@ -456,7 +468,7 @@ export class PackageManagerTool extends BaseTool<typeof PackageManagerSchema.sha
       const [packageJsonRaw, lockfileExists] = await Promise.all([
         fs
           .readFile(packageJsonPath, 'utf-8')
-          .then((data) => JSON.parse(data) as unknown)
+          .then(data => JSON.parse(data) as unknown)
           .catch((): null => null),
         fs
           .access(lockfilePath)
@@ -464,19 +476,25 @@ export class PackageManagerTool extends BaseTool<typeof PackageManagerSchema.sha
           .catch(() => false),
       ]);
 
-      if (!packageJsonRaw || typeof packageJsonRaw !== 'object' || Array.isArray(packageJsonRaw)) return null;
+      if (!packageJsonRaw || typeof packageJsonRaw !== 'object' || Array.isArray(packageJsonRaw))
+        return null;
 
-      const packageJson = packageJsonRaw as { dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
+      const packageJson = packageJsonRaw as {
+        dependencies?: Record<string, unknown>;
+        devDependencies?: Record<string, unknown>;
+      };
 
       let analysis = '';
 
       // Count dependencies
-      const deps = packageJson.dependencies && typeof packageJson.dependencies === 'object'
-        ? Object.keys(packageJson.dependencies).length
-        : 0;
-      const devDeps = packageJson.devDependencies && typeof packageJson.devDependencies === 'object'
-        ? Object.keys(packageJson.devDependencies).length
-        : 0;
+      const deps =
+        packageJson.dependencies && typeof packageJson.dependencies === 'object'
+          ? Object.keys(packageJson.dependencies).length
+          : 0;
+      const devDeps =
+        packageJson.devDependencies && typeof packageJson.devDependencies === 'object'
+          ? Object.keys(packageJson.devDependencies).length
+          : 0;
 
       analysis += `Dependencies: ${deps} production, ${devDeps} development\n`;
 
@@ -609,12 +627,7 @@ export class DeploymentTool extends BaseTool<typeof DeploySchema.shape> {
           stderr = `STDERR:\n${String((error as { stderr?: unknown }).stderr)}\n`;
         }
       }
-      return (
-        `❌ Deployment failed:\n` +
-        `Error: ${message}\n` +
-        `${stdout}` +
-        `${stderr}`
-      );
+      return `❌ Deployment failed:\n` + `Error: ${message}\n` + `${stdout}` + `${stderr}`;
     }
   }
 

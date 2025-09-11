@@ -23,12 +23,18 @@ export class ReasoningStepType {
   private constructor(private readonly _value: (typeof ReasoningStepType.VALID_TYPES)[number]) {}
 
   public static create(value: string): ReasoningStepType {
-    if (!this.VALID_TYPES.includes(value as "thought" | "action" | "observation" | "conclusion" | "error")) {
+    if (
+      !this.VALID_TYPES.includes(
+        value as 'thought' | 'action' | 'observation' | 'conclusion' | 'error'
+      )
+    ) {
       throw new Error(
         `Invalid reasoning step type: ${value}. Must be one of: ${this.VALID_TYPES.join(', ')}`
       );
     }
-    return new ReasoningStepType(value as "thought" | "action" | "observation" | "conclusion" | "error");
+    return new ReasoningStepType(
+      value as 'thought' | 'action' | 'observation' | 'conclusion' | 'error'
+    );
   }
 
   static thought(): ReasoningStepType {

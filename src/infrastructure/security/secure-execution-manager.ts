@@ -113,7 +113,7 @@ export class SecureExecutionManager {
   /**
    * Initialize the secure execution manager
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     try {
       await this.e2bService.initialize();
       this.isInitialized = true;
@@ -125,7 +125,10 @@ export class SecureExecutionManager {
         logger.info('✅ All code execution will be sandboxed via E2B');
       }
     } catch (error) {
-      logger.error('❌ Failed to initialize Secure Execution Manager:', error);
+      logger.error(
+        '❌ Failed to initialize Secure Execution Manager:',
+        error instanceof Error ? error : new Error(String(error))
+      );
 
       if (this.config.enforceE2BOnly) {
         throw new Error(
@@ -140,7 +143,7 @@ export class SecureExecutionManager {
   /**
    * Execute code securely with comprehensive security validation
    */
-  async executeSecurely(request: ExecutionRequest): Promise<ExecutionResult> {
+  public async executeSecurely(request: Readonly<ExecutionRequest>): Promise<ExecutionResult> {
     const startTime = Date.now();
 
     try {
@@ -165,7 +168,7 @@ export class SecureExecutionManager {
           `Security validation failed: ${securityValidation.reason}`,
           startTime,
           request.sessionId,
-          [securityValidation.reason || 'Security validation failed']
+          [securityValidation.reason ?? 'Security validation failed']
         );
       }
 
@@ -182,14 +185,17 @@ export class SecureExecutionManager {
         request.sessionId
       );
     } catch (error) {
-      logger.error('❌ Secure execution failed:', error);
+      logger.error(
+        '❌ Secure execution failed:',
+        error instanceof Error ? error : new Error(String(error))
+      );
 
       return {
         success: false,
         stderr: `Secure execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         exitCode: 1,
         executionTime: Date.now() - startTime,
-        sessionId: request.sessionId || 'unknown',
+        sessionId: request.sessionId ?? 'unknown',
         backend: 'error',
       };
     }
@@ -199,11 +205,11 @@ export class SecureExecutionManager {
    * Execute code via E2B sandbox
    */
   private async executeViaE2B(
-    request: ExecutionRequest,
+    request: Readonly<ExecutionRequest>,
     startTime: number
   ): Promise<ExecutionResult> {
     try {
-      const sessionId = request.sessionId || this.generateSessionId();
+      const sessionId = request.sessionId ?? this.generateSessionId();
 
       // Prepare secure execution environment
       const sanitizedRequest = this.sanitizeExecutionRequest(request);
@@ -212,7 +218,7 @@ export class SecureExecutionManager {
       const result = await this.e2bService.executeCode(
         sessionId,
         sanitizedRequest.command,
-        sanitizedRequest.language || 'python'
+        sanitizedRequest.language ?? 'python'
       );
 
       logger.info(
@@ -229,14 +235,17 @@ export class SecureExecutionManager {
         backend: 'e2b',
       };
     } catch (error) {
-      logger.error('❌ E2B execution failed:', error);
+      logger.error(
+        '❌ E2B execution failed:',
+        error instanceof Error ? error : new Error(String(error))
+      );
 
       return {
         success: false,
         stderr: `E2B execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         exitCode: 1,
         executionTime: Date.now() - startTime,
-        sessionId: request.sessionId || 'unknown',
+        sessionId: request.sessionId ?? 'unknown',
         backend: 'error',
       };
     }
@@ -279,7 +288,7 @@ export class SecureExecutionManager {
 
       // Command allowlist validation (if enforcing allowlist)
       if (this.config.allowedCommands.length > 0) {
-        const firstWord = request.command.trim().split(/\s+/)[0];
+        const [firstWord] = request.command.trim().split(/\s+/);
         const isAllowed = this.config.allowedCommands.some(
           allowed => firstWord === allowed || firstWord.startsWith(`${allowed}.`)
         );
@@ -294,9 +303,9 @@ export class SecureExecutionManager {
       }
 
       // Use the advanced security validator
-      const validationResult = await this.securityValidator.validateCode({
+      const validationResult = this.securityValidator.validateCode({
         code: request.command,
-        language: request.language || 'javascript',
+        language: request.language ?? 'javascript',
         environment: typeof request.environment === 'string' ? request.environment : 'node18-safe',
       });
 
@@ -310,7 +319,10 @@ export class SecureExecutionManager {
 
       return { isValid: true };
     } catch (error) {
-      logger.error('Security validation error:', error);
+      logger.error(
+        'Security validation error:',
+        error instanceof Error ? error : new Error(String(error))
+      );
       return {
         isValid: false,
         reason: 'Security validation system error',
@@ -450,8 +462,8 @@ export class SecureExecutionManager {
   /**
    * Get execution statistics for monitoring
    */
-  getStats(): {
-    e2bService: any;
+  public getStats(): {
+    e2bService: ReturnType<E2BService['getStats']>;
     config: SecureExecutionConfig;
     isInitialized: boolean;
   } {
@@ -465,8 +477,8 @@ export class SecureExecutionManager {
   /**
    * Shutdown and cleanup resources
    */
-  async shutdown(): Promise<void> {
-    await this.e2bService.shutdown();
+  public shutdown(): void {
+    this.e2bService.shutdown();
     this.isInitialized = false;
     logger.info('🔒 Secure Execution Manager shut down');
   }

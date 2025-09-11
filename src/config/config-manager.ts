@@ -77,7 +77,8 @@ export class ConfigManager {
           'http://localhost:11434',
         name: unified.model.defaultModel,
         timeout: unified.model.timeout ?? parseInt(process.env.REQUEST_TIMEOUT ?? '30000', 10),
-        maxTokens: unified.model.maxTokens ?? parseInt(process.env.MODEL_MAX_TOKENS ?? '131072', 10),
+        maxTokens:
+          unified.model.maxTokens ?? parseInt(process.env.MODEL_MAX_TOKENS ?? '131072', 10),
         temperature:
           unified.model.temperature ?? parseFloat(process.env.MODEL_TEMPERATURE ?? '0.7'),
       },
@@ -129,7 +130,10 @@ export class ConfigManager {
       models: string[];
     }[]
   ): Record<string, { provider: string; endpoint: string; enabled: boolean; models: string[] }> {
-    const result: Record<string, { provider: string; endpoint: string; enabled: boolean; models: string[] }> = {};
+    const result: Record<
+      string,
+      { provider: string; endpoint: string; enabled: boolean; models: string[] }
+    > = {};
 
     for (const provider of providers) {
       if (!provider.name) {

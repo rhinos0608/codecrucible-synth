@@ -1,6 +1,7 @@
 import { ModelRequest, ModelResponse } from '../../../domain/interfaces/model-client.js';
 import { HuggingFaceProvider } from '../../../providers/hybrid/huggingface-provider.js';
 import { logger } from '../../../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined } from '../../../utils/type-guards.js';
 import { ProviderAdapter } from './provider-adapter.js';
 
 export class HuggingFaceAdapter implements ProviderAdapter {
@@ -43,7 +44,7 @@ export class HuggingFaceAdapter implements ProviderAdapter {
         finishReason: providerResponse.metadata?.finishReason || 'stop',
       };
     } catch (error) {
-      logger.error('HuggingFaceAdapter request failed:', error);
+      logger.error('HuggingFaceAdapter request failed:', toErrorOrUndefined(error));
       throw new Error(
         `HuggingFace request failed: ${error instanceof Error ? error.message : String(error)}`
       );

@@ -9,6 +9,7 @@
 import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 import { responseCache } from './response-cache-manager.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import * as crypto from 'crypto';
 
 interface BatchableRequest {
@@ -354,7 +355,7 @@ export class IntelligentRequestBatcher {
         efficiency: `${((results.filter(r => r.success).length / group.requests.length) * 100).toFixed(1)}%`,
       });
     } catch (error) {
-      logger.error(`❌ Batch processing failed: ${batchKey}`, error);
+      logger.error(`❌ Batch processing failed: ${batchKey}`, toErrorOrUndefined(error));
 
       // Fallback: process requests individually
       for (const request of group.requests) {
@@ -375,7 +376,7 @@ export class IntelligentRequestBatcher {
 
     let provider = null;
 
-    // In test environment, use mock provider
+    // Resolve concrete provider for production execution
     if (
       process.env.NODE_ENV !== 'test' &&
       requests[0].provider &&
@@ -384,10 +385,38 @@ export class IntelligentRequestBatcher {
     ) {
       try {
         // Import provider dynamically to avoid circular dependencies
-        const { createProvider } = await import(`../../providers/${requests[0].provider}.js`);
-        provider = createProvider({ model: requests[0].model });
+        const providerName = requests[0].provider;
+        let providerModule;
+
+        // Try different import paths based on provider name
+        if (providerName === 'ollama') {
+          providerModule = await import('../../providers/hybrid/ollama-provider.js');
+          provider = new providerModule.OllamaProvider({
+            endpoint: 'http://localhost:11434',
+            defaultModel: requests[0].model || 'llama3.1:8b',
+            timeout: 60000,
+            maxRetries: 2,
+          });
+        } else if (providerName === 'lm-studio') {
+          providerModule = await import('../../providers/hybrid/lm-studio-provider.js');
+          provider = new providerModule.LMStudioProvider({
+            endpoint: 'ws://localhost:8080',
+            defaultModel: requests[0].model || 'local-model',
+            timeout: 60000,
+            maxRetries: 2,
+          });
+        } else {
+          // Fallback to old import pattern
+          const { createProvider } = await import(`../../providers/${providerName}.js`);
+          provider = createProvider({ model: requests[0].model });
+        }
       } catch (error) {
-        logger.warn('Failed to import provider, using mock', { provider: requests[0].provider });
+        // Surface provider resolution errors rather than masking with mocks
+        logger.error('Failed to import concrete provider', {
+          provider: requests[0].provider,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error instanceof Error ? error : new Error(String(error));
       }
     }
 
@@ -421,28 +450,16 @@ export class IntelligentRequestBatcher {
           // Make actual request
           let result;
 
-          if (provider) {
-            // Use actual provider
-            result = await provider.generate({
-              prompt: request.prompt,
-              tools: request.tools,
-              ...request.options,
-            });
-          } else {
-            // Use mock provider for tests
-            const processingTime = 50 + Math.random() * 100;
-            await new Promise(resolve => setTimeout(resolve, processingTime));
-
-            result = {
-              content: `Mock batch response for: ${request.prompt.substring(0, 50)}...`,
-              usage: {
-                prompt_tokens: Math.floor(request.prompt.length / 4),
-                completion_tokens: Math.floor(Math.random() * 200 + 50),
-                total_tokens:
-                  Math.floor(request.prompt.length / 4) + Math.floor(Math.random() * 200 + 50),
-              },
-            };
+          if (!provider) {
+            throw new Error('No concrete provider available for batch execution');
           }
+
+          // Use actual provider
+          result = await provider.generate({
+            prompt: request.prompt,
+            tools: request.tools,
+            ...request.options,
+          });
 
           return { success: true, data: result };
         } catch (error: any) {
@@ -493,16 +510,47 @@ export class IntelligentRequestBatcher {
         };
       } else {
         // Production environment - use actual provider
-        const { createProvider } = await import(`../../providers/${request.provider}.js`);
-        const provider = createProvider({
-          model: request.model,
-          ...request.options,
-        });
+        // Align with batch path: handle known providers explicitly
+        const providerName = request.provider;
+        let provider: any = null;
+
+        try {
+          if (providerName === 'ollama') {
+            const providerModule = await import('../../providers/hybrid/ollama-provider.js');
+            provider = new (providerModule as any).OllamaProvider({
+              endpoint: 'http://localhost:11434',
+              defaultModel: request.model || 'llama3.1:8b',
+              timeout: 60000,
+              maxRetries: 2,
+            });
+          } else if (providerName === 'lm-studio') {
+            const providerModule = await import('../../providers/hybrid/lm-studio-provider.js');
+            provider = new (providerModule as any).LMStudioProvider({
+              endpoint: 'ws://localhost:8080',
+              defaultModel: request.model || 'local-model',
+              timeout: 60000,
+              maxRetries: 2,
+            });
+          } else {
+            // Fallback to legacy import contract if available
+            const { createProvider } = await import(`../../providers/${providerName}.js`);
+            provider = createProvider({ model: request.model, ...(request.options || {}) });
+          }
+        } catch (e) {
+          logger.warn('Failed to import concrete provider, using mock', {
+            provider: providerName,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+
+        if (!provider) {
+          throw new Error('No concrete provider available for single request execution');
+        }
 
         result = await provider.generate({
           prompt: request.prompt,
           tools: request.tools,
-          ...request.options,
+          ...(request.options || {}),
         });
       }
 

@@ -105,10 +105,10 @@ export class EnterpriseTestRunner extends EventEmitter {
   /**
    * Run all test suites
    */
-  async runAll(): Promise<TestResult[]> {
+  public async runAll(): Promise<TestResult[]> {
     this.emit('run:start', { suites: this.suites.size });
 
-    for (const [suiteName, suite] of this.suites) {
+    for (const [_suiteName, suite] of this.suites) {
       await this.runSuite(suite);
     }
 
@@ -172,7 +172,7 @@ export class EnterpriseTestRunner extends EventEmitter {
       assertionCount = assert.count;
 
       // Run test with timeout
-      await this.runWithTimeout(test.fn, test.timeout!);
+      await this.runWithTimeout(test.fn, typeof test.timeout === 'number' ? test.timeout : 30000);
 
       passed = true;
     } catch (err) {
@@ -360,14 +360,25 @@ export class TestFixtures {
   /**
    * Clean up fixtures
    */
-  async cleanup(): Promise<void> {
-    for (const [name, fixture] of this.fixtures) {
-      if (typeof (fixture as any).cleanup === 'function') {
-        await (fixture as any).cleanup();
+  public async cleanup(): Promise<void> {
+    for (const [_name, fixture] of this.fixtures) {
+      if (isCleanable(fixture)) {
+        await fixture.cleanup();
       }
     }
     this.fixtures.clear();
   }
+}
+
+/**
+ * Type guard for objects with a cleanup method
+ */
+function isCleanable(obj: unknown): obj is { cleanup: () => Promise<void> | void } {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof (obj as { cleanup?: unknown }).cleanup === 'function'
+  );
 }
 
 // Mock utilities
@@ -375,27 +386,41 @@ export class MockFactory {
   /**
    * Create a mock function
    */
-  static fn<T extends (...args: any[]) => any>(): jest.MockedFunction<T> {
-    const calls: any[][] = [];
-    const results: any[] = [];
+  public static fn<T extends (...args: readonly unknown[]) => unknown>(): {
+    (...args: readonly unknown[]): unknown;
+    mockReturnValue: (value: unknown) => typeof mock;
+    mockResolvedValue: (value: unknown) => typeof mock;
+    mockRejectedValue: (error: unknown) => typeof mock;
+    calls: readonly unknown[][];
+    results: readonly unknown[];
+  } {
+    const calls: unknown[][] = [];
+    const results: unknown[] = [];
 
-    const mock = ((...args: any[]) => {
-      calls.push(args);
+    const mock = ((...args: readonly unknown[]): unknown => {
+      calls.push([...args]);
       const result = results[calls.length - 1];
       return result;
-    }) as any;
+    }) as {
+      (...args: readonly unknown[]): unknown;
+      mockReturnValue: (value: unknown) => typeof mock;
+      mockResolvedValue: (value: unknown) => typeof mock;
+      mockRejectedValue: (error: unknown) => typeof mock;
+      calls: readonly unknown[][];
+      results: readonly unknown[];
+    };
 
-    mock.mockReturnValue = (value: any) => {
+    mock.mockReturnValue = function (value: unknown): typeof mock {
       results.push(value);
       return mock;
     };
 
-    mock.mockResolvedValue = (value: any) => {
+    mock.mockResolvedValue = function (value: unknown): typeof mock {
       results.push(Promise.resolve(value));
       return mock;
     };
 
-    mock.mockRejectedValue = (error: any) => {
+    mock.mockRejectedValue = function (error: unknown): typeof mock {
       results.push(Promise.reject(error));
       return mock;
     };
@@ -409,7 +434,7 @@ export class MockFactory {
   /**
    * Create a mock object
    */
-  static object<T>(partial?: Partial<T>): T {
+  public static object<T>(partial?: Partial<T>): T {
     return {
       ...partial,
     } as T;

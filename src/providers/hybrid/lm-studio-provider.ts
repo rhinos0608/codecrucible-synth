@@ -5,15 +5,12 @@
 
 import { logger } from '../../infrastructure/logging/logger.js';
 import {
+  LLMCapabilities,
   LLMProvider,
   LLMResponse,
-  LLMCapabilities,
   LLMStatus,
 } from '../../domain/interfaces/llm-interfaces.js';
-import {
-  generateSystemPrompt,
-  generateContextualSystemPrompt,
-} from '../../domain/prompts/system-prompt.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface LMStudioConfig {
   endpoint: string;
@@ -119,16 +116,16 @@ export interface LMStudioPayload {
 }
 
 export class LMStudioProvider implements LLMProvider {
-  readonly name = 'lm-studio';
-  readonly endpoint: string;
-  private config: LMStudioConfig;
+  public readonly name = 'lm-studio';
+  public readonly endpoint: string;
+  private readonly config: LMStudioConfig;
   private currentLoad = 0;
   private lastError?: string;
   private responseTimeHistory: number[] = [];
   private errorCount = 0;
   private requestCount = 0;
 
-  constructor(config: LMStudioConfig) {
+  public constructor(config: Readonly<LMStudioConfig>) {
     this.config = config;
     this.endpoint = config.endpoint;
   }
@@ -136,10 +133,12 @@ export class LMStudioProvider implements LLMProvider {
   /**
    * Check if LM Studio is available and responding
    */
-  async isAvailable(): Promise<boolean> {
+  public async isAvailable(): Promise<boolean> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 5000);
 
       const response = await fetch(`${this.endpoint}/v1/models`, {
         method: 'GET',
@@ -149,7 +148,7 @@ export class LMStudioProvider implements LLMProvider {
       clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {
-      logger.debug('LM Studio availability check failed:', error);
+      logger.debug('LM Studio availability check failed:', toReadonlyRecord(error));
       return false;
     }
   }
@@ -157,7 +156,10 @@ export class LMStudioProvider implements LLMProvider {
   /**
    * Generate code using LM Studio
    */
-  async generateCode(prompt: string, options: LMStudioOptions = {}): Promise<LLMResponse> {
+  public async generateCode(
+    prompt: Readonly<string>,
+    options: Readonly<LMStudioOptions> = {}
+  ): Promise<LLMResponse> {
     const startTime = Date.now();
     this.currentLoad++;
     this.requestCount++;
@@ -220,7 +222,7 @@ export class LMStudioProvider implements LLMProvider {
    * Make a request with full OpenAI-compatible API support including tools
    * This is the preferred method for tool-enabled requests
    */
-  async request(requestOptions: unknown): Promise<unknown> {
+  public async request(requestOptions: unknown): Promise<unknown> {
     // Type guard to ensure request is LMStudioRequest
     if (!requestOptions || typeof requestOptions !== 'object') {
       throw new Error('Invalid request: expected an object');
@@ -233,13 +235,13 @@ export class LMStudioProvider implements LLMProvider {
     try {
       // Build messages from either messages array or prompt
       let messages: LMStudioMessage[];
-      if (typedRequest.messages && Array.isArray(typedRequest.messages)) {
-        messages = typedRequest.messages;
+      if (Array.isArray(typedRequest.messages)) {
+        messages = [...typedRequest.messages];
       } else if (typedRequest.prompt) {
         messages = [
           {
             role: 'system' as const,
-            content: this.getSystemPrompt(typedRequest.taskType || 'default'),
+            content: this.getSystemPrompt(typedRequest.taskType ?? 'default'),
           },
           {
             role: 'user' as const,
@@ -251,29 +253,26 @@ export class LMStudioProvider implements LLMProvider {
       }
 
       const payload: LMStudioPayload = {
-        model: typedRequest.model || this.config.defaultModel,
-        messages: messages,
+        model: typedRequest.model ?? this.config.defaultModel,
+        messages,
         temperature:
-          typedRequest.temperature ?? this.getTemperature(typedRequest.taskType || 'default'),
-        max_tokens:
-          typedRequest.maxTokens ?? this.getMaxTokens(typedRequest.taskType || 'default'),
+          typedRequest.temperature ?? this.getTemperature(typedRequest.taskType ?? 'default'),
+        max_tokens: typedRequest.maxTokens ?? this.getMaxTokens(typedRequest.taskType ?? 'default'),
         stream: false,
       };
 
-      // FIXED: Add tools to payload if provided
-      if (
-        typedRequest.tools &&
-        Array.isArray(typedRequest.tools) &&
-        typedRequest.tools.length > 0
-      ) {
+      // Add tools to payload if provided
+      if (Array.isArray(typedRequest.tools) && typedRequest.tools.length > 0) {
         payload.tools = typedRequest.tools;
-        payload.tool_choice = typedRequest.tool_choice || 'auto';
+        payload.tool_choice = typedRequest.tool_choice ?? 'auto';
       }
 
       const controller = new AbortController();
       const timeout = setTimeout(
-        () => controller.abort(),
-        typedRequest.timeout || this.config.timeout || 60000
+        () => {
+          controller.abort();
+        },
+        typedRequest.timeout ?? this.config.timeout ?? 60000
       );
 
       try {
@@ -290,49 +289,49 @@ export class LMStudioProvider implements LLMProvider {
           throw new Error(`LM Studio API error: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = (await response.json()) as unknown as LMStudioResponse;
 
-        if (!data.choices || data.choices.length === 0) {
+        if (!Array.isArray(data.choices) || data.choices.length === 0) {
           throw new Error('No response choices returned from LM Studio');
         }
 
-        const choice = data.choices[0];
+        const [choice] = data.choices;
         const responseTime = Date.now() - startTime;
 
-        // FIXED: Extract tool calls if present with correct structure
-        let toolCalls = undefined;
-        if (choice.message?.tool_calls && Array.isArray(choice.message.tool_calls)) {
-          toolCalls = choice.message.tool_calls.map((tc: LMStudioToolCall) => ({
+        // Extract tool calls if present with correct structure
+        let toolCalls: LMStudioToolCall[] | undefined = undefined;
+        if (Array.isArray(choice.message.tool_calls)) {
+          toolCalls = choice.message.tool_calls.map((tc: Readonly<LMStudioToolCall>) => ({
             id: tc.id,
-            type: tc.type || 'function',
+            type: 'function',
             function: {
-              name: tc.function?.name || '',
-              arguments: tc.function?.arguments || '{}',
+              name: tc.function.name,
+              arguments: tc.function.arguments,
             },
           }));
         }
 
         // Calculate confidence based on response quality indicators
         const confidence = this.calculateConfidence(
-          choice.message?.content || '',
+          String(choice.message.content ?? ''),
           responseTime,
           typedRequest.taskType
         );
 
         return {
-          id: data.id || `lms_${Date.now()}`,
-          content: choice.message?.content || '',
+          id: data.id ?? `lms_${Date.now()}`,
+          content: String(choice.message.content ?? ''),
           confidence,
           responseTime,
-          model: data.model || this.config.defaultModel,
+          model: data.model ?? this.config.defaultModel,
           provider: this.name,
-          toolCalls: toolCalls,
+          toolCalls,
           usage: {
-            promptTokens: data.usage?.prompt_tokens || 0,
-            completionTokens: data.usage?.completion_tokens || 0,
-            totalTokens: data.usage?.total_tokens || 0,
+            promptTokens: data.usage?.prompt_tokens ?? 0,
+            completionTokens: data.usage?.completion_tokens ?? 0,
+            totalTokens: data.usage?.total_tokens ?? 0,
           },
-          finishReason: choice.finish_reason || 'stop',
+          finishReason: choice.finish_reason ?? 'stop',
           metadata: {
             tokens: data.usage?.total_tokens,
             promptTokens: data.usage?.prompt_tokens,
@@ -374,7 +373,9 @@ export class LMStudioProvider implements LLMProvider {
     };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeout || this.config.timeout);
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, options.timeout ?? this.config.timeout);
 
     try {
       const response = await fetch(`${this.endpoint}/v1/chat/completions`, {
@@ -390,9 +391,9 @@ export class LMStudioProvider implements LLMProvider {
         throw new Error(`LM Studio API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as LMStudioResponse;
 
-      if (!data.choices || data.choices.length === 0) {
+      if (!Array.isArray(data.choices) || data.choices.length === 0) {
         throw new Error('No response choices returned from LM Studio');
       }
 
@@ -495,7 +496,7 @@ export class LMStudioProvider implements LLMProvider {
   /**
    * Get provider capabilities
    */
-  getCapabilities(): LLMCapabilities {
+  public getCapabilities(): LLMCapabilities {
     return {
       strengths: ['speed', 'templates', 'formatting', 'boilerplate', 'quick-edits'],
       optimalFor: [
@@ -514,7 +515,7 @@ export class LMStudioProvider implements LLMProvider {
   /**
    * Get current provider status
    */
-  async getStatus(): Promise<LLMStatus> {
+  public async getStatus(): Promise<LLMStatus> {
     const isAvailable = await this.isAvailable();
     const avgResponseTime =
       this.responseTimeHistory.length > 0
@@ -537,7 +538,7 @@ export class LMStudioProvider implements LLMProvider {
   /**
    * Reset statistics (for testing or maintenance)
    */
-  resetStats(): void {
+  public resetStats(): void {
     this.responseTimeHistory = [];
     this.errorCount = 0;
     this.requestCount = 0;

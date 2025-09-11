@@ -1,4 +1,4 @@
-import { VoiceDefinition } from './archetype-definitions.js';
+import type { VoiceDefinition } from './archetype-definitions.js';
 
 /**
  * Select appropriate voices for a task.

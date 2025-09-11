@@ -13,14 +13,14 @@ export interface JsonArray extends Array<JsonValue> {}
 
 // Model client types replacing 'any'
 export interface ModelClient {
-  generateVoiceResponse(
+  generateVoiceResponse: (
     prompt: string,
     voiceId: string,
-    options: ModelOptions
-  ): Promise<ModelResponse>;
-  processRequest(request: ModelRequest): Promise<ModelResponse>;
-  generateResponse(prompt: string, options?: ModelOptions): Promise<ModelResponse>;
-  getCapabilities(): ModelCapabilities;
+    options: Readonly<ModelOptions>
+  ) => Promise<ModelResponse>;
+  processRequest: (request: Readonly<ModelRequest>) => Promise<ModelResponse>;
+  generateResponse: (prompt: string, options?: Readonly<ModelOptions>) => Promise<ModelResponse>;
+  getCapabilities: () => ModelCapabilities;
 }
 
 export interface ModelOptions {
@@ -40,7 +40,7 @@ export interface ModelRequest {
   systemPrompt?: string;
   context?: string[];
   stream?: boolean;
-  onStreamingToken?: (token: string, metadata?: any) => void;
+  onStreamingToken?: (token: string, metadata?: unknown) => void;
 }
 
 export interface ModelResponse {
@@ -191,11 +191,11 @@ export interface FeatureFlags {
 
 // Repository pattern types
 export interface Repository<T> {
-  findById(id: string): Promise<T | null>;
-  findAll(filter?: Partial<T>): Promise<T[]>;
-  create(data: Omit<T, 'id'>): Promise<T>;
-  update(id: string, data: Partial<T>): Promise<T>;
-  delete(id: string): Promise<boolean>;
+  findById: (id: string) => Promise<T | null>;
+  findAll: (filter?: Partial<T>) => Promise<T[]>;
+  create: (data: Omit<T, 'id'>) => Promise<T>;
+  update: (id: string, data: Partial<T>) => Promise<T>;
+  delete: (id: string) => Promise<boolean>;
 }
 
 // Event types

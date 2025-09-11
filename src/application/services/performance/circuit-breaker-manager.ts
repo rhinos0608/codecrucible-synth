@@ -9,7 +9,7 @@ import type {
   CircuitBreakerState,
   CircuitBreakerConfig,
   ICircuitBreakerManager,
-  CircuitBreakerEvent
+  CircuitBreakerEvent,
 } from './performance-types.js';
 
 const logger = createLogger('CircuitBreakerManager');
@@ -26,20 +26,20 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
   private circuitBreakers: Map<string, CircuitBreakerState> = new Map();
   private metrics: Map<string, CircuitBreakerMetrics> = new Map();
   private checkInterval?: NodeJS.Timeout;
-  
+
   private readonly DEFAULT_CONFIG: CircuitBreakerConfig = {
     threshold: 5,
-    timeout: 60000,       // 1 minute
-    resetTimeout: 30000   // 30 seconds
+    timeout: 60000, // 1 minute
+    resetTimeout: 30000, // 30 seconds
   };
 
   constructor(private configs: Record<string, CircuitBreakerConfig> = {}) {
     super();
     this.initializeDefaultBreakers();
     this.startPeriodicChecks();
-    
-    logger.info('CircuitBreakerManager initialized', { 
-      breakerCount: this.circuitBreakers.size 
+
+    logger.info('CircuitBreakerManager initialized', {
+      breakerCount: this.circuitBreakers.size,
     });
   }
 
@@ -55,7 +55,7 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
       'external-api',
       'model-client',
       'cache-operations',
-      'database-operations'
+      'database-operations',
     ];
 
     defaultBreakers.forEach(name => {
@@ -75,7 +75,7 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
       successes: 0,
       threshold: config.threshold,
       timeout: config.timeout,
-      resetTimeout: config.resetTimeout
+      resetTimeout: config.resetTimeout,
     };
 
     const metrics: CircuitBreakerMetrics = {
@@ -83,7 +83,7 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
       successfulRequests: 0,
       failedRequests: 0,
       averageResponseTime: 0,
-      lastExecutionTime: Date.now()
+      lastExecutionTime: Date.now(),
     };
 
     this.circuitBreakers.set(name, breaker);
@@ -111,7 +111,7 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
    */
   public async executeWithBreaker<T>(name: string, operation: () => Promise<T>): Promise<T> {
     let breaker = this.circuitBreakers.get(name);
-    
+
     // Create breaker if it doesn't exist
     if (!breaker) {
       this.createCircuitBreaker(name, this.DEFAULT_CONFIG);
@@ -131,31 +131,30 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
     try {
       // Execute the operation
       const result = await operation();
-      
+
       // Record success
       const responseTime = Date.now() - startTime;
       this.recordSuccess(name, responseTime);
-      
-      logger.debug('Circuit breaker operation succeeded', { 
-        name, 
-        responseTime,
-        state: breaker.state 
-      });
-      
-      return result;
 
+      logger.debug('Circuit breaker operation succeeded', {
+        name,
+        responseTime,
+        state: breaker.state,
+      });
+
+      return result;
     } catch (error) {
       // Record failure
       const responseTime = Date.now() - startTime;
       this.recordFailure(name, responseTime);
-      
-      logger.warn('Circuit breaker operation failed', { 
-        name, 
+
+      logger.warn('Circuit breaker operation failed', {
+        name,
         error: error instanceof Error ? error.message : String(error),
         responseTime,
-        failures: breaker.failures
+        failures: breaker.failures,
       });
-      
+
       throw error;
     }
   }
@@ -172,7 +171,7 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
 
       case 'OPEN':
         // Check if timeout period has passed
-        if (breaker.lastFailure && (now - breaker.lastFailure) >= breaker.resetTimeout) {
+        if (breaker.lastFailure && now - breaker.lastFailure >= breaker.resetTimeout) {
           this.transitionTo(breaker, 'HALF_OPEN');
           return true;
         }
@@ -250,7 +249,7 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
       from: oldState,
       to: newState,
       failures: breaker.failures,
-      successes: breaker.successes
+      successes: breaker.successes,
     });
 
     // Emit state change event
@@ -261,10 +260,10 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
         name: breaker.name,
         oldState,
         newState,
-        reason: this.getTransitionReason(oldState, newState, breaker)
-      }
+        reason: this.getTransitionReason(oldState, newState, breaker),
+      },
     };
-    
+
     this.emit('state-change', event);
   }
 
@@ -304,7 +303,7 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
    */
   public async resetBreaker(name: string): Promise<void> {
     const breaker = this.circuitBreakers.get(name);
-    
+
     if (!breaker) {
       throw new Error(`Circuit breaker '${name}' not found`);
     }
@@ -325,10 +324,10 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
         name: breaker.name,
         oldState,
         newState: 'CLOSED',
-        reason: 'Manual reset'
-      }
+        reason: 'Manual reset',
+      },
     };
-    
+
     this.emit('state-change', event);
   }
 
@@ -337,7 +336,7 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
    */
   public async updateConfig(name: string, config: Partial<CircuitBreakerConfig>): Promise<void> {
     const breaker = this.circuitBreakers.get(name);
-    
+
     if (!breaker) {
       throw new Error(`Circuit breaker '${name}' not found`);
     }
@@ -370,14 +369,15 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
    */
   private performPeriodicChecks(): void {
     const now = Date.now();
-    
-    this.circuitBreakers.forEach((breaker) => {
+
+    this.circuitBreakers.forEach(breaker => {
       // Check for stale breakers (no activity for long time)
       const metrics = this.metrics.get(breaker.name);
-      if (metrics && (now - metrics.lastExecutionTime) > 300000) { // 5 minutes
-        logger.debug('Circuit breaker stale', { 
-          name: breaker.name, 
-          lastActivity: now - metrics.lastExecutionTime 
+      if (metrics && now - metrics.lastExecutionTime > 300000) {
+        // 5 minutes
+        logger.debug('Circuit breaker stale', {
+          name: breaker.name,
+          lastActivity: now - metrics.lastExecutionTime,
         });
       }
 
@@ -385,12 +385,15 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
       if (breaker.state === 'OPEN' && breaker.lastFailure) {
         const timeOpen = now - breaker.lastFailure;
         if (timeOpen > breaker.timeout) {
-          logger.info('Auto-resetting circuit breaker after timeout', { 
-            name: breaker.name, 
-            timeOpen 
+          logger.info('Auto-resetting circuit breaker after timeout', {
+            name: breaker.name,
+            timeOpen,
           });
           this.resetBreaker(breaker.name).catch(err => {
-            logger.error('Failed to auto-reset circuit breaker', { name: breaker.name, error: err });
+            logger.error('Failed to auto-reset circuit breaker', {
+              name: breaker.name,
+              error: err,
+            });
           });
         }
       }
@@ -428,16 +431,17 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
     const degraded: string[] = [];
     const unhealthy: string[] = [];
 
-    this.circuitBreakers.forEach((breaker) => {
+    this.circuitBreakers.forEach(breaker => {
       const metrics = this.metrics.get(breaker.name);
-      
+
       if (breaker.state === 'OPEN') {
         unhealthy.push(breaker.name);
       } else if (breaker.state === 'HALF_OPEN') {
         degraded.push(breaker.name);
       } else if (metrics && metrics.totalRequests > 0) {
         const errorRate = metrics.failedRequests / metrics.totalRequests;
-        if (errorRate > 0.1) { // 10% error rate
+        if (errorRate > 0.1) {
+          // 10% error rate
           degraded.push(breaker.name);
         } else {
           healthy.push(breaker.name);
@@ -451,7 +455,7 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
       healthy,
       degraded,
       unhealthy,
-      totalBreakers: this.circuitBreakers.size
+      totalBreakers: this.circuitBreakers.size,
     };
   }
 
@@ -463,11 +467,11 @@ export class CircuitBreakerManager extends EventEmitter implements ICircuitBreak
       clearInterval(this.checkInterval);
       this.checkInterval = undefined;
     }
-    
+
     this.circuitBreakers.clear();
     this.metrics.clear();
     this.removeAllListeners();
-    
+
     logger.info('CircuitBreakerManager destroyed');
   }
 }

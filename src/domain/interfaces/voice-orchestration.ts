@@ -62,7 +62,11 @@ export interface IVoiceOrchestrationService {
   /**
    * Generate single voice response (legacy compatibility method)
    */
-  generateSingleVoiceResponse: (voice: string, prompt: string, client?: unknown) => Promise<VoiceResponse>;
+  generateSingleVoiceResponse: (
+    voice: string,
+    prompt: string,
+    client?: unknown
+  ) => Promise<VoiceResponse>;
 
   /**
    * Get a voice response by name

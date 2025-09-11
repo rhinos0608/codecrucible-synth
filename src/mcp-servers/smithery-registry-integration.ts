@@ -5,6 +5,7 @@
 
 import { SmitheryRegistry } from '@smithery/registry';
 import { logger } from '../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../utils/type-guards.js';
 
 export interface SmitheryConfig {
   apiKey: string;
@@ -29,7 +30,7 @@ export interface SmitheryServer {
   tools: Array<{
     name: string;
     description: string;
-    inputSchema: any;
+    inputSchema: Record<string, unknown>;
   }>;
 }
 
@@ -191,16 +192,13 @@ export interface SmitheryServer {
  */
 export class SmitheryRegistryIntegration {
   /** Smithery registry client with bearer authentication and retry configuration */
-  private registry: SmitheryRegistry;
-
-  /** Configuration for API authentication and retry behavior */
-  private _config: SmitheryConfig;
+  private readonly registry: SmitheryRegistry;
 
   /**
    * Intelligent cache for server metadata to reduce API calls
    * Key: server qualified name, Value: server details with metadata
    */
-  private cachedServers: Map<string, SmitheryServer> = new Map();
+  private readonly cachedServers: Map<string, SmitheryServer> = new Map();
 
   /**
    * Creates a new SmitheryRegistryIntegration instance
@@ -237,13 +235,17 @@ export class SmitheryRegistryIntegration {
    * });
    * ```
    */
-  constructor(config: SmitheryConfig) {
+
+  // Add missing property
+  private readonly _config: Readonly<SmitheryConfig>;
+
+  public constructor(config: Readonly<SmitheryConfig>) {
     this._config = config;
 
     // Initialize Smithery registry with bearer authentication
     this.registry = new SmitheryRegistry({
       bearerAuth: config.apiKey,
-      retryConfig: config.retryConfig || {
+      retryConfig: config.retryConfig ?? {
         strategy: 'backoff',
         backoff: {
           initialInterval: 1000,
@@ -261,7 +263,7 @@ export class SmitheryRegistryIntegration {
   /**
    * Search for MCP servers in the Smithery registry
    */
-  async searchServers(query: string, limit: number = 10): Promise<SmitheryServer[]> {
+  public async searchServers(query: string, limit: number = 10): Promise<SmitheryServer[]> {
     try {
       logger.info(`Searching Smithery registry for: ${query}`);
 
@@ -271,34 +273,56 @@ export class SmitheryRegistryIntegration {
 
       const servers: SmitheryServer[] = [];
 
+      // Define an interface for the expected page structure
+      interface ServerPage {
+        result?: { servers?: unknown[] };
+        servers?: unknown[];
+      }
+
       // Process first page of results
-      for await (const page of result) {
+      for await (const pageRaw of result) {
         if (servers.length >= limit) break;
 
-        // Check if page has result property
-        const pageServers = (page as any).result?.servers || (page as any).servers || [];
+        const page = pageRaw as ServerPage;
+        const pageServers: unknown[] = page.result?.servers ?? page.servers ?? [];
 
-        for (const server of pageServers) {
+        for (const serverRaw of pageServers) {
           if (servers.length >= limit) break;
 
-          const serverDetails: SmitheryServer = {
-            qualifiedName: server.qualifiedName,
-            displayName: server.displayName,
-            description: server.description || 'No description available',
-            homepage: server.homepage || '',
-            useCount: server.useCount || 0,
-            tools: [], // Will be populated by getServerDetails
-          };
+          // Type guard for server object
+          if (
+            typeof serverRaw === 'object' &&
+            serverRaw !== null &&
+            'qualifiedName' in serverRaw &&
+            'displayName' in serverRaw
+          ) {
+            const server = serverRaw as {
+              qualifiedName: string;
+              displayName: string;
+              description?: string;
+              homepage?: string;
+              useCount?: number;
+            };
 
-          servers.push(serverDetails);
-          this.cachedServers.set(server.qualifiedName, serverDetails);
+            const serverDetails: SmitheryServer = {
+              qualifiedName: server.qualifiedName,
+              displayName: server.displayName,
+              description: server.description ?? 'No description available',
+              homepage: server.homepage ?? '',
+              useCount: server.useCount ?? 0,
+              tools: [], // Will be populated by getServerDetails
+            };
+
+            servers.push(serverDetails);
+            this.cachedServers.set(server.qualifiedName, serverDetails);
+          }
         }
       }
 
       logger.info(`Found ${servers.length} servers in Smithery registry`);
       return servers;
     } catch (error) {
-      logger.error('Error searching Smithery registry:', error);
+      logger.error('Error searching Smithery registry:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -306,32 +330,46 @@ export class SmitheryRegistryIntegration {
   /**
    * Get detailed information about a specific server
    */
-  async getServerDetails(qualifiedName: string): Promise<SmitheryServer | null> {
+  public async getServerDetails(qualifiedName: string): Promise<SmitheryServer | null> {
     try {
       // Check cache first
-      if (this.cachedServers.has(qualifiedName)) {
-        const cached = this.cachedServers.get(qualifiedName)!;
-        if (cached.tools.length > 0) {
-          return cached;
-        }
+      const cached = this.cachedServers.get(qualifiedName);
+      if (cached && cached.tools.length > 0) {
+        return cached;
       }
 
       logger.info(`Fetching details for server: ${qualifiedName}`);
 
-      const result = await this.registry.servers.get({
+      // Define an interface for the expected result structure
+      interface ToolResult {
+        name: string;
+        description?: string;
+        inputSchema?: Record<string, unknown>;
+      }
+
+      interface ServerResult {
+        qualifiedName: string;
+        displayName: string;
+        description?: string;
+        homepage?: string;
+        useCount?: number;
+        tools?: ToolResult[];
+      }
+
+      const result = (await this.registry.servers.get({
         qualifiedName,
-      });
+      })) as ServerResult;
 
       const serverDetails: SmitheryServer = {
         qualifiedName: result.qualifiedName,
         displayName: result.displayName,
-        description: (result as any).description || 'No description available',
-        homepage: (result as any).homepage || '',
-        useCount: (result as any).useCount || 0,
-        tools: (result.tools || []).map((tool: any) => ({
+        description: result.description ?? 'No description available',
+        homepage: result.homepage ?? '',
+        useCount: result.useCount ?? 0,
+        tools: (result.tools ?? []).map((tool: ToolResult) => ({
           name: tool.name,
-          description: tool.description || 'No description available',
-          inputSchema: tool.inputSchema || {},
+          description: tool.description ?? 'No description available',
+          inputSchema: tool.inputSchema ?? {},
         })),
       };
 
@@ -342,7 +380,7 @@ export class SmitheryRegistryIntegration {
 
       return serverDetails;
     } catch (error) {
-      logger.error(`Error getting server details for ${qualifiedName}:`, error);
+      logger.error(`Error getting server details for ${qualifiedName}:`, toErrorOrUndefined(error));
       return null;
     }
   }
@@ -350,35 +388,35 @@ export class SmitheryRegistryIntegration {
   /**
    * Get popular MCP servers from the registry
    */
-  async getPopularServers(limit: number = 20): Promise<SmitheryServer[]> {
+  public async getPopularServers(limit: number = 20): Promise<SmitheryServer[]> {
     return this.searchServers('is:verified', limit);
   }
 
   /**
    * Get servers by category or owner
    */
-  async getServersByOwner(owner: string, limit: number = 10): Promise<SmitheryServer[]> {
+  public async getServersByOwner(owner: string, limit: number = 10): Promise<SmitheryServer[]> {
     return this.searchServers(`owner:${owner}`, limit);
   }
 
   /**
    * Search for servers by tag or functionality
    */
-  async getServersByTag(tag: string, limit: number = 10): Promise<SmitheryServer[]> {
+  public async getServersByTag(tag: string, limit: number = 10): Promise<SmitheryServer[]> {
     return this.searchServers(`tag:${tag}`, limit);
   }
 
   /**
    * Get all cached servers
    */
-  getCachedServers(): SmitheryServer[] {
+  public getCachedServers(): SmitheryServer[] {
     return Array.from(this.cachedServers.values());
   }
 
   /**
    * Clear cache
    */
-  clearCache(): void {
+  public clearCache(): void {
     this.cachedServers.clear();
     logger.info('Smithery server cache cleared');
   }
@@ -386,16 +424,27 @@ export class SmitheryRegistryIntegration {
   /**
    * Health check for Smithery registry connection
    */
-  async healthCheck(): Promise<{ status: string; serversAvailable: number; error?: string }> {
+  public async healthCheck(): Promise<{
+    status: string;
+    serversAvailable: number;
+    error?: string;
+  }> {
     try {
+      // Define a type for the page structure
+      interface ServerListPage {
+        result?: { servers?: unknown[] };
+        servers?: unknown[];
+      }
+
       // Try to list a few servers to test connectivity
       const result = await this.registry.servers.list({
         q: 'is:verified',
       });
 
       let count = 0;
-      for await (const page of result) {
-        const pageServers = (page as any).result?.servers || (page as any).servers || [];
+      for await (const pageRaw of result) {
+        const page: ServerListPage = pageRaw as ServerListPage;
+        const pageServers: unknown[] = page.result?.servers || page.servers || [];
         count += pageServers.length;
         break; // Just check first page
       }
@@ -405,7 +454,7 @@ export class SmitheryRegistryIntegration {
         serversAvailable: count,
       };
     } catch (error) {
-      logger.error('Smithery registry health check failed:', error);
+      logger.error('Smithery registry health check failed:', toErrorOrUndefined(error));
       return {
         status: 'error',
         serversAvailable: 0,

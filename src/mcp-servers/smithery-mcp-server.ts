@@ -1,7 +1,8 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from '../infrastructure/logging/logger.js';
-import { SmitheryRegistryIntegration, SmitheryConfig } from './smithery-registry-integration.js';
+import { toErrorOrUndefined } from '../utils/type-guards.js';
+import { SmitheryConfig, SmitheryRegistryIntegration } from './smithery-registry-integration.js';
 
 export interface SmitheryMCPConfig {
   apiKey: string;
@@ -33,15 +34,15 @@ export interface ToolCallResponse {
 }
 
 export class SmitheryMCPServer {
-  private server: Server;
-  private config: SmitheryMCPConfig;
-  private registryIntegration: SmitheryRegistryIntegration;
-  private availableServers: Map<string, RegisteredServer> = new Map();
-  private availableTools: Map<string, RegisteredTool> = new Map();
+  private readonly server: Server;
+  private readonly config: SmitheryMCPConfig;
+  private readonly registryIntegration: SmitheryRegistryIntegration;
+  private readonly availableServers: Map<string, RegisteredServer> = new Map();
+  private readonly availableTools: Map<string, RegisteredTool> = new Map();
   private initialized: boolean = false;
   private initializationPromise: Promise<void> | null = null;
 
-  constructor(config: SmitheryMCPConfig) {
+  public constructor(config: Readonly<SmitheryMCPConfig>) {
     this.config = config;
 
     this.server = new Server(
@@ -65,17 +66,28 @@ export class SmitheryMCPServer {
       await this.discoverServers();
 
       // Register tool handlers
-      this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-        const { name, arguments: args } = request.params;
-        const result = await this.handleToolCall(name, args || {});
-        return {
-          content: result.content,
-          isError: result.isError,
-        };
-      });
+      this.server.setRequestHandler(
+        CallToolRequestSchema,
+        (
+          request: Readonly<{ params: { name: string; arguments?: ToolCallArgs } }>,
+          _extra: unknown
+        ) => {
+          const { name, arguments: args } = request.params;
+          // Type guard for name and args
+          if (typeof name !== 'string') {
+            throw new Error('Invalid tool name');
+          }
+          const safeArgs: ToolCallArgs = args && typeof args === 'object' ? args : {};
+          const result = this.handleToolCall(name, safeArgs);
+          return {
+            content: result.content,
+            isError: result.isError,
+          };
+        }
+      );
 
       // Register available tools dynamically from discovered servers
-      this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+      this.server.setRequestHandler(ListToolsRequestSchema, () => {
         const tools = Array.from(this.availableTools.values());
         logger.info(`Providing ${tools.length} tools from Smithery registry`);
         return { tools };
@@ -83,7 +95,7 @@ export class SmitheryMCPServer {
 
       logger.info('Smithery MCP server initialized successfully');
     } catch (error) {
-      logger.error('Error initializing Smithery MCP server:', error);
+      logger.error('Error initializing Smithery MCP server:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -146,12 +158,12 @@ export class SmitheryMCPServer {
 
       logger.info(`Discovered ${servers.length} servers with ${this.availableTools.size} tools`);
     } catch (error) {
-      logger.error('Error discovering Smithery servers:', error);
+      logger.error('Error discovering Smithery servers:', toErrorOrUndefined(error));
       // Continue with empty tools if discovery fails
     }
   }
 
-  private async handleToolCall(name: string, args: ToolCallArgs): Promise<ToolCallResponse> {
+  private handleToolCall(name: string, args: ToolCallArgs): ToolCallResponse {
     try {
       const tool = this.availableTools.get(name);
       if (!tool) {
@@ -170,7 +182,7 @@ export class SmitheryMCPServer {
         ],
       };
     } catch (error: unknown) {
-      logger.error(`Tool execution error for ${name}:`, error);
+      logger.error(`Tool execution error for ${name}:`, toErrorOrUndefined(error));
       const message = error instanceof Error ? error.message : 'Unknown error';
       return {
         content: [
@@ -184,7 +196,7 @@ export class SmitheryMCPServer {
     }
   }
 
-  async getServer(): Promise<Server> {
+  public async getServer(): Promise<Server> {
     await this.ensureInitialized();
     return this.server;
   }
@@ -195,7 +207,8 @@ export class SmitheryMCPServer {
     }
 
     if (this.initializationPromise) {
-      return this.initializationPromise;
+      await this.initializationPromise;
+      return;
     }
 
     this.initializationPromise = this.initializeServer();
@@ -203,31 +216,31 @@ export class SmitheryMCPServer {
     this.initialized = true;
   }
 
-  async getRegistryHealth(): Promise<Record<string, unknown>> {
+  public async getRegistryHealth(): Promise<Record<string, unknown>> {
     await this.ensureInitialized();
     return (await this.registryIntegration.healthCheck()) as Record<string, unknown>;
   }
 
-  getAvailableServers(): RegisteredServer[] {
+  public getAvailableServers(): RegisteredServer[] {
     return Array.from(this.availableServers.values());
   }
 
-  getAvailableTools(): RegisteredTool[] {
+  public getAvailableTools(): RegisteredTool[] {
     return Array.from(this.availableTools.values());
   }
 
-  async refreshServers(): Promise<void> {
+  public async refreshServers(): Promise<void> {
     await this.ensureInitialized();
     this.availableServers.clear();
     this.availableTools.clear();
     await this.discoverServers();
   }
 
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     await this.ensureInitialized();
   }
 
-  async shutdown(): Promise<void> {
+  public shutdown(): void {
     this.initialized = false;
     this.initializationPromise = null;
     this.availableServers.clear();

@@ -11,7 +11,10 @@ import { IWorkflowOrchestrator } from '../../domain/interfaces/workflow-orchestr
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 import { EnterpriseSecurityFramework } from '../../infrastructure/security/enterprise-security-framework.js';
+import { UnifiedSecurityValidator } from '../../infrastructure/security/unified-security-validator.js';
+import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 
 // Import all modular components
 import { CLISession, SessionManager } from '../cli/session-manager.js';
@@ -163,7 +166,9 @@ export class UnifiedCLICoordinator extends EventEmitter {
     super();
 
     // Initialize Security Framework
-    this.securityFramework = new EnterpriseSecurityFramework();
+    const securityLogger = createLogger('EnterpriseSecurityFramework');
+    const securityValidator = new UnifiedSecurityValidator(securityLogger);
+    this.securityFramework = new EnterpriseSecurityFramework(securityValidator, securityLogger);
 
     // Initialize Modular Components
     this.sessionManager = new SessionManager({
@@ -246,7 +251,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
       });
       logger.info('UnifiedCLICoordinator initialized with modular architecture');
     } catch (error) {
-      logger.error('Failed to initialize UnifiedCLICoordinator:', error);
+      logger.error('Failed to initialize UnifiedCLICoordinator:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -349,41 +354,43 @@ export class UnifiedCLICoordinator extends EventEmitter {
   /**
    * Transform raw system health data to expected SystemHealth format
    */
-  private transformSystemHealth(rawHealth: any): SystemHealth {
+  private transformSystemHealth(rawHealth: unknown): SystemHealth {
     // Handle different possible formats of system health data
     if (rawHealth && typeof rawHealth === 'object') {
+      const healthObj = rawHealth as Record<string, unknown>;
       const isHealthy =
-        rawHealth.status === 'healthy' ||
-        rawHealth.isHealthy === true ||
-        (rawHealth.errorRate !== undefined && rawHealth.errorRate < 0.1);
+        healthObj.status === 'healthy' ||
+        healthObj.isHealthy === true ||
+        (typeof healthObj.errorRate === 'number' && healthObj.errorRate < 0.1);
 
       let healthScore: number;
-      if (typeof rawHealth.healthScore === 'number') {
-        healthScore = Math.max(0, Math.min(1, rawHealth.healthScore));
-      } else if (rawHealth.status === 'healthy') {
+      if (typeof healthObj.healthScore === 'number') {
+        healthScore = Math.max(0, Math.min(1, healthObj.healthScore));
+      } else if (healthObj.status === 'healthy') {
         healthScore = 0.9;
-      } else if (rawHealth.status === 'degraded') {
+      } else if (healthObj.status === 'degraded') {
         healthScore = 0.6;
-      } else if (rawHealth.status === 'critical') {
+      } else if (healthObj.status === 'critical') {
         healthScore = 0.3;
       } else if (
-        typeof rawHealth.recoveryRate === 'number' &&
-        typeof rawHealth.errorRate === 'number'
+        typeof healthObj.recoveryRate === 'number' &&
+        typeof healthObj.errorRate === 'number'
       ) {
         // Calculate health score based on error and recovery rates
         healthScore = Math.max(
           0.1,
-          Math.min(1.0, rawHealth.recoveryRate * 0.7 + (1 - rawHealth.errorRate) * 0.3)
+          Math.min(1.0, healthObj.recoveryRate * 0.7 + (1 - healthObj.errorRate) * 0.3)
         );
       } else {
         healthScore = isHealthy ? 0.8 : 0.4;
       }
 
+      const errorStats = healthObj.errorStats as Record<string, unknown> | undefined;
       return {
         isHealthy,
         healthScore,
         errorStats: {
-          recentErrors: rawHealth.errorStats?.recentErrors ?? rawHealth.totalErrors ?? 0,
+          recentErrors: errorStats?.recentErrors as number ?? healthObj.totalErrors as number ?? 0,
         },
         ...rawHealth, // Include any additional properties
       };

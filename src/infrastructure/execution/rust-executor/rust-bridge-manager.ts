@@ -6,6 +6,8 @@
  */
 
 import { logger } from '../../logging/logger.js';
+import { toErrorOrUndefined } from '../../../utils/type-guards.js';
+import { loadRustExecutorSafely } from '../../../utils/rust-module-loader.js';
 
 export interface BridgeConfiguration {
   modulePath: string;
@@ -57,20 +59,38 @@ export class RustBridgeManager {
         timeout: this.config.initializationTimeout,
       });
 
-      // 2025 BEST PRACTICE: Use AbortSignal.timeout for module loading
-      const timeoutMs = this.config.initializationTimeout;
-      
-      try {
-        this.rustModule = await this.loadRustModuleWithTimeout(timeoutMs);
-      } catch (error) {
-        if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-          throw new Error(`Module load timeout after ${timeoutMs}ms`);
+      // Prefer robust loader used elsewhere in the app
+      const safe = loadRustExecutorSafely();
+      if (safe.available && safe.module) {
+        this.rustModule = safe.module;
+        logger.info('🦀 Rust bridge loaded via safe loader', {
+          source: safe.source,
+          binaryPath: safe.binaryPath,
+        });
+      } else {
+        // Fallback to dynamic import relative to dist file location
+        // dist path: dist/infrastructure/execution/rust-executor/rust-bridge-manager.js
+        // repo NAPI loader path: ../../../../rust-executor/index.js (from dist file)
+        const candidatePaths = [
+          '../../../../rust-executor/index.js',
+          '../../../../rust-executor',
+          '../../../rust-executor/index.js',
+        ];
+        let mod: any = null;
+        for (const p of candidatePaths) {
+          try {
+            mod = await import(p);
+            if (mod) {
+              this.rustModule = mod;
+              break;
+            }
+          } catch {
+            // try next
+          }
         }
-        throw error;
-      }
-
-      if (!this.rustModule) {
-        throw new Error('Rust bridge module not found');
+        if (!this.rustModule) {
+          throw new Error('Rust bridge module not found');
+        }
       }
 
       this.health.status = 'healthy';
@@ -79,7 +99,7 @@ export class RustBridgeManager {
       logger.info('Rust bridge initialized successfully');
       return true;
     } catch (error) {
-      logger.error('Failed to initialize Rust bridge:', error);
+      logger.error('Failed to initialize Rust bridge:', toErrorOrUndefined(error));
       this.health.status = 'failed';
       this.health.errorCount++;
       throw error;
@@ -121,23 +141,38 @@ export class RustBridgeManager {
 
     try {
       const startTime = Date.now();
-
-      // Test basic functionality
-      const testResult = this.rustModule.add(2, 2);
+      let ok = false;
+      // Prefer getVersion if available
+      if (typeof this.rustModule.getVersion === 'function') {
+        try {
+          void this.rustModule.getVersion();
+          ok = true;
+        } catch {
+          ok = false;
+        }
+      } else if (this.rustModule.RustExecutor) {
+        try {
+          const ex = this.rustModule.createRustExecutor
+            ? this.rustModule.createRustExecutor()
+            : new this.rustModule.RustExecutor();
+          ok = typeof ex.initialize === 'function' ? !!ex.initialize() : true;
+        } catch {
+          ok = false;
+        }
+      }
 
       this.health.responseTime = Date.now() - startTime;
       this.health.lastCheck = new Date();
 
-      if (testResult === 4) {
+      if (ok) {
         this.health.status = 'healthy';
         return true;
-      } else {
-        this.health.status = 'degraded';
-        this.health.errorCount++;
-        return false;
       }
+      this.health.status = 'degraded';
+      this.health.errorCount++;
+      return false;
     } catch (error) {
-      logger.error('Rust bridge health check failed:', error);
+      logger.error('Rust bridge health check failed:', toErrorOrUndefined(error));
       this.health.status = 'failed';
       this.health.errorCount++;
       this.health.lastCheck = new Date();
@@ -167,7 +202,7 @@ export class RustBridgeManager {
 
       logger.info('Rust bridge shut down successfully');
     } catch (error) {
-      logger.error('Error during Rust bridge shutdown:', error);
+      logger.error('Error during Rust bridge shutdown:', toErrorOrUndefined(error));
     }
   }
 
@@ -176,29 +211,32 @@ export class RustBridgeManager {
   private async loadRustModuleWithTimeout(timeoutMs: number): Promise<any> {
     // 2025 BEST PRACTICE: Apply AbortSignal timeout to async operations
     const timeoutSignal = AbortSignal.timeout(timeoutMs);
-    
+
     return new Promise((resolve, reject) => {
       // Handle timeout
       const timeoutHandler = () => {
         reject(new Error(`Module load timeout after ${timeoutMs}ms`));
       };
-      
+
       if (timeoutSignal.aborted) {
         timeoutHandler();
         return;
       }
-      
+
       timeoutSignal.addEventListener('abort', timeoutHandler);
-      
+
       // Attempt to load the module
       import(this.config.modulePath)
-        .then((module) => {
+        .then(module => {
           timeoutSignal.removeEventListener('abort', timeoutHandler);
           resolve(module);
         })
-        .catch((error) => {
+        .catch(error => {
           timeoutSignal.removeEventListener('abort', timeoutHandler);
-          logger.warn('Native Rust module not available, this is expected during development:', error);
+          logger.warn(
+            'Native Rust module not available, this is expected during development:',
+            error
+          );
           resolve(null);
         });
     });

@@ -67,7 +67,10 @@ class SubAgentIsolationSystem {
     },
   };
 
-  public createIsolationContext(agentId: string, _level: IsolationLevel = IsolationLevel.STANDARD): string {
+  public createIsolationContext(
+    agentId: string,
+    _level: IsolationLevel = IsolationLevel.STANDARD
+  ): string {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const context: IsolationContext = {

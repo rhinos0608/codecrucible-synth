@@ -1,5 +1,6 @@
 import { ModelResponse } from '../../domain/interfaces/model-client.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { toError } from '../../utils/type-guards.js';
 
 export interface ResponseHandler {
   parse: (raw: unknown, provider: string) => ModelResponse;
@@ -21,12 +22,7 @@ export class BasicResponseHandler implements ResponseHandler {
     });
 
     // Handle direct ModelResponse objects
-    if (
-      raw &&
-      typeof raw === 'object' &&
-      hasProp(raw, 'content') &&
-      hasProp(raw, 'model')
-    ) {
+    if (raw && typeof raw === 'object' && hasProp(raw, 'content') && hasProp(raw, 'model')) {
       const contentVal =
         typeof (raw as { content?: unknown }).content === 'string'
           ? (raw as { content?: string }).content
@@ -39,19 +35,26 @@ export class BasicResponseHandler implements ResponseHandler {
       ) {
         logger.warn('ResponseHandler received ModelResponse with empty content', {
           provider,
-          hasToolCalls:
-            typeof (raw as { toolCalls?: unknown[] }).toolCalls !== 'undefined' &&
-            Array.isArray((raw as { toolCalls?: unknown[] }).toolCalls) &&
-            ((raw as { toolCalls?: unknown[] }).toolCalls?.length ?? 0) > 0,
+          hasToolCalls: (() => {
+            const rawWithTools = raw as { toolCalls?: unknown[]; tool_calls?: unknown[] };
+            const toolCallsArray = rawWithTools.toolCalls || rawWithTools.tool_calls;
+            return (
+              typeof toolCallsArray !== 'undefined' &&
+              Array.isArray(toolCallsArray) &&
+              (toolCallsArray?.length ?? 0) > 0
+            );
+          })(),
           responseKeys: Object.keys(raw),
         });
 
         // If we have tool calls but no content, that's potentially valid
+        const rawWithTools = raw as { toolCalls?: unknown[]; tool_calls?: unknown[] };
+        const toolCallsArray = rawWithTools.toolCalls || rawWithTools.tool_calls;
         if (
           !(
-            typeof (raw as { toolCalls?: unknown[] }).toolCalls !== 'undefined' &&
-            Array.isArray((raw as { toolCalls?: unknown[] }).toolCalls) &&
-            ((raw as { toolCalls?: unknown[] }).toolCalls?.length ?? 0) > 0
+            typeof toolCallsArray !== 'undefined' &&
+            Array.isArray(toolCallsArray) &&
+            (toolCallsArray?.length ?? 0) > 0
           )
         ) {
           throw new Error(
@@ -72,10 +75,7 @@ export class BasicResponseHandler implements ResponseHandler {
       const rawObj = raw as Record<string, unknown>;
 
       // Handle nested message objects
-      if (
-        typeof rawObj.message === 'object' &&
-        rawObj.message !== null
-      ) {
+      if (typeof rawObj.message === 'object' && rawObj.message !== null) {
         const msg = rawObj.message as Record<string, unknown>;
         content =
           (typeof msg.content === 'string' && msg.content) ||
@@ -109,10 +109,9 @@ export class BasicResponseHandler implements ResponseHandler {
       let hasToolCalls = false;
       if (raw && typeof raw === 'object') {
         const rawObj = raw as Record<string, unknown>;
-        if (
-          Array.isArray(rawObj.toolCalls) &&
-          rawObj.toolCalls.length > 0
-        ) {
+        // Check both toolCalls (camelCase) and tool_calls (snake_case)
+        const toolCallsArray = rawObj.toolCalls || rawObj.tool_calls;
+        if (Array.isArray(toolCallsArray) && toolCallsArray.length > 0) {
           hasToolCalls = true;
         }
       }
@@ -120,18 +119,18 @@ export class BasicResponseHandler implements ResponseHandler {
       if (hasToolCalls) {
         logger.debug('ResponseHandler: empty content but tool calls present - proceeding', {
           provider,
-          toolCallCount:
-            (raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>).toolCalls))
-              ? ((raw as Record<string, unknown>).toolCalls as unknown[]).length
-              : 0,
+          toolCallCount: (() => {
+            if (raw && typeof raw === 'object') {
+              const rawObj = raw as Record<string, unknown>;
+              const toolCallsArray = rawObj.toolCalls || rawObj.tool_calls;
+              return Array.isArray(toolCallsArray) ? toolCallsArray.length : 0;
+            }
+            return 0;
+          })(),
         });
         content = ''; // Explicitly set to empty string for tool-only responses
       } else {
-        logger.error('ResponseHandler could not extract content from response', {
-          provider,
-          responseType: typeof raw,
-          responseKeys: raw && typeof raw === 'object' ? Object.keys(raw) : 'N/A',
-        });
+        logger.error('ResponseHandler could not extract content from response');
         throw new Error(
           `${provider} returned no usable content. Check service availability and model configuration.`
         );
@@ -154,7 +153,7 @@ export class BasicResponseHandler implements ResponseHandler {
       usage: rawObj.usage as ModelResponse['usage'],
       responseTime: rawObj.responseTime as ModelResponse['responseTime'],
       finishReason: rawObj.finishReason as ModelResponse['finishReason'],
-      toolCalls: rawObj.toolCalls as ModelResponse['toolCalls'],
+      toolCalls: (rawObj.toolCalls || rawObj.tool_calls) as ModelResponse['toolCalls'],
     };
   }
 
@@ -164,7 +163,7 @@ export class BasicResponseHandler implements ResponseHandler {
       throw error;
     }
     const errorMessage = String(error);
-    logger.error('ResponseHandler unknown error:', errorMessage);
+    logger.error('ResponseHandler unknown error', toError(errorMessage));
     throw new Error(errorMessage);
   }
 }

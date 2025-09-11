@@ -1,10 +1,10 @@
 import { ResourceSnapshot } from './resource-types.js';
 
 export class HealthChecker {
-  private recent: ResourceSnapshot[] = [];
+  private readonly recent: ResourceSnapshot[] = [];
   private readonly window = 5;
 
-  evaluate(snapshot: ResourceSnapshot): string[] {
+  public evaluate(snapshot: Readonly<ResourceSnapshot>): string[] {
     this.recent.push(snapshot);
     if (this.recent.length > this.window) {
       this.recent.shift();

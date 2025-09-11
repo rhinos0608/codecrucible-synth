@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { logger } from '../infrastructure/logging/logger.js';
+import { toError } from '../utils/type-guards.js';
 
 // DATABASE_URL and REDIS_URL are required except in 'test' environment.
 // First, parse NODE_ENV to determine environment
@@ -9,7 +10,10 @@ const NodeEnvSchema = z.object({
 
 const nodeEnvParsed = NodeEnvSchema.safeParse(process.env as Record<string, string | undefined>);
 if (!nodeEnvParsed.success) {
-  logger.error('Invalid NODE_ENV configuration:', nodeEnvParsed.error.format());
+  logger.error(
+    'Invalid NODE_ENV configuration',
+    toError(JSON.stringify(nodeEnvParsed.error.format()))
+  );
   process.exit(1);
 }
 
@@ -70,7 +74,10 @@ type Env = z.infer<typeof EnvSchema>;
 
 const parsed = EnvSchema.safeParse(process.env as Record<string, string | undefined>);
 if (!parsed.success) {
-  logger.error('Invalid environment configuration:', (parsed.error as z.ZodError).format());
+  logger.error(
+    'Invalid environment configuration',
+    toError(JSON.stringify((parsed.error as z.ZodError).format()))
+  );
   process.exit(1);
 }
 

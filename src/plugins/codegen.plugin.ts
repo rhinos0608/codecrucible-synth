@@ -16,9 +16,9 @@ export default function createCodegenPlugin(): IPlugin {
           if (args.length < 2 || typeof args[0] !== 'string' || typeof args[1] !== 'string') {
             throw new Error('codegen:scaffold requires two string arguments: template and target');
           }
-          
+
           const [template, target] = args as [string, string];
-          
+
           return { success: true, template, target };
         });
       }

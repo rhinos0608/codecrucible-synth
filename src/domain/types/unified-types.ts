@@ -204,11 +204,11 @@ export interface LivingSpiralProcess extends CodeCrucibleEntity {
 
 export type SpiralPhase = 'collapse' | 'council' | 'synthesis' | 'rebirth' | 'reflection';
 
-export interface SpiralIteration {
+export interface SpiralIteration<InputType = unknown, OutputType = unknown> {
   number: number;
   phase: SpiralPhase;
-  input: any;
-  output: any;
+  input: InputType;
+  output: OutputType;
   qualityScore: number;
   feedback: string[];
   improvementAreas: string[];
@@ -578,7 +578,7 @@ export interface FeatureFlag {
 export interface FeatureCondition {
   type: 'user' | 'environment' | 'time' | 'random';
   operator: '==' | '!=' | 'in' | 'not_in' | '>' | '<';
-  value: any;
+  value: string | number | boolean | string[] | number[];
 }
 
 export interface ModelConfiguration {
@@ -664,7 +664,7 @@ export interface AuditRetention {
 
 export interface AuditDestination {
   type: 'file' | 'database' | 'syslog' | 'http';
-  configuration: Record<string, any>;
+  configuration: Record<string, unknown>;
   enabled: boolean;
 }
 
@@ -740,7 +740,7 @@ export interface OptimizationConfiguration {
 export interface OptimizationStrategy {
   name: string;
   enabled: boolean;
-  configuration: Record<string, any>;
+  configuration: Record<string, unknown>;
   priority: number;
 }
 
@@ -769,7 +769,7 @@ export interface AlertConfiguration {
 
 export interface AlertChannel {
   type: 'email' | 'slack' | 'webhook' | 'sms';
-  configuration: Record<string, any>;
+  configuration: Record<string, unknown>;
   enabled: boolean;
 }
 
@@ -784,7 +784,7 @@ export interface DashboardPanel {
   title: string;
   type: 'chart' | 'table' | 'stat' | 'log';
   query: string;
-  visualization: Record<string, any>;
+  visualization: Record<string, unknown>;
 }
 
 export interface InfrastructureConfiguration {
@@ -817,13 +817,13 @@ export interface StorageConfiguration {
   basePath: string;
   encryption: boolean;
   compression: boolean;
-  configuration: Record<string, any>;
+  configuration: Record<string, unknown>;
 }
 
 export interface MessagingConfiguration {
   enabled: boolean;
   type: 'memory' | 'redis' | 'rabbitmq' | 'kafka';
-  configuration: Record<string, any>;
+  configuration: Record<string, unknown>;
 }
 
 export interface NetworkConfiguration {
@@ -861,7 +861,7 @@ export interface TLSConfiguration {
 export interface ApplicationError {
   code: string;
   message: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   cause?: Error;
   stack?: string;
   timestamp: Date;
@@ -869,7 +869,7 @@ export interface ApplicationError {
 
 export interface ValidationError extends ApplicationError {
   field: string;
-  value: any;
+  value: unknown;
   constraint: string;
 }
 
@@ -923,7 +923,7 @@ export interface PaginationInfo {
 export interface FilterCriteria {
   field: string;
   operator: 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le' | 'like' | 'in' | 'not_in';
-  value: any;
+  value: unknown;
 }
 
 /**
@@ -959,7 +959,7 @@ export interface DomainEvent {
   type: string;
   aggregateId: string;
   aggregateVersion: number;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   metadata: EventMetadata;
   timestamp: Date;
 }
@@ -984,7 +984,7 @@ export interface AuditEvent {
   action: string;
   resource: string;
   outcome: 'success' | 'failure' | 'error';
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
 }
@@ -1004,7 +1004,7 @@ export interface ComponentHealth {
   name: string;
   status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
   message?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   dependencies?: ComponentHealth[];
 }
 
@@ -1018,7 +1018,7 @@ export interface ComponentHealth {
 export interface CLIError {
   code: string;
   message: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 export enum CLIExitCode {
@@ -1029,9 +1029,9 @@ export enum CLIExitCode {
 }
 
 export interface REPLInterface {
-  start(): Promise<void>;
-  stop(): Promise<void>;
-  processCommand(command: string): Promise<string>;
+  start: () => Promise<void>;
+  stop: () => Promise<void>;
+  processCommand: (command: string) => Promise<string>;
 }
 
 /**
@@ -1083,7 +1083,7 @@ export interface ProjectContext {
 export interface MetricsData {
   timestamp: number;
   values: Record<string, number>;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ComplexityAnalysis {
@@ -1120,7 +1120,7 @@ export interface StreamToken {
   finished?: boolean;
   index: number;
   timestamp: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ModelRequest {
@@ -1131,7 +1131,7 @@ export interface ModelRequest {
   stream?: boolean;
   provider?: string;
   abortSignal?: AbortSignal;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   files?: string[];
   taskType?: TaskType;
 }
@@ -1200,8 +1200,8 @@ export interface AgentTask {
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   agentId: string;
-  context: Record<string, any>;
-  parameters: Record<string, any>;
+  context: Record<string, unknown>;
+  parameters: Record<string, unknown>;
   dependencies: string[];
   estimatedDuration?: number;
   actualDuration?: number;
@@ -1214,21 +1214,21 @@ export interface AgentResponse {
   taskId: string;
   agentId: string;
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: string;
   executionTime: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   timestamp: Date;
 }
 
 export interface ExecutionResult {
   success: boolean;
-  result?: any;
+  result?: unknown;
   content?: string;
   error?: string;
   executionTime: number;
   resourcesUsed: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   warnings?: string[];
 }
 
@@ -1238,7 +1238,7 @@ export interface ServerRequest {
   method: string;
   path: string;
   headers: Record<string, string>;
-  body?: any;
+  body?: unknown;
   query?: Record<string, string>;
   params?: Record<string, string>;
   timestamp: Date;
@@ -1250,14 +1250,14 @@ export interface ServerResponse {
   requestId: string;
   statusCode: number;
   headers: Record<string, string>;
-  body?: any;
+  body?: unknown;
   error?: string;
   executionTime: number;
   timestamp: Date;
 }
 
 // Re-export SecurityValidationContext from security validator
-export type { SecurityValidationContext } from '../services/unified-security-validator.js';
+export type { SecurityValidationContext } from '../services/unified-agent/unified-security-validator';
 
 // Configuration source tracking interfaces
 export interface ConfigurationSource {

@@ -85,7 +85,10 @@ export class SequentialToolExecutor {
   private readonly performanceProfiler?: PerformanceProfiler;
   private readonly rustBackend?: RustExecutionBackend;
 
-  public constructor(performanceProfiler?: PerformanceProfiler, rustBackend?: RustExecutionBackend) {
+  public constructor(
+    performanceProfiler?: PerformanceProfiler,
+    rustBackend?: RustExecutionBackend
+  ) {
     this.domainOrchestrator = new DomainAwareToolOrchestrator();
     this.performanceProfiler = performanceProfiler;
     this.rustBackend = rustBackend;
@@ -145,14 +148,17 @@ export class SequentialToolExecutor {
 
     try {
       // Step 1: Domain analysis and planning
-      const domainResult = this.domainOrchestrator.getToolsForPrompt(prompt, availableTools as Tool[]);
+      const domainResult = this.domainOrchestrator.getToolsForPrompt(
+        prompt,
+        availableTools as Tool[]
+      );
 
       const executionPlan: ExecutionPlan = {
         goal: prompt.length > 100 ? `${prompt.substring(0, 100)}...` : prompt,
         domain: domainResult.analysis.primaryDomain,
         estimatedSteps: this.estimateSteps(prompt, domainResult.analysis),
         selectedTools: (domainResult.tools as Tool[])
-          .map((t: Readonly<Tool>) => (t.function?.name ?? t.name))
+          .map((t: Readonly<Tool>) => t.function?.name ?? t.name)
           .filter((name: string): name is string => typeof name === 'string'),
         reasoning: domainResult.reasoning,
       };
@@ -220,11 +226,11 @@ export class SequentialToolExecutor {
           // STREAMING: Notify about tool execution
           const { selectedTool } = reasoningResult;
           const toolName: string =
-            (typeof selectedTool.function?.name === 'string'
+            typeof selectedTool.function?.name === 'string'
               ? selectedTool.function.name
               : typeof selectedTool.name === 'string'
-              ? selectedTool.name
-              : 'unknown-tool');
+                ? selectedTool.name
+                : 'unknown-tool';
           const toolArgs: Readonly<Record<string, unknown>> =
             reasoningResult.toolArgs && typeof reasoningResult.toolArgs === 'object'
               ? (reasoningResult.toolArgs as Readonly<Record<string, unknown>>)
@@ -264,19 +270,14 @@ export class SequentialToolExecutor {
           // Safely extract tool name
           let safeToolName: string = 'unknown-tool';
           const selectedToolCandidate = reasoningResult.selectedTool as Partial<Tool> | undefined;
-          if (
-            selectedToolCandidate &&
-            typeof selectedToolCandidate === 'object'
-          ) {
+          if (selectedToolCandidate && typeof selectedToolCandidate === 'object') {
             if (
               selectedToolCandidate.function &&
               typeof selectedToolCandidate.function === 'object' &&
               typeof selectedToolCandidate.function.name === 'string'
             ) {
               safeToolName = selectedToolCandidate.function.name;
-            } else if (
-              typeof selectedToolCandidate.name === 'string'
-            ) {
+            } else if (typeof selectedToolCandidate.name === 'string') {
               safeToolName = selectedToolCandidate.name;
             }
           }
@@ -294,10 +295,7 @@ export class SequentialToolExecutor {
 
           // Observation step: Process tool result
           const normalizedResult = ResponseNormalizer.normalizeToString(actionResult.result);
-          const observation = this.generateObservation(
-            normalizedResult,
-            safeToolName
-          );
+          const observation = this.generateObservation(normalizedResult, safeToolName);
 
           reasoningChain.push({
             step: currentStep + 2,
@@ -315,19 +313,14 @@ export class SequentialToolExecutor {
           // Update accumulated context for next reasoning step
           let prevActionName = 'unknown-tool';
           const prevActionToolCandidate = reasoningResult.selectedTool as Partial<Tool> | undefined;
-          if (
-            prevActionToolCandidate &&
-            typeof prevActionToolCandidate === 'object'
-          ) {
+          if (prevActionToolCandidate && typeof prevActionToolCandidate === 'object') {
             if (
               prevActionToolCandidate.function &&
               typeof prevActionToolCandidate.function === 'object' &&
               typeof prevActionToolCandidate.function.name === 'string'
             ) {
               prevActionName = prevActionToolCandidate.function.name;
-            } else if (
-              typeof prevActionToolCandidate.name === 'string'
-            ) {
+            } else if (typeof prevActionToolCandidate.name === 'string') {
               prevActionName = prevActionToolCandidate.name;
             }
           }
@@ -443,7 +436,9 @@ export class SequentialToolExecutor {
       .join('\n');
 
     const toolOptions = availableTools
-      .map((tool: Tool) => `- ${(tool.function?.name ?? tool.name)}: ${tool.function?.description ?? ''}`)
+      .map(
+        (tool: Tool) => `- ${tool.function?.name ?? tool.name}: ${tool.function?.description ?? ''}`
+      )
       .join('\n');
 
     const reasoningPrompt = `You are an AI assistant working step-by-step to help the user.
@@ -535,7 +530,9 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
     let toolArgs: unknown = undefined;
 
     if (actionName && actionName !== 'NONE' && actionName !== 'N/A') {
-      selectedTool = availableTools.find((tool: Readonly<Tool>) => (tool.function?.name ?? tool.name) === actionName);
+      selectedTool = availableTools.find(
+        (tool: Readonly<Tool>) => (tool.function?.name ?? tool.name) === actionName
+      );
 
       if (selectedTool && argsText && argsText !== 'N/A') {
         try {
@@ -574,11 +571,12 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
     success: boolean;
     error?: string;
   }> {
-    const toolName: string = typeof tool.function?.name === 'string'
-      ? tool.function.name
-      : typeof tool.name === 'string'
-      ? tool.name
-      : 'unknown-tool';
+    const toolName: string =
+      typeof tool.function?.name === 'string'
+        ? tool.function.name
+        : typeof tool.name === 'string'
+          ? tool.name
+          : 'unknown-tool';
     logger.info('🔧 SEQUENTIAL-EXECUTOR: Executing real MCP tool', {
       toolName,
       args,
@@ -608,7 +606,7 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
           output?: unknown;
           error?: string;
         }
-        const mcpResult = await toolIntegration.executeToolCall(formattedToolCall) as MCPResult;
+        const mcpResult = (await toolIntegration.executeToolCall(formattedToolCall)) as MCPResult;
 
         logger.info('🔧 SEQUENTIAL-EXECUTOR: MCP tool execution result', {
           toolName,
@@ -650,7 +648,9 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
           output?: unknown;
           error?: string;
         }
-        const basicResult = await basicToolIntegration.executeToolCall(formattedToolCall) as BasicToolResult;
+        const basicResult = (await basicToolIntegration.executeToolCall(
+          formattedToolCall
+        )) as BasicToolResult;
 
         if (basicResult?.success && basicResult.output) {
           const output = basicResult.output as { content?: unknown };

@@ -10,9 +10,10 @@
 
 import { EventEmitter } from 'events';
 import { cpus, loadavg } from 'os';
-import { performance, PerformanceObserver } from 'perf_hooks';
+import { PerformanceObserver, performance } from 'perf_hooks';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { loadRustExecutorSafely } from '../../utils/rust-module-loader.js';
 
 export interface MetricsConfig {
@@ -95,24 +96,26 @@ export interface SystemResourceMetrics {
  * Replaces placeholder implementations with actual system metrics
  */
 class SystemMonitoringUtils {
-  private static _cpuStartTimes: number[] = [];
-  private static eventLoopLagHistory: number[] = [];
+  private static readonly _cpuStartTimes: number[] = [];
+  private static readonly eventLoopLagHistory: number[] = [];
   private static performanceObserver: PerformanceObserver | null = null;
   private static activeConnections = 0;
 
   /**
    * Get real CPU usage percentage
    */
-  static getCPUUsage(): number {
+  public static getCPUUsage(): number {
     const cpuInfo = cpus();
     if (cpuInfo.length === 0) return 0;
 
     let totalIdle = 0;
     let totalTick = 0;
 
-    cpuInfo.forEach(cpu => {
+    cpuInfo.forEach((cpu: Readonly<(typeof cpuInfo)[0]>) => {
       for (const type in cpu.times) {
-        totalTick += cpu.times[type as keyof typeof cpu.times];
+        if (Object.prototype.hasOwnProperty.call(cpu.times, type)) {
+          totalTick += cpu.times[type as keyof typeof cpu.times];
+        }
       }
       totalIdle += cpu.times.idle;
     });
@@ -127,7 +130,7 @@ class SystemMonitoringUtils {
   /**
    * Get system load average (1, 5, 15 minute averages)
    */
-  static getLoadAverage(): number[] {
+  public static getLoadAverage(): number[] {
     try {
       return loadavg();
     } catch (error) {
@@ -139,7 +142,7 @@ class SystemMonitoringUtils {
   /**
    * Measure event loop lag
    */
-  static measureEventLoopLag(): Promise<number> {
+  public static async measureEventLoopLag(): Promise<number> {
     return new Promise(resolve => {
       const start = process.hrtime.bigint();
       setImmediate(() => {
@@ -163,7 +166,7 @@ class SystemMonitoringUtils {
   /**
    * Calculate event loop utilization
    */
-  static getEventLoopUtilization(): number {
+  public static getEventLoopUtilization(): number {
     try {
       // Use the performance import from the top of the file (ESM pattern)
       if (typeof performance.eventLoopUtilization === 'function') {
@@ -209,7 +212,7 @@ class SystemMonitoringUtils {
 
       this.performanceObserver.observe({ entryTypes: ['measure'] });
     } catch (error) {
-      logger.warn('Performance observer setup failed:', error);
+      logger.warn('Performance observer setup failed:', toReadonlyRecord(error));
     }
   }
 
@@ -228,22 +231,22 @@ class SystemMonitoringUtils {
  * Comprehensive monitoring system with Rust integration preparation
  */
 export class MCPServerMonitoring extends EventEmitter {
-  private config: MetricsConfig;
-  private serverMetrics: Map<string, ServerMetrics> = new Map();
+  private readonly config: MetricsConfig;
+  private readonly serverMetrics: Map<string, ServerMetrics> = new Map();
   private systemMetrics: SystemResourceMetrics[] = [];
-  private monitoringIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private readonly monitoringIntervals: Map<string, NodeJS.Timeout> = new Map();
   private isMonitoring = false;
-  private startTime = Date.now();
+  private readonly startTime = Date.now();
+  private _lastCleanup: number = 0;
 
   // Performance tracking
   private metricsCollectionTime = 0;
-  private _lastCleanup = Date.now();
-  private rustMetrics: { available: boolean; module: any | null } = {
+  private readonly rustMetrics: { available: boolean; module: unknown } = {
     available: false,
-    module: null,
+    module: null as unknown,
   };
 
-  constructor(config: Partial<MetricsConfig> = {}) {
+  public constructor(config: Readonly<Partial<MetricsConfig>> = {}) {
     super();
 
     this.config = {
@@ -252,7 +255,7 @@ export class MCPServerMonitoring extends EventEmitter {
       alertThresholds: {
         responseTime: 5000, // 5 seconds
         errorRate: 10, // 10%
-        memoryUsage: outputConfig.getConfig().maxBufferSize, // Use config limit
+        memoryUsage: outputConfig.getMaxBufferSize(), // Use config limit
         cpuUsage: 80, // 80%
       },
       healthCheckInterval: 30000, // 30 seconds
@@ -270,14 +273,14 @@ export class MCPServerMonitoring extends EventEmitter {
       this.rustMetrics = { available, module };
       if (available) logger.info('Rust metrics module available for MCP monitoring');
     } catch (err) {
-      logger.warn('Rust metrics module not available:', err);
+      logger.warn('Rust metrics module not available:', toReadonlyRecord(err));
     }
   }
 
   /**
    * Register a server for monitoring
    */
-  registerServer(serverId: string): void {
+  public registerServer(serverId: string): void {
     if (this.serverMetrics.has(serverId)) {
       logger.warn(`Server ${serverId} already registered for monitoring`);
       return;
@@ -312,7 +315,7 @@ export class MCPServerMonitoring extends EventEmitter {
   /**
    * Record operation metrics for a server
    */
-  recordOperation(
+  public recordOperation(
     serverId: string,
     operation: string,
     duration: number,
@@ -338,8 +341,7 @@ export class MCPServerMonitoring extends EventEmitter {
     }
 
     // Update response time (rolling average)
-    const currentAvg = serverMetric.metrics.avgResponseTime;
-    const totalRequests = serverMetric.metrics.totalRequests;
+    const { avgResponseTime: currentAvg, totalRequests } = serverMetric.metrics;
     serverMetric.metrics.avgResponseTime =
       (currentAvg * (totalRequests - 1) + duration) / totalRequests;
     serverMetric.metrics.currentResponseTime = duration;
@@ -374,10 +376,10 @@ export class MCPServerMonitoring extends EventEmitter {
   /**
    * Update server health status
    */
-  updateServerHealth(
+  public updateServerHealth(
     serverId: string,
     health: 'healthy' | 'degraded' | 'unhealthy',
-    details?: any
+    details?: unknown
   ): void {
     const serverMetric = this.serverMetrics.get(serverId);
     if (!serverMetric) return;
@@ -467,7 +469,7 @@ export class MCPServerMonitoring extends EventEmitter {
   /**
    * Start monitoring all registered servers
    */
-  startMonitoring(): void {
+  public startMonitoring(): void {
     if (this.isMonitoring) return;
 
     this.isMonitoring = true;
@@ -493,7 +495,7 @@ export class MCPServerMonitoring extends EventEmitter {
   /**
    * Stop monitoring
    */
-  stopMonitoring(): void {
+  public stopMonitoring(): void {
     if (!this.isMonitoring) return;
 
     this.isMonitoring = false;
@@ -513,11 +515,13 @@ export class MCPServerMonitoring extends EventEmitter {
    */
   private startServerMonitoring(serverId: string): void {
     if (this.monitoringIntervals.has(serverId)) {
-      clearInterval(this.monitoringIntervals.get(serverId)!);
+      clearInterval(this.monitoringIntervals.get(serverId));
     }
 
     const interval = setInterval(() => {
-      this.collectServerMetrics(serverId);
+      this.collectServerMetrics(serverId).catch(error => {
+        logger.error(`Error collecting server metrics for ${serverId}:`, error);
+      });
     }, this.config.healthCheckInterval);
 
     this.monitoringIntervals.set(serverId, interval);
@@ -543,7 +547,7 @@ export class MCPServerMonitoring extends EventEmitter {
 
       this.emit('metricsCollected', serverId, serverMetric.metrics);
     } catch (error) {
-      logger.error(`Failed to collect metrics for server ${serverId}:`, error);
+      logger.error(`Failed to collect metrics for server ${serverId}:`, toErrorOrUndefined(error));
     }
   }
 
@@ -575,14 +579,14 @@ export class MCPServerMonitoring extends EventEmitter {
         },
         cpu: {
           usage: cpuUsage, // Real CPU monitoring
-          loadAverage: loadAverage, // Real load average
+          loadAverage, // Real load average
         },
         eventLoop: {
           lag: eventLoopLag, // Real event loop lag monitoring
           utilization: eventLoopUtilization,
         },
         concurrent: {
-          activeConnections: activeConnections, // Real active connections tracking
+          activeConnections, // Real active connections tracking
           pendingOperations: this.metricsCollectionTime,
         },
       };
@@ -594,18 +598,65 @@ export class MCPServerMonitoring extends EventEmitter {
     };
 
     // Collect system metrics every 30 seconds
-    const systemInterval = setInterval(collectSystemMetrics, 30000);
+    const systemInterval = setInterval(() => {
+      void collectSystemMetrics();
+    }, 30000);
     this.monitoringIntervals.set('system', systemInterval);
 
     // Initial collection
-    collectSystemMetrics();
+    void collectSystemMetrics();
   }
-
   /**
    * Check alert conditions
    */
   private checkAlerts(serverId: string): void {
-    const serverMetric = this.serverMetrics.get(serverId)!;
+    const serverMetric = this.serverMetrics.get(serverId);
+    if (!serverMetric) return;
+    const { metrics } = serverMetric;
+    const thresholds = this.config.alertThresholds;
+
+    // Response time alert
+    if (metrics.currentResponseTime > thresholds.responseTime) {
+      this.createAlert(
+        serverId,
+        'warn',
+        `High response time: ${metrics.currentResponseTime}ms`,
+        'responseTime',
+        metrics.currentResponseTime,
+        thresholds.responseTime
+      );
+    }
+
+    // Error rate alert
+    if (metrics.errorRate > thresholds.errorRate) {
+      this.createAlert(
+        serverId,
+        'error',
+        `High error rate: ${metrics.errorRate.toFixed(1)}%`,
+        'errorRate',
+        metrics.errorRate,
+        thresholds.errorRate
+      );
+    }
+
+    // Memory usage alert
+    if (metrics.memoryUsage > thresholds.memoryUsage) {
+      this.createAlert(
+        serverId,
+        'warn',
+        `High memory usage: ${this.formatBytes(metrics.memoryUsage)}`,
+        'memoryUsage',
+        metrics.memoryUsage,
+        thresholds.memoryUsage
+      );
+    }
+  }
+  /**
+   * Check alert conditions
+    const serverMetric = this.serverMetrics.get(serverId);
+    if (!serverMetric) return;
+    const { metrics } = serverMetric;
+    const thresholds = this.config.alertThresholds;
     const metrics = serverMetric.metrics;
     const thresholds = this.config.alertThresholds;
 
@@ -726,25 +777,25 @@ export class MCPServerMonitoring extends EventEmitter {
   private performCleanup(): void {
     const now = Date.now();
 
-    // Clean up old metrics based on retention policy
     for (const [_serverId, serverMetric] of this.serverMetrics) {
       const cutoffTime = now - this.config.metricsRetentionMs;
 
       // Remove old activities
       serverMetric.recentActivity = serverMetric.recentActivity.filter(
-        activity => activity.timestamp.getTime() > cutoffTime
+        (activity: Readonly<ActivityEntry>) => activity.timestamp.getTime() > cutoffTime
       );
 
       // Remove old acknowledged alerts
       serverMetric.alerts = serverMetric.alerts.filter(
-        alert => !alert.acknowledged || alert.timestamp.getTime() > cutoffTime
+        (alert: Readonly<AlertEntry>) =>
+          !alert.acknowledged || alert.timestamp.getTime() > cutoffTime
       );
     }
 
     // Clean up old system metrics
     const systemCutoff = now - this.config.metricsRetentionMs / 2; // Keep system metrics for half retention
     this.systemMetrics = this.systemMetrics.filter(
-      metric => metric.timestamp.getTime() > systemCutoff
+      (metric: Readonly<SystemResourceMetrics>) => metric.timestamp.getTime() > systemCutoff
     );
 
     this._lastCleanup = now;
@@ -756,23 +807,46 @@ export class MCPServerMonitoring extends EventEmitter {
    */
   private async getCpuUsage(): Promise<number> {
     if (this.rustMetrics.available && this.rustMetrics.module) {
-      const mod = this.rustMetrics.module;
+      const mod = this.rustMetrics.module as Record<string, unknown>;
       try {
+        // get_cpu_usage direct
         if (typeof mod.get_cpu_usage === 'function') {
-          const v = mod.get_cpu_usage();
-          return typeof v?.then === 'function' ? await v : Number(v) || 0;
+          const v = (mod.get_cpu_usage as () => unknown)();
+          if (v && typeof (v as Promise<unknown>).then === 'function') {
+            const result = await (v as Promise<unknown>);
+            return Number(result) || 0;
+          }
+          return Number(v) || 0;
         }
-        if (mod.metrics && typeof mod.metrics.get_cpu_usage === 'function') {
-          const v = mod.metrics.get_cpu_usage();
-          return typeof v?.then === 'function' ? await v : Number(v) || 0;
+        // get_cpu_usage under metrics
+        if (
+          typeof mod.metrics === 'object' &&
+          mod.metrics !== null &&
+          typeof (mod.metrics as Record<string, unknown>).get_cpu_usage === 'function'
+        ) {
+          const v = ((mod.metrics as Record<string, unknown>).get_cpu_usage as () => unknown)();
+          if (v && typeof (v as Promise<unknown>).then === 'function') {
+            const result = await (v as Promise<unknown>);
+            return Number(result) || 0;
+          }
+          return Number(v) || 0;
         }
+        // getSystemMetrics
         if (typeof mod.getSystemMetrics === 'function') {
-          const m = await mod.getSystemMetrics();
-          const v = m?.cpu_usage ?? m?.cpu?.usage;
-          if (v != null) return Number(v) || 0;
+          const m = await (mod.getSystemMetrics as () => Promise<unknown>)();
+          if (m && typeof m === 'object') {
+            const mObj = m as Record<string, unknown>;
+            const v =
+              typeof mObj.cpu_usage !== 'undefined'
+                ? mObj.cpu_usage
+                : mObj.cpu && typeof mObj.cpu === 'object'
+                  ? (mObj.cpu as Record<string, unknown>).usage
+                  : undefined;
+            if (v !== undefined) return Number(v) || 0;
+          }
         }
       } catch (error) {
-        logger.warn('Rust CPU metrics failed, falling back:', error);
+        logger.warn('Rust CPU metrics failed, falling back:', toReadonlyRecord(error));
       }
     }
 
@@ -785,13 +859,13 @@ export class MCPServerMonitoring extends EventEmitter {
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 
   /**
    * Cleanup resources
    */
-  cleanup(): void {
+  public cleanup(): void {
     this.stopMonitoring();
 
     // Cleanup system monitoring utilities

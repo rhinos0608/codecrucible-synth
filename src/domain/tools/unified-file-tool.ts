@@ -60,7 +60,11 @@ export class BasicFileStrategy implements FileOperationStrategy {
         return result;
       }
       case 'write': {
-        const { content, encoding, mode } = args as { content: string; encoding?: BufferEncoding; mode?: number };
+        const { content, encoding, mode } = args as {
+          content: string;
+          encoding?: BufferEncoding;
+          mode?: number;
+        };
         if (typeof content !== 'string') {
           throw new Error('Content must be provided as a string for write operation');
         }
@@ -125,7 +129,7 @@ export class BasicFileStrategy implements FileOperationStrategy {
 
   private async writeFile(
     path: string,
-    args: Readonly<{ content: string; encoding?: BufferEncoding; mode?: number }>,
+    args: Readonly<{ content: string; encoding?: BufferEncoding; mode?: number }>
   ): Promise<void> {
     try {
       // Ensure directory exists
@@ -179,22 +183,16 @@ export class BasicFileStrategy implements FileOperationStrategy {
 export class BatchFileStrategy extends BasicFileStrategy {
   public override name = 'batch';
 
-  public override supports(
-    operation: string,
-    args: Readonly<Record<string, unknown>>
-  ): boolean {
+  public override supports(operation: string, args: Readonly<Record<string, unknown>>): boolean {
     const hasPathsArray =
       Object.prototype.hasOwnProperty.call(args, 'paths') &&
       Array.isArray((args as { paths?: unknown }).paths);
     const hasGlobPath =
       Object.prototype.hasOwnProperty.call(args, 'path') &&
       typeof (args as { path?: unknown }).path === 'string' &&
-      ((args as { path: string }).path).includes('*');
+      (args as { path: string }).path.includes('*');
 
-    return (
-      super.supports(operation, args) &&
-      (hasPathsArray || hasGlobPath)
-    );
+    return super.supports(operation, args) && (hasPathsArray || hasGlobPath);
   }
 
   public override async execute(
@@ -203,10 +201,7 @@ export class BatchFileStrategy extends BasicFileStrategy {
     context: Readonly<ToolExecutionContext>
   ): Promise<Array<{ path: string; success: boolean; result?: unknown; error?: string }>> {
     const paths = await this.resolvePaths(args, context);
-    const maxFiles =
-      typeof args.maxFiles === 'number'
-        ? args.maxFiles
-        : 20;
+    const maxFiles = typeof args.maxFiles === 'number' ? args.maxFiles : 20;
 
     if (paths.length > maxFiles) {
       throw new Error(`Too many files: ${paths.length} exceeds limit of ${maxFiles}`);
@@ -295,11 +290,11 @@ export class BatchFileStrategy extends BasicFileStrategy {
 export class SmartFileStrategy extends BatchFileStrategy {
   public override name = 'smart';
 
-  public override supports(
-    operation: string,
-    args: Readonly<Record<string, unknown>>
-  ): boolean {
-    return super.supports(operation, args) && (args as { includeMetadata?: boolean }).includeMetadata !== false;
+  public override supports(operation: string, args: Readonly<Record<string, unknown>>): boolean {
+    return (
+      super.supports(operation, args) &&
+      (args as { includeMetadata?: boolean }).includeMetadata !== false
+    );
   }
 
   public override async execute(
@@ -312,8 +307,9 @@ export class SmartFileStrategy extends BatchFileStrategy {
     if (operation === 'read') {
       if (Array.isArray(baseResult)) {
         // Multiple files
-        return baseResult.map((item: Readonly<{ path: string; success: boolean; result?: unknown; error?: string }>) =>
-          this.enhanceFileResult(item)
+        return baseResult.map(
+          (item: Readonly<{ path: string; success: boolean; result?: unknown; error?: string }>) =>
+            this.enhanceFileResult(item)
         );
       } else {
         // Single file
@@ -322,7 +318,7 @@ export class SmartFileStrategy extends BatchFileStrategy {
             path: (args as { path?: string }).path ?? '',
             success: true,
             result: baseResult,
-          })
+          }),
         ];
       }
     }
@@ -331,7 +327,14 @@ export class SmartFileStrategy extends BatchFileStrategy {
 
   private enhanceFileResult(
     item: Readonly<{ path: string; success: boolean; result?: unknown; error?: string }>
-  ): Readonly<{ path: string; success: boolean; result?: unknown; error?: string; metadata?: FileMetadata; enhanced?: boolean }> {
+  ): Readonly<{
+    path: string;
+    success: boolean;
+    result?: unknown;
+    error?: string;
+    metadata?: FileMetadata;
+    enhanced?: boolean;
+  }> {
     if (!item.success) {
       return item;
     }
@@ -763,10 +766,7 @@ export class UnifiedFileTool extends BaseTool {
       const smartStrategy = this.strategies.get('smart');
       if (
         smartStrategy &&
-        smartStrategy.supports(
-          typeof args.operation === 'string' ? args.operation : 'read',
-          args
-        )
+        smartStrategy.supports(typeof args.operation === 'string' ? args.operation : 'read', args)
       ) {
         return smartStrategy;
       }
@@ -774,16 +774,12 @@ export class UnifiedFileTool extends BaseTool {
 
     // Use batch strategy for multiple files or patterns
     const hasPathsArray = Array.isArray(args.paths);
-    const hasGlobPath =
-      typeof args.path === 'string' && args.path.includes('*');
+    const hasGlobPath = typeof args.path === 'string' && args.path.includes('*');
     if (hasPathsArray || hasGlobPath) {
       const batchStrategy = this.strategies.get('batch');
       if (
         batchStrategy &&
-        batchStrategy.supports(
-          typeof args.operation === 'string' ? args.operation : 'read',
-          args
-        )
+        batchStrategy.supports(typeof args.operation === 'string' ? args.operation : 'read', args)
       ) {
         return batchStrategy;
       }

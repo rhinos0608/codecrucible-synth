@@ -1,11 +1,12 @@
 import { performance } from 'perf_hooks';
 import { randomUUID } from 'crypto';
-import { EnterpriseSecurityFramework } from '../../../infrastructure/security/enterprise-security-framework.js';
-import { ResilientCLIWrapper } from '../../../infrastructure/resilience/resilient-cli-wrapper.js';
-import { MetricsCollector } from '../../cli/metrics-collector.js';
-import { UseCaseRouter } from '../../cli/use-case-router.js';
-import { SessionManager } from '../../cli/session-manager.js';
+import type { EnterpriseSecurityFramework } from '../../../infrastructure/security/enterprise-security-framework.js';
+import type { ResilientCLIWrapper } from '../../../infrastructure/resilience/resilient-cli-wrapper.js';
+import type { MetricsCollector } from '../../cli/metrics-collector.js';
+import type { UseCaseRouter } from '../../cli/use-case-router.js';
+import type { SessionManager } from '../../cli/session-manager.js';
 import { logger } from '../../../infrastructure/logging/unified-logger.js';
+import { stringArrayToRecord, toErrorOrUndefined } from '../../../utils/type-guards.js';
 import type {
   CLIOperationRequest,
   CLIOperationResponse,
@@ -22,10 +23,10 @@ interface Dependencies {
 }
 
 export interface ICLIOrchestrator {
-  processOperation(
+  processOperation: (
     request: Readonly<CLIOperationRequest>,
-    options: UnifiedCLIOptions
-  ): Promise<CLIOperationResponse>;
+    options: Readonly<UnifiedCLIOptions>
+  ) => Promise<CLIOperationResponse>;
 }
 
 export class CLIOrchestrator implements ICLIOrchestrator {
@@ -59,7 +60,7 @@ export class CLIOrchestrator implements ICLIOrchestrator {
       if (!securityValidation.allowed) {
         logger.warn(
           `🚫 Security validation failed for operation ${operationId}:`,
-          securityValidation.violations
+          stringArrayToRecord(securityValidation.violations)
         );
 
         metricsCollector.recordOperation(
@@ -84,29 +85,45 @@ export class CLIOrchestrator implements ICLIOrchestrator {
 
       const resilientResult = await resilientWrapper.executeWithRecovery(
         async () => {
-          // Adapt session format to match UseCaseRouter expectations
-          const adaptedSession = request.session ? {
-            id: request.session.id,
-            workingDirectory: request.session.workingDirectory || process.cwd(),
-            context: request.session.context || {
-              sessionId: request.session.id,
-              workingDirectory: request.session.workingDirectory || process.cwd(),
-              permissions: ['read', 'write'],
-              securityLevel: 'medium' as const,
-            },
-          } : undefined;
+          try {
+            // Primary operation - convert request to match UseCaseRouter interface
+            const adaptedRequest = {
+              ...request,
+              input:
+                typeof request.input === 'string' ||
+                (typeof request.input === 'object' && request.input !== null)
+                  ? request.input
+                  : String(request.input || ''),
+            };
+            return await useCaseRouter.executeOperation(adaptedRequest);
+          } catch (error) {
+            // Fallback operation - adapt session format and try again
+            const adaptedSession = request.session
+              ? {
+                  id: request.session.id,
+                  workingDirectory: request.session.workingDirectory || process.cwd(),
+                  context: request.session.context || {
+                    sessionId: request.session.id,
+                    workingDirectory: request.session.workingDirectory || process.cwd(),
+                    permissions: ['read', 'write'],
+                    securityLevel: 'medium' as const,
+                  },
+                }
+              : undefined;
 
-          const routerRequest = {
-            ...request,
-            input: typeof request.input === 'string' ? request.input : '',
-            session: adaptedSession,
-          };
-          return useCaseRouter.executeOperation(routerRequest);
+            const routerRequest = {
+              ...request,
+              input: typeof request.input === 'string' ? request.input : '',
+              session: adaptedSession,
+            };
+            return useCaseRouter.executeOperation(routerRequest);
+          }
         },
         {
           name: `CLI-${request.type}`,
           component: 'UnifiedCLICoordinator',
           critical: request.type === 'execute',
+          timeout: options.timeoutMs,
         },
         {
           enableGracefulDegradation: options.enableGracefulDegradation,
@@ -163,7 +180,7 @@ export class CLIOrchestrator implements ICLIOrchestrator {
         traceSpan
       );
 
-      logger.error(`CLI operation ${operationId} failed:`, error);
+      logger.error(`CLI operation ${operationId} failed:`, toErrorOrUndefined(error));
 
       return {
         id: operationId,

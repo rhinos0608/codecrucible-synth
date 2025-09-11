@@ -12,31 +12,51 @@ import { logger as concreteLogger } from './logger.js';
 export type { ILogger };
 
 export class LoggerAdapter implements ILogger {
-  constructor(private context?: string) {}
+  public constructor(private readonly context?: string) {}
 
-  info(message: string, meta?: any): void {
+  public info(message: string, meta?: unknown): void {
     const contextMessage = this.context ? `[${this.context}] ${message}` : message;
-    concreteLogger.info(contextMessage, meta);
+    concreteLogger.info(
+      contextMessage,
+      meta && typeof meta === 'object' && meta !== null
+        ? (meta as Record<string, unknown>)
+        : undefined
+    );
   }
 
-  error(message: string, error?: any): void {
+  public error(message: string, error?: unknown): void {
     const contextMessage = this.context ? `[${this.context}] ${message}` : message;
-    concreteLogger.error(contextMessage, error);
+    concreteLogger.error(contextMessage, error instanceof Error ? error : undefined);
   }
 
-  warn(message: string, meta?: any): void {
+  public warn(message: string, meta?: unknown): void {
     const contextMessage = this.context ? `[${this.context}] ${message}` : message;
-    concreteLogger.warn(contextMessage, meta);
+    concreteLogger.warn(
+      contextMessage,
+      meta && typeof meta === 'object' && meta !== null
+        ? (meta as Readonly<Record<string, unknown>>)
+        : undefined
+    );
   }
 
-  debug(message: string, meta?: any): void {
+  public debug(message: string, meta?: unknown): void {
     const contextMessage = this.context ? `[${this.context}] ${message}` : message;
-    concreteLogger.debug(contextMessage, meta);
+    concreteLogger.debug(
+      contextMessage,
+      meta && typeof meta === 'object' && meta !== null
+        ? (meta as Record<string, unknown>)
+        : undefined
+    );
   }
 
-  trace(message: string, meta?: any): void {
+  public trace(message: string, meta?: unknown): void {
     const contextMessage = this.context ? `[${this.context}] ${message}` : message;
-    concreteLogger.trace(contextMessage, meta);
+    concreteLogger.trace(
+      contextMessage,
+      meta && typeof meta === 'object' && meta !== null
+        ? (meta as Record<string, unknown>)
+        : undefined
+    );
   }
 }
 

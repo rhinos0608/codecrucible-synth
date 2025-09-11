@@ -8,9 +8,8 @@
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { outputConfig } from '../../utils/output-config.js';
-import {
-  loadRustExecutorSafely,
-} from '../../utils/rust-module-loader.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
+import { loadRustExecutorSafely } from '../../utils/rust-module-loader.js';
 import type {
   StreamChunk,
   StreamEvent,
@@ -19,31 +18,14 @@ import type {
   StreamSession,
 } from './stream-chunk-protocol.js';
 
-// Define the expected Rust module shape for type safety
-interface RustModule {
-  RustExecutor: new () => {
-    initialize: () => void;
-    streamFile: (
-      filePath: string,
-      chunkSize: number,
-      contextType: string,
-      chunkCallback: (chunk: unknown) => void
-    ) => string;
-    streamCommand: (
-      command: string,
-      args: readonly string[],
-      chunkSize: number,
-      chunkCallback: (chunk: unknown) => void
-    ) => string;
-    terminateStream?: (sessionId: string) => void;
-  };
-}
+// Import the complete interface from rust-module-loader
+import type { RustExecutorModule } from '../../utils/rust-module-loader.js';
 
 // Load the Rust executor with cross-platform support
 const rustModuleResult = loadRustExecutorSafely();
 const RustExecutor =
   rustModuleResult.available && rustModuleResult.module
-    ? (rustModuleResult.module as RustModule).RustExecutor
+    ? rustModuleResult.module.RustExecutor
     : null;
 
 if (rustModuleResult.available) {
@@ -56,7 +38,7 @@ if (rustModuleResult.available) {
  * High-performance streaming client backed by Rust
  */
 export class RustStreamingClient extends EventEmitter {
-  private readonly rustExecutor: InstanceType<RustModule['RustExecutor']> | null = null;
+  private readonly rustExecutor: InstanceType<RustExecutorModule['RustExecutor']> | null = null;
   private readonly activeSessions: Map<string, StreamSession> = new Map();
   private readonly processors: Map<string, StreamProcessor> = new Map();
   private readonly sessionTimeouts: Map<string, NodeJS.Timeout> = new Map();
@@ -69,11 +51,49 @@ export class RustStreamingClient extends EventEmitter {
 
     if (RustExecutor) {
       this.rustExecutor = new RustExecutor();
-      this.rustExecutor.initialize();
-      this.isInitialized = true;
-      logger.info('🦀 Rust streaming client initialized');
+      // Initialize asynchronously in background
+      this.initializeRustExecutor();
     } else {
       logger.warn('🔄 Rust executor unavailable - streaming will use TypeScript fallback');
+    }
+  }
+
+  private async initializeRustExecutor(): Promise<void> {
+    if (!this.rustExecutor) return;
+
+    try {
+      const initSuccess = await this.rustExecutor.initialize();
+      this.isInitialized = initSuccess;
+
+      // Check if runtime is available
+      if (typeof this.rustExecutor.is_runtime_available === 'function') {
+        const runtimeAvailable = this.rustExecutor.is_runtime_available();
+        logger.info('🦀 Rust streaming client initialized', {
+          initSuccess,
+          runtimeAvailable,
+          hasRuntimeStats: typeof this.rustExecutor.get_runtime_stats === 'function',
+        });
+
+        if (typeof this.rustExecutor.get_runtime_stats === 'function') {
+          try {
+            const stats = this.rustExecutor.get_runtime_stats();
+            logger.debug('Rust runtime stats:', JSON.parse(stats));
+          } catch (e) {
+            const errorInfo = toErrorOrUndefined(e);
+            logger.warn(
+              'Failed to get runtime stats:',
+              errorInfo
+                ? { message: errorInfo.message, name: errorInfo.name }
+                : { error: String(e) }
+            );
+          }
+        }
+      } else {
+        logger.info('🦀 Rust streaming client initialized (legacy runtime)');
+      }
+    } catch (error) {
+      logger.error('Failed to initialize Rust executor:', toErrorOrUndefined(error));
+      this.isInitialized = false;
     }
   }
 
@@ -129,7 +149,7 @@ export class RustStreamingClient extends EventEmitter {
       // Start streaming from Rust
       let rustStreamId = '';
       if (this.rustExecutor) {
-        rustStreamId = this.rustExecutor.streamFile(
+        rustStreamId = this.rustExecutor.stream_file(
           filePath,
           streamOptions.chunkSize,
           streamOptions.contextType,
@@ -142,7 +162,7 @@ export class RustStreamingClient extends EventEmitter {
       logger.info(`✅ Rust stream started: ${rustStreamId} for session ${sessionId}`);
       return sessionId;
     } catch (error) {
-      logger.error('❌ Rust file streaming failed:', error);
+      logger.error('❌ Rust file streaming failed:', toErrorOrUndefined(error));
       session.state = 'error';
       session.error = error instanceof Error ? error.message : String(error);
       await processor.onError(session.error, session);
@@ -191,17 +211,16 @@ export class RustStreamingClient extends EventEmitter {
 
     try {
       // Create callback for chunk processing
-      const chunkCallback = (chunk: unknown): undefined => {
+      const chunkCallback = (chunk: unknown): void => {
         void this.handleChunk(sessionId, chunk);
-        return undefined;
       };
 
       // Start streaming from Rust
       let rustStreamId = '';
       if (this.rustExecutor) {
-        rustStreamId = this.rustExecutor.streamCommand(
+        rustStreamId = this.rustExecutor.stream_command(
           command,
-          args,
+          [...args],
           streamOptions.chunkSize,
           chunkCallback
         );
@@ -212,10 +231,10 @@ export class RustStreamingClient extends EventEmitter {
       logger.info(`✅ Rust command stream started: ${rustStreamId} for session ${sessionId}`);
       return sessionId;
     } catch (error) {
-      logger.error('❌ Rust command streaming failed:', error);
+      logger.error('❌ Rust command streaming failed:', toErrorOrUndefined(error));
       session.state = 'error';
       session.error = error instanceof Error ? error.message : String(error);
-      await processor.onError(session.error, session);
+      await processor.onError(session.error ?? 'Unknown error', session);
       throw error;
     }
   }
@@ -249,7 +268,7 @@ export class RustStreamingClient extends EventEmitter {
         try {
           this.rustExecutor.terminateStream(sessionId);
         } catch (error) {
-          logger.debug(`Failed to terminate orphaned stream ${sessionId}:`, error);
+          logger.debug(`Failed to terminate orphaned stream ${sessionId}:`, { error });
         }
       }
       return;
@@ -286,11 +305,17 @@ export class RustStreamingClient extends EventEmitter {
           source: rawChunk.metadata.source,
           isLast: !!rawChunk.metadata.isLast,
           progress: typeof rawChunk.metadata.progress === 'number' ? rawChunk.metadata.progress : 0,
-          totalSize: typeof rawChunk.metadata.totalSize === 'number' ? rawChunk.metadata.totalSize : 0,
+          totalSize:
+            typeof rawChunk.metadata.totalSize === 'number' ? rawChunk.metadata.totalSize : 0,
           error: typeof rawChunk.metadata.error === 'string' ? rawChunk.metadata.error : undefined,
-          encoding: typeof rawChunk.metadata.encoding === 'string' ? rawChunk.metadata.encoding : undefined,
-          mimeType: typeof rawChunk.metadata.mimeType === 'string' ? rawChunk.metadata.mimeType : undefined,
-          compression: typeof rawChunk.metadata.compression === 'string' ? rawChunk.metadata.compression : undefined,
+          encoding:
+            typeof rawChunk.metadata.encoding === 'string' ? rawChunk.metadata.encoding : undefined,
+          mimeType:
+            typeof rawChunk.metadata.mimeType === 'string' ? rawChunk.metadata.mimeType : undefined,
+          compression:
+            typeof rawChunk.metadata.compression === 'string'
+              ? rawChunk.metadata.compression
+              : undefined,
         },
         timing: {
           generatedAt: rawChunk.timing.generatedAt,
@@ -347,7 +372,7 @@ export class RustStreamingClient extends EventEmitter {
         this.cleanupSession(sessionId);
       }
     } catch (error) {
-      logger.error(`Error processing chunk for session ${sessionId}:`, error);
+      logger.error(`Error processing chunk for session ${sessionId}:`, toErrorOrUndefined(error));
       session.state = 'error';
       session.error = error instanceof Error ? error.message : String(error);
       await processor.onError(session.error, session);
@@ -408,7 +433,7 @@ export class RustStreamingClient extends EventEmitter {
           processor.onError(session.error, session).catch(error => {
             logger.error(
               `Error calling processor onError for timed out session ${sessionId}:`,
-              error
+              error instanceof Error ? error : new Error(String(error))
             );
           });
         }
@@ -456,7 +481,9 @@ export class RustStreamingClient extends EventEmitter {
           this.rustExecutor.terminateStream(sessionId);
         }
       } catch (error) {
-        logger.warn(`Failed to terminate Rust stream ${sessionId}:`, error);
+        logger.warn(`Failed to terminate Rust stream ${sessionId}:`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 

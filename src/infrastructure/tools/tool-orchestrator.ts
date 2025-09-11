@@ -1,15 +1,15 @@
-import { WorkflowEngine, WorkflowStep, WorkflowResult } from './workflow-engine.js';
+import { WorkflowEngine, WorkflowResult, WorkflowStep } from './workflow-engine.js';
 import { ToolExecutionContext } from './unified-tool-registry.js';
 
 export class ToolOrchestrator {
-  private engine: WorkflowEngine;
+  private readonly engine: WorkflowEngine;
 
-  constructor(engine = new WorkflowEngine()) {
+  public constructor(engine: WorkflowEngine = new WorkflowEngine()) {
     this.engine = engine;
   }
 
-  async executeWorkflow(
-    steps: ReadonlyArray<Readonly<WorkflowStep<Readonly<Record<string, unknown>>>>>,
+  public async executeWorkflow(
+    steps: ReadonlyArray<WorkflowStep<Readonly<Record<string, unknown>>>>,
     context: ToolExecutionContext
   ): Promise<WorkflowResult> {
     return this.engine.run(steps, context);

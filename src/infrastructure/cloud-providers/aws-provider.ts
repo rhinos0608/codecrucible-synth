@@ -9,6 +9,7 @@ import * as EKS from '@aws-sdk/client-eks';
 import * as CloudFormation from '@aws-sdk/client-cloudformation';
 import * as AutoScaling from '@aws-sdk/client-auto-scaling';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface AWSDeploymentConfig {
   region: string;
@@ -103,7 +104,7 @@ export class AWSProvider {
 
       return response.StackId!;
     } catch (error) {
-      logger.error('Failed to deploy CloudFormation stack:', error);
+      logger.error('Failed to deploy CloudFormation stack:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -362,7 +363,7 @@ export class AWSProvider {
       logger.info(`Launched ${instances.length} EC2 instances`);
       return instances;
     } catch (error) {
-      logger.error('Failed to launch EC2 instances:', error);
+      logger.error('Failed to launch EC2 instances:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -445,7 +446,7 @@ export class AWSProvider {
       await this.autoScalingClient.send(asgCommand);
       logger.info(`Auto-scaling group created: ${groupName}`);
     } catch (error) {
-      logger.error('Failed to create auto-scaling group:', error);
+      logger.error('Failed to create auto-scaling group:', toErrorOrUndefined(error));
       throw error;
     }
   }

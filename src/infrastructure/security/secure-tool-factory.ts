@@ -18,6 +18,7 @@ import {
 import { RBACSystem, AuthorizationContext } from './production-rbac-system.js';
 import { z } from 'zod';
 import { logger } from '../logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import crypto from 'crypto';
 
 /**
@@ -62,7 +63,7 @@ export class SecureToolFactory {
 
       logger.info('✅ E2B service initialized - secure execution enabled');
     } catch (error) {
-      logger.warn('⚠️ E2B service initialization failed:', error);
+      logger.warn('⚠️ E2B service initialization failed:', toReadonlyRecord(error));
       logger.warn('🔒 Falling back to restricted execution mode');
       this.isE2BAvailable = false;
     }

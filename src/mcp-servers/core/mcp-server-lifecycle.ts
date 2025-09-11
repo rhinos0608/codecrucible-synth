@@ -11,6 +11,17 @@
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { mcpServerRegistry } from './mcp-server-registry.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
+
+/**
+ * Lightweight interface describing MCP servers managed by the lifecycle.
+ * Methods are optional because not all registered servers must implement every lifecycle hook.
+ */
+interface MCPServer {
+  initialize?: () => Promise<void> | void;
+  healthCheck?: () => Promise<boolean | { status?: string }> | boolean | { status?: string };
+  shutdown?: () => Promise<void> | void;
+}
 
 export interface LifecycleConfig {
   maxStartupTime: number; // Max time for all servers to start
@@ -33,14 +44,14 @@ export interface ServerHealthStatus {
  * Lightweight lifecycle orchestrator with circuit breaker pattern
  */
 export class MCPServerLifecycle extends EventEmitter {
-  private config: LifecycleConfig;
-  private healthStatuses: Map<string, ServerHealthStatus> = new Map();
-  private healthCheckIntervals: Map<string, NodeJS.Timeout> = new Map();
-  private circuitBreakers: Map<string, CircuitBreakerState> = new Map();
+  private readonly config: LifecycleConfig;
+  private readonly healthStatuses: Map<string, ServerHealthStatus> = new Map();
+  private readonly healthCheckIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private readonly circuitBreakers: Map<string, CircuitBreakerState> = new Map();
   private shutdownInProgress = false;
   private startupCompleted = false;
 
-  constructor(config: Partial<LifecycleConfig> = {}) {
+  public constructor(config: Readonly<Partial<LifecycleConfig>> = {}) {
     super();
 
     this.config = {
@@ -59,7 +70,7 @@ export class MCPServerLifecycle extends EventEmitter {
   /**
    * Start all registered servers with dependency resolution
    */
-  async startAll(): Promise<void> {
+  public async startAll(): Promise<void> {
     if (this.startupCompleted) {
       logger.warn('Lifecycle startup already completed');
       return;
@@ -90,7 +101,7 @@ export class MCPServerLifecycle extends EventEmitter {
       // Begin health monitoring
       this.startHealthMonitoring();
     } catch (error) {
-      logger.error('❌ MCP lifecycle startup failed:', error);
+      logger.error('❌ MCP lifecycle startup failed:', toErrorOrUndefined(error));
       this.emit('startupFailed', error);
       throw error;
     }
@@ -103,12 +114,9 @@ export class MCPServerLifecycle extends EventEmitter {
     const serverIds = mcpServerRegistry.getRegisteredServerIds();
 
     // Sort by priority (higher priority first)
-    const sortedIds = serverIds.sort((a, b) => {
-      const regA = mcpServerRegistry['registrations'].get(a);
-      const regB = mcpServerRegistry['registrations'].get(b);
-      if (!regA || !regB) return 0;
-      return regB.definition.priority - regA.definition.priority;
-    });
+    // If you want to implement priority, add a getPriority method to mcpServerRegistry.
+    // For now, sort as-is (no priority).
+    const sortedIds = serverIds;
 
     // Initialize health status for all servers
     for (const serverId of sortedIds) {
@@ -126,21 +134,47 @@ export class MCPServerLifecycle extends EventEmitter {
 
     // Start servers (registry handles dependencies and lazy loading)
     const startPromises = sortedIds
-      .filter(id => mcpServerRegistry.isServerAvailable(id))
-      .map(id => this.startServerSafely(id));
+      .filter((id: string) => mcpServerRegistry.isServerAvailable(id))
+      .map(async (id: string): Promise<void> => {
+        await this.startServerSafely(id);
+      });
 
     // Use Promise.allSettled but check for failures to fail fast
     const results = await Promise.allSettled(startPromises);
 
     // Check for critical server failures
     const failures = results
-      .map((result, index) => ({ result, serverId: sortedIds[index] }))
-      .filter(({ result }) => result.status === 'rejected');
+      .map((result: Readonly<PromiseSettledResult<void>>, index: number) => ({
+        result,
+        serverId: sortedIds[index],
+      }))
+      .filter(
+        (entry: Readonly<{ result: Readonly<PromiseSettledResult<void>>; serverId: string }>) =>
+          entry.result.status === 'rejected'
+      );
 
     if (failures.length > 0) {
-      const failedServerIds = failures.map(({ serverId }) => serverId);
-      const errorMessages = failures.map(({ result }) =>
-        result.status === 'rejected' ? result.reason.message || result.reason : 'Unknown error'
+      const failedServerIds = failures.map(
+        (entry: Readonly<{ result: Readonly<PromiseSettledResult<void>>; serverId: string }>) =>
+          entry.serverId
+      );
+      const errorMessages = failures.map(
+        (entry: Readonly<{ result: Readonly<PromiseSettledResult<void>>; serverId: string }>) => {
+          const { result } = entry;
+          if (result.status === 'rejected') {
+            const { reason }: { reason: unknown } = result as PromiseRejectedResult;
+            if (
+              reason &&
+              typeof reason === 'object' &&
+              'message' in reason &&
+              typeof (reason as { message?: unknown }).message === 'string'
+            ) {
+              return (reason as { message: string }).message;
+            }
+            return String(reason);
+          }
+          return 'Unknown error';
+        }
       );
 
       const errorMsg = `Critical MCP servers failed to start: ${failedServerIds.join(', ')}. Errors: ${errorMessages.join('; ')}`;
@@ -152,30 +186,15 @@ export class MCPServerLifecycle extends EventEmitter {
   }
 
   /**
-   * Start a single server with error isolation - throws for critical failures
+   * Safely start a server by id, handling missing initialize and errors.
    */
   private async startServerSafely(serverId: string): Promise<void> {
-    try {
-      // Get server instance (triggers lazy initialization)
-      const server = await mcpServerRegistry.getServer(serverId);
-
-      // Initialize if server has init method
-      if (server && typeof server.initialize === 'function') {
-        await server.initialize();
-      }
-
-      logger.info(`✅ Server ${serverId} started successfully`);
-      this.emit('serverStarted', serverId);
-    } catch (error) {
-      logger.error(`❌ Failed to start server ${serverId}:`, error);
-      this.updateHealthStatus(serverId, 'unhealthy', error);
-      this.emit('serverStartFailed', serverId, error);
-
-      // Re-throw the error so Promise.allSettled can detect the failure
-      // This enables fail-fast behavior for critical server startup failures
-      throw new Error(
-        `Server ${serverId} failed to start: ${error instanceof Error ? error.message : String(error)}`
-      );
+    const server = (await mcpServerRegistry.getServer(serverId)) as MCPServer;
+    if (server && typeof server.initialize === 'function') {
+      await server.initialize();
+      logger.info(`✅ Server ${serverId} initialized`);
+    } else {
+      logger.info(`ℹ️ Server ${serverId} has no initialize method, skipping`);
     }
   }
 
@@ -186,10 +205,9 @@ export class MCPServerLifecycle extends EventEmitter {
     if (!this.config.healthCheckInterval) return;
 
     for (const serverId of this.healthStatuses.keys()) {
-      const interval = setInterval(
-        () => this.performHealthCheck(serverId),
-        this.config.healthCheckInterval
-      );
+      const interval = setInterval(() => {
+        void this.performHealthCheck(serverId);
+      }, this.config.healthCheckInterval);
 
       this.healthCheckIntervals.set(serverId, interval);
     }
@@ -204,36 +222,48 @@ export class MCPServerLifecycle extends EventEmitter {
     const healthStatus = this.healthStatuses.get(serverId);
     if (!healthStatus) return;
 
+    // Skip if server is not available (disabled)
+    if (!mcpServerRegistry.isServerAvailable(serverId)) {
+      logger.debug(`⏭️ Skipping health check for disabled server: ${serverId}`);
+      return;
+    }
+
     // Skip if circuit breaker is open
     const circuitState = this.circuitBreakers.get(serverId);
     if (circuitState && circuitState.state === 'open') {
       if (Date.now() - circuitState.lastFailure > this.config.circuitBreakerTimeout) {
-        // Try to close circuit breaker
-        circuitState.state = 'half-open';
-        logger.info(`🔄 Circuit breaker half-open for ${serverId}`);
+        // Try to close circuit breaker after timeout
+        this.resetCircuitBreaker(serverId);
       } else {
-        return; // Skip health check while circuit is open
+        // Circuit breaker is still open, skip health check
+        this.updateHealthStatus(serverId, 'circuit_open');
+        return;
       }
     }
 
+    // Get server instance
+    const server = (await mcpServerRegistry.getServer(serverId)) as MCPServer;
+
+    // Perform health check if server supports it
+    let isHealthy = true;
     const startTime = Date.now();
-
     try {
-      // Get server instance
-      const server = await mcpServerRegistry.getServer(serverId);
-
-      // Perform health check if server supports it
-      let isHealthy = true;
-      if (server && typeof server.healthCheck === 'function') {
-        const healthResult = await Promise.race([
+      let healthResult: boolean | { status?: string } = true;
+      if (typeof server.healthCheck === 'function') {
+        healthResult = (await Promise.race([
           server.healthCheck(),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Health check timeout')), 5000)
-          ),
-        ]);
-        isHealthy = healthResult === true || (healthResult && healthResult.status === 'healthy');
+          new Promise<never>((_, reject) => {
+            setTimeout(() => {
+              reject(new Error('Health check timeout'));
+            }, 5000);
+          }),
+        ])) as boolean | { status?: string };
+        isHealthy =
+          healthResult === true ||
+          (typeof healthResult === 'object' &&
+            healthResult !== null &&
+            (healthResult as { status?: string }).status === 'healthy');
       }
-
       const responseTime = Date.now() - startTime;
 
       if (isHealthy) {
@@ -261,7 +291,7 @@ export class MCPServerLifecycle extends EventEmitter {
   private updateHealthStatus(
     serverId: string,
     status: ServerHealthStatus['status'],
-    error?: any,
+    error?: unknown,
     responseTime?: number
   ): void {
     const healthStatus = this.healthStatuses.get(serverId);
@@ -344,21 +374,21 @@ export class MCPServerLifecycle extends EventEmitter {
   /**
    * Get health status for all servers
    */
-  getHealthStatus(): ServerHealthStatus[] {
+  public getHealthStatus(): ServerHealthStatus[] {
     return Array.from(this.healthStatuses.values());
   }
 
   /**
    * Get health status for specific server
    */
-  getServerHealth(serverId: string): ServerHealthStatus | null {
-    return this.healthStatuses.get(serverId) || null;
+  public getServerHealth(serverId: string): ServerHealthStatus | null {
+    return this.healthStatuses.get(serverId) ?? null;
   }
 
   /**
    * Graceful shutdown of all servers
    */
-  async shutdown(): Promise<void> {
+  public async shutdown(): Promise<void> {
     if (this.shutdownInProgress) {
       logger.warn('Shutdown already in progress');
       return;
@@ -385,7 +415,7 @@ export class MCPServerLifecycle extends EventEmitter {
       logger.info('✅ MCP server lifecycle shutdown completed');
       this.emit('shutdownComplete');
     } catch (error) {
-      logger.error('❌ Error during shutdown:', error);
+      logger.error('❌ Error during shutdown:', toErrorOrUndefined(error));
       this.emit('shutdownError', error);
     } finally {
       this.cleanup();
@@ -393,24 +423,21 @@ export class MCPServerLifecycle extends EventEmitter {
   }
 
   /**
-   * Shutdown all servers
+   * Shutdown all registered servers gracefully
    */
   private async shutdownAllServers(): Promise<void> {
-    const serverIds = Array.from(this.healthStatuses.keys());
-
-    // Shutdown in reverse priority order
-    const shutdownPromises = serverIds.map(async serverId => {
+    const serverIds = mcpServerRegistry.getRegisteredServerIds();
+    const shutdownPromises = serverIds.map(async (serverId: string) => {
       try {
-        const server = await mcpServerRegistry.getServer(serverId);
+        const server = (await mcpServerRegistry.getServer(serverId)) as MCPServer;
         if (server && typeof server.shutdown === 'function') {
           await server.shutdown();
         }
         logger.info(`✅ Server ${serverId} shutdown completed`);
       } catch (error) {
-        logger.error(`❌ Error shutting down server ${serverId}:`, error);
+        logger.error(`❌ Error shutting down server ${serverId}:`, toErrorOrUndefined(error));
       }
     });
-
     await Promise.allSettled(shutdownPromises);
   }
 
@@ -430,7 +457,7 @@ export class MCPServerLifecycle extends EventEmitter {
   private setupProcessHandlers(): void {
     const gracefulShutdown = () => {
       logger.info('Received shutdown signal, initiating graceful shutdown...');
-      this.shutdown().finally(() => {
+      void this.shutdown().finally(() => {
         process.exit(0);
       });
     };

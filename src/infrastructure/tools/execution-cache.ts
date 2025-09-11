@@ -1,11 +1,11 @@
 export interface CachedItem {
-  result: any;
+  result: unknown;
   timestamp: number;
   ttl: number;
 }
 
 export class ExecutionCache extends Map<string, CachedItem> {
-  getValid(key: string): any | null {
+  public getValid(key: string): unknown {
     const cached = this.get(key);
     if (cached && Date.now() - cached.timestamp < cached.ttl) {
       return cached.result;
@@ -16,11 +16,11 @@ export class ExecutionCache extends Map<string, CachedItem> {
     return null;
   }
 
-  setResult(key: string, result: any, ttl: number): void {
+  public setResult(key: string, result: unknown, ttl: number): void {
     this.set(key, { result, timestamp: Date.now(), ttl });
   }
 
-  startCleanup(): NodeJS.Timeout {
+  public startCleanup(): NodeJS.Timeout {
     return setInterval(() => {
       const now = Date.now();
       for (const [key, cached] of this.entries()) {
@@ -32,7 +32,7 @@ export class ExecutionCache extends Map<string, CachedItem> {
   }
 }
 
-export function shouldCacheResult(result: any): boolean {
+export function shouldCacheResult(result: unknown): boolean {
   if (result instanceof Error || JSON.stringify(result).length > 100000) {
     return false;
   }

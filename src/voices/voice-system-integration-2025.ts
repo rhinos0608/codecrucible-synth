@@ -5,7 +5,8 @@
 
 import { VoiceArchetypeSystem } from './voice-archetype-system.js';
 import { logger } from '../infrastructure/logging/logger.js';
-import { CouncilMode } from './collaboration/council-decision-engine.js';
+import { toErrorOrUndefined } from '../utils/type-guards.js';
+import type { CouncilMode } from './collaboration/council-decision-engine.js';
 import { type IModelClient } from '../domain/interfaces/model-client.js';
 
 export interface VoiceSystemConfig {
@@ -126,7 +127,10 @@ export class VoiceSystemIntegration2025 {
       this.initialized = true;
       logger.info('Voice System Integration 2025 initialized successfully');
     } catch (error) {
-      logger.error('Failed to initialize Voice System Integration 2025:', error);
+      logger.error(
+        'Failed to initialize Voice System Integration 2025:',
+        toErrorOrUndefined(error)
+      );
       throw error;
     }
   }
@@ -146,7 +150,7 @@ export class VoiceSystemIntegration2025 {
       // Convert SynthesisResult to Record<string, unknown>
       return result as unknown as Record<string, unknown>;
     } catch (error) {
-      logger.error('Voice synthesis failed:', error);
+      logger.error('Voice synthesis failed:', toErrorOrUndefined(error));
 
       if (this.config.fallbackToLegacy) {
         logger.info('Falling back to legacy voice processing');
@@ -240,7 +244,12 @@ export class VoiceSystemIntegration2025 {
     // Adaptive selection based on criteria
     const priorities = this.calculateVoicePriorities(voices, criteria);
     return priorities
-      .sort((a: Readonly<{ voice: string; priority: number }>, b: Readonly<{ voice: string; priority: number }>) => b.priority - a.priority)
+      .sort(
+        (
+          a: Readonly<{ voice: string; priority: number }>,
+          b: Readonly<{ voice: string; priority: number }>
+        ) => b.priority - a.priority
+      )
       .slice(0, count)
       .map((v: Readonly<{ voice: string; priority: number }>) => v.voice);
   }
@@ -255,7 +264,10 @@ export class VoiceSystemIntegration2025 {
     }));
   }
 
-  private calculateVoicePriority(voice: string, criteria: Readonly<Record<string, unknown>>): number {
+  private calculateVoicePriority(
+    voice: string,
+    criteria: Readonly<Record<string, unknown>>
+  ): number {
     let priority = 0.5; // Base priority
 
     // Simple priority calculation based on voice type and criteria
@@ -385,7 +397,7 @@ export class VoiceSystemIntegration2025 {
         const voiceResult = await this.synthesizeSingleVoice(voice, request, options);
         results.push(voiceResult);
       } catch (error) {
-        logger.error(`Failed to synthesize voice ${voice}:`, error);
+        logger.error(`Failed to synthesize voice ${voice}:`, toErrorOrUndefined(error));
         // Continue with other voices
       }
     }
@@ -395,7 +407,10 @@ export class VoiceSystemIntegration2025 {
       voices: results,
       strategy: options.strategy ?? 'consensus',
       confidence:
-        results.length > 0 ? (results as ReadonlyArray<VoiceResult>).reduce((sum, r) => sum + r.confidence, 0) / results.length : 0,
+        results.length > 0
+          ? (results as ReadonlyArray<VoiceResult>).reduce((sum, r) => sum + r.confidence, 0) /
+            results.length
+          : 0,
       processingTime: Date.now(),
     };
   }
@@ -645,11 +660,18 @@ export class VoiceSystemIntegration2025 {
   ): Promise<SynthesisResult> {
     const results = await this.generateMultiVoiceSolutions(voices, prompt, {});
     return {
-      content: (results as ReadonlyArray<VoiceResult>).map((r: Readonly<VoiceResult>) => r.content).join('\n\n'),
+      content: (results as ReadonlyArray<VoiceResult>)
+        .map((r: Readonly<VoiceResult>) => r.content)
+        .join('\n\n'),
       voices: results,
       strategy,
       confidence:
-        results.length > 0 ? (results as ReadonlyArray<VoiceResult>).reduce((sum: number, r: Readonly<VoiceResult>) => sum + r.confidence, 0) / results.length : 0,
+        results.length > 0
+          ? (results as ReadonlyArray<VoiceResult>).reduce(
+              (sum: number, r: Readonly<VoiceResult>) => sum + r.confidence,
+              0
+            ) / results.length
+          : 0,
       processingTime: Date.now(),
     };
   }

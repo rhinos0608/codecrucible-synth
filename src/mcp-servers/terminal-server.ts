@@ -8,7 +8,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { ChildProcess, spawn } from 'child_process';
 import * as path from 'path';
 import { logger } from '../infrastructure/logging/logger.js';
-import { ToolExecutionArgs } from '../infrastructure/types/tool-execution-types.js';
+import { ToolExecutionArgs } from '../domain/interfaces/tool-execution.js';
 import { ToolCallResponse } from './smithery-mcp-server.js';
 
 // Secure command execution using spawn instead of exec to prevent shell injection
@@ -38,43 +38,70 @@ export class TerminalMCPServer {
   private readonly activeProcesses: Map<string, ChildProcess> = new Map();
 
   public constructor(config: TerminalConfig = {}) {
+    const isWin = process.platform === 'win32';
     this.config = {
       workingDirectory: config.workingDirectory ?? process.cwd(),
-      allowedCommands: config.allowedCommands ?? [
-        'npm',
-        'node',
-        'git',
-        'ls',
-        'cat',
-        'pwd',
-        'echo',
-        'mkdir',
-        'touch',
-        'grep',
-        'find',
-        'head',
-        'tail',
-        'wc',
-        'sort',
-        'uniq',
-        'tree',
-        'tsc',
-        'tsx',
-        'eslint',
-        'prettier',
-        'jest',
-        'mocha',
-        'vitest',
-        'curl',
-        'wget',
-        'python',
-        'python3',
-        'pip',
-        'pip3',
-        'cargo',
-        'rustc',
-        'go',
-      ],
+      allowedCommands:
+        config.allowedCommands ??
+        (isWin
+          ? [
+              'cmd',
+              'powershell',
+              'where',
+              'dir',
+              'type',
+              'findstr',
+              'npm',
+              'node',
+              'git',
+              'tsc',
+              'tsx',
+              'eslint',
+              'prettier',
+              'jest',
+              'mocha',
+              'vitest',
+              'python',
+              'pip',
+              'cargo',
+              'rustc',
+              'go',
+            ]
+          : [
+              'npm',
+              'node',
+              'git',
+              'ls',
+              'cat',
+              'pwd',
+              'echo',
+              'mkdir',
+              'touch',
+              'grep',
+              'find',
+              'head',
+              'tail',
+              'wc',
+              'sort',
+              'uniq',
+              'tree',
+              'tsc',
+              'tsx',
+              'eslint',
+              'prettier',
+              'jest',
+              'mocha',
+              'vitest',
+              'curl',
+              'wget',
+              'python',
+              'python3',
+              'pip',
+              'pip3',
+              'cargo',
+              'rustc',
+              'go',
+            ]),
       blockedCommands: config.blockedCommands ?? [
         'rm',
         'del',
@@ -200,7 +227,7 @@ export class TerminalMCPServer {
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
       const typedArgs = args ?? {};
 
@@ -276,7 +303,7 @@ export class TerminalMCPServer {
     timeout?: number
   ): Promise<TerminalResult> {
     const startTime = Date.now();
-    
+
     // Security: Check command against allow-list before parsing arguments
     if (!this.isCommandAllowed(command)) {
       throw new Error(`Command not allowed: ${command}`);
@@ -284,7 +311,7 @@ export class TerminalMCPServer {
 
     // Security: Use spawn instead of exec to prevent shell injection
     // Arguments are passed as separate array elements, not concatenated into shell command
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       let stdout = '';
       let stderr = '';
       let timedOut = false;
@@ -308,45 +335,45 @@ export class TerminalMCPServer {
       }, timeoutMs);
 
       // Collect stdout
-      if (child.stdout) {
-        child.stdout.on('data', (data) => {
-          stdout += data?.toString() || '';
-          if (stdout.length > (this.config.maxOutputSize || 1024 * 1024)) {
-            child.kill('SIGTERM');
-          }
-        });
-      }
+      child.stdout.on('data', (data: Readonly<Buffer>) => {
+        stdout += data.toString() || '';
+        if (stdout.length > (this.config.maxOutputSize ?? 1024 * 1024)) {
+          child.kill('SIGTERM');
+        }
+      });
 
       // Collect stderr
-      if (child.stderr) {
-        child.stderr.on('data', (data) => {
-          stderr += data?.toString() || '';
-          if (stderr.length > (this.config.maxOutputSize || 1024 * 1024)) {
-            child.kill('SIGTERM');
-          }
-        });
-      }
+      child.stderr.on('data', (data: Readonly<Buffer>) => {
+        stderr += data.toString() || '';
+        if (stderr.length > (this.config.maxOutputSize ?? 1024 * 1024)) {
+          child.kill('SIGTERM');
+        }
+      });
 
       // Handle completion
       child.on('close', (code, signal) => {
         clearTimeout(timeoutHandle);
         const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
-        
+
         resolve({
           stdout,
           stderr,
           exitCode: code ?? (signal ? 128 : 1),
           duration: Date.now() - startTime,
           command: fullCommand,
-          error: timedOut ? 'Command timed out' : (signal ? `Killed by signal: ${signal}` : undefined),
+          error: timedOut
+            ? 'Command timed out'
+            : signal
+              ? `Killed by signal: ${signal}`
+              : undefined,
         });
       });
 
       // Handle spawn errors
-      child.on('error', (error) => {
+      child.on('error', error => {
         clearTimeout(timeoutHandle);
         const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
-        
+
         resolve({
           stdout,
           stderr,
@@ -457,7 +484,9 @@ export class TerminalMCPServer {
     }
   }
 
-  public async getEnvironment(variable?: string): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
+  public async getEnvironment(
+    variable?: string
+  ): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
     await Promise.resolve(); // Ensures at least one await expression
     if (variable) {
       const value = process.env[variable];
@@ -478,7 +507,9 @@ export class TerminalMCPServer {
     }
   }
 
-  public async setWorkingDirectory(dirPath: string): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
+  public async setWorkingDirectory(
+    dirPath: string
+  ): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
     try {
       const fs = await import('fs/promises');
       await fs.access(dirPath); // Check if directory exists
@@ -498,10 +529,14 @@ export class TerminalMCPServer {
     }
   }
 
-  public async listProcesses(): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
+  public async listProcesses(): Promise<{
+    content: { type: 'text'; text: string }[];
+    isError: boolean;
+  }> {
     await Promise.resolve(); // Ensures at least one await expression
     const processList = Array.from(this.activeProcesses.entries()).map(
-      ([id, process]: readonly [string, ChildProcess]) => `${id}: PID ${process.pid} (${process.killed ? 'killed' : 'running'})`
+      ([id, process]: readonly [string, ChildProcess]) =>
+        `${id}: PID ${process.pid} (${process.killed ? 'killed' : 'running'})`
     );
 
     return {
@@ -515,7 +550,9 @@ export class TerminalMCPServer {
     };
   }
 
-  public async killProcess(processId: string): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
+  public async killProcess(
+    processId: string
+  ): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
     await Promise.resolve(); // Ensures at least one await expression
     const process = this.activeProcesses.get(processId);
     if (!process) {
@@ -566,30 +603,33 @@ export class TerminalMCPServer {
   }
 
   /**
-     * Call a tool directly (for internal use)
-     */
-    public async callTool(toolName: string, args: Readonly<ToolExecutionArgs>): Promise<ToolCallResponse> {
-      switch (toolName) {
-        case 'run_command':
-          return this.runCommand(
-            args.command ?? '',
-            args.args ?? [],
-            typeof args.workingDirectory === 'string' ? args.workingDirectory : undefined,
-            typeof args.timeout === 'number' ? args.timeout : undefined,
-            args.captureOutput !== false
-          );
-        case 'run_script':
-          return this.runScript(
-            args.content ?? '',
-            typeof args.interpreter === 'string' ? args.interpreter : 'bash',
-            typeof args.workingDirectory === 'string' ? args.workingDirectory : undefined,
-            typeof args.timeout === 'number' ? args.timeout : undefined
-          );
-        case 'get_environment':
-          return this.getEnvironment(typeof args.variable === 'string' ? args.variable : undefined);
-        case 'set_working_directory':
-          return this.setWorkingDirectory(args.path ?? '.');
-        case 'list_processes':
+   * Call a tool directly (for internal use)
+   */
+  public async callTool(
+    toolName: string,
+    args: Readonly<ToolExecutionArgs>
+  ): Promise<ToolCallResponse> {
+    switch (toolName) {
+      case 'run_command':
+        return this.runCommand(
+          args.command ?? '',
+          args.args ?? [],
+          typeof args.workingDirectory === 'string' ? args.workingDirectory : undefined,
+          typeof args.timeout === 'number' ? args.timeout : undefined,
+          args.captureOutput !== false
+        );
+      case 'run_script':
+        return this.runScript(
+          args.content ?? '',
+          typeof args.interpreter === 'string' ? args.interpreter : 'bash',
+          typeof args.workingDirectory === 'string' ? args.workingDirectory : undefined,
+          typeof args.timeout === 'number' ? args.timeout : undefined
+        );
+      case 'get_environment':
+        return this.getEnvironment(typeof args.variable === 'string' ? args.variable : undefined);
+      case 'set_working_directory':
+        return this.setWorkingDirectory(args.path ?? '.');
+      case 'list_processes':
         return this.listProcesses();
       case 'kill_process':
         return this.killProcess(args.processId as string);

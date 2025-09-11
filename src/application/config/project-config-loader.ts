@@ -13,6 +13,7 @@ import { access, readFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { parse as parseYAML } from 'yaml';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface ProjectInstructions {
   projectName?: string;
@@ -201,7 +202,7 @@ export class ProjectConfigurationLoader {
 
       return config;
     } catch (error) {
-      logger.warn('❌ Failed to load project configuration:', error);
+      logger.warn('❌ Failed to load project configuration:', toReadonlyRecord(error));
       config.loadTime = Date.now();
       return config;
     }

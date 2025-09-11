@@ -51,7 +51,11 @@ export interface SystemEvents {
   'security:audit': { action: string; result: 'allow' | 'deny' };
 
   // Performance Events
-  'performance:operation_start': { operationId: string; operationType: string; metadata?: Record<string, unknown> };
+  'performance:operation_start': {
+    operationId: string;
+    operationType: string;
+    metadata?: Record<string, unknown>;
+  };
   'performance:operation_end': {
     operationId: string;
     duration: number;

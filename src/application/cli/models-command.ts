@@ -7,6 +7,7 @@
 import { ModelInfo, ModelSelector } from '../../infrastructure/user-interaction/model-selector.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { createCliTimeout } from '../../utils/timeout-utils.js';
+import { stringToRecord } from '../../utils/type-guards.js';
 import { enterpriseErrorHandler } from '../../infrastructure/error-handling/enterprise-error-handler.js';
 
 export interface ModelsCommandOptions {
@@ -229,7 +230,7 @@ export class ModelsCommand {
     if (modelsResult.success) {
       return modelsResult.result || [];
     } else {
-      logger.warn('Model discovery timed out or failed:', modelsResult.error);
+      logger.warn('Model discovery timed out or failed:', stringToRecord(modelsResult.error));
       return [];
     }
   }

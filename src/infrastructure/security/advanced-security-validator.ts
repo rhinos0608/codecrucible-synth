@@ -3,10 +3,11 @@
  * Enhanced security validation with enterprise-grade features
  */
 
-import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
+import { IUnifiedSecurityValidator, SecurityValidationResult } from '../../domain/interfaces/security-validator.js';
 import { ModernInputSanitizer } from './modern-input-sanitizer.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 import type { ILogger } from '../../domain/interfaces/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface SecurityValidationOptions {
   enableStrictMode: boolean;
@@ -21,7 +22,7 @@ export interface ValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
-  sanitizedInput?: any;
+  sanitizedInput?: unknown;
   securityLevel: 'low' | 'medium' | 'high' | 'critical';
   validationTime: number;
   // Add missing properties for compatibility
@@ -35,11 +36,14 @@ export interface ValidationResult {
 }
 
 export class AdvancedSecurityValidator {
-  private unifiedValidator: UnifiedSecurityValidator;
+  private unifiedValidator: IUnifiedSecurityValidator;
   private inputSanitizer: ModernInputSanitizer;
   private options: SecurityValidationOptions;
 
-  constructor(options?: Partial<SecurityValidationOptions>) {
+  constructor(
+    unifiedValidator: IUnifiedSecurityValidator,
+    options?: Partial<SecurityValidationOptions>
+  ) {
     this.options = {
       enableStrictMode: true,
       maxInputLength: 10000,
@@ -59,16 +63,9 @@ export class AdvancedSecurityValidator {
       ...options,
     };
 
-    // Create a logger for the validator
-    const validatorLogger = {
-      info: (msg: string) => console.log(`[SecurityValidator] ${msg}`),
-      error: (msg: string, error?: any) => console.error(`[SecurityValidator] ${msg}`, error),
-      warn: (msg: string) => console.warn(`[SecurityValidator] ${msg}`),
-      debug: (msg: string) => console.debug(`[SecurityValidator] ${msg}`),
-      trace: (msg: string) => console.trace(`[SecurityValidator] ${msg}`),
-    } as ILogger;
-
-    this.unifiedValidator = new UnifiedSecurityValidator(validatorLogger, {
+    // Use the injected validator and update its configuration
+    this.unifiedValidator = unifiedValidator;
+    this.unifiedValidator.updateConfig({
       enabled: true,
       securityLevel: this.options.enableStrictMode ? 'strict' : 'medium',
       maxInputLength: this.options.maxInputLength,
@@ -104,25 +101,26 @@ export class AdvancedSecurityValidator {
     this.inputSanitizer = new ModernInputSanitizer();
   }
 
-  async validate(input: any, context: any = {}): Promise<ValidationResult> {
+  async validate(input: unknown, context: Record<string, unknown> = {}): Promise<ValidationResult> {
     const startTime = Date.now();
     const errors: string[] = [];
     const warnings: string[] = [];
     let securityLevel: ValidationResult['securityLevel'] = 'low';
 
     try {
-      // Basic validation using unified validator
-      const basicValidation = await this.unifiedValidator.validateInput(input.toString(), {
-        sessionId: context.sessionId || 'default',
+      // Basic validation using unified validator - properly handle unknown input type
+      const inputString = typeof input === 'string' ? input : String(input);
+      const basicValidation = await this.unifiedValidator.validateInput(inputString, {
+        sessionId: typeof context.sessionId === 'string' ? context.sessionId : 'default',
         requestId: `advanced-${Date.now()}`,
         userAgent: 'CodeCrucible-AdvancedSecurityValidator',
         ipAddress: '127.0.0.1',
         timestamp: new Date(),
         operationType: 'advanced-security-validation',
-        userId: context.userId,
-        workingDirectory: context.workingDirectory || process.cwd(),
+        userId: typeof context.userId === 'string' ? context.userId : undefined,
+        workingDirectory: typeof context.workingDirectory === 'string' ? context.workingDirectory : process.cwd(),
         environment: this.options.enableStrictMode ? 'production' : 'development',
-        permissions: context.permissions || [],
+        permissions: Array.isArray(context.permissions) ? context.permissions as string[] : [],
         metadata: {
           securityLevel: this.options.enableStrictMode ? 'high' : 'medium',
           timeoutMs: 30000,
@@ -200,7 +198,7 @@ export class AdvancedSecurityValidator {
 
       return result;
     } catch (error) {
-      logger.error('Advanced security validation failed:', error);
+      logger.error('Advanced security validation failed:', toErrorOrUndefined(error));
 
       return {
         isValid: false,
@@ -223,11 +221,11 @@ export class AdvancedSecurityValidator {
   /**
    * Validate input (alias for validate method for backward compatibility)
    */
-  async validateInput(input: any, context: any = {}): Promise<ValidationResult> {
+  async validateInput(input: unknown, context: Record<string, unknown> = {}): Promise<ValidationResult> {
     return await this.validate(input, context);
   }
 
-  async validateBatch(inputs: any[], context: any = {}): Promise<ValidationResult[]> {
+  async validateBatch(inputs: unknown[], context: Record<string, unknown> = {}): Promise<ValidationResult[]> {
     const results = await Promise.all(inputs.map(async input => this.validate(input, context)));
 
     // Log batch summary if logging is enabled
@@ -245,7 +243,7 @@ export class AdvancedSecurityValidator {
     logger.info('Advanced security validator options updated');
   }
 
-  getSecurityReport(): any {
+  getSecurityReport(): Record<string, unknown> {
     return {
       options: this.options,
       validationCount: 0, // Would track in real implementation
@@ -256,7 +254,7 @@ export class AdvancedSecurityValidator {
   }
 
   // Private validation methods
-  private validatePatterns(input: any): { isValid: boolean; errors: string[]; warnings: string[] } {
+  private validatePatterns(input: unknown): { isValid: boolean; errors: string[]; warnings: string[] } {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -287,7 +285,7 @@ export class AdvancedSecurityValidator {
     };
   }
 
-  private validateLength(input: any): { isValid: boolean; errors: string[] } {
+  private validateLength(input: unknown): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
     const inputStr = typeof input === 'string' ? input : JSON.stringify(input);
 
@@ -304,8 +302,8 @@ export class AdvancedSecurityValidator {
   }
 
   private validateStructure(
-    input: any,
-    context: any
+    input: unknown,
+    context: Record<string, unknown>
   ): { isValid: boolean; errors: string[]; warnings: string[] } {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -336,7 +334,7 @@ export class AdvancedSecurityValidator {
     };
   }
 
-  private isEncrypted(input: any): boolean {
+  private isEncrypted(input: unknown): boolean {
     // Simple heuristic to check if input might be encrypted
     if (typeof input !== 'string') return false;
 
@@ -344,7 +342,7 @@ export class AdvancedSecurityValidator {
     return /^[A-Za-z0-9+/]+=*$/.test(input) && input.length > 20;
   }
 
-  private getObjectDepth(obj: any, depth: number = 0): number {
+  private getObjectDepth(obj: unknown, depth: number = 0): number {
     if (depth > 20) return depth; // Prevent stack overflow
 
     if (typeof obj !== 'object' || obj === null) {
@@ -356,7 +354,7 @@ export class AdvancedSecurityValidator {
     return Math.max(depth, ...depths);
   }
 
-  private logValidationResult(result: ValidationResult, input: any, context: any): void {
+  private logValidationResult(result: ValidationResult, input: unknown, context: Record<string, unknown>): void {
     const level = result.isValid ? 'info' : 'warn';
     const message =
       `Security validation ${result.isValid ? 'passed' : 'failed'}: ` +
@@ -365,7 +363,7 @@ export class AdvancedSecurityValidator {
     logger[level](message);
 
     if (result.errors.length > 0) {
-      logger.warn('Validation errors:', result.errors);
+      logger.warn('Validation errors:', toReadonlyRecord({ errors: result.errors }));
     }
   }
 }

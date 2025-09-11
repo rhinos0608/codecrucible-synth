@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool } from './base-tool';
 import { promises as fs } from 'fs';
-import { join, relative, isAbsolute, dirname } from 'path';
-import { UnifiedModelClient } from '../../application/services/client.js';
+import { dirname, isAbsolute, join } from 'path';
+import { UnifiedModelClient } from '../../application/services/client';
 
 const GenerateCodeSchema = z.object({
   specification: z.string().describe('Natural language description of what code to generate'),
@@ -17,12 +17,12 @@ const GenerateCodeSchema = z.object({
   context: z.string().optional().describe('Additional context about the project or existing code'),
 });
 
-export class CodeGeneratorTool extends BaseTool {
-  private modelClient: UnifiedModelClient;
+export class CodeGeneratorTool extends BaseTool<typeof GenerateCodeSchema.shape> {
+  private readonly modelClient: UnifiedModelClient;
 
-  constructor(
-    private agentContext: { workingDirectory: string },
-    modelClient: UnifiedModelClient
+  public constructor(
+    private readonly agentContext: Readonly<{ workingDirectory: string }>,
+    modelClient: Readonly<UnifiedModelClient>
   ) {
     super({
       name: 'generateCode',
@@ -30,10 +30,10 @@ export class CodeGeneratorTool extends BaseTool {
       category: 'Code Generation',
       parameters: GenerateCodeSchema,
     });
-    this.modelClient = modelClient;
+    this.modelClient = modelClient as UnifiedModelClient;
   }
 
-  async execute(args: z.infer<typeof GenerateCodeSchema>): Promise<string> {
+  public async execute(args: Readonly<z.infer<typeof GenerateCodeSchema>>): Promise<string> {
     try {
       const { specification, language, codeType, fileName, context } = args;
 
@@ -438,11 +438,11 @@ const ModifyCodeSchema = z.object({
     .describe('Whether to create a backup before modification'),
 });
 
-export class CodeModifierTool extends BaseTool {
-  private modelClient: UnifiedModelClient;
+export class CodeModifierTool extends BaseTool<typeof ModifyCodeSchema.shape> {
+  private readonly modelClient: UnifiedModelClient;
 
-  constructor(
-    private agentContext: { workingDirectory: string },
+  public constructor(
+    private readonly agentContext: Readonly<{ workingDirectory: string }>,
     modelClient: UnifiedModelClient
   ) {
     super({
@@ -454,7 +454,7 @@ export class CodeModifierTool extends BaseTool {
     this.modelClient = modelClient;
   }
 
-  async execute(args: z.infer<typeof ModifyCodeSchema>): Promise<string> {
+  public async execute(args: Readonly<z.infer<typeof ModifyCodeSchema>>): Promise<string> {
     try {
       const { filePath, modification, preserveFormatting, createBackup } = args;
 
@@ -573,12 +573,12 @@ const RefactorCodeSchema = z.object({
     .describe('Options for extraction refactorings'),
 });
 
-export class RefactoringTool extends BaseTool {
-  private modelClient: UnifiedModelClient;
+export class RefactoringTool extends BaseTool<typeof RefactorCodeSchema.shape> {
+  private readonly modelClient: UnifiedModelClient;
 
-  constructor(
-    private agentContext: { workingDirectory: string },
-    modelClient: UnifiedModelClient
+  public constructor(
+    private readonly agentContext: Readonly<{ workingDirectory: string }>,
+    modelClient: Readonly<UnifiedModelClient>
   ) {
     super({
       name: 'refactorCode',
@@ -586,10 +586,10 @@ export class RefactoringTool extends BaseTool {
       category: 'Code Refactoring',
       parameters: RefactorCodeSchema,
     });
-    this.modelClient = modelClient;
+    this.modelClient = modelClient as UnifiedModelClient;
   }
 
-  async execute(args: z.infer<typeof RefactorCodeSchema>): Promise<string> {
+  public async execute(args: Readonly<z.infer<typeof RefactorCodeSchema>>): Promise<string> {
     try {
       const { filePath, refactorType, targetElement, newName, extractionOptions } = args;
 
@@ -627,10 +627,18 @@ export class RefactoringTool extends BaseTool {
     refactorType: string,
     targetElement?: string,
     newName?: string,
-    extractionOptions?: any
+    extractionOptions?: {
+      startLine?: number;
+      endLine?: number;
+      newFunctionName?: string;
+    }
   ): string {
+    const startLine = extractionOptions?.startLine ?? '';
+    const endLine = extractionOptions?.endLine ?? '';
+    const newFunctionName = extractionOptions?.newFunctionName ?? 'extractedFunction';
+
     const refactorInstructions = {
-      extract_function: `Extract the code between lines ${extractionOptions?.startLine} and ${extractionOptions?.endLine} into a new function named "${extractionOptions?.newFunctionName || 'extractedFunction'}"`,
+      extract_function: `Extract the code between lines ${startLine} and ${endLine} into a new function named "${newFunctionName}"`,
       extract_class: `Extract related methods and properties into a new class`,
       rename_variable: `Rename the variable "${targetElement}" to "${newName}" throughout the code`,
       inline_function: `Inline the function "${targetElement}" by replacing all calls with the function body`,
@@ -643,8 +651,9 @@ export class RefactoringTool extends BaseTool {
     };
 
     const instruction =
-      refactorInstructions[refactorType as keyof typeof refactorInstructions] ||
-      `Perform ${refactorType} refactoring`;
+      refactorType in refactorInstructions
+        ? refactorInstructions[refactorType as keyof typeof refactorInstructions]
+        : `Perform ${refactorType} refactoring`;
 
     return `You are an expert code refactoring specialist. Perform the following refactoring on the provided code.
 

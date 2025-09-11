@@ -6,8 +6,8 @@
  */
 
 import {
-  IUserInteraction,
   DisplayOptions,
+  IUserInteraction,
   PromptOptions,
 } from '../../domain/interfaces/user-interaction.js';
 import chalk from 'chalk';
@@ -16,20 +16,20 @@ import inquirer from 'inquirer';
 
 export class CLIUserInteraction implements IUserInteraction {
   private currentSpinner: Ora | null = null;
-  private _isVerbose: boolean;
+  private _isVerbose: boolean = false;
 
-  constructor(options: { verbose?: boolean } = {}) {
+  public constructor(options: Readonly<{ verbose?: boolean }> = {}) {
     this._isVerbose = options.verbose ?? false;
   }
 
-  async display(message: string, options: DisplayOptions = {}): Promise<void> {
+  public async display(message: string, options: Readonly<DisplayOptions> = {}): Promise<void> {
     // Stop any current spinner
     if (this.currentSpinner) {
       this.currentSpinner.stop();
       this.currentSpinner = null;
     }
 
-    const prefix = options.prefix || '';
+    const prefix = options.prefix ?? '';
     const formattedMessage = this.formatMessage(message, options.type, prefix);
 
     if (options.stream) {
@@ -37,7 +37,7 @@ export class CLIUserInteraction implements IUserInteraction {
       process.stdout.write(formattedMessage);
 
       // Ensure the output is flushed and finalized properly
-      if (options.final || message.trim().length === 0 || message.endsWith('\n')) {
+      if ((options.final ?? false) || message.trim().length === 0 || message.endsWith('\n')) {
         process.stdout.write('\n');
       }
 
@@ -54,20 +54,19 @@ export class CLIUserInteraction implements IUserInteraction {
       }
     }
   }
-
-  async warn(message: string): Promise<void> {
+  public async warn(message: string): Promise<void> {
     await this.display(message, { type: 'warn' });
   }
 
-  async error(message: string): Promise<void> {
+  public async error(message: string): Promise<void> {
     await this.display(message, { type: 'error' });
   }
 
-  async success(message: string): Promise<void> {
+  public async success(message: string): Promise<void> {
     await this.display(message, { type: 'success' });
   }
 
-  async progress(message: string, progress?: number): Promise<void> {
+  public async progress(message: string, progress?: number): Promise<void> {
     if (progress !== undefined) {
       // Show progress with percentage
       const progressBar = this.createProgressBar(progress);
@@ -82,49 +81,45 @@ export class CLIUserInteraction implements IUserInteraction {
     }
   }
 
-  async prompt(question: string, options: PromptOptions = {}): Promise<string> {
+  public async prompt(question: string, options: Readonly<PromptOptions> = {}): Promise<string> {
     // Stop any current spinner
     if (this.currentSpinner) {
       this.currentSpinner.stop();
       this.currentSpinner = null;
     }
 
-    const inquirerOptions: any = {
+    const inquirerOptions = {
       type: 'input',
       name: 'answer',
       message: question,
       default: options.defaultValue,
-    };
-
-    if (options.validation) {
-      inquirerOptions.validate = (input: string) => {
+      validate: (input: string): string | boolean => {
         if (options.required && !input.trim()) {
           return 'This field is required';
         }
-
         if (options.validation) {
           const result = options.validation(input);
           if (result === true) return true;
           if (typeof result === 'string') return result;
           return 'Invalid input';
         }
-
         return true;
-      };
-    }
+      },
+    };
 
-    const answers = await inquirer.prompt([inquirerOptions]);
+    // Cast to any to avoid strict Inquirer generic typing issues across versions
+    const answers = await (inquirer as any).prompt([{ ...(inquirerOptions as any) }]);
     return answers.answer;
   }
 
-  async confirm(question: string): Promise<boolean> {
+  public async confirm(question: string): Promise<boolean> {
     // Stop any current spinner
     if (this.currentSpinner) {
       this.currentSpinner.stop();
       this.currentSpinner = null;
     }
 
-    const answers = await inquirer.prompt([
+    const confirmAnswers: { confirmed: boolean } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'confirmed',
@@ -133,17 +128,17 @@ export class CLIUserInteraction implements IUserInteraction {
       },
     ]);
 
-    return answers.confirmed;
+    return confirmAnswers.confirmed;
   }
 
-  async select(question: string, choices: readonly string[]): Promise<string> {
+  public async select(question: string, choices: readonly string[]): Promise<string> {
     // Stop any current spinner
     if (this.currentSpinner) {
       this.currentSpinner.stop();
       this.currentSpinner = null;
     }
 
-    const answers = await inquirer.prompt([
+    const selectAnswers: { selected: string } = await inquirer.prompt([
       {
         type: 'list',
         name: 'selected',
@@ -152,13 +147,13 @@ export class CLIUserInteraction implements IUserInteraction {
       },
     ]);
 
-    return answers.selected;
+    return selectAnswers.selected;
   }
 
   /**
    * Stop any active progress indicators
    */
-  stopProgress(): void {
+  public stopProgress(): void {
     if (this.currentSpinner) {
       this.currentSpinner.stop();
       this.currentSpinner = null;
@@ -168,7 +163,7 @@ export class CLIUserInteraction implements IUserInteraction {
   /**
    * Set verbose mode
    */
-  setVerbose(verbose: boolean): void {
+  public setVerbose(verbose: boolean): void {
     this._isVerbose = verbose;
   }
 

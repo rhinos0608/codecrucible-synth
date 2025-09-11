@@ -51,8 +51,14 @@ export interface SelectionResult {
 
 export interface IProviderSelectionStrategy {
   selectProvider: (context: Readonly<SelectionContext>) => SelectionResult;
-  createFallbackChain: (primaryProvider: ProviderType, context: Readonly<SelectionContext>) => ProviderType[];
-  validateProviderForContext: (provider: ProviderType, context: Readonly<SelectionContext>) => boolean;
+  createFallbackChain: (
+    primaryProvider: ProviderType,
+    context: Readonly<SelectionContext>
+  ) => ProviderType[];
+  validateProviderForContext: (
+    provider: ProviderType,
+    context: Readonly<SelectionContext>
+  ) => boolean;
 }
 
 export class ProviderSelectionStrategy extends EventEmitter implements IProviderSelectionStrategy {
@@ -109,7 +115,11 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
           break;
 
         case 'adaptive': {
-          const { provider, reason: adaptiveReason, confidence: adaptiveConfidence } = this.selectAdaptiveProvider(context);
+          const {
+            provider,
+            reason: adaptiveReason,
+            confidence: adaptiveConfidence,
+          } = this.selectAdaptiveProvider(context);
           selectedProvider = provider;
           reason = adaptiveReason;
           confidence = adaptiveConfidence;

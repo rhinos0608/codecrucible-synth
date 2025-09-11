@@ -175,8 +175,9 @@ export class ModelCapability {
   public static create(
     capabilities: readonly (typeof ModelCapability.VALID_CAPABILITIES)[number][]
   ): ModelCapability {
-    const validCapabilities = capabilities.filter((cap): cap is (typeof ModelCapability.VALID_CAPABILITIES)[number] =>
-      this.VALID_CAPABILITIES.includes(cap)
+    const validCapabilities = capabilities.filter(
+      (cap): cap is (typeof ModelCapability.VALID_CAPABILITIES)[number] =>
+        this.VALID_CAPABILITIES.includes(cap)
     );
     return new ModelCapability(Object.freeze(validCapabilities));
   }

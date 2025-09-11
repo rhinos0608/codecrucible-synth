@@ -76,7 +76,10 @@ export class SpiralPhaseExecutor {
     }
   }
 
-  private async executeCollapsePhase(input: Readonly<PhaseInput>, startTime: number): Promise<PhaseOutput> {
+  private async executeCollapsePhase(
+    input: Readonly<PhaseInput>,
+    startTime: number
+  ): Promise<PhaseOutput> {
     const request = ProcessingRequest.create(
       this.buildCollapsePrompt(input.content),
       'problem-decomposition' as RequestType,
@@ -120,7 +123,10 @@ export class SpiralPhaseExecutor {
     };
   }
 
-  private async executeSynthesisPhase(input: Readonly<PhaseInput>, startTime: number): Promise<PhaseOutput> {
+  private async executeSynthesisPhase(
+    input: Readonly<PhaseInput>,
+    startTime: number
+  ): Promise<PhaseOutput> {
     const request = ProcessingRequest.create(
       this.buildSynthesisPrompt(input.content),
       'solution-synthesis' as RequestType,
@@ -144,7 +150,10 @@ export class SpiralPhaseExecutor {
     };
   }
 
-  private async executeRebirthPhase(input: Readonly<PhaseInput>, startTime: number): Promise<PhaseOutput> {
+  private async executeRebirthPhase(
+    input: Readonly<PhaseInput>,
+    startTime: number
+  ): Promise<PhaseOutput> {
     const request = ProcessingRequest.create(
       this.buildRebirthPrompt(input.content),
       'implementation-planning' as RequestType,
@@ -168,7 +177,10 @@ export class SpiralPhaseExecutor {
     };
   }
 
-  private async executeReflectionPhase(input: Readonly<PhaseInput>, startTime: number): Promise<PhaseOutput> {
+  private async executeReflectionPhase(
+    input: Readonly<PhaseInput>,
+    startTime: number
+  ): Promise<PhaseOutput> {
     const request = ProcessingRequest.create(
       this.buildReflectionPrompt(input.content, input.previousPhases),
       'quality-assessment' as RequestType,
@@ -282,30 +294,27 @@ Be honest about quality and provide specific guidance for next steps.`;
   }
 
   /**
-     * Generate intelligent fallback responses when models don't support generateResponse
-     * This ensures the system continues to function gracefully with meaningful output
-     */
-    private generateFallbackResponse(
-      phase: SpiralPhase,
-      originalContent: string
-    ): string {
-      switch (phase) {
-        case 'collapse':
-          return this.generateCollapseResponse(originalContent);
-  
-        case 'synthesis':
-          return this.generateSynthesisResponse(originalContent);
-  
-        case 'rebirth':
-          return this.generateRebirthResponse(originalContent);
-  
-        case 'reflection':
-          return this.generateReflectionResponse(originalContent);
-  
-        default:
-          return this.generateGenericResponse(phase, originalContent);
-      }
+   * Generate intelligent fallback responses when models don't support generateResponse
+   * This ensures the system continues to function gracefully with meaningful output
+   */
+  private generateFallbackResponse(phase: SpiralPhase, originalContent: string): string {
+    switch (phase) {
+      case 'collapse':
+        return this.generateCollapseResponse(originalContent);
+
+      case 'synthesis':
+        return this.generateSynthesisResponse(originalContent);
+
+      case 'rebirth':
+        return this.generateRebirthResponse(originalContent);
+
+      case 'reflection':
+        return this.generateReflectionResponse(originalContent);
+
+      default:
+        return this.generateGenericResponse(phase, originalContent);
     }
+  }
 
   private generateCollapseResponse(content: string): string {
     // Analyze the content and break it down into components

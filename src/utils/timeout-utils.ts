@@ -23,7 +23,9 @@ export async function withTimeout<T>(
         reject(new Error(`${operation} timed out after ${timeoutMs}ms`));
       }, timeoutMs);
       // Clear timeout if the main promise resolves first
-      void promise.finally(() => { clearTimeout(timeoutId); });
+      void promise.finally(() => {
+        clearTimeout(timeoutId);
+      });
     });
 
     const result = await Promise.race([promise, timeoutPromise]);

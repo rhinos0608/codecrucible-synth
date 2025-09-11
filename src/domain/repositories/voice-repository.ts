@@ -102,12 +102,14 @@ export interface IAdvancedVoiceRepository extends IVoiceRepository {
   /**
    * Find the most suitable voice for a given context
    */
-  findBestMatch: (context: Readonly<{
-    taskType: 'creative' | 'analytical' | 'balanced';
-    requiredExpertise?: readonly string[];
-    excludedVoices?: readonly string[];
-    preferredStyle?: string;
-  }>) => Promise<Voice | null>;
+  findBestMatch: (
+    context: Readonly<{
+      taskType: 'creative' | 'analytical' | 'balanced';
+      requiredExpertise?: readonly string[];
+      excludedVoices?: readonly string[];
+      preferredStyle?: string;
+    }>
+  ) => Promise<Voice | null>;
 
   /**
    * Get voice usage statistics

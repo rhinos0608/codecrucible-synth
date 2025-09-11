@@ -13,8 +13,12 @@ import {
   AnalysisResponse,
   IAnalyzeFileUseCase,
 } from '../../domain/interfaces/use-cases.js';
-import type { IWorkflowOrchestrator, WorkflowRequest } from '../../domain/interfaces/workflow-orchestrator.js';
+import type {
+  IWorkflowOrchestrator,
+  WorkflowRequest,
+} from '../../domain/interfaces/workflow-orchestrator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 
 export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
   public constructor(private readonly orchestrator: Readonly<IWorkflowOrchestrator>) {}
@@ -99,7 +103,7 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
       };
     } catch (error) {
       const duration = performance.now() - startTime;
-      logger.error('File analysis failed:', error);
+      logger.error('File analysis failed', toErrorOrUndefined(error));
 
       return {
         success: false,
@@ -211,15 +215,19 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
         resultText = (result as { content: string }).content;
       } else if ('text' in result && typeof (result as { text?: unknown }).text === 'string') {
         resultText = (result as { text: string }).text;
-      } else if ('response' in result && typeof (result as { response?: unknown }).response === 'string') {
+      } else if (
+        'response' in result &&
+        typeof (result as { response?: unknown }).response === 'string'
+      ) {
         resultText = (result as { response: string }).response;
       } else if (
         'message' in result &&
         typeof (result as { message?: unknown }).message === 'object' &&
         'content' in (result as { message: { content?: unknown } }).message &&
-        typeof ((result as { message: { content?: unknown } }).message as { content?: unknown }).content === 'string'
+        typeof ((result as { message: { content?: unknown } }).message as { content?: unknown })
+          .content === 'string'
       ) {
-        resultText = ((result as { message: { content: string } }).message).content;
+        resultText = (result as { message: { content: string } }).message.content;
       } else {
         // If no standard content field found, try to stringify but log for debugging
         // eslint-disable-next-line no-console
@@ -284,7 +292,8 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
   private extractCodeQuality(
     text: string
   ): AnalysisResponse['analysis']['codeQuality'] | undefined {
-    const qualitySection = this.extractSection(text, 'Code Quality') ?? this.extractSection(text, 'Quality');
+    const qualitySection =
+      this.extractSection(text, 'Code Quality') ?? this.extractSection(text, 'Quality');
     const issues =
       this.extractListItems(text, 'Issues') ??
       this.extractListItems(text, 'Problems') ??
@@ -298,7 +307,8 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
 
     // Try to find an explicit numeric score
     let score: number | undefined;
-    const percentMatch = text.match(/(?:score|quality)[:\s]*([0-9]{1,3})\s*%/i) ?? text.match(/([0-9]{1,3})\s*%/);
+    const percentMatch =
+      text.match(/(?:score|quality)[:\s]*([0-9]{1,3})\s*%/i) ?? text.match(/([0-9]{1,3})\s*%/);
     if (percentMatch) {
       score = Math.min(100, Math.max(0, Number(percentMatch[1])));
     } else {
@@ -356,34 +366,34 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
     } as unknown as AnalysisResponse['analysis']['codeQuality'];
   }
 
-    // Try to parse code structure from any code fenced blocks in the AI result or from the free text.
-    // This uses language-agnostic heuristics and a few language-specific regexes to count classes,
-    // functions, and collect declared/imported dependencies.
-    private extractStructure(text: string): AnalysisResponse['analysis']['structure'] | undefined {
-      // Find fenced code blocks and pick the largest one (most likely the actual file content)
-      const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
-      let match: RegExpExecArray | null;
-      let bestBlock: { lang?: string; code: string } | null = null;
-      while ((match = codeBlockRegex.exec(text))) {
+  // Try to parse code structure from any code fenced blocks in the AI result or from the free text.
+  // This uses language-agnostic heuristics and a few language-specific regexes to count classes,
+  // functions, and collect declared/imported dependencies.
+  private extractStructure(text: string): AnalysisResponse['analysis']['structure'] | undefined {
+    // Find fenced code blocks and pick the largest one (most likely the actual file content)
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    let match: RegExpExecArray | null;
+    let bestBlock: { lang?: string; code: string } | null = null;
+    while ((match = codeBlockRegex.exec(text))) {
       const [, lang, code] = match;
       if (!bestBlock || code.length > bestBlock.code.length) {
         bestBlock = { lang, code };
       }
-      }
+    }
 
-      const codeToParse = bestBlock?.code ?? text;
+    const codeToParse = bestBlock?.code ?? text;
 
-      // Generic patterns
-      const classRegex = /\bclass\s+[A-Za-z0-9_]+/g; // matches JS/TS/Java/C#/Python "class Name"
-      const functionRegexes: RegExp[] = [
+    // Generic patterns
+    const classRegex = /\bclass\s+[A-Za-z0-9_]+/g; // matches JS/TS/Java/C#/Python "class Name"
+    const functionRegexes: RegExp[] = [
       /\bfunction\s+[A-Za-z0-9_]+\s*\(/g, // JS/TS/Java
       /\b[A-Za-z0-9_]+\s*=\s*\([^)]*\)\s*=>/g, // arrow functions assigned to vars (JS/TS)
       /^\s*def\s+[A-Za-z0-9_]+\s*\(/gm, // Python
       /\b(public|private|protected)?\s*[A-Za-z0-9_<>[\]]+\s+[A-Za-z0-9_]+\s*\(/g, // Java/C#/Go style method signatures (approx)
-      ];
+    ];
 
-      // Dependency/import patterns for multiple languages
-      const importPatterns: RegExp[] = [
+    // Dependency/import patterns for multiple languages
+    const importPatterns: RegExp[] = [
       /import\s+.*?\s+from\s+['"]([^'"]+)['"]/g, // ES modules
       /import\s+['"]([^'"]+)['"]/g, // side-effect imports
       /require\(['"]([^'"]+)['"]\)/g, // CommonJS
@@ -392,55 +402,61 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
       /^from\s+([A-Za-z0-9_.]+)\s+import/gm, // Python from ... import
       /\bpackage\s+([A-Za-z0-9_.]+);/g, // Java package (not external deps but informative)
       /^#include\s+<([^>]+)>/gm, // C/C++
-      ];
+    ];
 
-      // Count classes
-      const classes = (codeToParse.match(classRegex) ?? []).length;
+    // Count classes
+    const classes = (codeToParse.match(classRegex) ?? []).length;
 
-      // Count functions using multiple heuristics and deduplicate approximate overlaps
-      const functionCount = functionRegexes.reduce(
-        (acc: number, rx: Readonly<RegExp>) => acc + (codeToParse.match(rx) ?? []).length,
-        0
-      );
+    // Count functions using multiple heuristics and deduplicate approximate overlaps
+    const functionCount = functionRegexes.reduce(
+      (acc: number, rx: Readonly<RegExp>) => acc + (codeToParse.match(rx) ?? []).length,
+      0
+    );
 
-      // Collect dependencies
-      const deps = new Set<string>();
-      for (const rx of importPatterns) {
-        let m: RegExpExecArray | null;
-        while ((m = rx.exec(codeToParse))) {
-          const [, dep] = m;
-          if (dep) {
-            // normalize common path prefixes
-            deps.add(dep.replace(/^\.\/+/, './').replace(/^\.\.\/+/, '..').trim());
-          }
+    // Collect dependencies
+    const deps = new Set<string>();
+    for (const rx of importPatterns) {
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(codeToParse))) {
+        const [, dep] = m;
+        if (dep) {
+          // normalize common path prefixes
+          deps.add(
+            dep
+              .replace(/^\.\/+/, './')
+              .replace(/^\.\.\/+/, '..')
+              .trim()
+          );
         }
       }
-
-      // Attempt to detect number of files referenced in the analysis text (AI may report multiple files)
-      let files = 1;
-      const filesMatch = text.match(/\bfiles?\s*[:=]\s*([0-9]+)\b/i);
-      if (filesMatch) {
-        files = Math.max(1, Number(filesMatch[1]));
-      } else {
-        // If AI lists multiple filenames, try to count unique occurrences of typical filenames/extensions
-        const filenameRegex = /\b[A-Za-z0-9_\-./\\]+?\.(?:ts|js|py|java|cs|cpp|c|go|rs|rb|php|swift|kt|scala)\b/g;
-        const found = new Set<string>();
-        let fm: RegExpExecArray | null;
-        while ((fm = filenameRegex.exec(text))) {
-          found.add(fm[0]);
-        }
-        if (found.size > 1) files = found.size;
-      }
-
-      // Provide a conservative functions estimate and ensure non-negative integers
-      const functions = Math.max(0, functionCount);
-      const dependencies = Array.from(deps).sort();
-
-      return {
-        files,
-            classes,
-            functions,
-            dependencies,
-          };
-        }
     }
+
+    // Attempt to detect number of files referenced in the analysis text (AI may report multiple files)
+    let files = 1;
+    const filesMatch = text.match(/\bfiles?\s*[:=]\s*([0-9]+)\b/i);
+    if (filesMatch) {
+      files = Math.max(1, Number(filesMatch[1]));
+    } else {
+      // If AI lists multiple filenames, try to count unique occurrences of typical filenames/extensions
+      const filenameRegex =
+        /\b[A-Za-z0-9_\-./\\]+?\.(?:ts|js|py|java|cs|cpp|c|go|rs|rb|php|swift|kt|scala)\b/g;
+      const found = new Set<string>();
+      let fm: RegExpExecArray | null;
+      while ((fm = filenameRegex.exec(text))) {
+        found.add(fm[0]);
+      }
+      if (found.size > 1) files = found.size;
+    }
+
+    // Provide a conservative functions estimate and ensure non-negative integers
+    const functions = Math.max(0, functionCount);
+    const dependencies = Array.from(deps).sort();
+
+    return {
+      files,
+      classes,
+      functions,
+      dependencies,
+    };
+  }
+}

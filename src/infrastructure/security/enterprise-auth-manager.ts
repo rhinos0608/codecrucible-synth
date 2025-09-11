@@ -251,7 +251,7 @@ export class EnterpriseAuthManager {
 
       // Get user info
       const users = this.rbac.getUsers();
-      const user = (await users).find(u => u.id === session.userId);
+      const user = (await users).find((u: any) => u.id === session.userId);
       if (!user || user?.status !== 'active') {
         return {
           valid: false,
@@ -264,7 +264,6 @@ export class EnterpriseAuthManager {
 
       return {
         valid: true,
-        user: user!,
         session,
         permissions: session.permissions,
       };
@@ -293,7 +292,7 @@ export class EnterpriseAuthManager {
       }
 
       const users = this.rbac.getUsers();
-      const user = (await users).find(u => u.id === session.userId);
+      const user = (await users).find((u: any) => u.id === session.userId);
       if (!user || user?.status !== 'active') {
         return {
           success: false,
@@ -301,8 +300,22 @@ export class EnterpriseAuthManager {
         };
       }
 
-      // Generate new access token
-      const newAccessToken = this.generateAccessToken(user!, session);
+      // Generate new access token using session info
+      const tokenPayload = {
+        sub: user!.id,
+        username: user!.username,
+        roles: session.roles || [],
+        permissions: session.permissions || [],
+        sessionId: session.id,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(session.expiresAt.getTime() / 1000),
+        jti: crypto.randomUUID(),
+      };
+      const jwtSecret = await this.secretsManager.getSecret('JWT_SECRET');
+      if (!jwtSecret) {
+        throw new Error('JWT secret not available');
+      }
+      const newAccessToken = jwt.sign(tokenPayload, jwtSecret);
 
       // Optionally rotate refresh token
       const newRefreshToken = this.generateRefreshToken(session);
@@ -310,7 +323,6 @@ export class EnterpriseAuthManager {
 
       return {
         success: true,
-        user: user!,
         session,
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,

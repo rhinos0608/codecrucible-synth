@@ -37,14 +37,14 @@ export interface TerminalSession {
 }
 
 export class E2BTerminalTool {
-  private sessions: Map<string, TerminalSession> = new Map();
+  private readonly sessions: Map<string, TerminalSession> = new Map();
   private sessionCounter = 0;
   private readonly logger = createLogger('E2BTerminal');
-  private terminalServer: TerminalMCPServer;
-  private processManager: AdvancedProcessTool;
-  private securityValidator: SecurityValidator;
+  private readonly terminalServer: TerminalMCPServer;
+  private readonly processManager: AdvancedProcessTool;
+  private readonly securityValidator: SecurityValidator;
 
-  constructor(workingDirectory: string = process.cwd()) {
+  public constructor(workingDirectory: string = process.cwd()) {
     this.terminalServer = new TerminalMCPServer({
       workingDirectory,
       timeout: 30000,
@@ -58,7 +58,7 @@ export class E2BTerminalTool {
     this.logger.info('E2BTerminalTool initialized with real backend integrations');
   }
 
-  async initialize(): Promise<void> {
+  public initialize(): void {
     try {
       // SecurityValidator doesn't need initialization
       this.logger.info('E2BTerminalTool initialization complete');
@@ -68,14 +68,13 @@ export class E2BTerminalTool {
     }
   }
 
-  async createSession(workingDirectory?: string): Promise<TerminalSession> {
+  public async createSession(workingDirectory?: string): Promise<TerminalSession> {
     const sessionId = `e2b_session_${++this.sessionCounter}`;
-    const effectiveWorkingDir = workingDirectory || process.cwd();
+    const effectiveWorkingDir = workingDirectory ?? process.cwd();
 
     try {
       // Validate the working directory
-      const validationResult =
-        await this.securityValidator.validateEnvironment(effectiveWorkingDir);
+      const validationResult = this.securityValidator.validateEnvironment(effectiveWorkingDir);
 
       if (!validationResult.isValid) {
         throw new Error(`Invalid working directory: ${validationResult.reason}`);
@@ -98,12 +97,15 @@ export class E2BTerminalTool {
 
       return session;
     } catch (error) {
-      this.logger.error(`Failed to create terminal session: ${error}`);
+      this.logger.error(`Failed to create terminal session: ${String(error)}`);
       throw error;
     }
   }
 
-  async executeCommand(sessionId: string, command: TerminalCommand): Promise<TerminalResult> {
+  public async executeCommand(
+    sessionId: Readonly<string>,
+    command: Readonly<TerminalCommand>
+  ): Promise<TerminalResult> {
     const startTime = Date.now();
     const session = this.sessions.get(sessionId);
 
@@ -134,7 +136,7 @@ export class E2BTerminalTool {
         };
       }
 
-      const validationResult = await this.securityValidator.validateCode({
+      this.securityValidator.validateCode({
         code: fullCommand,
         language: 'bash',
         environment: 'e2b_sandbox',
@@ -172,7 +174,8 @@ export class E2BTerminalTool {
           stderr: '',
           exitCode: 0,
           executionTime: Date.now() - startTime,
-          sessionId: 'sessionId' in processResult ? (processResult.sessionId || undefined) : undefined,
+          sessionId:
+            'sessionId' in processResult ? processResult.sessionId || undefined : undefined,
         };
       }
 
@@ -204,14 +207,17 @@ export class E2BTerminalTool {
 
   private async executeViaTerminalServer(
     sessionId: string,
-    command: TerminalCommand
+    command: Readonly<TerminalCommand>
   ): Promise<{
     stdout: string;
     stderr: string;
     exitCode: number;
     duration: number;
   }> {
-    const session = this.sessions.get(sessionId)!;
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session with id ${sessionId} not found`);
+    }
     const fullCommand = command.args
       ? `${command.command} ${command.args.join(' ')}`
       : command.command;
@@ -219,8 +225,8 @@ export class E2BTerminalTool {
     // Use the terminal server's tool execution capabilities
     const toolResult = await this.terminalServer.callTool('run_command', {
       command: fullCommand,
-      workingDirectory: command.workingDirectory || session.workingDirectory,
-      timeout: command.timeout || 30000,
+      workingDirectory: command.workingDirectory ?? session.workingDirectory,
+      timeout: command.timeout ?? 30000,
       captureOutput: true,
       environment: { ...session.environment, ...command.environment },
     });
@@ -233,16 +239,27 @@ export class E2BTerminalTool {
     }
 
     const allText = extractAllContentText(toolResult.content);
-    const result = JSON.parse(allText || '{}');
+    interface TerminalServerResult {
+      stdout?: string;
+      stderr?: string;
+      exitCode?: number;
+      duration?: number;
+    }
+    let result: TerminalServerResult = {};
+    try {
+      result = JSON.parse(allText || '{}') as TerminalServerResult;
+    } catch {
+      result = {};
+    }
     return {
-      stdout: result.stdout || '',
-      stderr: result.stderr || '',
-      exitCode: result.exitCode || 0,
-      duration: result.duration || 0,
+      stdout: result.stdout ?? '',
+      stderr: result.stderr ?? '',
+      exitCode: result.exitCode ?? 0,
+      duration: result.duration ?? 0,
     };
   }
 
-  async changeDirectory(sessionId: string, directory: string): Promise<boolean> {
+  public async changeDirectory(sessionId: string, directory: string): Promise<boolean> {
     const session = this.sessions.get(sessionId);
     if (!session || !session.isActive) {
       return false;
@@ -250,7 +267,7 @@ export class E2BTerminalTool {
 
     try {
       // Validate the directory path
-      const validationResult = await this.securityValidator.validateEnvironment(directory);
+      const validationResult = this.securityValidator.validateEnvironment(directory);
 
       if (!validationResult.isValid) {
         this.logger.warn(
@@ -282,7 +299,11 @@ export class E2BTerminalTool {
     }
   }
 
-  async setEnvironmentVariable(sessionId: string, key: string, value: string): Promise<boolean> {
+  public async setEnvironmentVariable(
+    sessionId: string,
+    key: string,
+    value: string
+  ): Promise<boolean> {
     const session = this.sessions.get(sessionId);
     if (!session || !session.isActive) {
       return false;
@@ -290,13 +311,13 @@ export class E2BTerminalTool {
 
     try {
       // Validate environment variable key and value
-      const keyValidation = await this.securityValidator.validateEnvironment(key);
+      const keyValidation = this.securityValidator.validateEnvironment(key);
 
-      const valueValidation = await this.securityValidator.validateEnvironment(value);
+      const valueValidation = this.securityValidator.validateEnvironment(value);
 
       if (!keyValidation.isValid || !valueValidation.isValid) {
         this.logger.warn(
-          `Environment variable rejected for session ${sessionId}: ${keyValidation.reason || valueValidation.reason}`
+          `Environment variable rejected for session ${sessionId}: ${keyValidation.reason ?? valueValidation.reason}`
         );
         return false;
       }
@@ -311,7 +332,7 @@ export class E2BTerminalTool {
     }
   }
 
-  async interactWithProcess(sessionId: string, input: string): Promise<TerminalResult> {
+  public async interactWithProcess(sessionId: string, input: string): Promise<TerminalResult> {
     const startTime = Date.now();
     const session = this.sessions.get(sessionId);
 
@@ -327,7 +348,7 @@ export class E2BTerminalTool {
 
     try {
       // Validate input
-      const validationResult = await this.securityValidator.validateCode({
+      const validationResult = this.securityValidator.validateCode({
         code: input,
         language: 'text',
         environment: 'e2b_sandbox',
@@ -385,7 +406,7 @@ export class E2BTerminalTool {
     }
   }
 
-  async closeSession(sessionId: string): Promise<void> {
+  public async closeSession(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) {
       return;
@@ -410,9 +431,9 @@ export class E2BTerminalTool {
     }
   }
 
-  async getSessionStatus(sessionId: string): Promise<{
+  public async getSessionStatus(sessionId: string): Promise<{
     session?: TerminalSession;
-    processStatus?: any;
+    processStatus?: unknown;
   }> {
     const session = this.sessions.get(sessionId);
     if (!session) {
@@ -439,15 +460,19 @@ export class E2BTerminalTool {
     };
   }
 
-  getActiveSessions(): TerminalSession[] {
-    return Array.from(this.sessions.values()).filter(session => session.isActive);
+  public getActiveSessions(): ReadonlyArray<TerminalSession> {
+    return Array.from(this.sessions.values()).filter(
+      (session: TerminalSession) => session.isActive
+    );
   }
 
-  async cleanup(): Promise<void> {
+  public async cleanup(): Promise<void> {
     this.logger.info('Cleaning up E2B terminal sessions...');
 
     const activeSessions = this.getActiveSessions();
-    const cleanupPromises = activeSessions.map(session => this.closeSession(session.id));
+    const cleanupPromises = activeSessions.map(async (session: TerminalSession) => {
+      await this.closeSession(session.id);
+    });
 
     await Promise.allSettled(cleanupPromises);
 
@@ -456,24 +481,26 @@ export class E2BTerminalTool {
   }
 
   // Health check method for monitoring
-  async healthCheck(): Promise<{
+  public async healthCheck(): Promise<{
     isHealthy: boolean;
     activeSessions: number;
-    details: Record<string, any>;
+    details: Record<string, unknown>;
   }> {
     const activeSessions = this.getActiveSessions();
     const now = Date.now();
     const staleThreshold = 30 * 60 * 1000; // 30 minutes
-
-    // Check for stale sessions
     const staleSessions = activeSessions.filter(
-      session => now - session.lastActivity > staleThreshold
+      (session: TerminalSession) => now - session.lastActivity > staleThreshold
     );
 
     // Clean up stale sessions
     if (staleSessions.length > 0) {
       this.logger.info(`Cleaning up ${staleSessions.length} stale sessions`);
-      await Promise.allSettled(staleSessions.map(session => this.closeSession(session.id)));
+      await Promise.allSettled(
+        staleSessions.map(async (session: TerminalSession) => {
+          await this.closeSession(session.id);
+        })
+      );
     }
 
     return {

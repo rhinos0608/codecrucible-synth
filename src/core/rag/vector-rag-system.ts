@@ -29,8 +29,11 @@ export class VectorRAGSystem {
    * @param query - The query used for the search.
    * @returns An array of enriched documents.
    */
-  private enrichDocuments(docs: ReadonlyArray<MinimalDoc>, query: Readonly<ExtendedRAGQuery>): EnrichedDoc[] {
-    return docs.map((doc) => {
+  private enrichDocuments(
+    docs: ReadonlyArray<MinimalDoc>,
+    query: Readonly<ExtendedRAGQuery>
+  ): EnrichedDoc[] {
+    return docs.map(doc => {
       const content = extractContent(doc);
       const embedding = extractEmbedding(doc);
       const confidence = embedding
@@ -131,7 +134,9 @@ export class VectorRAGSystem {
     const enriched = this.enrichDocuments(docs, query);
 
     // Compute aggregate confidence: maximum doc confidence (conservative)
-    const confidences = enriched.map((d: Readonly<{ confidence?: number }>) => (typeof d.confidence === 'number' ? d.confidence : 0));
+    const confidences = enriched.map((d: Readonly<{ confidence?: number }>) =>
+      typeof d.confidence === 'number' ? d.confidence : 0
+    );
     const aggregateConfidence = confidences.length > 0 ? Math.max(...confidences) : 0;
 
     const finalResult: RAGResult = {
@@ -182,63 +187,63 @@ export class VectorRAGSystem {
      *
      * This function is intentionally defensive about field names.
      */
-  
-    // Define a minimal document and query type for safety
-  }
-  
-  // Move these interfaces to the top-level (outside the class)
-  interface MinimalDoc {
-    id?: string;
-    _id?: string;
-    text?: string;
-    content?: string;
-    body?: string;
+
+  // Define a minimal document and query type for safety
+}
+
+// Move these interfaces to the top-level (outside the class)
+interface MinimalDoc {
+  id?: string;
+  _id?: string;
+  text?: string;
+  content?: string;
+  body?: string;
+  embedding?: number[];
+  vector?: number[];
+  metadata?: {
+    [key: string]: unknown;
     embedding?: number[];
-    vector?: number[];
-    metadata?: {
-      [key: string]: unknown;
-      embedding?: number[];
-      path?: string;
-      file?: string;
-      filename?: string;
-      line?: number;
-      lineno?: number;
-      startLine?: number;
-      position?: number;
-      score?: number;
-    };
-    score?: number;
-    relevance?: number;
-    rank?: number;
-    document?: string;
-    source?: string;
     path?: string;
     file?: string;
-  }
-  
-  interface EnrichedDoc {
-    id?: string;
-    text: string;
-    raw: Readonly<MinimalDoc>;
-    metadata: {
-      [key: string]: unknown;
-      provenance: ReturnType<typeof normalizeProvenance>;
-    };
+    filename?: string;
+    line?: number;
+    lineno?: number;
+    startLine?: number;
+    position?: number;
     score?: number;
-    confidence: number;
-    snippet: string;
-  }
-  
-  // Fix the type to match RAGQuery (query must be string, not string | undefined)
-  interface ExtendedRAGQuery extends RAGQuery {
-    embedding?: number[];
-    vector?: number[];
-    text?: string;
-    // Remove the optional modifier to match RAGQuery
-    query: string;
-  }
-  
-  // Add the method to the class (not nested)
+  };
+  score?: number;
+  relevance?: number;
+  rank?: number;
+  document?: string;
+  source?: string;
+  path?: string;
+  file?: string;
+}
+
+interface EnrichedDoc {
+  id?: string;
+  text: string;
+  raw: Readonly<MinimalDoc>;
+  metadata: {
+    [key: string]: unknown;
+    provenance: ReturnType<typeof normalizeProvenance>;
+  };
+  score?: number;
+  confidence: number;
+  snippet: string;
+}
+
+// Fix the type to match RAGQuery (query must be string, not string | undefined)
+interface ExtendedRAGQuery extends RAGQuery {
+  embedding?: number[];
+  vector?: number[];
+  text?: string;
+  // Remove the optional modifier to match RAGQuery
+  query: string;
+}
+
+// Add the method to the class (not nested)
 // Removed duplicate class definition
 
 /* --------------------------
@@ -273,7 +278,11 @@ function _normalizeRawScore(doc: Readonly<MinimalDoc>): number | undefined {
   return undefined;
 }
 
-function normalizeProvenance(doc: Readonly<MinimalDoc>): { path?: string; line?: number; original: MinimalDoc['metadata'] } {
+function normalizeProvenance(doc: Readonly<MinimalDoc>): {
+  path?: string;
+  line?: number;
+  original: MinimalDoc['metadata'];
+} {
   const md = doc.metadata ?? {};
   // common fields: path, file, filename
   const path = md.path ?? md.file ?? md.filename ?? doc.path ?? doc.file;
@@ -324,7 +333,13 @@ function truncateWhitespace(s: string) {
 }
 
 function cosineSimilarity(a: number[], b: number[]) {
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length === 0 || b.length === 0 || a.length !== b.length) {
+  if (
+    !Array.isArray(a) ||
+    !Array.isArray(b) ||
+    a.length === 0 ||
+    b.length === 0 ||
+    a.length !== b.length
+  ) {
     return 0;
   }
   let dot = 0;
@@ -367,11 +382,12 @@ async function _sha1(input: string): Promise<string> {
     return String(h);
   }
 }
-async function createCustomHash(algorithm: string): Promise<ReturnType<typeof import('crypto').createHash>> {
+async function createCustomHash(
+  algorithm: string
+): Promise<ReturnType<typeof import('crypto').createHash>> {
   if (typeof algorithm !== 'string' || algorithm.length === 0) {
     throw new Error('Invalid algorithm specified for createHash');
   }
   const crypto = await import('crypto');
   return crypto.createHash(algorithm);
 }
-

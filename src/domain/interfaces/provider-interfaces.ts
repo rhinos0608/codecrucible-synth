@@ -129,7 +129,8 @@ export class ProviderClient implements IProviderManager {
   private readonly providers: Map<string, IProvider> = new Map();
   private readonly metrics: Map<string, ProviderMetrics> = new Map();
   private readonly healthChecks: Map<string, ProviderHealthCheck> = new Map();
-  private readonly eventListeners: Map<string, Array<(data: Readonly<unknown>) => void>> = new Map();
+  private readonly eventListeners: Map<string, Array<(data: Readonly<unknown>) => void>> =
+    new Map();
   private readonly healthCheckIntervals: Map<string, NodeJS.Timeout> = new Map();
 
   public constructor(private readonly config: ReadonlyArray<ProviderConfig>) {
@@ -251,18 +252,20 @@ export class ProviderClient implements IProviderManager {
   }
 
   public async initializeAll(): Promise<void> {
-    const initPromises = Array.from(this.providers.values()).map(async (provider: Readonly<IProvider>) => {
-      try {
-        await provider.initialize();
-      } catch (error) {
-        throw new ProviderError(
-          `Failed to initialize provider ${provider.id}`,
-          provider.id,
-          'initialize',
-          error as Error
-        );
+    const initPromises = Array.from(this.providers.values()).map(
+      async (provider: Readonly<IProvider>) => {
+        try {
+          await provider.initialize();
+        } catch (error) {
+          throw new ProviderError(
+            `Failed to initialize provider ${provider.id}`,
+            provider.id,
+            'initialize',
+            error as Error
+          );
+        }
       }
-    });
+    );
 
     await Promise.allSettled(initPromises);
   }
@@ -289,13 +292,15 @@ export class ProviderClient implements IProviderManager {
   }
 
   public async shutdownAll(): Promise<void> {
-    const shutdownPromises = Array.from(this.providers.values()).map(async (provider: Readonly<IProvider>) => {
-      try {
-        await provider.shutdown();
-      } catch (error) {
-        console.error(`Error shutting down provider ${provider.id}:`, error);
+    const shutdownPromises = Array.from(this.providers.values()).map(
+      async (provider: Readonly<IProvider>) => {
+        try {
+          await provider.shutdown();
+        } catch (error) {
+          console.error(`Error shutting down provider ${provider.id}:`, error);
+        }
       }
-    });
+    );
 
     await Promise.allSettled(shutdownPromises);
 
@@ -327,23 +332,25 @@ export class ProviderClient implements IProviderManager {
   public async healthCheckAll(): Promise<Map<string, ProviderHealthCheck>> {
     const results = new Map<string, ProviderHealthCheck>();
 
-    const checkPromises = Array.from(this.providers.entries()).map(async ([id, provider]: readonly [string, Readonly<IProvider>]) => {
-      try {
-        const healthCheck = await provider.getHealthCheck();
-        results.set(id, healthCheck);
-        this.healthChecks.set(id, healthCheck);
-      } catch (error) {
-        const failedCheck: ProviderHealthCheck = {
-          isHealthy: false,
-          lastCheckTime: Date.now(),
-          errorCount: (this.healthChecks.get(id)?.errorCount ?? 0) + 1,
-          averageResponseTime: 0,
-          details: { error: error instanceof Error ? error.message : 'Unknown error' },
-        };
-        results.set(id, failedCheck);
-        this.healthChecks.set(id, failedCheck);
+    const checkPromises = Array.from(this.providers.entries()).map(
+      async ([id, provider]: readonly [string, Readonly<IProvider>]) => {
+        try {
+          const healthCheck = await provider.getHealthCheck();
+          results.set(id, healthCheck);
+          this.healthChecks.set(id, healthCheck);
+        } catch (error) {
+          const failedCheck: ProviderHealthCheck = {
+            isHealthy: false,
+            lastCheckTime: Date.now(),
+            errorCount: (this.healthChecks.get(id)?.errorCount ?? 0) + 1,
+            averageResponseTime: 0,
+            details: { error: error instanceof Error ? error.message : 'Unknown error' },
+          };
+          results.set(id, failedCheck);
+          this.healthChecks.set(id, failedCheck);
+        }
       }
-    });
+    );
 
     await Promise.allSettled(checkPromises);
     return results;

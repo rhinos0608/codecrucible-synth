@@ -5,6 +5,7 @@
 
 import { Logger } from '../logging/logger.js';
 import { EventEmitter } from 'events';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { HardwareAwareModelSelector } from './hardware-aware-model-selector.js';
 import { UserWarningSystem } from '../monitoring/user-warning-system.js';
 import { resourceManager } from './resource-cleanup-manager.js';
@@ -140,7 +141,7 @@ export class ActiveProcessManager extends EventEmitter {
     try {
       await processConfig.promise;
     } catch (error) {
-      this.logger.warn(`Process ${id} failed:`, error);
+      this.logger.warn(`Process ${id} failed:`, toReadonlyRecord(error));
     } finally {
       this.unregisterProcess(id);
     }
@@ -165,7 +166,7 @@ export class ActiveProcessManager extends EventEmitter {
       this.logger.debug(`Stopped process ${processId}`);
       return true;
     } catch (error) {
-      this.logger.warn(`Failed to stop process ${processId}:`, error);
+      this.logger.warn(`Failed to stop process ${processId}:`, toReadonlyRecord(error));
       return false;
     }
   }
@@ -355,7 +356,7 @@ export class ActiveProcessManager extends EventEmitter {
         this.logger.info('✅ Successfully switched to smaller model due to memory pressure');
       }
     } catch (error) {
-      this.logger.error('Failed to handle emergency memory pressure:', error);
+      this.logger.error('Failed to handle emergency memory pressure:', toErrorOrUndefined(error));
     } finally {
       this.isTerminating = false;
       this.modelSwitchInProgress = false;
@@ -485,7 +486,7 @@ export class ActiveProcessManager extends EventEmitter {
 
       return true;
     } catch (error) {
-      this.logger.error(`Failed to terminate process ${processId}:`, error);
+      this.logger.error(`Failed to terminate process ${processId}:`, toErrorOrUndefined(error));
       return false;
     }
   }
@@ -593,7 +594,7 @@ export class ActiveProcessManager extends EventEmitter {
    */
   public updateThresholds(newThresholds: Readonly<Partial<ResourceThresholds>>): void {
     this.thresholds = { ...this.thresholds, ...newThresholds };
-    this.logger.info('Updated resource thresholds:', this.thresholds);
+    this.logger.info('Updated resource thresholds:', toReadonlyRecord(this.thresholds));
   }
 
   /**

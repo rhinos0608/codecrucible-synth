@@ -3,9 +3,9 @@
  * Provides comprehensive security controls for the collaboration system
  */
 
-import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
+import { IUnifiedSecurityValidator } from '../../domain/interfaces/security-validator.js';
 import { ModernInputSanitizer } from '../../infrastructure/security/modern-input-sanitizer.js';
-import { logger } from '../logging/logger.js';
+import { ILogger } from '../../domain/interfaces/logger.js';
 
 export interface SecurityPolicy {
   maxConcurrentOperations: number;
@@ -50,8 +50,8 @@ export interface AgentAction {
   type: 'analyze' | 'generate' | 'transform' | 'validate' | 'communicate' | 'tool_usage';
   agentId: string;
   timestamp: Date;
-  payload?: any;
-  parameters?: Record<string, any>;
+  payload?: unknown;
+  parameters?: Record<string, unknown>;
   securityLevel?: 'low' | 'medium' | 'high' | 'critical';
   resourceRequirements: {
     memory: number;
@@ -62,12 +62,15 @@ export interface AgentAction {
 }
 
 export class EnterpriseSecurityFramework {
-  private securityValidator: UnifiedSecurityValidator;
+  private securityValidator: IUnifiedSecurityValidator;
   private inputSanitizer: ModernInputSanitizer;
   private defaultPolicy: SecurityPolicy;
 
-  constructor() {
-    this.securityValidator = new UnifiedSecurityValidator(logger);
+  constructor(
+    securityValidator: IUnifiedSecurityValidator,
+    logger: ILogger
+  ) {
+    this.securityValidator = securityValidator;
     this.inputSanitizer = new ModernInputSanitizer();
     this.defaultPolicy = {
       maxConcurrentOperations: 10,
@@ -85,7 +88,7 @@ export class EnterpriseSecurityFramework {
 
   async validateOperation(
     operation: string,
-    context: Record<string, any> = {}
+    context: Record<string, unknown> = {}
   ): Promise<SecurityValidationResult> {
     try {
       // Sanitize inputs

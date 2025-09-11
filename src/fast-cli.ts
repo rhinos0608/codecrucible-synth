@@ -53,7 +53,9 @@ async function showQuickStatus(): Promise<void> {
   try {
     const controller = new AbortController();
     const healthCheckTimeout = Number.parseInt(process.env.HEALTH_CHECK_TIMEOUT ?? '3000', 10);
-    const timeoutId = setTimeout(() => { controller.abort(); }, healthCheckTimeout);
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, healthCheckTimeout);
 
     const ollamaEndpoint = process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434';
     const response = await fetch(`${ollamaEndpoint}/api/tags`, { signal: controller.signal });
@@ -66,7 +68,9 @@ async function showQuickStatus(): Promise<void> {
   try {
     const controller = new AbortController();
     const healthCheckTimeout = Number.parseInt(process.env.HEALTH_CHECK_TIMEOUT ?? '3000', 10);
-    const timeoutId = setTimeout(() => { controller.abort(); }, healthCheckTimeout);
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, healthCheckTimeout);
 
     const lmStudioEndpoint = process.env.LM_STUDIO_ENDPOINT ?? 'http://localhost:1234';
     const response = await fetch(`${lmStudioEndpoint}/v1/models`, { signal: controller.signal });
@@ -88,15 +92,19 @@ async function showAvailableModels(): Promise<void> {
   try {
     const controller = new AbortController();
     const modelListTimeout = Number.parseInt(process.env.MODEL_LIST_TIMEOUT ?? '5000', 10);
-    const timeoutId = setTimeout(() => { controller.abort(); }, modelListTimeout);
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, modelListTimeout);
 
     const ollamaEndpoint = process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434';
     const response = await fetch(`${ollamaEndpoint}/api/tags`, { signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (response.ok) {
-      interface OllamaTags { models?: Array<{ name: string }> }
-      const data = await response.json() as OllamaTags;
+      interface OllamaTags {
+        models?: Array<{ name: string }>;
+      }
+      const data = (await response.json()) as OllamaTags;
       console.log('Ollama Models:');
       if (Array.isArray(data.models) && data.models.length > 0) {
         for (const m of data.models) {
@@ -114,15 +122,19 @@ async function showAvailableModels(): Promise<void> {
   try {
     const controller = new AbortController();
     const modelListTimeout = Number.parseInt(process.env.MODEL_LIST_TIMEOUT ?? '5000', 10);
-    const timeoutId = setTimeout(() => { controller.abort(); }, modelListTimeout);
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, modelListTimeout);
 
     const lmStudioEndpoint = process.env.LM_STUDIO_ENDPOINT ?? 'http://localhost:1234';
     const response = await fetch(`${lmStudioEndpoint}/v1/models`, { signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (response.ok) {
-      interface LMStudioModels { data?: Array<{ id: string }> }
-      const data = await response.json() as LMStudioModels;
+      interface LMStudioModels {
+        data?: Array<{ id: string }>;
+      }
+      const data = (await response.json()) as LMStudioModels;
       console.log();
       console.log('LM Studio Models:');
       if (Array.isArray(data.data) && data.data.length > 0) {

@@ -1,1301 +1,173 @@
-/**
- * Production Hardening System - Enterprise Security & Reliability
- *
- * Comprehensive production-ready hardening system that transforms CodeCrucible Synth
- * from a development prototype into an enterprise-grade platform.
- *
- * Key Features:
- * - Multi-level timeout management with intelligent recovery
- * - Resource limits enforcement with automatic cleanup
- * - Comprehensive error handling with automated recovery
- * - Enterprise observability with audit trails and alerting
- * - Security hardening with DoS protection and input validation
- * - Graceful shutdown with proper resource cleanup
- * - Performance protection and anti-degradation measures
- */
-
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 import { logger } from '../logging/logger.js';
-import {
-  TimeoutLevel,
-  TimeoutManager,
-  TimeoutStrategy,
-} from '../error-handling/timeout-manager.js';
-import { CircuitBreakerManager } from '../error-handling/circuit-breaker-system.js';
-import { ObservabilitySystem } from '../observability/observability-system.js';
-import { MetricExporter } from '../observability/metrics-collector.js';
-import { ObservabilityConfig } from '../observability/observability-coordinator.js';
+import type { ProductionHardeningConfig, ProductionStats } from './hardening-types.js';
+import { SecurityEnforcer } from './security-enforcer.js';
 
-// Production Hardening Configuration
-export interface ProductionHardeningConfig {
-  // Resource Management
-  resourceLimits: {
-    memory: {
-      maxHeapSize: number; // Maximum heap size in bytes
-      warningThreshold: number; // Warning at % of max
-      criticalThreshold: number; // Critical at % of max
-      forceCleanupThreshold: number; // Force cleanup at % of max
-      gcInterval: number; // Garbage collection interval
-    };
-    cpu: {
-      maxUsagePercent: number; // Maximum CPU usage %
-      warningThreshold: number; // Warning threshold %
-      throttleThreshold: number; // Start throttling at %
-      monitoringInterval: number; // CPU monitoring interval
-    };
-    concurrency: {
-      maxConcurrentOperations: number;
-      maxQueueSize: number;
-      operationTimeout: number;
-      requestTimeout: number;
-    };
-  };
+function deepMerge<T extends Record<string, unknown>>(base: T, override: Partial<T>): T {
+  const result: Record<string, unknown> = { ...base };
+  for (const key of Object.keys(override)) {
+    const baseVal = base[key as keyof T];
+    const overrideVal = override[key as keyof Partial<T>];
+    if (
+      baseVal &&
+      overrideVal &&
+      typeof baseVal === 'object' &&
+      typeof overrideVal === 'object' &&
+      !Array.isArray(baseVal) &&
+      !Array.isArray(overrideVal)
+    ) {
+      // Cast to any for nested merge to avoid generic constraint complexity
+      result[key] = deepMerge(baseVal as any, overrideVal as any);
+    } else if (overrideVal !== undefined) {
+      result[key] = overrideVal;
+    }
+  }
+  return result as T;
+}
 
-  // Timeout Management
-  timeouts: {
-    operation: number; // Individual operation timeout
-    request: number; // Request processing timeout
-    session: number; // Session timeout
-    system: number; // System-wide operation timeout
-    shutdown: number; // Graceful shutdown timeout
-  };
-
-  // Security Hardening
+const defaultConfig: ProductionHardeningConfig = {
   security: {
-    rateLimiting: {
-      enabled: boolean;
-      requestsPerMinute: number;
-      burstLimit: number;
-      banDuration: number;
-    };
+    rateLimiting: { enabled: true, requestsPerMinute: 60, burstLimit: 10, banDuration: 60 },
     inputValidation: {
-      enabled: boolean;
-      maxInputSize: number;
-      sanitizeInputs: boolean;
-      blockSuspiciousPatterns: boolean;
-    };
+      enabled: true,
+      maxInputSize: 1024,
+      sanitizeInputs: true,
+      blockSuspiciousPatterns: true,
+    },
     auditLogging: {
-      enabled: boolean;
-      auditAllOperations: boolean;
-      sensitiveDataRedaction: boolean;
-      logRetentionDays: number;
-    };
-  };
+      enabled: true,
+      auditAllOperations: true,
+      sensitiveDataRedaction: true,
+      logRetentionDays: 30,
+    },
+  },
+};
 
-  // Error Recovery
-  errorRecovery: {
-    maxRetries: number;
-    retryBackoffMultiplier: number;
-    maxBackoffTime: number;
-    autoRecoveryEnabled: boolean;
-    fallbackModeEnabled: boolean;
-  };
-
-  // Health Monitoring
-  monitoring: {
-    healthCheckInterval: number;
-    metricsCollectionInterval: number;
-    alertingEnabled: boolean;
-    alertThresholds: {
-      memoryUsage: number;
-      cpuUsage: number;
-      errorRate: number;
-      responseTime: number;
-    };
-  };
+export interface ExecuteOptions {
+  securityContext?: { userId: string; action: string; input?: unknown };
+  timeout?: number;
+  priority?: string;
+  resourceRequirements?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
-// Production Hardening Statistics
-export interface ProductionStats {
-  uptime: number;
-  totalOperations: number;
-  successRate: number;
-  averageResponseTime: number;
-
-  resourceUsage: {
-    memory: {
-      current: number;
-      peak: number;
-      utilizationPercent: number;
-    };
-    cpu: {
-      current: number;
-      average: number;
-    };
-    concurrency: {
-      active: number;
-      queued: number;
-      completed: number;
-    };
-  };
-
-  security: {
-    blockedRequests: number;
-    rateLimitViolations: number;
-    suspiciousPatterns: number;
-    auditEntries: number;
-  };
-
-  reliability: {
-    timeouts: number;
-    circuitBreakerTrips: number;
-    errorRecoveries: number;
-    forcedCleanups: number;
-  };
-
-  performance: {
-    operationsPerSecond: number;
-    memoryLeaks: number;
-    performanceDegradations: number;
-    optimizationActions: number;
-  };
-}
-
-// Production Alert
-export interface ProductionAlert {
-  id: string;
-  timestamp: number;
-  level: 'info' | 'warning' | 'error' | 'critical';
-  category: 'resource' | 'security' | 'performance' | 'reliability' | 'system';
-  message: string;
-  details: unknown;
-  action?: string;
-  resolved?: boolean;
-  resolvedAt?: number;
-}
-
-/**
- * Main Production Hardening System
- *
- * Orchestrates all production-ready components to ensure enterprise-grade reliability,
- * security, and performance under production workloads.
- */
 export class ProductionHardeningSystem extends EventEmitter {
   private static instance: ProductionHardeningSystem | null = null;
+  private readonly security: SecurityEnforcer;
+  private readonly stats: ProductionStats = {
+    uptime: 0,
+    totalOperations: 0,
+    successRate: 0,
+    averageResponseTime: 0,
+    resourceUsage: {
+      memory: { current: 0, peak: 0, utilizationPercent: 0 },
+    },
+  };
+  private readonly start = Date.now();
+  private alerts: string[] = [];
+  private successfulOperations = 0;
 
-  private readonly config: ProductionHardeningConfig;
-  private readonly stats: ProductionStats;
-  private alerts: ProductionAlert[] = [];
-  private isRunning: boolean = false;
-  private readonly startTime: number;
-
-  // Core Components
-  private readonly timeoutManager: TimeoutManager;
-  private readonly circuitBreakerManager: CircuitBreakerManager;
-  private readonly observabilitySystem: ObservabilitySystem;
-  private readonly resourceMonitor: ResourceMonitor;
-  private readonly securityHardener: SecurityHardener;
-  private readonly errorRecoverySystem: ErrorRecoverySystem;
-  private readonly performanceProtector: PerformanceProtector;
-  private readonly shutdownHandler: GracefulShutdownHandler;
-
-  // Monitoring Intervals
-  private monitoringIntervals: NodeJS.Timeout[] = [];
-
-  // Operational State
-  private readonly activeOperations = new Map<string, OperationContext>();
-  private performanceHistory: PerformanceMetric[] = [];
-
-  private constructor(config?: Readonly<Partial<ProductionHardeningConfig>>) {
+  private constructor(private readonly config: ProductionHardeningConfig) {
     super();
-
-    this.config = this.createDefaultConfig(config);
-    this.startTime = Date.now();
-    this.stats = this.initializeStats();
-
-    // Initialize core components
-    this.timeoutManager = TimeoutManager.getInstance();
-    this.circuitBreakerManager = CircuitBreakerManager.getInstance();
-    this.observabilitySystem = new ObservabilitySystem(this.createObservabilityConfig());
-    this.resourceMonitor = new ResourceMonitor(this.config.resourceLimits, this);
-    this.securityHardener = new SecurityHardener(this.config.security, this);
-    this.errorRecoverySystem = new ErrorRecoverySystem(this.config.errorRecovery, this);
-    this.performanceProtector = new PerformanceProtector(this.config, this);
-    this.shutdownHandler = new GracefulShutdownHandler(this.config.timeouts.shutdown, this);
-
-    this.setupEventHandlers();
-
-    logger.info('🔒 Production Hardening System initialized', {
-      memoryLimit: `${(this.config.resourceLimits.memory.maxHeapSize / 1024 / 1024).toFixed(0)}MB`,
-      securityEnabled: this.config.security.rateLimiting.enabled,
-      observabilityEnabled: true,
-    });
+    this.security = new SecurityEnforcer(config.security);
   }
 
-  public static getInstance(config?: Readonly<Partial<ProductionHardeningConfig>>): ProductionHardeningSystem {
-    if (!ProductionHardeningSystem.instance) {
-      ProductionHardeningSystem.instance = new ProductionHardeningSystem(config);
+  public static getInstance(
+    config: Partial<ProductionHardeningConfig> = {}
+  ): ProductionHardeningSystem {
+    if (!this.instance) {
+      const merged: ProductionHardeningConfig = {
+        security: {
+          rateLimiting: {
+            ...defaultConfig.security.rateLimiting,
+            ...(config.security?.rateLimiting ?? {}),
+          },
+          inputValidation: {
+            ...defaultConfig.security.inputValidation,
+            ...(config.security?.inputValidation ?? {}),
+          },
+          auditLogging: {
+            ...defaultConfig.security.auditLogging,
+            ...(config.security?.auditLogging ?? {}),
+          },
+        },
+      };
+      this.instance = new ProductionHardeningSystem(merged);
     }
-    return ProductionHardeningSystem.instance;
+    return this.instance;
   }
 
-  /**
-   * Initialize the production hardening system
-   */
   public async initialize(): Promise<void> {
-    if (this.isRunning) {
-      logger.warn('Production hardening system already running');
-      return;
-    }
-
-    try {
-      logger.info('🚀 Initializing Production Hardening System...');
-
-      // Initialize core components
-      await this.observabilitySystem.initialize();
-      await this.resourceMonitor.initialize();
-      await this.securityHardener.initialize();
-      await this.errorRecoverySystem.initialize();
-      await this.performanceProtector.initialize();
-      await this.shutdownHandler.initialize();
-
-      // Start monitoring systems
-      this.startMonitoring();
-
-      // Register global error handlers
-      this.registerGlobalErrorHandlers();
-
-      this.isRunning = true;
-      this.emit('system:initialized');
-
-      logger.info('✅ Production Hardening System initialized successfully');
-    } catch (error) {
-      logger.error('Failed to initialize production hardening system:', error);
-      throw error;
-    }
+    await this.security.initialize();
+    logger.info('🔒 Production hardening system initialized');
   }
 
-  /**
-   * Execute operation with comprehensive production hardening
-   */
   public async executeWithHardening<T>(
     operationId: string,
     operation: () => Promise<T>,
-    options: Readonly<{
-      timeout?: number;
-      priority?: 'low' | 'medium' | 'high' | 'critical';
-      retries?: number;
-      circuitBreaker?: boolean;
-      resourceRequirements?: {
-        memory?: number;
-        cpu?: number;
-      };
-      metadata?: Record<string, unknown>;
-    }> = {}
+    options: ExecuteOptions = {}
   ): Promise<T> {
-    const startTime = performance.now();
-    const context: OperationContext = {
-      id: operationId,
-      startTime,
-      priority: options.priority ?? 'medium',
-      metadata: options.metadata ?? {},
-      resourceRequirements: options.resourceRequirements ?? {},
-      status: 'starting',
-    };
-
-    this.activeOperations.set(operationId, context);
-    this.stats.totalOperations++;
-
+    const start = performance.now();
     try {
-      // Security validation
-      await this.securityHardener.validateOperation(operationId, context);
-
-      // Resource allocation check
-      await this.resourceMonitor.checkResourceAvailability(context);
-
-      // Execute with timeout and circuit breaker protection
-      const result = await this.executeWithAllProtections(operation, context, options);
-
-      // Record successful completion
-      context.status = 'completed';
-      context.endTime = performance.now();
-      context.duration = context.endTime - context.startTime;
-
-      this.recordOperationSuccess(context);
-      this.emit('operation:completed', context);
-
+      await this.security.enforce({
+        userId: options.securityContext?.userId,
+        action: options.securityContext?.action || operationId,
+        metadata: { input: options.securityContext?.input },
+      });
+      const result = await operation();
+      this.recordSuccess(performance.now() - start);
       return result;
     } catch (error) {
-      // Handle operation failure
-      context.status = 'failed';
-      context.endTime = performance.now();
-      context.duration = context.endTime - context.startTime;
-      context.error = error as Error;
-
-      await this.handleOperationFailure(context, error as Error);
+      await this.security.handleFailure(operationId, error as Error);
+      this.recordFailure(performance.now() - start);
       throw error;
-    } finally {
-      this.activeOperations.delete(operationId);
-
-      // Update performance metrics
-      if (context.duration) {
-        this.updatePerformanceMetrics(context);
-      }
     }
   }
 
-  /**
-   * Get comprehensive production statistics
-   */
-  public getProductionStats(): ProductionStats {
-    const currentStats: ProductionStats = { ...this.stats };
+  private recordSuccess(duration: number): void {
+    this.stats.totalOperations++;
+    this.successfulOperations++;
+    const n = this.stats.totalOperations;
+    this.stats.averageResponseTime = (this.stats.averageResponseTime * (n - 1) + duration) / n;
 
-    // Update real-time metrics
-    currentStats.uptime = Date.now() - this.startTime;
-    currentStats.resourceUsage = this.resourceMonitor.getCurrentUsage() as ProductionStats['resourceUsage'];
-    currentStats.security = this.securityHardener.getSecurityStats() as ProductionStats['security'];
-    currentStats.reliability = this.getReliabilityStats() as ProductionStats['reliability'];
-    currentStats.performance = this.performanceProtector.getPerformanceStats() as ProductionStats['performance'];
+    this.stats.successRate = (this.successfulOperations / n) * 100;
 
-    return currentStats;
+    this.stats.successRate = (this.stats.successRate * (n - 1) + 100) / n;
   }
 
-  /**
-   * Get active production alerts
-   */
-  public getActiveAlerts(): ProductionAlert[] {
-    return this.alerts.filter((alert: Readonly<ProductionAlert>) => !alert.resolved);
+  private recordFailure(duration: number): void {
+    this.stats.totalOperations++;
+    const n = this.stats.totalOperations;
+    this.stats.averageResponseTime = (this.stats.averageResponseTime * (n - 1) + duration) / n;
+    this.stats.successRate = (this.successfulOperations / n) * 100;
   }
 
-  /**
-   * Create production health report
-   */
-  public async getHealthReport(): Promise<ProductionHealthReport> {
-    const stats = this.getProductionStats();
-    const systemHealth = await this.observabilitySystem.getSystemHealth();
-    const resourceHealth = this.resourceMonitor.getHealthStatus();
-    const securityHealth = this.securityHardener.getSecurityHealth();
-
-    const overallScore = this.calculateOverallHealthScore(
-      systemHealth.overallScore,
-      resourceHealth.score,
-      securityHealth.score
-    );
-
-    return {
-      timestamp: Date.now(),
-      overallStatus: this.getHealthStatus(overallScore),
-      overallScore,
-      uptime: stats.uptime,
-
-      components: {
-        system: systemHealth,
-        resources: resourceHealth as { status: string; score: number },
-        security: securityHealth as { score: number },
-        performance: this.performanceProtector.getHealthStatus() as { status: string; score: number },
-        reliability: this.getReliabilityHealth() as { status: string; errorRate: number; stats: any },
-      },
-
-      metrics: stats,
-      activeAlerts: this.getActiveAlerts(),
-      recommendations: this.generateHealthRecommendations(stats),
-    };
-  }
-
-  /**
-   * Trigger emergency measures for critical situations
-   */
   public async triggerEmergencyMode(reason: string): Promise<void> {
-    logger.error(`🚨 EMERGENCY MODE TRIGGERED: ${reason}`);
+    this.alerts.push(reason);
+    await this.security.emergencyLockdown();
+    this.emit('emergency:activated', { reason });
+  }
 
-    const alert: ProductionAlert = {
-      id: `emergency_${Date.now()}`,
-      timestamp: Date.now(),
-      level: 'critical',
-      category: 'system',
-      message: `Emergency mode activated: ${reason}`,
-      details: { reason, activeOperations: this.activeOperations.size },
-      action: 'emergency_measures_activated',
+  public getProductionStats(): ProductionStats {
+    this.stats.uptime = Date.now() - this.start;
+    const mem = process.memoryUsage();
+    this.stats.resourceUsage.memory = {
+      current: mem.heapUsed,
+      peak: mem.heapTotal,
+      utilizationPercent: (mem.heapUsed / mem.heapTotal) * 100,
     };
-
-    this.alerts.push(alert);
-    this.emit('emergency:activated', alert);
-
-    // Emergency measures
-    await Promise.all([
-      this.resourceMonitor.emergencyCleanup(),
-      this.performanceProtector.emergencyOptimization(),
-      this.errorRecoverySystem.emergencyRecovery(),
-      this.securityHardener.emergencyLockdown(),
-    ]);
-
-    // Force garbage collection if available
-    if (global.gc) {
-      global.gc();
-    }
-
-    logger.warn('Emergency measures completed');
+    return { ...this.stats };
   }
 
-  /**
-   * Graceful shutdown of the production hardening system
-   */
-  public async shutdown(): Promise<void> {
-    if (!this.isRunning) return;
-
-    logger.info('🛑 Shutting down Production Hardening System...');
-
-    try {
-      // Activate shutdown handler
-      await this.shutdownHandler.initiateShutdown();
-
-      // Stop monitoring
-      this.stopMonitoring();
-
-      // Shutdown components in proper order
-      await this.performanceProtector.shutdown();
-      await this.securityHardener.shutdown();
-      await this.errorRecoverySystem.shutdown();
-      await this.resourceMonitor.shutdown();
-      await this.observabilitySystem.shutdown();
-
-      this.isRunning = false;
-      this.removeAllListeners();
-
-      logger.info('✅ Production Hardening System shutdown completed');
-    } catch (error) {
-      logger.error('Error during shutdown:', error);
-      throw error;
-    }
-  }
-
-  // Private Implementation Methods
-
-  private async executeWithAllProtections<T>(
-    operation: () => Promise<T>,
-    context: Readonly<OperationContext>,
-    options: Readonly<{
-      timeout?: number;
-      priority?: 'low' | 'medium' | 'high' | 'critical';
-      retries?: number;
-      circuitBreaker?: boolean;
-      resourceRequirements?: Readonly<{
-        memory?: number;
-        cpu?: number;
-      }>;
-      metadata?: Readonly<Record<string, unknown>>;
-    }>
-  ): Promise<T> {
-    // Wrap with timeout protection
-    const timeoutDuration = options.timeout ?? this.config.timeouts.operation;
-    const timeoutPromise = this.timeoutManager.withTimeout(operation, context.id, {
-      level: TimeoutLevel.OPERATION,
-      duration: timeoutDuration,
-      strategy: TimeoutStrategy.GRACEFUL,
-    });
-
-    // Circuit breaker protection if enabled
-    if (options.circuitBreaker) {
-      const circuitBreaker = this.circuitBreakerManager.getCircuitBreaker(
-        `operation_${context.id}`,
-        {
-          failureThreshold: 5,
-          recoveryTimeout: 30000,
-          timeout: timeoutDuration,
-          successThreshold: 3,
-          operationTimeout: timeoutDuration,
-          onStateChange: (state: string, breaker: string) => {
-            logger.info(`Circuit breaker ${breaker} state changed to ${state}`);
-          },
-          onFailure: (error: Readonly<Error>, breaker: string) => {
-            logger.warn(`Circuit breaker ${breaker} failure:`, error.message);
-          },
-        }
-      );
-
-      if (circuitBreaker) {
-        return circuitBreaker.execute(() => timeoutPromise);
-      }
-    }
-
-    return timeoutPromise;
-  }
-
-  private recordOperationSuccess(context: Readonly<OperationContext>): void {
-    const successRate =
-      (this.stats.totalOperations - this.getFailureCount()) / this.stats.totalOperations;
-    this.stats.successRate = successRate * 100;
-
-    if (context.duration) {
-      this.stats.averageResponseTime =
-        this.stats.averageResponseTime * 0.9 + context.duration * 0.1;
-    }
-
-    // Record performance metrics
-    this.observabilitySystem.recordTimer('operation.duration', context.duration || 0, {
-      operation: context.id,
-      status: 'success',
-    });
-
-    this.observabilitySystem.incrementCounter('operation.success', { operation: context.id });
-  }
-
-  private async handleOperationFailure(context: OperationContext, error: Error): Promise<void> {
-    logger.error(`Operation failed: ${context.id}`, error);
-
-    // Record failure metrics
-    this.observabilitySystem.incrementCounter('operation.failure', {
-      operation: context.id,
-      error: error.name,
-    });
-
-    // Try error recovery if enabled
-    if (this.config.errorRecovery.autoRecoveryEnabled) {
-      await this.errorRecoverySystem.handleFailure(context, error);
-    }
-
-    // Create alert for critical errors
-    if (this.isCriticalError(error)) {
-      const alert: ProductionAlert = {
-        id: `error_${Date.now()}`,
-        timestamp: Date.now(),
-        level: 'error',
-        category: 'reliability',
-        message: `Critical operation failure: ${context.id}`,
-        details: { error: error.message, context },
-        action: 'investigate_and_recover',
-      };
-
-      this.alerts.push(alert);
-      this.emit('alert:created', alert);
-    }
-
-    this.emit('operation:failed', { context, error });
-  }
-
-  private startMonitoring(): void {
-    // Resource monitoring
-    const resourceInterval = setInterval(() => {
-      this.resourceMonitor.performResourceCheck();
-    }, this.config.monitoring.healthCheckInterval);
-    this.monitoringIntervals.push(resourceInterval);
-
-    // Performance monitoring
-    const perfInterval = setInterval(() => {
-      this.performanceProtector.checkPerformance();
-    }, this.config.monitoring.metricsCollectionInterval);
-    this.monitoringIntervals.push(perfInterval);
-
-    // Security monitoring
-    const secInterval = setInterval(() => {
-      this.securityHardener.performSecurityCheck();
-    }, 30000); // Every 30 seconds
-    this.monitoringIntervals.push(secInterval);
-
-    // Alert processing
-    const alertInterval = setInterval(() => {
-      this.processAlerts();
-    }, 10000); // Every 10 seconds
-    this.monitoringIntervals.push(alertInterval);
-  }
-
-  private stopMonitoring(): void {
-    this.monitoringIntervals.forEach(interval => {
-      clearInterval(interval);
-    });
-    this.monitoringIntervals = [];
-  }
-
-  private registerGlobalErrorHandlers(): void {
-    // Unhandled promise rejections
-    process.on('unhandledRejection', (reason: Readonly<unknown>, _promise: Readonly<Promise<unknown>>) => {
-      logger.error('Unhandled Promise Rejection:', reason);
-      // Safely cast reason to string for error message
-      const message = `Unhandled Promise Rejection: ${typeof reason === 'string' ? reason : (reason instanceof Error ? reason.message : JSON.stringify(reason))}`;
-      void this.handleCriticalError(new Error(message));
-    });
-
-    // Uncaught exceptions
-    process.on('uncaughtException', (error: Readonly<Error>) => {
-      logger.error('Uncaught Exception:', error);
-      void this.handleCriticalError(error);
-    });
-
-    // Warning handler
-    process.on('warning', (warning: Readonly<Error>) => {
-      logger.warn('Process Warning:', warning);
-    });
-  }
-
-  private async handleCriticalError(error: Readonly<Error>): Promise<void> {
-    await this.triggerEmergencyMode(`Critical error: ${error.message}`);
-  }
-
-  private setupEventHandlers(): void {
-    // Resource monitoring events
-    this.resourceMonitor.on('resource:warning', (data: Readonly<{ resource?: string }>) => {
-      this.createAlert('warning', 'resource', `Resource usage warning: ${data.resource ?? 'unknown'}`, data);
-    });
-
-    this.resourceMonitor.on('resource:critical', (data: Readonly<{ resource?: string }>) => {
-      this.createAlert('critical', 'resource', `Critical resource usage: ${data.resource ?? 'unknown'}`, data);
-      void this.triggerEmergencyMode(`Critical resource usage: ${data.resource ?? 'unknown'}`);
-    });
-
-    // Security events
-    this.securityHardener.on('security:threat', (data: { type?: string }) => {
-      this.createAlert('error', 'security', `Security threat detected: ${data.type}`, data);
-    });
-
-    // Performance events
-    this.performanceProtector.on('performance:degradation', data => {
-      this.createAlert('warning', 'performance', `Performance degradation detected`, data);
-    });
-  }
-
-  private createAlert(
-    level: 'info' | 'warning' | 'error' | 'critical',
-    category: 'resource' | 'security' | 'performance' | 'reliability' | 'system',
-    message: string,
-    details: unknown
-  ): void {
-    const alert: ProductionAlert = {
-      id: `${category}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`,
-      timestamp: Date.now(),
-      level,
-      category,
-      message,
-      details,
-    };
-
-    this.alerts.push(alert);
-    this.emit('alert:created', alert);
-
-    // Keep only recent alerts
-    if (this.alerts.length > 1000) {
-      this.alerts = this.alerts.slice(-500);
-    }
-  }
-
-  private processAlerts(): void {
-    const activeAlerts = this.getActiveAlerts();
-
-    // Auto-resolve alerts that are no longer relevant
-    activeAlerts.forEach(alert => {
-      if (this.shouldAutoResolveAlert(alert)) {
-        alert.resolved = true;
-        alert.resolvedAt = Date.now();
-        this.emit('alert:resolved', alert);
-      }
-    });
-  }
-
-  private shouldAutoResolveAlert(alert: ProductionAlert): boolean {
-    // Auto-resolve old resource alerts if resources are now healthy
-    if (alert.category === 'resource' && Date.now() - alert.timestamp > 300000) {
-      // 5 minutes
-      const resourceHealth = this.resourceMonitor.getHealthStatus();
-      return resourceHealth.status === 'healthy';
-    }
-
-    return false;
-  }
-
-  private updatePerformanceMetrics(context: OperationContext): void {
-    if (!context.duration) return;
-
-    const metric: PerformanceMetric = {
-      timestamp: Date.now(),
-      operationId: context.id,
-      duration: context.duration,
-      success: context.status === 'completed',
-      memoryUsed: process.memoryUsage().heapUsed,
-      metadata: context.metadata,
-    };
-
-    this.performanceHistory.push(metric);
-
-    // Keep only recent metrics
-    if (this.performanceHistory.length > 10000) {
-      this.performanceHistory = this.performanceHistory.slice(-5000);
-    }
-  }
-
-  private getFailureCount(): number {
-    return this.performanceHistory.filter(m => !m.success).length;
-  }
-
-  private isCriticalError(error: Error): boolean {
-    const criticalErrors = [
-      'OutOfMemoryError',
-      'TimeoutError',
-      'SecurityViolation',
-      'CircuitBreakerError',
-    ];
-
-    return criticalErrors.some(type => error.name.includes(type) || error.message.includes(type));
-  }
-
-  private getReliabilityStats(): ReliabilityStats {
-    return {
-      timeouts: this.performanceHistory.filter((m: Readonly<PerformanceMetric>) => m.metadata.timeout).length,
-      circuitBreakerTrips: 0, // Would be tracked by circuit breaker manager
-      errorRecoveries: 0, // Would be tracked by error recovery system
-      forcedCleanups: 0, // Would be tracked by resource monitor
-    };
-  }
-
-  private getReliabilityHealth(): { status: 'healthy' | 'degraded' | 'critical'; errorRate: number; stats: ReliabilityStats } {
-    const stats: ReliabilityStats = this.getReliabilityStats();
-    const totalOps = this.stats.totalOperations;
-
-    const errorRate = totalOps > 0 ? (this.getFailureCount() / totalOps) * 100 : 0;
-
-    return {
-      status: errorRate < 1 ? 'healthy' : errorRate < 5 ? 'degraded' : 'critical',
-      errorRate,
-      stats,
-    };
-  }
-
-  private calculateOverallHealthScore(
-    systemScore: number,
-    resourceScore: number,
-    securityScore: number
-  ): number {
-    return (systemScore + resourceScore + securityScore) / 3;
-  }
-
-  private getHealthStatus(score: number): 'healthy' | 'degraded' | 'critical' {
-    if (score >= 0.8) return 'healthy';
-    if (score >= 0.5) return 'degraded';
-    return 'critical';
-  }
-
-  private generateHealthRecommendations(stats: ProductionStats): string[] {
-    const recommendations: string[] = [];
-
-    if (stats.resourceUsage.memory.utilizationPercent > 80) {
-      recommendations.push('Consider increasing memory limits or optimizing memory usage');
-    }
-
-    if (stats.resourceUsage.cpu.current > 80) {
-      recommendations.push('High CPU usage detected - consider load balancing or optimization');
-    }
-
-    if (stats.successRate < 95) {
-      recommendations.push(
-        'Success rate below target - investigate error patterns and implement fixes'
-      );
-    }
-
-    if (stats.averageResponseTime > 5000) {
-      recommendations.push('Response time high - consider performance optimization');
-    }
-
-    return recommendations;
-  }
-
-  private createDefaultConfig(
-    override?: Partial<ProductionHardeningConfig>
-  ): ProductionHardeningConfig {
-    const defaultConfig: ProductionHardeningConfig = {
-      resourceLimits: {
-        memory: {
-          maxHeapSize: 512 * 1024 * 1024, // 512MB
-          warningThreshold: 75,
-          criticalThreshold: 90,
-          forceCleanupThreshold: 95,
-          gcInterval: 30000,
-        },
-        cpu: {
-          maxUsagePercent: 80,
-          warningThreshold: 60,
-          throttleThreshold: 75,
-          monitoringInterval: 5000,
-        },
-        concurrency: {
-          maxConcurrentOperations: 50,
-          maxQueueSize: 100,
-          operationTimeout: 300000, // 5 minutes
-          requestTimeout: 60000, // 1 minute
-        },
-      },
-
-      timeouts: {
-        operation: 30000, // 30 seconds
-        request: 120000, // 2 minutes
-        session: 1800000, // 30 minutes
-        system: 300000, // 5 minutes
-        shutdown: 30000, // 30 seconds
-      },
-
-      security: {
-        rateLimiting: {
-          enabled: true,
-          requestsPerMinute: 100,
-          burstLimit: 20,
-          banDuration: 300000, // 5 minutes
-        },
-        inputValidation: {
-          enabled: true,
-          maxInputSize: 1024 * 1024, // 1MB
-          sanitizeInputs: true,
-          blockSuspiciousPatterns: true,
-        },
-        auditLogging: {
-          enabled: true,
-          auditAllOperations: false,
-          sensitiveDataRedaction: true,
-          logRetentionDays: 30,
-        },
-      },
-
-      errorRecovery: {
-        maxRetries: 3,
-        retryBackoffMultiplier: 2,
-        maxBackoffTime: 60000,
-        autoRecoveryEnabled: true,
-        fallbackModeEnabled: true,
-      },
-
-      monitoring: {
-        healthCheckInterval: 30000,
-        metricsCollectionInterval: 10000,
-        alertingEnabled: true,
-        alertThresholds: {
-          memoryUsage: 80,
-          cpuUsage: 75,
-          errorRate: 5,
-          responseTime: 5000,
-        },
-      },
-    };
-
-    return override ? this.mergeConfig(defaultConfig, override) : defaultConfig;
-  }
-
-  private mergeConfig(
-    base: ProductionHardeningConfig,
-    override: Partial<ProductionHardeningConfig>
-  ): ProductionHardeningConfig {
-    // Deep merge configuration
-    return {
-      ...base,
-      ...override,
-      resourceLimits: {
-        ...base.resourceLimits,
-        ...override.resourceLimits,
-        memory: { ...base.resourceLimits.memory, ...(override.resourceLimits?.memory || {}) },
-        cpu: { ...base.resourceLimits.cpu, ...(override.resourceLimits?.cpu || {}) },
-        concurrency: {
-          ...base.resourceLimits.concurrency,
-          ...(override.resourceLimits?.concurrency || {}),
-        },
-      },
-      timeouts: { ...base.timeouts, ...(override.timeouts || {}) },
-      security: {
-        ...base.security,
-        ...override.security,
-        rateLimiting: { ...base.security.rateLimiting, ...(override.security?.rateLimiting || {}) },
-        inputValidation: {
-          ...base.security.inputValidation,
-          ...(override.security?.inputValidation || {}),
-        },
-        auditLogging: { ...base.security.auditLogging, ...(override.security?.auditLogging || {}) },
-      },
-      errorRecovery: { ...base.errorRecovery, ...(override.errorRecovery || {}) },
-      monitoring: {
-        ...base.monitoring,
-        ...override.monitoring,
-        alertThresholds: {
-          ...base.monitoring.alertThresholds,
-          ...(override.monitoring?.alertThresholds || {}),
-        },
-      },
-    };
-  }
-
-  private createObservabilityConfig(): ObservabilityConfig {
-    return {
-      metrics: {
-        enabled: true,
-        retentionDays: 7,
-        exportInterval: 60000,
-        exporters: [] as MetricExporter[],
-      },
-      tracing: {
-        enabled: true,
-        samplingRate: 0.1, // 10% sampling in production
-        maxSpansPerTrace: 100,
-        exporters: [] as unknown[],
-      },
-      logging: {
-        level: 'info',
-        outputs: [{ type: 'console', format: 'structured', configuration: {} }],
-        structured: true,
-        includeStackTrace: false,
-      },
-      health: {
-        checkInterval: this.config.monitoring.healthCheckInterval,
-        timeoutMs: 5000,
-        retryAttempts: 3,
-      },
-      alerting: {
-        enabled: this.config.monitoring.alertingEnabled,
-        rules: [],
-        defaultCooldown: 300000,
-      },
-      storage: {
-        dataPath: './production-data',
-        maxFileSize: 100 * 1024 * 1024, // 100MB
-        compressionEnabled: true,
-        encryptionEnabled: false,
-      },
-      telemetry: {
-        enabled: true,
-        interval: 10000,
-        exporters: [],
-      },
-    };
-  }
-
-  private initializeStats(): ProductionStats {
-    return {
-      uptime: 0,
-      totalOperations: 0,
-      successRate: 100,
-      averageResponseTime: 0,
-
-      resourceUsage: {
-        memory: { current: 0, peak: 0, utilizationPercent: 0 },
-        cpu: { current: 0, average: 0 },
-        concurrency: { active: 0, queued: 0, completed: 0 },
-      },
-
-      security: {
-        blockedRequests: 0,
-        rateLimitViolations: 0,
-        suspiciousPatterns: 0,
-        auditEntries: 0,
-      },
-
-      reliability: {
-        timeouts: 0,
-        circuitBreakerTrips: 0,
-        errorRecoveries: 0,
-        forcedCleanups: 0,
-      },
-
-      performance: {
-        operationsPerSecond: 0,
-        memoryLeaks: 0,
-        performanceDegradations: 0,
-        optimizationActions: 0,
-      },
-    };
-  }
-}
-
-// ObservabilityConfig interface imported from observability-coordinator.ts
-
-// Supporting Classes (Placeholder implementations - would be fully implemented)
-
-interface ReliabilityStats {
-  timeouts: number;
-  circuitBreakerTrips: number;
-  errorRecoveries: number;
-  forcedCleanups: number;
-}
-
-interface OperationContext {
-  id: string;
-  startTime: number;
-  endTime?: number;
-  duration?: number;
-  priority: string;
-  metadata: Record<string, unknown>;
-  resourceRequirements: {
-    memory?: number;
-    cpu?: number;
-  };
-  status: 'starting' | 'running' | 'completed' | 'failed';
-  error?: Error;
-}
-
-type ResourceLimits = ProductionHardeningConfig['resourceLimits'];
-
-class ResourceMonitor extends EventEmitter {
-  public constructor(
-    private readonly limits: Readonly<ResourceLimits>,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private readonly _hardeningSystem: Readonly<ProductionHardeningSystem>
-  ) {
-    super();
-  }
-
-  public async initialize(): Promise<void> {
-    // Initialize resource monitoring
-  }
-
-  public async checkResourceAvailability(_context: Readonly<OperationContext>): Promise<void> {
-    // Check if resources are available for operation
-  }
-
-  public performResourceCheck(): void {
-    // Check current resource usage against limits
-    const memUsage = process.memoryUsage();
-    const heapPercent = (memUsage.heapUsed / this.limits.memory.maxHeapSize) * 100;
-
-    if (heapPercent > this.limits.memory.criticalThreshold) {
-      this.emit('resource:critical', { resource: 'memory', usage: heapPercent });
-    } else if (heapPercent > this.limits.memory.warningThreshold) {
-      this.emit('resource:warning', { resource: 'memory', usage: heapPercent });
-    }
-  }
-
-  public getCurrentUsage(): {
-    memory: { current: number; peak: number; utilizationPercent: number };
-    cpu: { current: number; average: number };
-    concurrency: { active: number; queued: number; completed: number };
-  } {
-    const memUsage = process.memoryUsage();
-    return {
-      memory: {
-        current: memUsage.heapUsed,
-        peak: memUsage.heapTotal,
-        utilizationPercent: (memUsage.heapUsed / this.limits.memory.maxHeapSize) * 100,
-      },
-      cpu: { current: 0, average: 0 }, // Would implement CPU monitoring
-      concurrency: { active: 0, queued: 0, completed: 0 },
-    };
-  }
-
-  public getHealthStatus(): { status: string; score: number } {
-    const usage = this.getCurrentUsage();
-    const memScore = Math.max(0, 1 - usage.memory.utilizationPercent / 100);
-    return { status: memScore > 0.7 ? 'healthy' : 'degraded', score: memScore };
-  }
-
-  public async emergencyCleanup(): Promise<void> {
-    // Perform emergency resource cleanup
-    if (global.gc) {
-      global.gc();
-    }
+  public getActiveAlerts(): string[] {
+    return [...this.alerts];
   }
 
   public async shutdown(): Promise<void> {
-    // Cleanup resource monitoring
+    await this.security.shutdown();
+    logger.info('🛑 Production hardening system shut down');
   }
 }
 
-type SecurityConfig = ProductionHardeningConfig['security'];
-
-class SecurityHardener extends EventEmitter {
-  public constructor(
-    private readonly config: Readonly<SecurityConfig>,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private readonly hardeningSystem: Readonly<ProductionHardeningSystem>
-  ) {
-    super();
-  }
-
-  public async initialize(): Promise<void> {
-    // Initialize security hardening
-  }
-
-  public async validateOperation(_operationId: string, _context: Readonly<OperationContext>): Promise<void> {
-    // Validate operation against security policies
-  }
-
-  public performSecurityCheck(): void {
-    // Perform periodic security checks
-  }
-
-  public getSecurityStats(): {
-    blockedRequests: number;
-    rateLimitViolations: number;
-    suspiciousPatterns: number;
-    auditEntries: number;
-  } {
-    return {
-      blockedRequests: 0,
-      rateLimitViolations: 0,
-      suspiciousPatterns: 0,
-      auditEntries: 0,
-    };
-  }
-
-  public getSecurityHealth(): { score: number } {
-    // Return a default security health score
-    return { score: 1 };
-  }
-
-  public async emergencyLockdown(): Promise<void> {
-    // Perform emergency lockdown procedures
-  }
-
-  public async shutdown(): Promise<void> {
-    // Cleanup security components
-  }
-}
-
-type ErrorRecoveryConfig = ProductionHardeningConfig['errorRecovery'];
-
-class ErrorRecoverySystem {
-  public constructor(
-    private readonly config: Readonly<ErrorRecoveryConfig>,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private readonly hardeningSystem: Readonly<ProductionHardeningSystem>
-  ) {}
-
-  public async initialize(): Promise<void> {
-    // Initialize error recovery system
-  }
-
-  public async handleFailure(_context: Readonly<OperationContext>, _error: Readonly<Error>): Promise<void> {
-    // Handle operation failure and attempt recovery
-  }
-
-  public async emergencyRecovery(): Promise<void> {
-    // Perform emergency recovery procedures
-  }
-
-  public async shutdown(): Promise<void> {
-    // Cleanup error recovery system
-  }
-}
-
-class PerformanceProtector extends EventEmitter {
-  public constructor(
-    private readonly config: Readonly<ProductionHardeningConfig>,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private readonly hardeningSystem: Readonly<ProductionHardeningSystem>
-  ) {
-    super();
-  }
-
-  public async initialize(): Promise<void> {
-    // Initialize performance protection
-  }
-
-  public checkPerformance(): void {
-    // Check for performance issues
-    const memUsage = process.memoryUsage();
-    if (memUsage.heapUsed > this.config.resourceLimits.memory.maxHeapSize * 0.8) {
-      this.emit('performance:degradation', { type: 'memory', usage: memUsage.heapUsed });
-    }
-  }
-
-  public getPerformanceStats(): {
-    operationsPerSecond: number;
-    memoryLeaks: number;
-    performanceDegradations: number;
-    optimizationActions: number;
-  } {
-    return {
-      operationsPerSecond: 0,
-      memoryLeaks: 0,
-      performanceDegradations: 0,
-      optimizationActions: 0,
-    };
-  }
-
-  public async emergencyRecovery(): Promise<void> {
-    // Perform emergency recovery procedures
-  }
-
-  public async shutdown(): Promise<void> {
-    // Cleanup error recovery system
-  }
-
-  public getHealthStatus(): { status: string; score: number } {
-    return { status: 'healthy', score: 0.9 };
-  }
-
-  public async emergencyOptimization(): Promise<void> {
-    // Perform emergency performance optimization
-  }
-}
-
-class GracefulShutdownHandler {
-  private shutdownStarted: boolean = false;
-
-  public constructor(
-    private readonly shutdownTimeout: number,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private readonly hardeningSystem: Readonly<ProductionHardeningSystem>
-  ) {}
-
-  public initialize(): void {
-    // Register shutdown signal handlers
-    process.once('SIGTERM', () => { void this.handleShutdownSignal('SIGTERM'); return undefined; });
-    process.once('SIGINT', () => { void this.handleShutdownSignal('SIGINT'); return undefined; });
-    process.once('SIGUSR2', () => { void this.handleShutdownSignal('SIGUSR2'); return undefined; });
-  }
-
-  private async handleShutdownSignal(signal: string): Promise<void> {
-    if (this.shutdownStarted) return;
-
-    logger.info(`Received ${signal}, initiating graceful shutdown...`);
-    await this.initiateShutdown();
-  }
-
-  public async initiateShutdown(): Promise<void> {
-    if (this.shutdownStarted) return;
-
-    this.shutdownStarted = true;
-
-    const shutdownTimeout = setTimeout(() => {
-      logger.error('Graceful shutdown timeout exceeded, forcing exit');
-      process.exit(1);
-    }, this.shutdownTimeout);
-
-    try {
-      await this.hardeningSystem.shutdown();
-      clearTimeout(shutdownTimeout);
-      logger.info('Graceful shutdown completed');
-      process.exit(0);
-    } catch (error) {
-      logger.error('Error during graceful shutdown:', error);
-      clearTimeout(shutdownTimeout);
-      process.exit(1);
-    }
-  }
-}
-interface OperationContext {
-  id: string;
-  startTime: number;
-  endTime?: number;
-  duration?: number;
-  priority: string;
-  metadata: Record<string, unknown>;
-  resourceRequirements: {
-    memory?: number;
-    cpu?: number;
-  };
-  status: 'starting' | 'running' | 'completed' | 'failed';
-  error?: Error;
-}
-
-// Removed unused OperationRequest interface
-
-interface PerformanceMetric {
-  timestamp: number;
-  operationId: string;
-  duration: number;
-  success: boolean;
-  memoryUsed: number;
-  metadata: Record<string, unknown>;
-}
-
-interface ProductionHealthReport {
-  timestamp: number;
-  overallStatus: 'healthy' | 'degraded' | 'critical';
-  overallScore: number;
-  uptime: number;
-  components: {
-    system: unknown;
-    resources: { status: string; score: number };
-    security: { score: number };
-    performance: { status: string; score: number };
-    reliability: { status: string; errorRate: number; stats: unknown };
-  };
-  metrics: ProductionStats;
-  activeAlerts: ProductionAlert[];
-  recommendations: string[];
-}
-
-// Export the production hardening system
 export const productionHardeningSystem = ProductionHardeningSystem.getInstance();

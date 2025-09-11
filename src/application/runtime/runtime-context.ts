@@ -9,8 +9,8 @@
  */
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import {
-  unifiedResourceCoordinator,
   UnifiedResourceCoordinator,
+  unifiedResourceCoordinator,
 } from '../../infrastructure/performance/unified-resource-coordinator.js';
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { UnifiedConfigurationManager } from '../../domain/config/config-manager.js';
@@ -23,12 +23,12 @@ interface ListenerRemover {
   removeAllListeners: () => void;
 }
 
-function isDisposable(value: any): value is Disposable {
-  return value != null && typeof (value as Disposable)?.dispose === 'function';
+function isDisposable(value: unknown): value is Disposable {
+  return value !== null && typeof (value as Disposable).dispose === 'function';
 }
 
-function hasListenerRemover(value: any): value is ListenerRemover {
-  return value != null && typeof (value as ListenerRemover).removeAllListeners === 'function';
+function hasListenerRemover(value: unknown): value is ListenerRemover {
+  return value !== null && typeof (value as ListenerRemover).removeAllListeners === 'function';
 }
 
 export interface RuntimeContext {
@@ -37,7 +37,7 @@ export interface RuntimeContext {
   securityValidator?: UnifiedSecurityValidator;
   configManager?: UnifiedConfigurationManager;
   // Optional concrete infrastructure runtime helpers (set by application layer)
-  rustBackend?: any;
+  rustBackend?: unknown;
 }
 
 export interface CreateRuntimeContextOptions {

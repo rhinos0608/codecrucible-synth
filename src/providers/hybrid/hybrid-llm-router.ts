@@ -5,6 +5,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 
 export interface TaskComplexityMetrics {
   linesOfCode?: number;
@@ -50,12 +51,25 @@ export interface HybridConfig {
 
 export class HybridLLMRouter extends EventEmitter {
   private readonly config: HybridConfig;
-  private readonly taskHistory: Map<string, RoutingDecision & { actualPerformance: { success: boolean; responseTime: number; qualityScore?: number; errorType?: string; taskType: string } }> = new Map();
+  private readonly taskHistory: Map<
+    string,
+    RoutingDecision & {
+      actualPerformance: {
+        success: boolean;
+        responseTime: number;
+        qualityScore?: number;
+        errorType?: string;
+        taskType: string;
+      };
+    }
+  > = new Map();
   private currentLoads: { lmStudio: number; ollama: number } = { lmStudio: 0, ollama: 0 };
 
   // PERFORMANCE OPTIMIZATIONS: Caching and metrics
-  private readonly routingDecisionCache: Map<string, { decision: RoutingDecision; timestamp: number }> =
-    new Map();
+  private readonly routingDecisionCache: Map<
+    string,
+    { decision: RoutingDecision; timestamp: number }
+  > = new Map();
   private readonly performanceMetrics: Map<string, number[]> = new Map();
   private readonly CACHE_TTL = 300000; // 5 minutes
   private readonly MAX_CACHE_SIZE = 1000;
@@ -115,7 +129,7 @@ export class HybridLLMRouter extends EventEmitter {
 
       return await Promise.resolve(loadAdjustedDecision);
     } catch (error) {
-      logger.error('Error in task routing:', error);
+      logger.error('Error in task routing', { error: toErrorOrUndefined(error) });
       return Promise.resolve(this.getFailsafeDecision());
     }
   }
@@ -634,7 +648,17 @@ export class HybridLLMRouter extends EventEmitter {
    * Calculate aggregate metrics for a set of history entries
    */
   private calculateAggregateMetrics(
-    history: Array<RoutingDecision & { actualPerformance: { success: boolean; responseTime: number; qualityScore?: number; errorType?: string; taskType: string } }>
+    history: Array<
+      RoutingDecision & {
+        actualPerformance: {
+          success: boolean;
+          responseTime: number;
+          qualityScore?: number;
+          errorType?: string;
+          taskType: string;
+        };
+      }
+    >
   ) {
     if (history.length === 0) {
       return { successRate: 0, avgResponseTime: 0, sampleSize: 0 };

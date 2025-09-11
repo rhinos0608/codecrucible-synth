@@ -115,31 +115,31 @@ export class GlobalEvidenceCollector {
   }
 
   /**
-     * Get all captured tool results
-     */
-    public getToolResults(): ToolResultEvidence[] {
-      return [...this.toolResults];
-    }
-  
-    /**
-     * Get only the raw tool results (for backward compatibility)
-     */
-    public getRawToolResults(): Readonly<ToolResult>[] {
-      return this.toolResults.map((evidence: Readonly<ToolResultEvidence>) => evidence.result);
-    }
-  
-    /**
-     * Clear all tool results from memory
-     */
-    public clearToolResults(): void {
-      const clearedCount = this.toolResults.length;
-      this.toolResults = [];
-  
-      logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool results cleared', {
-        clearedCount,
-        remainingCollectors: this.evidenceCollectors.size,
-      });
-    }
+   * Get all captured tool results
+   */
+  public getToolResults(): ToolResultEvidence[] {
+    return [...this.toolResults];
+  }
+
+  /**
+   * Get only the raw tool results (for backward compatibility)
+   */
+  public getRawToolResults(): Readonly<ToolResult>[] {
+    return this.toolResults.map((evidence: Readonly<ToolResultEvidence>) => evidence.result);
+  }
+
+  /**
+   * Clear all tool results from memory
+   */
+  public clearToolResults(): void {
+    const clearedCount = this.toolResults.length;
+    this.toolResults = [];
+
+    logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool results cleared', {
+      clearedCount,
+      remainingCollectors: this.evidenceCollectors.size,
+    });
+  }
 
   /**
    * Get collector statistics for monitoring
@@ -152,7 +152,9 @@ export class GlobalEvidenceCollector {
     oldestResult?: Date;
     newestResult?: Date;
   } {
-    const successCount = this.toolResults.filter((r: Readonly<ToolResultEvidence>) => r.success).length;
+    const successCount = this.toolResults.filter(
+      (r: Readonly<ToolResultEvidence>) => r.success
+    ).length;
     const errorCount = this.toolResults.filter((r: Readonly<ToolResultEvidence>) => r.error).length;
     const timestamps = this.toolResults.map((r: Readonly<ToolResultEvidence>) => r.timestamp);
 
@@ -162,9 +164,13 @@ export class GlobalEvidenceCollector {
       successCount,
       errorCount,
       oldestResult:
-        timestamps.length > 0 ? new Date(Math.min(...timestamps.map((t: Readonly<Date>) => t.getTime()))) : undefined,
+        timestamps.length > 0
+          ? new Date(Math.min(...timestamps.map((t: Readonly<Date>) => t.getTime())))
+          : undefined,
       newestResult:
-        timestamps.length > 0 ? new Date(Math.max(...timestamps.map((t: Readonly<Date>) => t.getTime()))) : undefined,
+        timestamps.length > 0
+          ? new Date(Math.max(...timestamps.map((t: Readonly<Date>) => t.getTime())))
+          : undefined,
     };
   }
 
@@ -212,11 +218,15 @@ export class GlobalEvidenceCollector {
         logger.debug('Evidence collector: Calling collector callback');
         collector(evidence.result); // Maintain backward compatibility by passing raw result
       } catch (error) {
-        logger.error('Evidence collector callback failed', {
-          error,
-          evidenceTimestamp: evidence.timestamp,
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error(
+          'Evidence collector callback failed',
+          error instanceof Error ? error : new Error(errorMessage)
+        );
+        logger.info('Evidence collector callback failed with timestamp', {
+          timestamp: evidence.timestamp,
         });
-        logger.warn('Evidence collector callback failed:', error);
+        logger.warn('Evidence collector callback failed:', { error: errorMessage });
       }
     });
   }

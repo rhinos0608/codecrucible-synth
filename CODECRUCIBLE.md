@@ -1,28 +1,25 @@
-# CodeCrucible Synth
+# CodeCrucible Synth Overview
 
-AI-powered code generation and analysis tool that implements hybrid model architecture with multi-voice synthesis system.
+This file is generated at startup to summarize the architecture.
 
-## Instructions
+## Layers
+- Domain: Core interfaces and types under `src/domain`.
+- Application: Orchestrators, services, CLI under `src/application`.
+- Infrastructure: Providers, tools, logging, MCP, Rust backend under `src/infrastructure`.
+- Providers: Local and hybrid model providers under `src/providers`.
 
-- Follow TypeScript best practices with strict type checking
-- Use ES modules with .js extensions in imports
-- Implement comprehensive error handling with graceful degradation  
-- Follow the Living Spiral methodology for complex implementations
-- Always include detailed JSDoc comments for public APIs
-- Use dependency injection patterns for modularity
+## Orchestration
+- Main orchestrator: ConcreteWorkflowOrchestrator.
+- Sub-agent: SubAgentOrchestrator (own context window) via `agent_spawn`.
+- Request execution: RequestExecutionManager with Rust backend.
 
-## Code Style
+## Tools
+- Built-in suite: bash_run, file_read, file_write, glob_search, grep_search, agent_spawn.
+- Tool calls prefer MCP (JSON-RPC 2.0) via MCPServerManager.
+- Domain-aware selection narrows tools for accuracy/performance.
 
-- Use 2-space indentation
-- Prefer async/await over Promise chains
-- Use descriptive variable and function names
-- Follow existing patterns in the codebase for consistency
-- Avoid deeply nested code structures
+## Rust Execution
+- High-performance ops via `RustExecutionBackend` (N-API).
+- Integrated through RequestExecutionManager and FilesystemTools.
 
-## Preferences
-
-- Response style: detailed with explanations
-- Include tests for new functionality
-- Include comprehensive comments
-- Include documentation for complex features
-- Prefer multi-voice analysis for architectural decisions
+For details, see ARCHITECTURE.md and docs/TOOL_SUITE.md.

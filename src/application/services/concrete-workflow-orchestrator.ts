@@ -26,6 +26,7 @@ import {
 } from '../../domain/interfaces/model-client.js';
 import { IMcpManager } from '../../domain/interfaces/mcp-manager.js';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { randomUUID } from 'crypto';
 import { RequestExecutionManager } from '../../infrastructure/execution/request-execution-manager.js';
 import { ToolRegistry } from './orchestrator/tool-registry.js';
@@ -36,6 +37,7 @@ import type { ToolExecutionResult } from '../../domain/interfaces/tool-execution
 import type { IModelProvider } from '../../domain/interfaces/model-client.js';
 import type { ProviderType, ProjectContext } from '../../domain/types/unified-types.js';
 import type { Provider } from '../../infrastructure/execution/request-execution-manager.js';
+import { toError } from '../../utils/type-guards.js';
 
 /**
  * ToolExecutionError type definition for error mapping in executeTool
@@ -81,7 +83,11 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
             ) => {
               return await modelClient.request(request);
             },
-            getModelName: () => 'unified-model-client', // Optional method
+            // Provide an actual model name hint when available for capability checks
+            getModelName: () =>
+              process.env.DEFAULT_MODEL && process.env.DEFAULT_MODEL.trim().length > 0
+                ? (process.env.DEFAULT_MODEL as string)
+                : 'llama3.1:8b',
           } as Provider;
         }
         return undefined;
@@ -172,7 +178,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       logger.info('ConcreteWorkflowOrchestrator: Shutdown complete.');
       this.eventBus?.emit('orchestrator:shutdown', { timestamp: Date.now() });
     } catch (err) {
-      logger.error('Error during orchestrator shutdown:', err);
+      logger.error('Error during orchestrator shutdown', toErrorOrUndefined(err));
       throw err;
     }
   }
@@ -293,17 +299,23 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
           },
         };
 
+        // Inject the Rust backend from the runtime context to avoid duplicate initialization
+        const injectedRustBackend = (dependencies.runtimeContext as unknown as {
+          rustBackend?: unknown;
+        })?.rustBackend as unknown;
+
         this.requestExecutionManager = new RequestExecutionManager(
           config,
           processManager,
-          providerRepository
+          providerRepository,
+          (injectedRustBackend as unknown) as import('../../infrastructure/execution/rust-executor/index.js').RustExecutionBackend | null
         );
         logger.info(
           '  - requestExecutionManager: ✅ Initialized with advanced execution strategies'
         );
       } catch (innerError: unknown) {
-        logger.error('Failed to initialize requestExecutionManager:', innerError);
-        throw innerError;
+        logger.error('Failed to initialize requestExecutionManager:', toError(innerError));
+        throw toError(innerError);
       }
 
       this.isInitialized = true;
@@ -311,8 +323,8 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       logger.info('ConcreteWorkflowOrchestrator initialized successfully');
       this.eventBus.emit('orchestrator:initialized', { timestamp: Date.now() });
     } catch (error: unknown) {
-      logger.error('Failed to initialize ConcreteWorkflowOrchestrator:', error);
-      throw error;
+      logger.error('Failed to initialize ConcreteWorkflowOrchestrator:', toError(error));
+      throw toError(error);
     }
   }
   /**
@@ -461,30 +473,13 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       return userPrompt;
     }
 
-    const systemInstructions = `SYSTEM INSTRUCTIONS: You have access to powerful tools for file system operations, code analysis, and project management. You MUST use these tools when:
+    // Add concise, direct instructions for tool usage
+    // This works with the system prompt from OllamaProvider
+    const enhancedPrompt = `${userPrompt}
 
-1. **Reading/analyzing files**: Use filesystem_read_file to read actual file contents instead of guessing
-2. **Listing directories**: Use filesystem_list_directory to see what files exist instead of assuming
-3. **Writing/modifying files**: Use filesystem_write_file to make actual changes instead of showing example code
-4. **Getting file information**: Use filesystem_get_stats to check if files exist and get metadata
-5. **Code analysis**: Read the actual files first, then provide analysis based on real content
-6. **Making changes**: Always read existing files first, then make informed modifications
+IMPORTANT: You have access to tools for filesystem operations, git, and system commands. Use these tools proactively to complete the user's request. Don't just describe what you would do - actually use the tools to examine files, run commands, and provide real results based on what you find.`;
 
-DO NOT:
-- Generate responses based on assumptions about file contents
-- Provide generic code examples without checking actual project structure
-- Make recommendations without examining the actual codebase first
-- Describe files or code without actually reading them
-
-ALWAYS:
-- Use tools to examine the actual state of the project before responding
-- Base your responses on real file contents, not knowledge or assumptions
-- Read configuration files, source code, and project structure when relevant
-- Verify file existence before making recommendations
-
-User Request: ${userPrompt}`;
-
-    return systemInstructions;
+    return enhancedPrompt;
   }
 
   private async handlePromptRequest(request: WorkflowRequest): Promise<any> {
@@ -573,7 +568,8 @@ User Request: ${userPrompt}`;
     return {
       id: request.id,
       prompt: enhancedPrompt,
-      model: payloadTyped.options?.model,
+      // Ensure the model string is present for downstream capability checks (e.g., tool calling support)
+      model: payloadTyped.options?.model ?? process.env.DEFAULT_MODEL,
       // Let ModelClient use its properly configured defaultProvider from model selection
       temperature: payloadTyped.options?.temperature,
       maxTokens: payloadTyped.options?.maxTokens,
@@ -621,12 +617,13 @@ User Request: ${userPrompt}`;
     modelRequest: ModelRequest
   ): Promise<ModelResponse> {
     logger.debug('ConcreteWorkflowOrchestrator: Checking for tool calls');
-    logger.debug('ConcreteWorkflowOrchestrator: response keys:', Object.keys(response));
-    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls exists:', !!response.toolCalls);
-    logger.debug(
-      'ConcreteWorkflowOrchestrator: response.toolCalls length:',
-      response.toolCalls?.length
-    );
+    logger.debug('ConcreteWorkflowOrchestrator: response keys:', { keys: Object.keys(response) });
+    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls exists:', {
+      hasToolCalls: !!response.toolCalls,
+    });
+    logger.debug('ConcreteWorkflowOrchestrator: response.toolCalls length:', {
+      length: response.toolCalls?.length,
+    });
 
     if (
       response.toolCalls &&
@@ -781,7 +778,9 @@ User Request: ${userPrompt}`;
           }
         } catch (err) {
           // If MCP tool failed, allow fallback to local fs below
-          logger.debug('MCP stats tool failed, falling back to fs.stat:', err);
+          logger.debug('MCP stats tool failed, falling back to fs.stat', {
+            error: toReadonlyRecord(err),
+          });
           usedMcp = false;
         }
       }
@@ -821,7 +820,9 @@ User Request: ${userPrompt}`;
             fileContent = undefined;
           }
         } catch (err) {
-          logger.debug('MCP read tool threw, falling back to fs.readFile:', err);
+          logger.debug('MCP read tool threw, falling back to fs.readFile', {
+            error: toReadonlyRecord(err),
+          });
           fileContent = undefined;
         }
       }
@@ -878,7 +879,9 @@ User Request: ${userPrompt}`;
         try {
           modelResponse = await this.processToolCalls(modelResponse, request, modelRequest);
         } catch (err) {
-          logger.warn('Processing tool calls during analysis failed:', err);
+          logger.warn('Processing tool calls during analysis failed', {
+            error: toReadonlyRecord(err),
+          });
         }
 
         // Try to parse model text into JSON result if the model returned plain text
@@ -969,11 +972,7 @@ User Request: ${userPrompt}`;
       this.eventBus.emit('workflow:analysis_completed', { id: request.id, path: resolvedPath });
       return result;
     } catch (err: unknown) {
-      logger.error(
-        'Analysis request failed for',
-        typeof resolvedPath !== 'undefined' ? resolvedPath : '',
-        err
-      );
+      logger.error('Analysis request failed', toErrorOrUndefined(err));
       this.eventBus.emit('workflow:analysis_failed', {
         id: request?.id,
         path: typeof resolvedPath !== 'undefined' ? resolvedPath : '',

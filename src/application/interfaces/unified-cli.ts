@@ -150,20 +150,23 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         this.processPrompt(prompt, options),
       getSuggestions: async () => {
         const suggestions = await this.getSuggestions();
-        return suggestions.map((s: Readonly<{ command: string; description: string; relevance: number }>) => ({
-          command: s.command,
-          description: s.description,
-          relevance: s.relevance,
-        }));
+        return suggestions.map(
+          (s: Readonly<{ command: string; description: string; relevance: number }>) => ({
+            command: s.command,
+            description: s.description,
+            relevance: s.relevance,
+          })
+        );
       },
-      showStatus: async () => { await this.showStatus(); },
+      showStatus: async () => {
+        await this.showStatus();
+      },
       execCommand: async (name: string, args: readonly unknown[]) =>
         this.execCommand(name, Array.from(args)),
     });
 
     this.setupEventHandlers();
   }
-
 
   /**
    * Execute a plugin command by name with arguments.
@@ -178,10 +181,14 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
     const session = this.currentSession;
     const context = session?.context;
     const extendedSession = session as ExtendedCLISession | null;
-    const configurationManager: Readonly<DomainUnifiedConfigurationManager> | undefined = extendedSession?.configurationManager;
-    const resourceCoordinator: UnifiedResourceCoordinator | undefined = extendedSession?.resourceCoordinator;
+    const configurationManager: Readonly<DomainUnifiedConfigurationManager> | undefined =
+      extendedSession?.configurationManager;
+    const resourceCoordinator: UnifiedResourceCoordinator | undefined =
+      extendedSession?.resourceCoordinator;
     if (!session || !context || !configurationManager || !resourceCoordinator) {
-      throw new Error('Current session, context, configuration manager, or resource coordinator is not available.');
+      throw new Error(
+        'Current session, context, configuration manager, or resource coordinator is not available.'
+      );
     }
     // Ensure runtimeContext has required properties: eventBus, resourceCoordinator
     // Ensure eventBus is always defined for runtimeContext to satisfy type requirements
@@ -410,12 +417,16 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         description: string;
         examples: ReadonlyArray<string>;
         contextRelevance: number;
-      }> = await (this.coordinator.getIntelligentCommands as (context?: string) => Promise<ReadonlyArray<{
-        command: string;
-        description: string;
-        examples: ReadonlyArray<string>;
-        contextRelevance: number;
-      }>>)(context);
+      }> = await (
+        this.coordinator.getIntelligentCommands as (context?: string) => Promise<
+          ReadonlyArray<{
+            command: string;
+            description: string;
+            examples: ReadonlyArray<string>;
+            contextRelevance: number;
+          }>
+        >
+      )(context);
       return commands.map(
         (
           cmd: Readonly<{
@@ -766,7 +777,11 @@ ${chalk.yellow('Capabilities:')}
   public async listModels(): Promise<void> {
     try {
       // Mock model list until coordinator method is implemented
-      interface Model { name: string; description?: string; provider?: string }
+      interface Model {
+        name: string;
+        description?: string;
+        provider?: string;
+      }
       const models: Model[] = [
         { name: 'qwen2.5-coder:7b', description: 'Fast coding model', provider: 'Ollama' },
         { name: 'deepseek-coder:8b', description: 'Advanced reasoning model', provider: 'Ollama' },
@@ -854,12 +869,12 @@ ${chalk.yellow('Capabilities:')}
       this.coordinator.off('error:critical', this.coordinatorCriticalHandler);
     }
     if (this.coordinatorOverloadHandler) {
-    if (this._sigintWrapper) {
-      process.off('SIGINT', this._sigintWrapper);
-    }
-    if (this._sigtermWrapper) {
-      process.off('SIGTERM', this._sigtermWrapper);
-    }
+      if (this._sigintWrapper) {
+        process.off('SIGINT', this._sigintWrapper);
+      }
+      if (this._sigtermWrapper) {
+        process.off('SIGTERM', this._sigtermWrapper);
+      }
       if (this._sigtermWrapper) {
         process.off('SIGTERM', this._sigtermWrapper);
       }

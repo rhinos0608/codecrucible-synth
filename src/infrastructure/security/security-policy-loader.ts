@@ -112,7 +112,7 @@ export class SecurityPolicyLoader {
   /**
    * Load security policies from configuration file
    */
-  async loadPolicies(environment: string = 'production'): Promise<SecurityPolicies> {
+  public async loadPolicies(environment: string = 'production'): Promise<SecurityPolicies> {
     const now = Date.now();
 
     // Return cached policies if still valid
@@ -126,10 +126,18 @@ export class SecurityPolicyLoader {
     try {
       const configPath = path.join(process.cwd(), 'config', 'security-policies.yaml');
       const fileContent = await fs.readFile(configPath, 'utf-8');
-      const config = yaml.load(fileContent) as any;
+      const configRaw = yaml.load(fileContent);
+
+      // Type guard for configRaw
+      if (!this.isValidConfig(configRaw)) {
+        throw new Error('Invalid security policy config structure');
+      }
+      const config = configRaw as SecurityPolicies & {
+        environments?: Record<string, Partial<SecurityPolicies>>;
+      };
 
       // Apply environment-specific overrides
-      const basePolicies = {
+      const basePolicies: SecurityPolicies = {
         inputValidation: config.inputValidation,
         authentication: config.authentication,
         executionSecurity: config.executionSecurity,
@@ -137,8 +145,8 @@ export class SecurityPolicyLoader {
       };
 
       // Apply environment overrides if they exist
-      if (config.environments?.[environment]) {
-        const envOverrides = config.environments[environment];
+      if (config.environments && config.environments[environment]) {
+        const envOverrides = config.environments[environment] as Partial<SecurityPolicies>;
         SecurityPolicyLoader.policies = this.mergeDeep(basePolicies, envOverrides);
       } else {
         SecurityPolicyLoader.policies = basePolicies;
@@ -147,9 +155,11 @@ export class SecurityPolicyLoader {
       SecurityPolicyLoader.lastLoadTime = now;
       logger.info(`🔒 Security policies loaded for environment: ${environment}`);
 
-      return SecurityPolicyLoader.policies!;
+      return SecurityPolicyLoader.policies;
     } catch (error) {
-      logger.error(`❌ Failed to load security policies: ${error}`);
+      logger.error(
+        `❌ Failed to load security policies: ${error instanceof Error ? error.message : String(error)}`
+      );
 
       // Return fallback policies
       return this.getFallbackPolicies();
@@ -157,16 +167,34 @@ export class SecurityPolicyLoader {
   }
 
   /**
+   * Type guard for config object
+   */
+  private isValidConfig(
+    config: unknown
+  ): config is SecurityPolicies & { environments?: Record<string, Partial<SecurityPolicies>> } {
+    if (typeof config !== 'object' || config === null) return false;
+    const c = config as Record<string, unknown>;
+    return (
+      typeof c.inputValidation === 'object' &&
+      typeof c.authentication === 'object' &&
+      typeof c.executionSecurity === 'object' &&
+      typeof c.rateLimiting === 'object'
+    );
+  }
+
+  /**
    * Get compiled dangerous patterns as RegExp objects
    */
-  async getDangerousPatterns(): Promise<RegExp[]> {
+  public async getDangerousPatterns(): Promise<RegExp[]> {
     const policies = await this.loadPolicies();
 
-    return policies.inputValidation.dangerousPatterns.map(pattern => {
+    return policies.inputValidation.dangerousPatterns.map((pattern: Readonly<DangerousPattern>) => {
       try {
-        return new RegExp(pattern.pattern, pattern.flags || 'g');
+        return new RegExp(pattern.pattern, pattern.flags ?? 'g');
       } catch (error) {
-        logger.warn(`⚠️ Invalid security pattern: ${pattern.pattern} - ${error}`);
+        logger.warn(
+          `⚠️ Invalid security pattern: ${pattern.pattern} - ${error instanceof Error ? error.message : String(error)}`
+        );
         return new RegExp('__INVALID_PATTERN__', 'g'); // Safe fallback
       }
     });
@@ -175,7 +203,7 @@ export class SecurityPolicyLoader {
   /**
    * Get allowed commands set
    */
-  async getAllowedCommands(): Promise<Set<string>> {
+  public async getAllowedCommands(): Promise<Set<string>> {
     const policies = await this.loadPolicies();
     return new Set(policies.inputValidation.allowedCommands);
   }
@@ -183,7 +211,7 @@ export class SecurityPolicyLoader {
   /**
    * Get authentication configuration
    */
-  async getAuthConfig(): Promise<SecurityPolicies['authentication']> {
+  public async getAuthConfig(): Promise<SecurityPolicies['authentication']> {
     const policies = await this.loadPolicies();
     return policies.authentication;
   }
@@ -191,7 +219,7 @@ export class SecurityPolicyLoader {
   /**
    * Get execution security configuration
    */
-  async getExecutionConfig(): Promise<SecurityPolicies['executionSecurity']> {
+  public async getExecutionConfig(): Promise<SecurityPolicies['executionSecurity']> {
     const policies = await this.loadPolicies();
     return policies.executionSecurity;
   }
@@ -199,19 +227,19 @@ export class SecurityPolicyLoader {
   /**
    * Deep merge objects (for environment overrides)
    */
-  private mergeDeep(target: any, source: any): any {
-    const output = Object.assign({}, target);
+  private mergeDeep<T extends object, U extends object>(target: T, source: U): T & U {
+    const output: any = { ...target };
 
     if (this.isObject(target) && this.isObject(source)) {
-      Object.keys(source).forEach(key => {
-        if (this.isObject(source[key])) {
+      (Object.keys(source) as (keyof U)[]).forEach(key => {
+        if (this.isObject((source as any)[key])) {
           if (!(key in target)) {
-            Object.assign(output, { [key]: source[key] });
+            output[key] = (source as any)[key];
           } else {
-            output[key] = this.mergeDeep(target[key], source[key]);
+            output[key] = this.mergeDeep((target as any)[key], (source as any)[key]);
           }
         } else {
-          Object.assign(output, { [key]: source[key] });
+          output[key] = (source as any)[key];
         }
       });
     }

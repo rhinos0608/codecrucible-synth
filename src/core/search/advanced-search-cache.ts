@@ -1,4 +1,4 @@
-import type { RAGResult } from './types.js';
+import type { RAGResult } from './types';
 
 interface CacheEntry {
   result: RAGResult;
@@ -11,11 +11,11 @@ interface CacheConfig {
 }
 
 export class AdvancedSearchCacheManager {
-  private cache = new Map<string, CacheEntry>();
+  private readonly cache = new Map<string, CacheEntry>();
 
-  constructor(private config: CacheConfig) {}
+  public constructor(private readonly config: Readonly<CacheConfig>) {}
 
-  async get(key: string): Promise<RAGResult | undefined> {
+  public get(key: string): RAGResult | undefined {
     const entry = this.cache.get(key);
     if (!entry) return undefined;
     const age = Date.now() - entry.timestamp;
@@ -26,9 +26,9 @@ export class AdvancedSearchCacheManager {
     return entry.result;
   }
 
-  async set(key: string, result: RAGResult): Promise<void> {
+  public set(key: string, result: Readonly<RAGResult>): void {
     if (this.cache.size >= this.config.maxCacheSize) {
-      const firstKey = this.cache.keys().next().value as string | undefined;
+      const firstKey = this.cache.keys().next().value;
       if (firstKey) {
         this.cache.delete(firstKey);
       }
@@ -36,11 +36,11 @@ export class AdvancedSearchCacheManager {
     this.cache.set(key, { result, timestamp: Date.now() });
   }
 
-  async clearCache(): Promise<void> {
+  public clearCache(): void {
     this.cache.clear();
   }
 
-  async shutdown(): Promise<void> {
+  public shutdown(): void {
     this.cache.clear();
   }
 }

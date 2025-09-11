@@ -18,6 +18,7 @@ import {
   WorkflowRequest,
 } from '../../domain/interfaces/workflow-orchestrator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 
 export class GenerateCodeUseCase implements IGenerateCodeUseCase {
   public constructor(private readonly orchestrator: IWorkflowOrchestrator) {}
@@ -106,7 +107,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
       };
     } catch (error) {
       const duration = performance.now() - startTime;
-      logger.error('Code generation failed:', error);
+      logger.error('Code generation failed', toErrorOrUndefined(error));
 
       return {
         success: false,
@@ -239,7 +240,10 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
         resultText = (obj.message as { content: string }).content;
       } else {
         // If no standard content field found, try to stringify but log for debugging
-        logger.error('Unexpected result format in generate-code-use-case', { result });
+        logger.error(
+          'Unexpected result format in generate-code-use-case',
+          new Error(JSON.stringify({ result }))
+        );
         resultText = JSON.stringify(result, null, 2);
       }
     } else {
@@ -375,7 +379,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
         logger.debug('File written successfully', { path: file.path });
         logger.info(`Generated file saved: ${file.path}`);
       } catch (error) {
-        logger.error(`Failed to save file ${file.path}`, { error, filePath: file.path });
+        logger.error(`Failed to save file ${file.path}`, toErrorOrUndefined(error));
         throw new Error(`Failed to save file ${file.path}: ${error}`);
       }
     }
@@ -408,13 +412,10 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
     // Handle file creation case
     let summary = `Generated ${files.length} file(s) based on: "${request.prompt}"\n\n`;
 
-    const filesByType = files.reduce<Record<string, number>>(
-      (acc, file) => {
-        acc[file.type] = (acc[file.type] || 0) + 1;
-        return acc;
-      },
-      {}
-    );
+    const filesByType = files.reduce<Record<string, number>>((acc, file) => {
+      acc[file.type] = (acc[file.type] || 0) + 1;
+      return acc;
+    }, {});
 
     if (files.length > 0) {
       summary += 'Files created:\n';

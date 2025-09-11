@@ -5,6 +5,7 @@
 
 import { ProductionDatabaseManager as DatabaseManager } from '../../database/production-database-manager.js';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { join, dirname } from 'path';
 import { promises as fs, existsSync } from 'fs';
 import { createReadStream, createWriteStream } from 'fs';
@@ -134,7 +135,7 @@ export class BackupManager {
 
       logger.info('Backup manager initialized successfully');
     } catch (error) {
-      logger.error('Failed to initialize backup manager:', error);
+      logger.error('Failed to initialize backup manager', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -200,7 +201,10 @@ export class BackupManager {
       return metadata;
     } catch (error) {
       const duration = performance.now() - startTime;
-      logger.error(`Full backup failed: ${backupId} (${duration.toFixed(2)}ms)`, error);
+      logger.error('Full backup failed', toErrorOrUndefined(error), {
+        backupId,
+        duration: duration.toFixed(2),
+      });
 
       // Send failure notification
       await this.sendNotification('failure', {
@@ -248,7 +252,10 @@ export class BackupManager {
       logger.info(`Restore completed: ${options.backupId} (${duration.toFixed(2)}ms)`);
     } catch (error) {
       const duration = performance.now() - startTime;
-      logger.error(`Restore failed: ${options.backupId} (${duration.toFixed(2)}ms)`, error);
+      logger.error('Restore failed', toErrorOrUndefined(error), {
+        backupId: options.backupId,
+        duration: duration.toFixed(2),
+      });
       throw error;
     }
   }
@@ -301,7 +308,9 @@ export class BackupManager {
         await fs.rm(tempDir, { recursive: true, force: true });
       }
     } catch (error) {
-      logger.error(`Backup integrity verification failed: ${backup.id}`, error);
+      logger.error('Backup integrity verification failed', toErrorOrUndefined(error), {
+        backupId: backup.id,
+      });
       return false;
     }
   }
@@ -454,7 +463,7 @@ export class BackupManager {
 
       return backupPath;
     } catch (error) {
-      logger.error('Database backup failed:', error);
+      logger.error('Database backup failed', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -639,7 +648,7 @@ export class BackupManager {
         size: stats.size,
       };
     } catch (error) {
-      logger.error('Failed to create backup package:', error);
+      logger.error('Failed to create backup package', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -743,7 +752,9 @@ export class BackupManager {
             logger.warn(`Unsupported backup destination type: ${destination.type}`);
         }
       } catch (error) {
-        logger.error(`Failed to store backup to ${destination.type}:`, error);
+        logger.error('Failed to store backup to destination', toErrorOrUndefined(error), {
+          destinationType: destination.type,
+        });
       }
     }
   }
@@ -823,7 +834,7 @@ export class BackupManager {
       logger.warn('Azure Blob Storage not yet implemented, using local fallback');
       await this.storeBackupLocal(sourcePath, { ...destination, type: 'local' }, metadata);
     } catch (error) {
-      logger.error('Azure backup failed:', error);
+      logger.error('Azure backup failed', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -843,7 +854,7 @@ export class BackupManager {
         }));
       }
     } catch (error) {
-      logger.warn('Failed to load backup history:', error);
+      logger.warn('Failed to load backup history:', toReadonlyRecord(error));
       this.backupHistory = [];
     }
   }
@@ -880,7 +891,7 @@ export class BackupManager {
 
         logger.info(`Cleaned up old backup: ${backup.id}`);
       } catch (error) {
-        logger.warn(`Failed to cleanup backup ${backup.id}:`, error);
+        logger.warn(`Failed to cleanup backup ${backup.id}:`, toReadonlyRecord(error));
       }
     }
 
@@ -898,7 +909,7 @@ export class BackupManager {
       try {
         await this.performFullBackup();
       } catch (error) {
-        logger.error('Scheduled backup failed:', error);
+        logger.error('Scheduled backup failed', { error: toErrorOrUndefined(error) });
       }
     }, DAILY_MS);
 
@@ -935,7 +946,7 @@ export class BackupManager {
 
       logger.info(`Backup extracted to: ${extractDir}`);
     } catch (error) {
-      logger.error('Failed to extract backup archive:', error);
+      logger.error('Failed to extract backup archive', { error: toErrorOrUndefined(error) });
       throw new Error(`Archive extraction failed: ${error}`);
     }
 
@@ -978,7 +989,7 @@ export class BackupManager {
         throw new Error('Empty response from S3');
       }
     } catch (error) {
-      logger.error('Failed to download from S3:', error);
+      logger.error('Failed to download from S3', { error: toErrorOrUndefined(error) });
       throw error;
     }
   }
@@ -1024,7 +1035,7 @@ export class BackupManager {
           break;
       }
     } catch (error) {
-      logger.error('Database restore failed:', error);
+      logger.error('Database restore failed', { error: toErrorOrUndefined(error) });
       throw error;
     }
   }
@@ -1143,7 +1154,7 @@ export class BackupManager {
         // For now, we log the restore. In production, you would merge/replace specific config sections
         // based on your application's configuration management needs
       } catch (error) {
-        logger.error('Configuration restore failed:', error);
+        logger.error('Configuration restore failed', { error: toErrorOrUndefined(error) });
         throw error;
       }
     } else {

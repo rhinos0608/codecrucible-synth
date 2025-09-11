@@ -108,10 +108,7 @@ export class FileOperationsAdapter extends EventEmitter {
   private readonly securityService: FileSecurityService;
   private operationCounter: number = 0;
 
-  public constructor(
-    fileSystemClient: FileSystemClient,
-    securityService?: FileSecurityService
-  ) {
+  public constructor(fileSystemClient: FileSystemClient, securityService?: FileSecurityService) {
     super();
     this.fileSystemClient = fileSystemClient;
     this.securityService = securityService ?? new FileSecurityService();
@@ -151,7 +148,9 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Read file with security validation
    */
-  public async readFile(request: Readonly<FileReadRequest>): Promise<SecureFileResult<string | Buffer>> {
+  public async readFile(
+    request: Readonly<FileReadRequest>
+  ): Promise<SecureFileResult<string | Buffer>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
@@ -176,7 +175,7 @@ export class FileOperationsAdapter extends EventEmitter {
           path: request.path,
           violations: securityValidation.violations.map(v => ({
             code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
-            message: (v as any).message
+            message: (v as any).message,
           })),
         });
 
@@ -184,7 +183,7 @@ export class FileOperationsAdapter extends EventEmitter {
           success: false,
           securityViolations: securityValidation.violations.map(v => ({
             code: (v as any).code ?? 'UNKNOWN',
-            message: (v as any).message ?? 'Unknown violation'
+            message: (v as any).message ?? 'Unknown violation',
           })),
           riskLevel: securityValidation.riskLevel,
           operationId,
@@ -210,7 +209,8 @@ export class FileOperationsAdapter extends EventEmitter {
           path: request.path,
           violations: contentValidation.violations.map(v => ({
             code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
-            message: typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation'
+            message:
+              typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation',
           })),
         });
       }
@@ -228,7 +228,7 @@ export class FileOperationsAdapter extends EventEmitter {
         securityViolations: contentValidation.violations.map(v => ({
           code: (v as any).code,
           message: (v as any).message,
-          ...v
+          ...v,
         })),
         riskLevel: contentValidation.riskLevel,
         operationId,
@@ -278,7 +278,7 @@ export class FileOperationsAdapter extends EventEmitter {
           success: false,
           securityViolations: securityValidation.violations.map(v => ({
             code: v.type,
-            message: v.description
+            message: v.description,
           })),
           riskLevel: securityValidation.riskLevel,
           operationId,
@@ -309,7 +309,7 @@ export class FileOperationsAdapter extends EventEmitter {
           securityViolations: contentValidation.violations.map(v => ({
             code: v.type,
             message: v.description,
-            ...v
+            ...v,
           })),
           riskLevel: contentValidation.riskLevel,
           operationId,
@@ -335,7 +335,7 @@ export class FileOperationsAdapter extends EventEmitter {
         securityViolations: contentValidation.violations.map(v => ({
           code: v.type,
           message: v.description,
-          ...v
+          ...v,
         })),
         riskLevel: contentValidation.riskLevel,
         operationId,
@@ -385,7 +385,7 @@ export class FileOperationsAdapter extends EventEmitter {
           success: false,
           securityViolations: securityValidation.violations.map(v => ({
             code: (v as any).code ?? 'UNKNOWN',
-            message: (v as any).message ?? 'Unknown violation'
+            message: (v as any).message ?? 'Unknown violation',
           })),
           riskLevel: securityValidation.riskLevel,
           operationId,
@@ -460,10 +460,7 @@ export class FileOperationsAdapter extends EventEmitter {
         request.policy
       );
 
-      const combinedViolations = [
-        ...sourceValidation.violations,
-        ...targetValidation.violations,
-      ];
+      const combinedViolations = [...sourceValidation.violations, ...targetValidation.violations];
 
       if (
         combinedViolations.length > 0 &&
@@ -473,7 +470,7 @@ export class FileOperationsAdapter extends EventEmitter {
           success: false,
           securityViolations: combinedViolations.map(v => ({
             code: (v as any).code ?? 'UNKNOWN',
-            message: (v as any).message ?? 'Unknown violation'
+            message: (v as any).message ?? 'Unknown violation',
           })),
           riskLevel: this.getHigherRiskLevel(
             sourceValidation.riskLevel,
@@ -511,7 +508,7 @@ export class FileOperationsAdapter extends EventEmitter {
         success: true,
         securityViolations: combinedViolations.map(v => ({
           code: v.type,
-          message: v.description
+          message: v.description,
         })),
         riskLevel: this.getHigherRiskLevel(sourceValidation.riskLevel, targetValidation.riskLevel),
         operationId,
@@ -572,11 +569,13 @@ export class FileOperationsAdapter extends EventEmitter {
       const combinedViolations: ReadonlyArray<SecurityViolation> = [
         ...sourceValidation.violations.map(v => ({
           code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
-          message: typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation'
+          message:
+            typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation',
         })),
         ...targetValidation.violations.map(v => ({
           code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
-          message: typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation'
+          message:
+            typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation',
         })),
       ];
 
@@ -651,7 +650,9 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Create directory with security validation
    */
-  public async createDirectory(request: Readonly<SecureFileOperation>): Promise<SecureFileResult<void>> {
+  public async createDirectory(
+    request: Readonly<SecureFileOperation>
+  ): Promise<SecureFileResult<void>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
@@ -664,8 +665,9 @@ export class FileOperationsAdapter extends EventEmitter {
           success: false,
           securityViolations: securityValidation.violations.map(v => ({
             code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
-            message: typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation',
-            ...v
+            message:
+              typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation',
+            ...v,
           })),
           riskLevel: 'medium',
           operationId,
@@ -735,7 +737,8 @@ export class FileOperationsAdapter extends EventEmitter {
           success: false,
           securityViolations: securityValidation.violations.map(v => ({
             code: typeof (v as any).code === 'string' ? (v as any).code : 'UNKNOWN',
-            message: typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation'
+            message:
+              typeof (v as any).message === 'string' ? (v as any).message : 'Unknown violation',
           })),
           riskLevel: securityValidation.riskLevel,
           operationId,
@@ -805,7 +808,9 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Search files with security filtering
    */
-  public async searchFiles(options: Readonly<FileSearchOptions>): Promise<SecureFileResult<string[]>> {
+  public async searchFiles(
+    options: Readonly<FileSearchOptions>
+  ): Promise<SecureFileResult<string[]>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
@@ -971,36 +976,39 @@ export class FileOperationsAdapter extends EventEmitter {
       ...pathValidation.violations.map(v => ({
         code: (v as any).code ?? 'UNKNOWN',
         message: (v as any).message ?? 'Unknown violation',
-        ...v
+        ...v,
       })),
       ...fileValidation.violations.map(v => ({
         code: (v as any).code ?? 'UNKNOWN',
         message: (v as any).message ?? 'Unknown violation',
-        ...v
-      }))
+        ...v,
+      })),
     ];
     const isSecure = allViolations.length === 0;
     const recommendations = [
-      ...new Set([...(pathValidation.recommendations ?? []), ...(fileValidation.recommendations ?? [])]),
+      ...new Set([
+        ...(pathValidation.recommendations ?? []),
+        ...(fileValidation.recommendations ?? []),
+      ]),
     ];
 
     return {
-    ...metadata,
-    securityStatus: {
-      isSecure,
-      riskLevel: fileValidation.riskLevel,
-      violations: allViolations,
-      recommendations,
-    },
-  };
-}
+      ...metadata,
+      securityStatus: {
+        isSecure,
+        riskLevel: fileValidation.riskLevel,
+        violations: allViolations,
+        recommendations,
+      },
+    };
+  }
 
-/**
- * Helper to check if a file is hidden (starts with a dot, but not '.' or '..')
- */
-private isHiddenFile(filename: string): boolean {
-  return filename ? filename.startsWith('.') && filename !== '.' && filename !== '..' : false;
-}
+  /**
+   * Helper to check if a file is hidden (starts with a dot, but not '.' or '..')
+   */
+  private isHiddenFile(filename: string): boolean {
+    return filename ? filename.startsWith('.') && filename !== '.' && filename !== '..' : false;
+  }
 }
 
 // Factory function for creating configured file operations adapters

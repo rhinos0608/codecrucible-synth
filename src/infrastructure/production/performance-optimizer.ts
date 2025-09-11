@@ -1,5 +1,12 @@
 import { ResourceSnapshot } from './resource-types.js';
 
+interface GlobalWithGC {
+  gc?: () => void;
+  [key: string]: unknown;
+}
+
+declare const global: GlobalWithGC;
+
 export class PerformanceOptimizer {
   private lastOptimization = 0;
 
@@ -10,14 +17,14 @@ export class PerformanceOptimizer {
    * as triggering GC when memory pressure is high. Expensive optimizations are
    * avoided to keep runtime overhead minimal.
    */
-  analyze(snapshot: ResourceSnapshot): void {
+  public analyze(snapshot: Readonly<ResourceSnapshot>): void {
     if (
       snapshot.memory.utilizationPercent > 90 &&
-      typeof (global as any).gc === 'function' &&
+      typeof global.gc === 'function' &&
       Date.now() - this.lastOptimization > 60_000
     ) {
       try {
-        (global as any).gc();
+        global.gc?.();
         this.lastOptimization = Date.now();
       } catch {
         // ignore gc errors

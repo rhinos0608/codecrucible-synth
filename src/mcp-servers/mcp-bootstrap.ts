@@ -1,7 +1,9 @@
 import { MCPServerManager } from './mcp-server-manager.js';
 import { logger } from '../infrastructure/logging/logger.js';
+import { toReadonlyRecord } from '../utils/type-guards.js';
 
 export function createMcpServerManager(): MCPServerManager {
+  const isWin = process.platform === 'win32';
   const mcpConfig = {
     filesystem: {
       enabled: true,
@@ -15,17 +17,33 @@ export function createMcpServerManager(): MCPServerManager {
     },
     terminal: {
       enabled: true,
-      allowedCommands: [
-        'ls',
-        'cat',
-        'pwd',
-        'echo',
-        'grep',
-        'find',
-        'git',
-        'npm',
-        'node',
-      ] as string[],
+      allowedCommands: (isWin
+        ? [
+            // Windows-friendly commands
+            'cmd',
+            'powershell',
+            'where',
+            'dir',
+            'type',
+            'findstr',
+            // common dev tools
+            'git',
+            'npm',
+            'node',
+          ]
+        : [
+            // POSIX-friendly commands
+            'ls',
+            'cat',
+            'pwd',
+            'echo',
+            'grep',
+            'find',
+            // common dev tools
+            'git',
+            'npm',
+            'node',
+          ]) as string[],
       blockedCommands: ['rm', 'del', 'rmdir', 'sudo', 'su'],
     },
     packageManager: {
@@ -53,7 +71,7 @@ export async function bootstrapMcpServers(): Promise<MCPServerManager | null> {
   } catch (error) {
     logger.warn(
       '⚠️ MCP servers initialization had issues, continuing with degraded capabilities:',
-      error
+      toReadonlyRecord(error)
     );
     return null;
   }

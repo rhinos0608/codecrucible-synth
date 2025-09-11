@@ -12,6 +12,7 @@
  */
 
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 import { UseCaseDependencies, getDependencyContainer } from '../services/dependency-container.js';
 import { AnalysisRequest, GenerationRequest } from '../use-cases/index.js';
 import { FileReferenceParser } from './file-reference-parser.js';
@@ -30,12 +31,12 @@ import {
 export interface CLIOperationRequest {
   id: string;
   type: 'prompt' | 'analyze' | 'execute' | 'navigate' | 'suggest';
-  input: string;
+  input: string | object;
   options?: UseCaseRouterOptions;
   session?: {
     id: string;
-    workingDirectory: string;
-    context: WorkflowContext;
+    workingDirectory?: string;
+    context?: WorkflowContext;
   };
 }
 
@@ -131,7 +132,7 @@ export class UseCaseRouter {
         );
       }
     } catch (error) {
-      logger.warn('⚠️ Failed to load project configuration:', error);
+      logger.warn('⚠️ Failed to load project configuration:', toReadonlyRecord(error));
     }
 
     // Process @ syntax file references
@@ -148,7 +149,7 @@ export class UseCaseRouter {
           );
         }
       } catch (error) {
-        logger.warn('❌ Failed to process @ file references:', error);
+        logger.warn('❌ Failed to process @ file references:', toReadonlyRecord(error));
         // Continue with original input on parsing failure
       }
     }
@@ -156,10 +157,14 @@ export class UseCaseRouter {
     // AI-driven tool selection: Let the model decide between MCP tools and codebase analysis
     // const codebaseAnalysis: CodebaseAnalysisResult | null = null;
 
+    // Ensure processedInput is a string for downstream processing
+    const stringInput =
+      typeof processedInput === 'string' ? processedInput : JSON.stringify(processedInput);
+
     // Enhance input with project context if available
-    let contextEnhancedInput = processedInput;
-    if (projectConfig && projectConfig.isLoaded && typeof processedInput === 'string') {
-      contextEnhancedInput = this.enhanceInputWithProjectContext(processedInput, projectConfig);
+    let contextEnhancedInput = stringInput;
+    if (projectConfig && projectConfig.isLoaded) {
+      contextEnhancedInput = this.enhanceInputWithProjectContext(stringInput, projectConfig);
     }
 
     // Further enhance with codebase analysis if available
@@ -338,7 +343,8 @@ export class UseCaseRouter {
     }
 
     // Check if this is a code generation request using ORIGINAL user input, not enhanced context
-    const originalInput = request.input;
+    const originalInput =
+      typeof request.input === 'string' ? request.input : JSON.stringify(request.input);
     if (this.isCodeGenerationRequest(originalInput)) {
       const generationRequest: GenerationRequest = {
         prompt: enhancedInput as string,

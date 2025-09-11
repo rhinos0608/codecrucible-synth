@@ -6,8 +6,9 @@
  */
 
 import { logger } from '../../logging/logger.js';
+import { BridgeAdapter, type IRustExecutionBridge } from './bridge-adapter.js';
 import * as path from 'path';
-import { pathToFileURL } from 'url';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../../utils/type-guards.js';
 import type {
   ToolExecutionRequest,
   ToolExecutionResult,
@@ -66,9 +67,9 @@ interface NativeRustExecutor {
  */
 export class RustExecutionBackend {
   private rustExecutor: NativeRustExecutor | null = null;
+  private bridge?: IRustExecutionBridge;
   private initialized = false;
   private initializationPromise: Promise<boolean> | null = null; // Prevent concurrent initialization
-  private initializationLock = false; // Simple lock mechanism
   private options: RustExecutorOptions;
   private tsOrchestrator?: IToolExecutor;
   private performanceStats = {
@@ -78,7 +79,11 @@ export class RustExecutionBackend {
     averageExecutionTime: 0,
   };
 
-  constructor(options: RustExecutorOptions = {}, tsOrchestrator?: IToolExecutor) {
+  constructor(
+    options: RustExecutorOptions = {},
+    tsOrchestrator?: IToolExecutor,
+    bridge?: IRustExecutionBridge
+  ) {
     this.options = {
       enableProfiling: true,
       maxConcurrency: 4,
@@ -87,6 +92,7 @@ export class RustExecutionBackend {
       ...options,
     };
     this.tsOrchestrator = tsOrchestrator;
+    this.bridge = bridge ?? new BridgeAdapter();
   }
 
   /**
@@ -110,26 +116,16 @@ export class RustExecutionBackend {
       return this.initializationPromise;
     }
 
-    // Check lock to prevent concurrent initialization
-    if (this.initializationLock) {
-      // Wait for the lock to be released and return result
-      while (this.initializationLock) {
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-      return this.initialized;
-    }
-
-    // Acquire lock and create initialization promise
-    this.initializationLock = true;
+    // Create initialization promise once and reuse it
     this.initializationPromise = this.doInitialize();
 
     try {
       const result = await this.initializationPromise;
       return result;
-    } finally {
-      // Release lock regardless of outcome
-      this.initializationLock = false;
+    } catch (error) {
+      // Reset promise on failure to allow retry
       this.initializationPromise = null;
+      throw error;
     }
   }
 
@@ -138,6 +134,21 @@ export class RustExecutionBackend {
    */
   private async doInitialize(): Promise<boolean> {
     try {
+      // Prefer bridge path first
+      try {
+        if (this.bridge) {
+          const ok = await this.bridge.initialize();
+          if (ok) {
+            this.initialized = true;
+            logger.info('RustExecutionBackend initialized via bridge', {
+              executorId: this.bridge.getId(),
+            });
+            return true;
+          }
+        }
+      } catch {
+        // fall through to direct NAPI attempt
+      }
       // Initialize logging for Rust module
       if (typeof global !== 'undefined') {
         const { initLogging } = await import('./rust-native-module.js').catch(async () => {
@@ -206,7 +217,7 @@ export class RustExecutionBackend {
       this.initialized = false;
       return false;
     } catch (error) {
-      logger.error('RustExecutionBackend initialization error:', error);
+      logger.error('RustExecutionBackend initialization error:', toErrorOrUndefined(error));
       this.initialized = false;
       return false;
     }
@@ -219,8 +230,8 @@ export class RustExecutionBackend {
     const startTime = Date.now();
     this.performanceStats.totalRequests++;
 
-    // Fallback to TypeScript if Rust not available
-    if (!this.initialized || !this.rustExecutor) {
+    // Fallback to TypeScript if neither bridge nor direct executor is available
+    if (!this.initialized || (!this.rustExecutor && !(this.bridge && this.bridge.isAvailable()))) {
       logger.debug('🔄 Using TypeScript fallback for tool execution');
       return this.executeTypescriptFallback(request);
     }
@@ -240,11 +251,13 @@ export class RustExecutionBackend {
         result = await this.executeGenericOperation(request);
       }
 
-      // Sync performance metrics from Rust executor
+      // Sync performance metrics from bridge (preferred) or direct executor
       let parsedMetrics: any = undefined;
       try {
-        const metricsStr = this.rustExecutor.getPerformanceMetrics();
-        const metrics = JSON.parse(metricsStr);
+        const metrics =
+          this.bridge && this.bridge.isAvailable()
+            ? JSON.parse(this.bridge.getPerformanceMetrics())
+            : JSON.parse(this.rustExecutor?.getPerformanceMetrics() ?? '{}');
         this.performanceStats = {
           totalRequests: metrics.total_requests ?? 0,
           successfulRequests: metrics.successful_requests ?? 0,
@@ -252,22 +265,26 @@ export class RustExecutionBackend {
           averageExecutionTime: metrics.average_execution_time_ms ?? 0,
         };
       } catch (err) {
-        logger.warn('Failed to parse Rust executor global performance metrics', err);
+        logger.warn(
+          'Failed to parse Rust executor global performance metrics',
+          toReadonlyRecord(err)
+        );
       }
 
       if (result.performance_metrics) {
         try {
           parsedMetrics = JSON.parse(result.performance_metrics);
         } catch (err) {
-          logger.warn('Failed to parse Rust execution performance_metrics', err);
+          logger.warn('Failed to parse Rust execution performance_metrics', toReadonlyRecord(err));
           parsedMetrics = result.performance_metrics;
         }
       } else {
         parsedMetrics = undefined;
       }
+      const execMs = (result as any).executionTimeMs ?? (result as any).execution_time_ms ?? 0;
       logger.debug('✅ Rust execution completed', {
         toolId: request.toolId,
-        executionTime: result.execution_time_ms,
+        executionTime: execMs,
         success: result.success,
       });
 
@@ -281,16 +298,16 @@ export class RustExecutionBackend {
             }
           : undefined,
         metadata: {
-          executionTimeMs: result.execution_time_ms,
+          executionTimeMs: execMs,
           executor: 'rust',
           performanceMetrics: parsedMetrics,
           ...request.metadata,
         },
-        executionTimeMs: result.execution_time_ms,
+        executionTimeMs: execMs,
       };
     } catch (error) {
       this.performanceStats.failedRequests++;
-      logger.error('Rust execution failed:', error);
+      logger.error('Rust execution failed:', toErrorOrUndefined(error));
 
       return {
         success: false,
@@ -314,7 +331,8 @@ export class RustExecutionBackend {
    * Check if Rust backend is available
    */
   isAvailable(): boolean {
-    return this.initialized && this.rustExecutor !== null;
+    // Check both direct executor and bridge paths
+    return this.initialized && (this.rustExecutor !== null || this.bridge?.isAvailable() === true);
   }
 
   /**
@@ -330,12 +348,33 @@ export class RustExecutionBackend {
   async destroy(): Promise<void> {
     if (this.rustExecutor) {
       try {
-        // Cleanup Rust resources if needed
+        // Call cleanup method if it exists on the Rust executor
+        if (typeof (this.rustExecutor as any).cleanup === 'function') {
+          await (this.rustExecutor as any).cleanup();
+        } else if (typeof (this.rustExecutor as any).destroy === 'function') {
+          await (this.rustExecutor as any).destroy();
+        }
+
+        // Reset performance stats
+        this.performanceStats = {
+          totalRequests: 0,
+          successfulRequests: 0,
+          failedRequests: 0,
+          averageExecutionTime: 0,
+        };
+
+        // Clear executor and state
         this.rustExecutor = null;
         this.initialized = false;
-        logger.info('RustExecutionBackend cleaned up');
+        this.initializationPromise = null;
+
+        logger.info('RustExecutionBackend cleaned up successfully');
       } catch (error) {
-        logger.error('Error cleaning up Rust executor:', error);
+        logger.error('Error cleaning up Rust executor:', toErrorOrUndefined(error));
+        // Still reset state even if cleanup fails
+        this.rustExecutor = null;
+        this.initialized = false;
+        this.initializationPromise = null;
       }
     }
   }
@@ -346,7 +385,6 @@ export class RustExecutionBackend {
     request: ToolExecutionRequest
   ): Promise<ToolExecutionResult> {
     const startTime = Date.now();
-    this.performanceStats.totalRequests++;
 
     if (!this.tsOrchestrator) {
       this.performanceStats.failedRequests++;
@@ -432,7 +470,7 @@ export class RustExecutionBackend {
     }
 
     const operation = String(request.arguments?.operation || 'read');
-    const path = request.arguments?.path || request.arguments?.filePath || '';
+    const filePath = request.arguments?.path || request.arguments?.filePath || '';
     const content =
       typeof request.arguments?.content === 'string'
         ? request.arguments.content
@@ -445,7 +483,12 @@ export class RustExecutionBackend {
       workingDirectory: request.context?.workingDirectory || process.cwd(),
     };
 
-    return await (this.rustExecutor as any).executeFilesystem(operation, path, content, options);
+    return await (this.rustExecutor as any).executeFilesystem(
+      operation,
+      filePath,
+      content,
+      options
+    );
   }
 
   private async executeCommandOperation(
@@ -514,7 +557,7 @@ export class RustExecutionBackend {
           averageExecutionTime: metrics.average_execution_time_ms ?? 0,
         };
       } catch (err) {
-        logger.warn('Failed to fetch Rust performance metrics', err);
+        logger.warn('Failed to fetch Rust performance metrics', toReadonlyRecord(err));
       }
     }
     return {

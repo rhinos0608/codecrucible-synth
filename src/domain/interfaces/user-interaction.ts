@@ -71,21 +71,13 @@ export interface IUserInteraction extends IUserOutput, IUserInput {}
  * Event-based user interaction for decoupled communication
  */
 export interface IUserInteractionEvents {
-  emit: (
-    event: 'display',
-    message: Readonly<string>,
-    options?: Readonly<DisplayOptions>
-  ) => void;
+  emit: (event: 'display', message: Readonly<string>, options?: Readonly<DisplayOptions>) => void;
   emitPrompt: (
     event: 'prompt',
     question: Readonly<string>,
     options?: Readonly<PromptOptions>
   ) => void;
-  emitProgress: (
-    event: 'progress',
-    message: Readonly<string>,
-    progress?: Readonly<number>
-  ) => void;
+  emitProgress: (event: 'progress', message: Readonly<string>, progress?: Readonly<number>) => void;
   onDisplay: (
     event: 'display',
     handler: (message: Readonly<string>, options?: Readonly<DisplayOptions>) => void

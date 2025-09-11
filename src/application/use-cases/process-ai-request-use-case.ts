@@ -96,7 +96,8 @@ export class ProcessAIRequestUseCase {
     }
 
     // Output transformation
-    const safeResponse: ModelResponse = typeof response === 'string' ? { content: response } : response;
+    const safeResponse: ModelResponse =
+      typeof response === 'string' ? { content: response } : response;
     return this.transformToOutput(safeResponse, selectedModel.primaryModel, primaryVoice);
   }
 
@@ -109,7 +110,12 @@ export class ProcessAIRequestUseCase {
     }
 
     // Normalise and clamp numeric parameters
-    const normalizeNumber = (value: number | undefined, min: number, max: number, fallback: number): number =>
+    const normalizeNumber = (
+      value: number | undefined,
+      min: number,
+      max: number,
+      fallback: number
+    ): number =>
       typeof value === 'number' && !Number.isNaN(value)
         ? Math.min(max, Math.max(min, value))
         : fallback;
@@ -118,7 +124,10 @@ export class ProcessAIRequestUseCase {
     const maxTokens = Math.max(1, Math.floor(normalizeNumber(input.maxTokens, 1, 100000, 1024)));
 
     // Preferred model string (trim or undefined)
-    const preferredModel = typeof input.model === 'string' && input.model.trim().length > 0 ? input.model.trim() : undefined;
+    const preferredModel =
+      typeof input.model === 'string' && input.model.trim().length > 0
+        ? input.model.trim()
+        : undefined;
 
     // Voice requirements: keep structured so voice orchestration can make decisions
     const voiceRequirements = input.voice
@@ -178,15 +187,23 @@ export class ProcessAIRequestUseCase {
         if (typeof r.content === 'string' && r.content.length) return r.content;
         // OpenAI-like chat/completion
         if (Array.isArray(r.choices) && r.choices.length) {
-          interface Choice { text?: string; message?: { content?: string } }
+          interface Choice {
+            text?: string;
+            message?: { content?: string };
+          }
           const [first]: (Choice | undefined)[] = r.choices;
           if (typeof first.text === 'string' && first.text.length > 0) return first.text;
-          if (typeof first.message?.content === 'string' && first.message.content.length > 0) return first.message.content;
+          if (typeof first.message?.content === 'string' && first.message.content.length > 0)
+            return first.message.content;
         }
         // Some model clients use `text` or `output` or `data`
         if (typeof r.text === 'string') return r.text;
         if (typeof r.output === 'string') return r.output;
-        if (Array.isArray(r.outputs) && r.outputs.length > 0 && typeof r.outputs[0]?.content === 'string') {
+        if (
+          Array.isArray(r.outputs) &&
+          r.outputs.length > 0 &&
+          typeof r.outputs[0]?.content === 'string'
+        ) {
           return r.outputs[0].content;
         }
       }
@@ -216,8 +233,12 @@ export class ProcessAIRequestUseCase {
       if (typeof resp.processingTime === 'number') return resp.processingTime;
       if (typeof resp.durationMs === 'number') return resp.durationMs;
       if (
-        (typeof resp.timestamp === 'string' || typeof resp.timestamp === 'number' || resp.timestamp instanceof Date) &&
-        (typeof resp.generatedAt === 'string' || typeof resp.generatedAt === 'number' || resp.generatedAt instanceof Date)
+        (typeof resp.timestamp === 'string' ||
+          typeof resp.timestamp === 'number' ||
+          resp.timestamp instanceof Date) &&
+        (typeof resp.generatedAt === 'string' ||
+          typeof resp.generatedAt === 'number' ||
+          resp.generatedAt instanceof Date)
       ) {
         // support two timestamps
         const a = new Date(resp.timestamp).getTime();
@@ -248,7 +269,7 @@ export class ProcessAIRequestUseCase {
     const confidence = getConfidence(response);
 
     // Normalize model name to string
-    const modelName = (() : string => {
+    const modelName = ((): string => {
       try {
         // Model may expose a name string or an object that stringifies
         if (typeof model.name === 'string') return model.name;
@@ -260,7 +281,7 @@ export class ProcessAIRequestUseCase {
     })();
 
     // Normalize voice id
-    const voiceId = (() : string => {
+    const voiceId = ((): string => {
       if (!voice) return 'default';
       if (typeof voice === 'string') return voice;
       if (typeof voice.id === 'string') return voice.id;

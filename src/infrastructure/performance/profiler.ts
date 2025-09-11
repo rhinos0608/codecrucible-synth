@@ -11,6 +11,7 @@ import { performance } from 'perf_hooks';
 import { MetricsCollector } from '../observability/metrics-collector.js';
 import { AdaptivePerformanceTuner, PerformanceMetrics } from './adaptive-performance-tuner.js';
 import { logger } from '../logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface ProfileOperation {
   id: string;
@@ -494,7 +495,7 @@ export class PerformanceProfiler extends EventEmitter {
       try {
         this.endSession(sessionId);
       } catch (error) {
-        logger.error(`Error ending session ${sessionId}:`, error);
+        logger.error(`Error ending session ${sessionId}:`, toErrorOrUndefined(error));
       }
     });
 

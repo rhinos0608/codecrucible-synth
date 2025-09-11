@@ -54,7 +54,9 @@ export class PluginManager {
   }
 
   // Simple loader for pre-imported modules/factories to avoid direct FS coupling here
-  public async loadFromFactories(factories: ReadonlyArray<() => Promise<IPlugin> | IPlugin>): Promise<void> {
+  public async loadFromFactories(
+    factories: ReadonlyArray<() => Promise<IPlugin> | IPlugin>
+  ): Promise<void> {
     for (const factory of factories) {
       const plugin = await Promise.resolve(factory());
       this.register(plugin);

@@ -73,7 +73,17 @@ export class UnifiedGitTool extends BaseTool {
 
   public async execute(
     args: Readonly<{
-      operation?: 'status' | 'log' | 'diff' | 'branch' | 'remote' | 'add' | 'commit' | 'push' | 'pull' | 'stash';
+      operation?:
+        | 'status'
+        | 'log'
+        | 'diff'
+        | 'branch'
+        | 'remote'
+        | 'add'
+        | 'commit'
+        | 'push'
+        | 'pull'
+        | 'stash';
       args?: readonly string[];
       files?: readonly string[];
       message?: string;
@@ -83,8 +93,17 @@ export class UnifiedGitTool extends BaseTool {
   ): Promise<ToolExecutionResult> {
     const startTime = Date.now();
     try {
-      const operation: 'status' | 'log' | 'diff' | 'branch' | 'remote' | 'add' | 'commit' | 'push' | 'pull' | 'stash' =
-        args.operation ?? 'status';
+      const operation:
+        | 'status'
+        | 'log'
+        | 'diff'
+        | 'branch'
+        | 'remote'
+        | 'add'
+        | 'commit'
+        | 'push'
+        | 'pull'
+        | 'stash' = args.operation ?? 'status';
       const gitArgs = this.buildGitArgs(operation, args);
       const result = await this.runGitCommand(gitArgs, context);
 
@@ -111,7 +130,17 @@ export class UnifiedGitTool extends BaseTool {
   }
 
   private buildGitArgs(
-    operation: 'status' | 'log' | 'diff' | 'branch' | 'remote' | 'add' | 'commit' | 'push' | 'pull' | 'stash',
+    operation:
+      | 'status'
+      | 'log'
+      | 'diff'
+      | 'branch'
+      | 'remote'
+      | 'add'
+      | 'commit'
+      | 'push'
+      | 'pull'
+      | 'stash',
     args: Readonly<{
       args?: readonly string[];
       files?: readonly string[];

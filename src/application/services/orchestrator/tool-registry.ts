@@ -2,6 +2,7 @@ import { ModelTool } from '../../../domain/interfaces/model-client.js';
 import { IMcpManager } from '../../../domain/interfaces/mcp-manager.js';
 import { createDefaultToolRegistry } from '../../../infrastructure/tools/default-tool-registry.js';
 import { logger } from '../../../infrastructure/logging/logger.js';
+import { toReadonlyRecord } from '../../../utils/type-guards.js';
 
 /**
  * Wrapper around MCP tool registry with simple caching.
@@ -43,7 +44,7 @@ export class ToolRegistry {
 
       return await Promise.resolve(filteredTools);
     } catch (error) {
-      logger.warn('Failed to get MCP tools for model:', error);
+      logger.warn('Failed to get MCP tools for model:', toReadonlyRecord(error));
       const registry = this.initializeRegistry();
       return Promise.resolve(
         ['filesystem_list', 'filesystem_read']
@@ -208,11 +209,10 @@ export class ToolRegistry {
       contexts.add('server');
     }
 
-    // If no specific context detected, include common contexts
+    // If no specific context detected, include a safe default (avoid terminal by default)
     if (contexts.size === 1) {
-      // Only filesystem
+      // Only filesystem detected → add development, but do NOT add terminal implicitly
       contexts.add('development');
-      contexts.add('terminal');
     }
 
     return contexts;

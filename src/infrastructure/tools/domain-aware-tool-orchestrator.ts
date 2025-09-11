@@ -1,5 +1,4 @@
 import { createLogger } from '../logging/logger-adapter.js';
-import { ResponseNormalizer } from '../../utils/response-normalizer.js';
 
 /**
  * Domain-Aware Tool Orchestrator
@@ -44,7 +43,7 @@ export class DomainAwareToolOrchestrator {
    * Define tool domains with their associated tools and keywords
    */
   private initializeToolDomains(): void {
-    const domains: ToolDomain[] = [
+    const domains: readonly ToolDomain[] = [
       {
         name: 'coding',
         description: 'Software development, code analysis, file operations',
@@ -96,12 +95,19 @@ export class DomainAwareToolOrchestrator {
           'dependency',
         ],
         tools: [
+          // New core tool suite
+          'file_read',
+          'file_write',
+          'grep_search',
+          'glob_search',
+          'bash_run',
+          // Legacy/internal tools kept for compatibility and broader coverage
           'filesystem_read_file',
           'filesystem_write_file',
           'filesystem_list_directory',
-          'filesystem_file_stats',
+          'filesystem_get_stats',
           'filesystem_find_files',
-          'mcp_execute_command', // For build commands
+          'mcp_execute_command',
           'mcp_read_file',
           'mcp_write_file',
         ],
@@ -264,13 +270,13 @@ export class DomainAwareToolOrchestrator {
       },
     ];
 
-    domains.forEach(domain => {
+    (domains as ToolDomain[]).forEach(domain => {
       this.toolDomains.set(domain.name, domain);
     });
 
     this.logger.info('Domain-aware tool orchestrator initialized', {
       domainCount: domains.length,
-      totalKeywords: domains.reduce((sum, d) => sum + d.keywords.length, 0),
+      totalKeywords: (domains as ToolDomain[]).reduce((sum, d) => sum + d.keywords.length, 0),
     });
   }
 
@@ -284,7 +290,10 @@ export class DomainAwareToolOrchestrator {
         if (!this.keywordIndex.has(normalizedKeyword)) {
           this.keywordIndex.set(normalizedKeyword, []);
         }
-        this.keywordIndex.get(normalizedKeyword)!.push(domainName);
+        const domainList = this.keywordIndex.get(normalizedKeyword);
+        if (domainList) {
+          domainList.push(domainName);
+        }
       });
     }
 
@@ -299,7 +308,7 @@ export class DomainAwareToolOrchestrator {
   /**
    * Analyze prompt to determine primary and secondary domains
    */
-  analyzeDomain(prompt: string): DomainAnalysis {
+  public analyzeDomain(prompt: string): DomainAnalysis {
     const normalizedPrompt = prompt.toLowerCase();
     const words = normalizedPrompt.split(/\s+/);
 
@@ -310,11 +319,11 @@ export class DomainAwareToolOrchestrator {
     for (const word of words) {
       // Check direct keyword matches
       if (this.keywordIndex.has(word)) {
-        const domains = this.keywordIndex.get(word)!;
+        const domains = this.keywordIndex.get(word) ?? [];
         detectedKeywords.push(word);
 
-        domains.forEach(domain => {
-          const currentScore = domainScores.get(domain) || 0;
+        domains.forEach((domain: string) => {
+          const currentScore = domainScores.get(domain) ?? 0;
           domainScores.set(domain, currentScore + 1);
         });
       }
@@ -323,8 +332,8 @@ export class DomainAwareToolOrchestrator {
       for (const [keyword, domains] of this.keywordIndex) {
         if (keyword.includes(' ') && normalizedPrompt.includes(keyword)) {
           detectedKeywords.push(keyword);
-          domains.forEach(domain => {
-            const currentScore = domainScores.get(domain) || 0;
+          domains.forEach((domain: string) => {
+            const currentScore = domainScores.get(domain) ?? 0;
             domainScores.set(domain, currentScore + 2); // Higher weight for phrase matches
           });
         }
@@ -333,19 +342,23 @@ export class DomainAwareToolOrchestrator {
 
     // Apply domain priority weights
     for (const [domain, score] of domainScores) {
-      const domainInfo = this.toolDomains.get(domain)!;
+      const domainInfo = this.toolDomains.get(domain);
+      if (!domainInfo) continue;
       const priorityWeight = 1 / domainInfo.priority; // Lower priority number = higher weight
       domainScores.set(domain, score * priorityWeight);
     }
 
     // Determine primary and secondary domains
     const sortedDomains = Array.from(domainScores.entries()).sort(
-      ([, scoreA], [, scoreB]) => scoreB - scoreA
+      ([, scoreA]: readonly [string, number], [, scoreB]: readonly [string, number]) =>
+        scoreB - scoreA
     );
 
     const primaryDomain = sortedDomains.length > 0 ? sortedDomains[0][0] : 'mixed';
     const primaryScore = sortedDomains.length > 0 ? sortedDomains[0][1] : 0;
-    const secondaryDomains = sortedDomains.slice(1, 3).map(([domain]) => domain);
+    const secondaryDomains = sortedDomains
+      .slice(1, 3)
+      .map(([domain]: readonly [string, number]) => domain);
 
     // Calculate confidence based on score distribution
     const totalScore = Array.from(domainScores.values()).reduce((sum, score) => sum + score, 0);
@@ -375,11 +388,11 @@ export class DomainAwareToolOrchestrator {
   /**
    * Get domain-specific tool subset for a given prompt
    */
-  getToolsForPrompt(
+  public getToolsForPrompt(
     prompt: string,
-    allAvailableTools: any[]
+    allAvailableTools: ReadonlyArray<{ name: string; function?: { name: string } }>
   ): {
-    tools: any[];
+    tools: Array<{ name: string; function?: { name: string } }>;
     analysis: DomainAnalysis;
     reasoning: string;
   } {
@@ -395,7 +408,7 @@ export class DomainAwareToolOrchestrator {
     }
 
     // Start with primary domain tools
-    let selectedToolNames = new Set(primaryDomain.tools);
+    let selectedToolNames = new Set<string>(primaryDomain.tools);
 
     // Add tools from secondary domains if confidence is low or mixed task
     if (analysis.confidence < 0.7 || analysis.secondaryDomains.length > 0) {
@@ -411,10 +424,10 @@ export class DomainAwareToolOrchestrator {
     }
 
     // Apply aggressive domain tool limit (CRITICAL: Ollama 500 error fix)
-    const maxTools = primaryDomain.maxTools || 3; // Reduced from 8 to 3 for Ollama performance
+    const maxTools = primaryDomain.maxTools ?? 3; // Reduced from 8 to 3 for Ollama performance
     if (selectedToolNames.size > maxTools) {
       // Prioritize primary domain tools
-      selectedToolNames = new Set([
+      selectedToolNames = new Set<string>([
         ...primaryDomain.tools.slice(0, maxTools - 1), // More aggressive primary selection
         ...Array.from(selectedToolNames).slice(primaryDomain.tools.length, maxTools),
       ]);
@@ -422,7 +435,7 @@ export class DomainAwareToolOrchestrator {
 
     // Filter available tools to match selected tool names
     const selectedTools = allAvailableTools.filter(tool => {
-      const toolName = tool.function?.name || tool.name;
+      const toolName: string = tool.function?.name ?? tool.name;
       return selectedToolNames.has(toolName);
     });
 
@@ -436,8 +449,41 @@ export class DomainAwareToolOrchestrator {
       selectedToolCount: selectedTools.length,
       primaryDomain: analysis.primaryDomain,
       confidence: analysis.confidence.toFixed(2),
-      toolNames: selectedTools.map(t => t.function?.name || t.name),
+      toolNames: selectedTools.map(
+        (t: { name: string; function?: { name: string } }) => t.function?.name ?? t.name
+      ),
     });
+
+    return {
+      tools: selectedTools,
+      analysis,
+      reasoning,
+    };
+  }
+  /**
+   * Get tools for a specific domain
+   */
+  private getToolsForDomain(
+    domainName: string,
+    allAvailableTools: ReadonlyArray<{ name: string; function?: { name: string } }>,
+    analysis: DomainAnalysis
+  ): {
+    tools: Array<{ name: string; function?: { name: string } }>;
+    analysis: DomainAnalysis;
+    reasoning: string;
+  } {
+    const domain = this.toolDomains.get(domainName) ?? this.toolDomains.get('mixed');
+
+    if (!domain) {
+      throw new Error('No valid domain found');
+    }
+
+    const selectedTools = allAvailableTools.filter(tool => {
+      const toolName: string = tool.function?.name ?? tool.name;
+      return domain.tools.includes(toolName);
+    });
+
+    const reasoning = `Fallback to ${domainName} domain, selected ${selectedTools.length} tools`;
 
     return {
       tools: selectedTools,
@@ -447,37 +493,15 @@ export class DomainAwareToolOrchestrator {
   }
 
   /**
-   * Get tools for a specific domain
-   */
-  private getToolsForDomain(
-    domainName: string,
-    allAvailableTools: any[],
-    analysis: DomainAnalysis
-  ): {
-    tools: any[];
-    analysis: DomainAnalysis;
-    reasoning: string;
-  } {
-    const domain = this.toolDomains.get(domainName) || this.toolDomains.get('mixed')!;
-
-    const selectedTools = allAvailableTools.filter(tool => {
-      const toolName = tool.function?.name || tool.name;
-      return domain.tools.includes(toolName);
-    });
-
-    const reasoning = `Fallback to ${domainName} domain, selected ${selectedTools.length} tools`;
-
-    return { tools: selectedTools, analysis, reasoning };
-  }
-
-  /**
    * Get all available domains for debugging/info purposes
    */
-  getAvailableDomains(): Array<{ name: string; description: string; toolCount: number }> {
-    return Array.from(this.toolDomains.entries()).map(([name, domain]) => ({
-      name,
-      description: domain.description,
-      toolCount: domain.tools.length,
-    }));
+  public getAvailableDomains(): Array<{ name: string; description: string; toolCount: number }> {
+    return Array.from(this.toolDomains.entries()).map(
+      ([name, domain]: readonly [string, ToolDomain]) => ({
+        name,
+        description: domain.description,
+        toolCount: domain.tools.length,
+      })
+    );
   }
 }

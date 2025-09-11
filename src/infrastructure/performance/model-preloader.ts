@@ -8,6 +8,7 @@
 import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 import { responseCache } from './response-cache-manager.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 interface ModelMetrics {
   modelName: string;
@@ -246,7 +247,7 @@ export class ModelPreloader {
         // Add delay between warmups to avoid overloading
         await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (error) {
-        logger.error(`Warmup queue processing error for ${item.key}`, error);
+        logger.error(`Warmup queue processing error for ${item.key}`, toErrorOrUndefined(error));
       }
     }
 

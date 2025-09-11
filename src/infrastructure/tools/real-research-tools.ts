@@ -1,6 +1,25 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
-import { logger } from '../logging/logger.js';
+import { BaseTool } from './base-tool';
+import { logger } from '../logging/logger';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
+
+// Schema definitions
+const GoogleWebSearchSchema = z.object({
+  query: z.string().describe('Web search query'),
+});
+
+const RefDocumentationSearchSchema = z.object({
+  query: z.string().describe('Documentation search query'),
+});
+
+const RefReadUrlSchema = z.object({
+  url: z.string().describe('The URL to read'),
+});
+
+const ExaWebSearchSchema = z.object({
+  query: z.string().describe('Web search query'),
+  numResults: z.number().optional().default(5),
+});
 
 interface SearchResult {
   title: string;
@@ -30,42 +49,43 @@ interface UrlReadResponse {
 }
 
 interface MCPGlobal {
-  mcp__exa__web_search_exa?: (params: {
-    query: string;
-    numResults?: number;
-  }) => Promise<SearchResponse>;
-  mcp__ref_tools_ref_tools_mcp__ref_search_documentation?: (params: {
-    query: string;
-  }) => Promise<SearchResponse>;
-  mcp__ref_tools_ref_tools_mcp__ref_read_url?: (params: {
-    url: string;
-  }) => Promise<UrlReadResponse>;
+  mcp__exa__web_search_exa?: (
+    params: Readonly<{
+      query: string;
+      numResults?: number;
+    }>
+  ) => Promise<SearchResponse>;
+  mcp__ref_tools_ref_tools_mcp__ref_search_documentation?: (
+    params: Readonly<{
+      query: string;
+    }>
+  ) => Promise<SearchResponse>;
+  mcp__ref_tools_ref_tools_mcp__ref_read_url?: (
+    params: Readonly<{
+      url: string;
+    }>
+  ) => Promise<UrlReadResponse>;
 }
 
 declare const global: typeof globalThis & MCPGlobal;
 
-export class GoogleWebSearchTool extends BaseTool {
-  constructor(private _agentContext: { workingDirectory: string }) {
+export class GoogleWebSearchTool extends BaseTool<typeof GoogleWebSearchSchema.shape> {
+  public constructor() {
     super({
       name: 'googleWebSearch',
       description: 'Search the web using Google search capabilities.',
       category: 'Research',
-      parameters: z.object({
-        query: z.string().describe('Web search query'),
-      }),
+      parameters: GoogleWebSearchSchema,
     });
   }
 
-  public async execute(params: { query: string }): Promise<SearchResponse> {
+  public async execute(params: Readonly<{ query: string }>): Promise<SearchResponse> {
     try {
       logger.info(`🔍 Google Web Search: ${params.query}`);
 
       // Try to use MCP Exa search if available
       try {
-        if (
-          typeof global.mcp__exa__web_search_exa !== 'undefined' &&
-          global.mcp__exa__web_search_exa
-        ) {
+        if (typeof global.mcp__exa__web_search_exa !== 'undefined') {
           return await global.mcp__exa__web_search_exa({ query: params.query });
         }
       } catch (e) {
@@ -87,7 +107,7 @@ export class GoogleWebSearchTool extends BaseTool {
         source: 'fallback_search',
       };
     } catch (error) {
-      logger.error('Google Web Search failed:', error);
+      logger.error('Google Web Search failed:', toErrorOrUndefined(error));
       return {
         success: false,
         error: `Google Web Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -99,19 +119,17 @@ export class GoogleWebSearchTool extends BaseTool {
   }
 }
 
-export class RefDocumentationTool extends BaseTool {
-  constructor(private _agentContext: { workingDirectory: string }) {
+export class RefDocumentationTool extends BaseTool<typeof RefDocumentationSearchSchema.shape> {
+  public constructor() {
     super({
       name: 'refDocumentationSearch',
       description: 'Search programming documentation and API references using Ref-Search.',
       category: 'Research',
-      parameters: z.object({
-        query: z.string().describe('Documentation search query'),
-      }),
+      parameters: RefDocumentationSearchSchema,
     });
   }
 
-  public async execute(params: { query: string }): Promise<SearchResponse> {
+  public async execute(params: Readonly<{ query: string }>): Promise<SearchResponse> {
     try {
       logger.info(`📚 Ref Documentation Search: ${params.query}`);
 
@@ -144,7 +162,7 @@ export class RefDocumentationTool extends BaseTool {
         source: 'fallback_documentation',
       };
     } catch (error) {
-      logger.error('Ref Documentation Search failed:', error);
+      logger.error('Ref Documentation Search failed:', toErrorOrUndefined(error));
       return {
         success: false,
         error: `Ref Documentation Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -156,15 +174,13 @@ export class RefDocumentationTool extends BaseTool {
   }
 }
 
-export class RefReadUrlTool extends BaseTool {
+export class RefReadUrlTool extends BaseTool<typeof RefReadUrlSchema.shape> {
   constructor(private _agentContext: { workingDirectory: string }) {
     super({
       name: 'refReadUrl',
       description: 'Read the content of a URL returned from a Ref-Search result.',
       category: 'Research',
-      parameters: z.object({
-        url: z.string().describe('The URL to read'),
-      }),
+      parameters: RefReadUrlSchema,
     });
   }
 
@@ -218,7 +234,7 @@ export class RefReadUrlTool extends BaseTool {
         };
       }
     } catch (error) {
-      logger.error('Ref Read URL failed:', error);
+      logger.error('Ref Read URL failed:', toErrorOrUndefined(error));
       return {
         success: false,
         error: `Ref Read URL failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -229,29 +245,25 @@ export class RefReadUrlTool extends BaseTool {
   }
 }
 
-export class ExaWebSearchTool extends BaseTool {
-  constructor(private _agentContext: { workingDirectory: string }) {
+export class ExaWebSearchTool extends BaseTool<typeof ExaWebSearchSchema.shape> {
+  public constructor() {
     super({
       name: 'exaWebSearch',
       description: 'Perform advanced web search using Exa AI.',
       category: 'Research',
-      parameters: z.object({
-        query: z.string().describe('Web search query'),
-        numResults: z.number().optional().default(5),
-      }),
+      parameters: ExaWebSearchSchema,
     });
   }
 
-  public async execute(params: { query: string; numResults?: number }): Promise<SearchResponse> {
+  public async execute(
+    params: Readonly<{ query: string; numResults?: number }>
+  ): Promise<SearchResponse> {
     try {
       logger.info(`🔍 Exa Web Search: ${params.query}`);
 
       // Try to use MCP Exa search if available
       try {
-        if (
-          typeof global.mcp__exa__web_search_exa !== 'undefined' &&
-          global.mcp__exa__web_search_exa
-        ) {
+        if (typeof global.mcp__exa__web_search_exa !== 'undefined') {
           return await global.mcp__exa__web_search_exa({
             query: params.query,
             numResults: params.numResults,
@@ -283,7 +295,7 @@ export class ExaWebSearchTool extends BaseTool {
         source: 'fallback_exa_search',
       };
     } catch (error) {
-      logger.error('Exa Web Search failed:', error);
+      logger.error('Exa Web Search failed:', toErrorOrUndefined(error));
       return {
         success: false,
         error: `Exa Web Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,

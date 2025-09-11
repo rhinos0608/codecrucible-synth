@@ -6,8 +6,9 @@
  */
 
 import { logger } from '../logging/unified-logger.js';
-import { ModelSelector, ModelSelectionResult, ModelInfo } from './model-selector.js';
+import { ModelInfo, ModelSelectionResult, ModelSelector } from './model-selector.js';
 import { modelCapabilityService } from '../discovery/model-capability-service.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface SmartSelectionOptions {
   preferredModel?: string;
@@ -29,7 +30,7 @@ export class SmartModelSelector {
   /**
    * Select the best model based on user preferences and capabilities
    */
-  async selectModel(options: SmartSelectionOptions = {}): Promise<ModelSelectionResult> {
+  public async selectModel(options: SmartSelectionOptions = {}): Promise<ModelSelectionResult> {
     // Get options from environment variables or parameters
     const {
       preferredModel = process.env.MODEL_PREFERRED,
@@ -39,26 +40,26 @@ export class SmartModelSelector {
     } = options;
 
     logger.info('🤖 Smart model selection started', {
-      preferredModel: preferredModel || 'none',
+      preferredModel: preferredModel ?? 'none',
       requireFunctionCalling,
       fallbackToBest,
-      preferredProvider: provider || 'any',
+      preferredProvider: provider ?? 'any',
     });
 
     // Discover available models
     const models = await this.selector.discoverModels();
-    const availableModels = models.filter(m => m.available);
+    const availableModels = (models as readonly ModelInfo[]).filter(m => m.available);
 
     if (availableModels.length === 0) {
       throw new Error('No AI models available');
     }
 
     logger.info(
-      `📋 Found ${availableModels.length} available models across ${[...new Set(availableModels.map(m => m.provider))].length} providers`
+      `📋 Found ${availableModels.length} available models across ${[...new Set((availableModels as readonly ModelInfo[]).map(m => m.provider))].length} providers`
     );
 
     // Step 1: Try user's preferred model
-    if (preferredModel && preferredModel.trim()) {
+    if (preferredModel?.trim()) {
       const result = await this.tryPreferredModel(
         availableModels,
         preferredModel,
@@ -79,11 +80,11 @@ export class SmartModelSelector {
 
     // Step 3: Dynamic selection based on capabilities
     if (fallbackToBest) {
-      return await this.selectBestAvailable(availableModels, requireFunctionCalling);
+      return this.selectBestAvailable(availableModels, requireFunctionCalling);
     }
 
     // Step 4: Simple fallback
-    const fallbackModel = availableModels[0];
+    const [fallbackModel] = availableModels;
     logger.info(`⚠️ Using simple fallback: ${fallbackModel.name} (${fallbackModel.provider})`);
 
     return {
@@ -130,7 +131,7 @@ export class SmartModelSelector {
       } catch (error) {
         logger.warn(
           `⚠️ Could not verify function calling for preferred model ${preferredModel.name}:`,
-          error
+          toReadonlyRecord(error)
         );
         logger.info(
           `✅ Using preferred model anyway: ${preferredModel.name} (function calling verification failed)`
@@ -183,17 +184,17 @@ export class SmartModelSelector {
    * Select the best available model based on capability scoring
    */
   private async selectBestAvailable(
-    availableModels: ModelInfo[],
+    availableModels: readonly ModelInfo[],
     requireFunctionCalling: boolean
   ): Promise<ModelSelectionResult> {
-    return await this.selectBestFromModels(availableModels, requireFunctionCalling);
+    return this.selectBestFromModels(availableModels, requireFunctionCalling);
   }
 
   /**
    * Score models and select the best one
    */
   private async selectBestFromModels(
-    models: ModelInfo[],
+    models: readonly ModelInfo[],
     requireFunctionCalling: boolean
   ): Promise<ModelSelectionResult> {
     logger.info(`🎯 Scoring ${models.length} models for selection...`);
@@ -253,44 +254,77 @@ export class SmartModelSelector {
               reasons.push('json-mode');
             }
           } catch (error) {
-            logger.debug(`Could not check capabilities for ${model.name}:`, error);
+            logger.debug(
+              `Could not check capabilities for ${model.name}:`,
+              toReadonlyRecord(error)
+            );
             // Give moderate score for unknown capabilities
             score += 3;
             reasons.push('unknown-capabilities');
           }
         }
 
-        // Model family bonuses (based on known performance)
+        // Model family bonuses (based on actual benchmark performance)
         const modelNameLower = model.name.toLowerCase();
         if (modelNameLower.includes('llama3.1')) {
-          score += 12; // Excellent function calling
-          reasons.push('llama3.1-excellent');
-        } else if (modelNameLower.includes('llama3.2')) {
-          score += 8; // Good function calling
-          reasons.push('llama3.2-good');
+          // Llama 3.1 is EXCELLENT at function calling: 89.06% BFCL accuracy (8B), 90.76% (70B)
+          score += 18; // Highest score for proven excellent function calling
+          reasons.push('llama3.1-excellent-functions');
+        } else if (
+          modelNameLower.includes('qwen2.5-coder:7b') ||
+          modelNameLower.includes('qwen2.5-coder:14b') ||
+          modelNameLower.includes('qwen2.5-coder:32b')
+        ) {
+          score += 15; // Excellent function calling and coding (7B+ models)
+          reasons.push('qwen2.5-coder-7b+-excellent');
+        } else if (modelNameLower.includes('qwen2.5-coder:3b')) {
+          score += 10; // Good but 3B is at transition point for function calling
+          reasons.push('qwen2.5-coder-3b-good');
         } else if (modelNameLower.includes('deepseek-coder')) {
-          score += 10; // Great for coding
-          reasons.push('deepseek-coder');
+          score += 12; // Great for coding with function calling
+          reasons.push('deepseek-coder-excellent');
+        } else if (modelNameLower.includes('mistral') || modelNameLower.includes('mixtral')) {
+          score += 14; // Native function calling support
+          reasons.push('mistral-native-functions');
+        } else if (modelNameLower.includes('llama3.2')) {
+          score += 8; // Good but not as proven as 3.1
+          reasons.push('llama3.2-good');
         } else if (modelNameLower.includes('coder')) {
-          score += 6; // Coding models
+          score += 8; // Coding models
           reasons.push('coding-model');
         } else if (modelNameLower.includes('instruct')) {
-          score += 7; // Instruction-tuned
+          score += 5; // Instruction-tuned
           reasons.push('instruction-tuned');
         }
 
-        // Size considerations (larger models tend to be better at complex tasks)
+        // Size considerations (larger models significantly better for function calling)
         if (model.size) {
           const size = model.size.toLowerCase();
-          if (size.includes('13b') || size.includes('14b')) {
-            score += 5;
+          if (
+            size.includes('70b') ||
+            size.includes('32b') ||
+            size.includes('27b') ||
+            size.includes('20b')
+          ) {
+            score += 8; // Very large models excel at function calling
+            if (requireFunctionCalling) score += 4; // Extra bonus for function calling
+            reasons.push('very-large-model');
+          } else if (size.includes('13b') || size.includes('14b')) {
+            score += 6;
+            if (requireFunctionCalling) score += 2;
             reasons.push('large-model');
           } else if (size.includes('7b') || size.includes('8b')) {
-            score += 3;
+            score += 4;
+            if (requireFunctionCalling) score += 1;
             reasons.push('medium-model');
-          } else if (size.includes('3b') || size.includes('2b')) {
-            score += 1; // Small but still usable
-            reasons.push('small-model');
+          } else if (size.includes('3b')) {
+            score += 2; // 3B is transition point - usable but not ideal for function calling
+            if (requireFunctionCalling) score -= 1; // Small penalty for function calling
+            reasons.push('small-model-transition');
+          } else if (size.includes('1b') || size.includes('2b')) {
+            score += 0; // Too small for reliable function calling
+            if (requireFunctionCalling) score -= 3; // Significant penalty
+            reasons.push('very-small-model');
           }
         }
 
@@ -305,7 +339,7 @@ export class SmartModelSelector {
     // Sort by score (highest first)
     scoredModels.sort((a, b) => b.score - a.score);
 
-    const bestModel = scoredModels[0];
+    const [bestModel] = scoredModels;
 
     logger.info(`✅ Selected best model: ${bestModel.model.name}`, {
       score: bestModel.score,
@@ -317,11 +351,13 @@ export class SmartModelSelector {
     if (scoredModels.length > 1) {
       logger.debug(
         'Top 3 model candidates:',
-        scoredModels.slice(0, 3).map(m => ({
-          name: m.model.name,
-          score: m.score,
-          provider: m.model.provider,
-        }))
+        toReadonlyRecord(
+          scoredModels.slice(0, 3).map(m => ({
+            name: m.model.name,
+            score: m.score,
+            provider: m.model.provider,
+          }))
+        )
       );
     }
 
@@ -336,10 +372,10 @@ export class SmartModelSelector {
  * Quick selection function that uses smart selection logic
  */
 export async function smartQuickSelectModel(
-  options: SmartSelectionOptions = {}
+  options: Readonly<SmartSelectionOptions> = {}
 ): Promise<ModelSelectionResult> {
   const selector = new SmartModelSelector();
-  return await selector.selectModel(options);
+  return selector.selectModel(options);
 }
 
 // Export the smart selector as singleton

@@ -31,7 +31,7 @@ export class PerformanceMonitor {
     }
   }
 
-  public getMetrics(): ToolExecutionMetrics[] {
+  getMetrics(): ToolExecutionMetrics[] {
     return [...this.metrics];
   }
 }

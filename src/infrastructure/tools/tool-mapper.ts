@@ -26,7 +26,9 @@ export function mapToMcpToolName(functionName: string): string {
   return mapping[functionName] || functionName;
 }
 
-export function createToolAliasMapping(availableTools: ReadonlyMap<string, unknown>): Record<string, string> {
+export function createToolAliasMapping(
+  availableTools: ReadonlyMap<string, unknown>
+): Record<string, string> {
   const aliases: Record<string, string> = {};
 
   aliases.filesystem_read_file = 'filesystem_read_file';

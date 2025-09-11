@@ -1,10 +1,9 @@
 import { ModelTool } from '../../domain/interfaces/model-client.js';
 import { createLogger } from '../logging/logger-adapter.js';
 import {
-  ToolRegistryKey,
-  ToolFunctionName,
-  TypedToolIdentifiers,
   TYPED_TOOL_CATALOG,
+  ToolRegistryKey,
+  TypedToolIdentifiers,
 } from './typed-tool-identifiers.js';
 import { IMcpManager } from '../../domain/interfaces/mcp-manager.js';
 
@@ -19,7 +18,11 @@ interface ToolRegistryOptions {
 /**
  * Create parameter definitions for each tool type
  */
-function createParametersForTool(registryKey: ToolRegistryKey): any {
+function createParametersForTool(registryKey: ToolRegistryKey): {
+  type: 'object';
+  properties: Record<string, unknown>;
+  required?: string[];
+} {
   switch (registryKey) {
     case 'filesystem_list':
       return {
@@ -144,7 +147,7 @@ function createParametersForTool(registryKey: ToolRegistryKey): any {
         required: [],
       };
 
-    default:
+    default: {
       // Type-safe exhaustive check - will cause compile error if new tools are added without parameters
       const _exhaustiveCheck: never = registryKey;
       return {
@@ -152,6 +155,7 @@ function createParametersForTool(registryKey: ToolRegistryKey): any {
         properties: {},
         required: [],
       };
+    }
   }
 }
 
@@ -159,12 +163,8 @@ function createParametersForTool(registryKey: ToolRegistryKey): any {
  * Type-safe tool registry creation with compile-time validation
  */
 export function createDefaultToolRegistry(
-  options: ToolRegistryOptions = {}
+  _options: ToolRegistryOptions = {}
 ): Map<ToolRegistryKey, ModelTool> {
-  const { mcpManager, allowedOrigins, autoApproveTools } = options;
-  const origins = allowedOrigins ?? (process.env.TOOL_ALLOWED_ORIGINS || 'local').split(',');
-  const autoApprove = autoApproveTools ?? process.env.AUTO_APPROVE_TOOLS === 'true';
-
   const registry = new Map<ToolRegistryKey, ModelTool>();
 
   // Helper function to create ModelTool from typed definition
@@ -208,8 +208,8 @@ export class DefaultToolRegistryHelpers {
   /**
    * Get tool by registry key (type-safe)
    */
-  static getTool(
-    registry: Map<ToolRegistryKey, ModelTool>,
+  public static getTool(
+    registry: ReadonlyMap<ToolRegistryKey, ModelTool>,
     key: ToolRegistryKey
   ): ModelTool | undefined {
     return registry.get(key);
@@ -218,22 +218,25 @@ export class DefaultToolRegistryHelpers {
   /**
    * Check if registry contains tool (type-safe)
    */
-  static hasTool(registry: Map<ToolRegistryKey, ModelTool>, key: ToolRegistryKey): boolean {
+  public static hasTool(
+    registry: ReadonlyMap<ToolRegistryKey, ModelTool>,
+    key: ToolRegistryKey
+  ): boolean {
     return registry.has(key);
   }
 
   /**
    * Get all tool keys from registry (type-safe)
    */
-  static getAllKeys(registry: Map<ToolRegistryKey, ModelTool>): ToolRegistryKey[] {
+  public static getAllKeys(registry: ReadonlyMap<ToolRegistryKey, ModelTool>): ToolRegistryKey[] {
     return Array.from(registry.keys());
   }
 
   /**
    * Get tools by category (type-safe)
    */
-  static getToolsByCategory(
-    registry: Map<ToolRegistryKey, ModelTool>,
+  public static getToolsByCategory(
+    registry: ReadonlyMap<ToolRegistryKey, ModelTool>,
     category: string
   ): Array<{ key: ToolRegistryKey; tool: ModelTool }> {
     const result: Array<{ key: ToolRegistryKey; tool: ModelTool }> = [];
@@ -250,7 +253,7 @@ export class DefaultToolRegistryHelpers {
   /**
    * Find registry key by function name (type-safe)
    */
-  static findKeyByFunctionName(functionName: string): ToolRegistryKey | null {
+  public static findKeyByFunctionName(functionName: string): ToolRegistryKey | null {
     for (const [key, toolDef] of Object.entries(TYPED_TOOL_CATALOG)) {
       if (toolDef.functionName === functionName) {
         return key as ToolRegistryKey;
@@ -262,7 +265,7 @@ export class DefaultToolRegistryHelpers {
   /**
    * Validate tool registration completeness
    */
-  static validateRegistry(registry: Map<ToolRegistryKey, ModelTool>): {
+  public static validateRegistry(registry: ReadonlyMap<ToolRegistryKey, ModelTool>): {
     isValid: boolean;
     missingTools: ToolRegistryKey[];
     extraTools: string[];

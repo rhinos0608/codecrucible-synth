@@ -12,7 +12,7 @@
 import { EventEmitter } from 'events';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { PerformanceProfiler } from '../performance/profiler.js';
-import { logger } from '../logging/logger.js';
+import { createLogger } from '../logging/logger-adapter.js';
 
 export interface EventBusConfig {
   batching: {
@@ -31,7 +31,7 @@ export interface EventBusConfig {
     enabled: boolean;
     windowMs: number;
     maxDuplicates: number;
-    keyExtractor?: (event: string, data: any) => string;
+    keyExtractor?: (event: string, data: unknown) => string;
   };
   profiling: {
     enabled: boolean;
@@ -40,7 +40,7 @@ export interface EventBusConfig {
   };
 }
 
-export interface QueuedEvent<T = any> {
+export interface QueuedEvent<T = unknown> {
   id: string;
   event: string;
   data: T;
@@ -78,12 +78,13 @@ export interface EventBusStats {
  * Enterprise-grade optimized EventBus with advanced processing capabilities
  */
 export class OptimizedEventBus extends EventEmitter implements IEventBus {
-  private performanceProfiler?: PerformanceProfiler;
+  private readonly performanceProfiler?: PerformanceProfiler;
   private config: EventBusConfig;
+  private logger = createLogger('OptimizedEventBus');
 
   // Performance profiling
-  private eventSessions = new Map<string, string>();
-  private handlerTimings = new Map<string, number>();
+  private readonly eventSessions = new Map<string, string>();
+  private readonly handlerTimings = new Map<string, number>();
 
   // Batching system
   private eventQueue: QueuedEvent[] = [];
@@ -95,11 +96,11 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   private priorityQueue: QueuedEvent[] = [];
 
   // Deduplication system
-  private recentEvents = new Map<string, { count: number; lastSeen: number }>();
+  private readonly recentEvents = new Map<string, { count: number; lastSeen: number }>();
   private deduplicationCleanupTimer?: NodeJS.Timeout;
 
   // Statistics
-  private stats: EventBusStats = {
+  private readonly stats: EventBusStats = {
     totalEvents: 0,
     batchedEvents: 0,
     priorityQueuedEvents: 0,
@@ -114,7 +115,10 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     deduplicationMapSize: 0,
   };
 
-  constructor(performanceProfiler?: PerformanceProfiler, config?: Partial<EventBusConfig>) {
+  public constructor(
+    performanceProfiler?: PerformanceProfiler,
+    config?: Readonly<Partial<EventBusConfig>>
+  ) {
     super();
     this.setMaxListeners(100);
 
@@ -147,7 +151,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
         enabled: true,
         windowMs: 5000,
         maxDuplicates: 3,
-        keyExtractor: (event: string, data: any) => {
+        keyExtractor: (event: string, data: unknown): string => {
           const dataStr = typeof data === 'object' ? JSON.stringify(data) : String(data);
           return `${event}:${dataStr}`;
         },
@@ -163,7 +167,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     this.setupBatchProcessing();
     this.setupDeduplicationCleanup();
 
-    logger.info('OptimizedEventBus initialized', {
+    this.logger.info('OptimizedEventBus initialized', {
       batchingEnabled: this.config.batching.enabled,
       priorityQueueEnabled: this.config.priorityQueue.enabled,
       deduplicationEnabled: this.config.deduplication.enabled,
@@ -173,7 +177,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   /**
    * Emit an event with comprehensive optimization pipeline
    */
-  override emit<T = any>(event: string, data: T): boolean {
+  public override emit<T = unknown>(event: string, data: T): boolean {
     this.stats.totalEvents++;
 
     // Phase 1: Deduplication check
@@ -184,7 +188,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
 
     // Phase 2: Create queued event
     const queuedEvent: QueuedEvent<T> = {
-      id: `event_${event}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      id: `event_${event}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       event,
       data,
       priority: this.getEventPriority(event),
@@ -209,7 +213,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   /**
    * Subscribe to an event with optional profiled handler
    */
-  override on<T = any>(event: string, handler: (data: T) => void): this {
+  public override on<T = unknown>(event: string, handler: (data: T) => void): this {
     if (
       this.config.profiling.enabled &&
       this.config.profiling.profileHandlers &&
@@ -225,7 +229,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   /**
    * Subscribe once with optional profiled handler
    */
-  override once<T = any>(event: string, handler: (data: T) => void): this {
+  public override once<T = unknown>(event: string, handler: (data: T) => void): this {
     if (
       this.config.profiling.enabled &&
       this.config.profiling.profileHandlers &&
@@ -241,14 +245,14 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   /**
    * Unsubscribe from an event
    */
-  override off<T = any>(event: string, handler: (data: T) => void): this {
+  public override off<T = unknown>(event: string, handler: (data: T) => void): this {
     return super.off(event, handler);
   }
 
   /**
    * Remove all listeners for an event
    */
-  override removeAllListeners(event?: string): this {
+  public override removeAllListeners(event?: string): this {
     return super.removeAllListeners(event);
   }
 
@@ -260,7 +264,10 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
    * Check if event should be deduplicated
    */
   private shouldDeduplicate<T>(event: string, data: T): boolean {
-    const deduplicationKey = this.config.deduplication.keyExtractor!(event, data);
+    if (!this.config.deduplication.keyExtractor) {
+      throw new Error('Deduplication keyExtractor is not defined');
+    }
+    const deduplicationKey = this.config.deduplication.keyExtractor(event, data);
     const recentEvent = this.recentEvents.get(deduplicationKey);
 
     if (recentEvent) {
@@ -300,9 +307,13 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
 
     // Process queue immediately for high priority events
     if (queuedEvent.priority >= 8) {
-      setImmediate(() => this.processPriorityQueue());
+      setImmediate(() => {
+        this.processPriorityQueue();
+      });
     } else {
-      process.nextTick(() => this.processPriorityQueue());
+      process.nextTick(() => {
+        this.processPriorityQueue();
+      });
     }
 
     this.updateQueueSizes();
@@ -323,11 +334,11 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
 
     // Trigger batch processing if batch is full
     if (this.eventQueue.length >= this.config.batching.batchSize) {
-      this.processBatch();
+      void this.processBatch();
     } else if (!this.batchTimer) {
       // Set timer for batch timeout
       this.batchTimer = setTimeout(() => {
-        this.processBatch();
+        void this.processBatch();
       }, this.config.batching.batchTimeoutMs);
     }
 
@@ -342,7 +353,11 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     if (this.eventQueue.length === 0) return;
 
     const batchStartTime = Date.now();
-    const batchId = this.currentBatchId!;
+    if (!this.currentBatchId) {
+      this.logger.error('No current batch ID when processing batch');
+      return;
+    }
+    const batchId = this.currentBatchId;
     const batch = [...this.eventQueue];
 
     // Clear current batch
@@ -375,14 +390,14 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
         {
           batchId,
           batchSize: batch.length,
-          eventTypes: Array.from(new Set(batch.map(e => e.event))),
+          eventTypes: Array.from(new Set(batch.map(e => e.event))) as readonly string[],
         }
       );
     }
 
     try {
       // Process all events in the batch
-      const promises = batch.map(async queuedEvent => {
+      const promises = batch.map(queuedEvent => {
         try {
           eventTypes.add(queuedEvent.event);
           const result = this.emitDirect(queuedEvent);
@@ -390,7 +405,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
           return result;
         } catch (error) {
           errorCount++;
-          logger.error('Batch event processing error', { eventId: queuedEvent.id, error });
+          this.logger.error('Batch event processing error', { eventId: queuedEvent.id, error });
           return false;
         }
       });
@@ -415,7 +430,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
         this.performanceProfiler.endSession(profilingSessionId);
       }
 
-      logger.debug('Batch processing completed', {
+      this.logger.debug('Batch processing completed', {
         batchId,
         eventCount: batch.length,
         successCount,
@@ -428,7 +443,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
         this.performanceProfiler.endSession(profilingSessionId);
       }
 
-      logger.error('Batch processing failed', { batchId, error });
+      this.logger.error('Batch processing failed', { batchId, error });
       throw error;
     }
   }
@@ -446,7 +461,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
       try {
         this.emitDirect(queuedEvent);
       } catch (error) {
-        logger.error('Priority queue processing error', {
+        this.logger.error('Priority queue processing error', {
           eventId: queuedEvent.id,
           priority: queuedEvent.priority,
           error,
@@ -456,7 +471,9 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
 
     // Schedule next processing if more events remain
     if (this.priorityQueue.length > 0) {
-      setImmediate(() => this.processPriorityQueue());
+      setImmediate(() => {
+        this.processPriorityQueue();
+      });
     }
 
     this.updateQueueSizes();
@@ -539,14 +556,14 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
       }
 
       try {
-        const result = originalHandler(data);
+        originalHandler(data);
 
         if (this.performanceProfiler && handlerSessionId && handlerOperationId) {
           this.performanceProfiler.endOperation(handlerSessionId, handlerOperationId);
           this.performanceProfiler.endSession(handlerSessionId);
         }
 
-        return result;
+        return;
       } catch (error) {
         if (this.performanceProfiler && handlerSessionId && handlerOperationId) {
           this.performanceProfiler.endOperation(
@@ -619,7 +636,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
       droppedEvents,
     });
 
-    logger.warn('Priority queue overflow', { droppedEvents });
+    this.logger.warn('Priority queue overflow', { droppedEvents });
   }
 
   /**
@@ -682,7 +699,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   /**
    * Get comprehensive event bus statistics
    */
-  getEventBusStats(): EventBusStats & { config: EventBusConfig } {
+  public getEventBusStats(): EventBusStats & { config: EventBusConfig } {
     this.updateQueueSizes();
     this.stats.deduplicationMapSize = this.recentEvents.size;
 
@@ -695,7 +712,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   /**
    * Update configuration at runtime
    */
-  updateConfig(updates: Partial<EventBusConfig>): void {
+  public updateConfig(updates: Readonly<Partial<EventBusConfig>>): void {
     this.config = {
       ...this.config,
       ...updates,
@@ -705,13 +722,13 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
       profiling: { ...this.config.profiling, ...updates.profiling },
     };
 
-    logger.info('EventBus configuration updated', { updates });
+    this.logger.info('EventBus configuration updated', { updates });
   }
 
   /**
    * Cleanup resources
    */
-  destroy(): void {
+  public destroy(): void {
     // Clear timers
     if (this.batchTimer) {
       clearTimeout(this.batchTimer);
@@ -723,7 +740,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
 
     // Process remaining queued events
     if (this.eventQueue.length > 0) {
-      this.processBatch();
+      void this.processBatch();
     }
 
     // Clear all maps and queues
@@ -733,7 +750,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     this.eventSessions.clear();
     this.handlerTimings.clear();
 
-    logger.info('OptimizedEventBus destroyed', {
+    this.logger.info('OptimizedEventBus destroyed', {
       finalStats: this.getEventBusStats(),
     });
   }

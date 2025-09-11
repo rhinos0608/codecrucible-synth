@@ -1,6 +1,7 @@
 import { LMStudioClient } from '@lmstudio/sdk';
 import { logger } from '../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../utils/error-utils.js';
+import { toErrorOrUndefined } from '../utils/type-guards.js';
 
 export interface LMStudioConfig {
   endpoint?: string;
@@ -175,11 +176,7 @@ export class LMStudioProvider {
 
       return response.content;
     } catch (error) {
-      logger.error('LMStudioProvider generateText failed', {
-        error: getErrorMessage(error),
-        model: this.model,
-        endpoint: this.config.endpoint,
-      });
+      logger.error('LMStudioProvider generateText failed', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -217,12 +214,9 @@ export class LMStudioProvider {
             yield chunk.content;
           }
         }
-      }());
+      })();
     } catch (error) {
-      logger.error('LMStudioProvider generateTextStreaming failed', {
-        error: getErrorMessage(error),
-        model: this.model,
-      });
+      logger.error('LMStudioProvider generateTextStreaming failed', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -248,8 +242,14 @@ export class LMStudioProvider {
 
       // Filter/convert to roles supported by LM Studio ('system' | 'user' | 'assistant')
       const lmMessages: LMChatMessageInput[] = messages
-        .filter((m: Readonly<ChatMessage>) => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
-        .map((m: Readonly<ChatMessage>) => ({ role: m.role as LMChatMessageInput['role'], content: m.content }));
+        .filter(
+          (m: Readonly<ChatMessage>) =>
+            m.role === 'system' || m.role === 'user' || m.role === 'assistant'
+        )
+        .map((m: Readonly<ChatMessage>) => ({
+          role: m.role as LMChatMessageInput['role'],
+          content: m.content,
+        }));
 
       // Use respond with sanitized messages
       const response = await model.respond(lmMessages, {
@@ -265,10 +265,7 @@ export class LMStudioProvider {
 
       return response.content;
     } catch (error) {
-      logger.error('LMStudioProvider chat failed', {
-        error: getErrorMessage(error),
-        model: this.model,
-      });
+      logger.error('LMStudioProvider chat failed', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -322,10 +319,7 @@ export class LMStudioProvider {
         metadata: { model: modelToUse, task },
       };
     } catch (error) {
-      logger.error('LMStudioProvider act failed', {
-        error: getErrorMessage(error),
-        model: this.model,
-      });
+      logger.error('LMStudioProvider act failed', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -375,9 +369,7 @@ export class LMStudioProvider {
 
       throw new Error('No available models found. Please load a model in LM Studio first.');
     } catch (error) {
-      logger.error('LMStudioProvider model detection failed', {
-        error: getErrorMessage(error),
-      });
+      logger.error('LMStudioProvider model detection failed', toErrorOrUndefined(error));
       throw error;
     }
   }

@@ -17,12 +17,8 @@ import { createServer, Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { IEventBus } from '../interfaces/event-bus.js';
 import { IUserInteraction } from '../interfaces/user-interaction.js';
-import {
-  UnifiedConfiguration,
-  ServerRequest,
-  ServerResponse,
-  SecurityValidationContext,
-} from '../types/unified-types.js';
+import { UnifiedConfiguration, ServerRequest, ServerResponse } from '../types/unified-types.js';
+import { SecurityValidationContext as MainSecurityContext } from './unified-security-validator.js';
 import { UnifiedSecurityValidator } from './unified-security-validator.js';
 import { UnifiedPerformanceSystem } from './unified-performance-system.js';
 import { ILogger } from '../interfaces/logger.js';
@@ -268,7 +264,7 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
         ipAddress: '127.0.0.1',
         timestamp: new Date(),
         operationType: 'server-request',
-      } as SecurityValidationContext);
+      } as MainSecurityContext);
 
       // Process request (simplified - would route to appropriate handlers)
       const response: ServerResponse = {
@@ -402,7 +398,7 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
           ipAddress: req.ip || '127.0.0.1',
           timestamp: new Date(),
           operationType: 'api-analyze',
-        } as SecurityValidationContext);
+        } as MainSecurityContext);
 
         // Process via event bus
         this._eventBus.emit('api:analyze', { input, type, requestId: req.headers['x-request-id'] });
@@ -432,7 +428,7 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
           ipAddress: req.ip || '127.0.0.1',
           timestamp: new Date(),
           operationType: 'api-generate',
-        } as SecurityValidationContext);
+        } as MainSecurityContext);
 
         // Process via event bus
         this._eventBus.emit('api:generate', {

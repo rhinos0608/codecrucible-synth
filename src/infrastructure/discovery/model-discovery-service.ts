@@ -43,12 +43,12 @@ export class ModelDiscoveryService {
   /**
    * Discover all available models from all providers
    */
-  async discoverModels(options: ModelDiscoveryOptions = {}): Promise<ModelInfo[]> {
+  public async discoverModels(options: Readonly<ModelDiscoveryOptions> = {}): Promise<ModelInfo[]> {
     const {
       includeUnavailable = false,
       timeout = 10000,
       cache = true,
-      providers = ['ollama', 'lm-studio', 'anthropic', 'huggingface'],
+      providers = ['ollama', 'lm-studio', 'anthropic', 'huggingface', 'openai', 'google'],
     } = options;
 
     const allModels: ModelInfo[] = [];
@@ -57,8 +57,10 @@ export class ModelDiscoveryService {
       try {
         const models = await this.discoverModelsFromProvider(provider, { timeout, cache });
         allModels.push(...models);
-      } catch (error) {
-        logger.warn(`Failed to discover models from ${provider}:`, error);
+      } catch (error: unknown) {
+        logger.warn(`Failed to discover models from ${provider}:`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
         // Add fallback models for failed providers
         allModels.push(...this.getFallbackModels(provider));
       }
@@ -67,7 +69,7 @@ export class ModelDiscoveryService {
     // Filter based on availability preference
     const filteredModels = includeUnavailable
       ? allModels
-      : allModels.filter(model => model.isAvailable);
+      : allModels.filter((model: Readonly<ModelInfo>) => model.isAvailable);
 
     logger.info(`Discovered ${filteredModels.length} models from ${providers.length} providers`, {
       providers: providers.join(', '),
@@ -82,9 +84,9 @@ export class ModelDiscoveryService {
   /**
    * Discover models from a specific provider
    */
-  async discoverModelsFromProvider(
+  public async discoverModelsFromProvider(
     provider: ProviderType,
-    options: { timeout?: number; cache?: boolean } = {}
+    options: Readonly<{ timeout?: number; cache?: boolean }> = {}
   ): Promise<ModelInfo[]> {
     const { timeout = 10000, cache = true } = options;
 
@@ -124,8 +126,11 @@ export class ModelDiscoveryService {
 
       logger.debug(`Discovered ${models.length} models from ${provider}`);
       return models;
-    } catch (error) {
-      logger.error(`Error discovering models from ${provider}:`, error);
+    } catch (error: unknown) {
+      logger.error(
+        `Error discovering models from ${provider}:`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       return this.getFallbackModels(provider);
     }
   }
@@ -145,31 +150,63 @@ export class ModelDiscoveryService {
         throw new Error(`Ollama API returned ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data: unknown = await response.json();
       const models: ModelInfo[] = [];
 
-      if (data.models && Array.isArray(data.models)) {
-        for (const model of data.models) {
-          models.push({
-            name: model.name,
-            provider: 'ollama',
-            size: model.details?.parameter_size || model.size,
-            family: model.details?.family,
-            isAvailable: true,
-            lastChecked: new Date(),
-            metadata: {
-              parametersSize: model.details?.parameter_size,
-              quantization: model.details?.quantization_level,
-              createdAt: model.created_at ? new Date(model.created_at) : undefined,
-              modifiedAt: model.modified_at ? new Date(model.modified_at) : undefined,
-            },
-          });
+      if (
+        typeof data === 'object' &&
+        data !== null &&
+        'models' in data &&
+        Array.isArray((data as { models: unknown }).models)
+      ) {
+        for (const modelRaw of (data as { models: unknown[] }).models) {
+          if (typeof modelRaw === 'object' && modelRaw !== null && 'name' in modelRaw) {
+            const model = modelRaw as {
+              name: string;
+              size?: string;
+              details?: {
+                parameter_size?: string;
+                family?: string;
+                quantization_level?: string;
+              };
+              created_at?: string | number | Date;
+              modified_at?: string | number | Date;
+            };
+            models.push({
+              name: model.name,
+              provider: 'ollama',
+              size: model.details?.parameter_size ?? model.size,
+              family: model.details?.family,
+              isAvailable: true,
+              lastChecked: new Date(),
+              metadata: {
+                parametersSize: model.details?.parameter_size,
+                quantization: model.details?.quantization_level,
+                createdAt: model.created_at
+                  ? new Date(
+                      typeof model.created_at === 'string' || typeof model.created_at === 'number'
+                        ? model.created_at
+                        : Date.now()
+                    )
+                  : undefined,
+                modifiedAt: model.modified_at
+                  ? new Date(
+                      typeof model.modified_at === 'string' || typeof model.modified_at === 'number'
+                        ? model.modified_at
+                        : Date.now()
+                    )
+                  : undefined,
+              },
+            });
+          }
         }
       }
 
       return models;
-    } catch (error) {
-      logger.warn('Ollama not available or models not accessible:', error);
+    } catch (error: unknown) {
+      logger.warn('Ollama not available or models not accessible:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -189,27 +226,39 @@ export class ModelDiscoveryService {
         throw new Error(`LM Studio API returned ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const dataUnknown: unknown = await response.json();
       const models: ModelInfo[] = [];
 
-      if (data.data && Array.isArray(data.data)) {
-        for (const model of data.data) {
-          models.push({
-            name: model.id,
-            provider: 'lm-studio',
-            isAvailable: true,
-            lastChecked: new Date(),
-            capabilities: ['chat', 'completion'],
-            metadata: {
-              createdAt: model.created ? new Date(model.created * 1000) : undefined,
-            },
-          });
+      if (
+        typeof dataUnknown === 'object' &&
+        dataUnknown !== null &&
+        'data' in dataUnknown &&
+        Array.isArray((dataUnknown as { data: unknown }).data)
+      ) {
+        const dataArr = (dataUnknown as { data: unknown[] }).data;
+        for (const modelRaw of dataArr) {
+          if (typeof modelRaw === 'object' && modelRaw !== null && 'id' in modelRaw) {
+            const model = modelRaw as { id: string; created?: number };
+            models.push({
+              name: model.id,
+              provider: 'lm-studio',
+              isAvailable: true,
+              lastChecked: new Date(),
+              capabilities: ['chat', 'completion'],
+              metadata: {
+                createdAt:
+                  typeof model.created === 'number' ? new Date(model.created * 1000) : undefined,
+              },
+            });
+          }
         }
       }
 
       return models;
-    } catch (error) {
-      logger.warn('LM Studio not available or models not accessible:', error);
+    } catch (error: unknown) {
+      logger.warn('LM Studio not available or models not accessible:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -256,19 +305,26 @@ export class ModelDiscoveryService {
             }))
           );
         } catch (searchError) {
-          logger.debug(`HF search failed for query "${searchQuery.query}":`, searchError);
+          logger.debug(`HF search failed for query "${searchQuery.query}":`, {
+            error: searchError instanceof Error ? searchError.message : String(searchError),
+          });
         }
       }
 
       // Remove duplicates and limit results
       const uniqueModels = allModels
-        .filter((model, index, self) => index === self.findIndex(m => m.name === model.name))
+        .filter(
+          (model: Readonly<ModelInfo>, index: number, self: ReadonlyArray<Readonly<ModelInfo>>) =>
+            index === self.findIndex((m: Readonly<ModelInfo>) => m.name === model.name)
+        )
         .slice(0, 20);
 
       logger.info(`Discovered ${uniqueModels.length} HuggingFace models dynamically`);
       return uniqueModels;
     } catch (error) {
-      logger.warn('Dynamic HuggingFace discovery failed, using fallback models:', error);
+      logger.warn('Dynamic HuggingFace discovery failed, using fallback models:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       // Fallback to curated list if API fails
       return [
@@ -424,7 +480,7 @@ export class ModelDiscoveryService {
   /**
    * Get cache statistics
    */
-  getCacheStats(): {
+  public getCacheStats(): {
     totalCachedProviders: number;
     totalCachedModels: number;
     cacheStatus: Array<{
@@ -434,17 +490,19 @@ export class ModelDiscoveryService {
       isValid: boolean;
     }>;
   } {
-    const cacheStatus = Array.from(this.modelCache.entries()).map(([provider, models]) => ({
-      provider,
-      modelCount: models.length,
-      expiresIn: Math.max(0, (this.cacheExpiry.get(provider) || 0) - Date.now()),
-      isValid: this.isValidCache(provider),
-    }));
+    const cacheStatus = Array.from(this.modelCache.entries()).map(
+      ([provider, models]: readonly [ProviderType, readonly ModelInfo[]]) => ({
+        provider,
+        modelCount: models.length,
+        expiresIn: Math.max(0, (this.cacheExpiry.get(provider) ?? 0) - Date.now()),
+        isValid: this.isValidCache(provider),
+      })
+    );
 
     return {
       totalCachedProviders: this.modelCache.size,
       totalCachedModels: Array.from(this.modelCache.values()).reduce(
-        (total, models) => total + models.length,
+        (total: number, models: readonly ModelInfo[]) => total + models.length,
         0
       ),
       cacheStatus,

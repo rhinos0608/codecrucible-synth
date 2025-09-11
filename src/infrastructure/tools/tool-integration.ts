@@ -6,6 +6,10 @@
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { FilesystemTools } from './filesystem-tools.js';
 import type { RustExecutionBackend as RealRustExecutionBackend } from '../execution/rust-executor/rust-execution-backend.js';
+import {
+  ToolExecutionContext,
+  ToolExecutionResult,
+} from '../../domain/interfaces/tool-execution.js';
 
 export interface LLMFunction {
   type: 'function';
@@ -31,25 +35,12 @@ export interface ToolCall {
 // Use the real RustExecutionBackend type for type safety
 export type RustExecutionBackend = Readonly<RealRustExecutionBackend>;
 
-// Define types for tool arguments and execution results
-export interface ToolExecutionContext {
-  startTime: number;
-  userId: string;
-  requestId: string;
-  environment: string;
-}
-
-export interface ToolExecutionResult {
-  success: boolean;
-  metadata?: {
-    executionTime?: number;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
-
 export interface ToolDefinition<TArgs = Record<string, unknown>, TResult = ToolExecutionResult> {
   id: string;
+  // Some tool providers also expose a human/callable name distinct from id (e.g., filesystem_read_file)
+  // We keep it optional to avoid breaking existing implementers.
+  // When present, we will expose this as the LLM-facing function name and also register it for lookup.
+  name?: string;
   description: string;
   inputSchema: {
     properties: Record<string, unknown>;
@@ -72,41 +63,41 @@ export class ToolIntegration {
     this.filesystemTools = new FilesystemTools();
   }
 
-/**
- * Ensures that tools are initialized before use.
- */
-private async ensureInitialized(): Promise<void> {
-  if (!this.isInitialized) {
-    await this.initializeTools();
+  /**
+   * Ensures that tools are initialized before use.
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (!this.isInitialized) {
+      await this.initializeTools();
+    }
   }
-}
 
-/**
- * Allows setting or updating the Rust backend after construction.
- */
-public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
-  this.rustBackend = backend;
-  if (typeof this.filesystemTools.setRustBackend === 'function') {
-    // Cast to the correct type for FilesystemTools
-    this.filesystemTools.setRustBackend(backend as RealRustExecutionBackend);
-    this.logger.info('Rust backend updated via setRustBackend');
+  /**
+   * Allows setting or updating the Rust backend after construction.
+   */
+  public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
+    this.rustBackend = backend;
+    if (typeof this.filesystemTools.setRustBackend === 'function') {
+      // Cast to the correct type for FilesystemTools
+      this.filesystemTools.setRustBackend(backend as RealRustExecutionBackend);
+      this.logger.info('Rust backend updated via setRustBackend');
+    }
   }
-}
-/* Duplicate constructor removed; logic merged into the main constructor above */
+  /* Duplicate constructor removed; logic merged into the main constructor above */
 
   private async initializeTools(): Promise<void> {
-    await Promise.resolve();
     try {
       // Initialize filesystem tools with proper backend delegation
+
+      // Always wire the MCP manager for fallback operations
+      this.filesystemTools.setMCPManager(this.mcpManager);
+      this.logger.info('MCP manager attached to filesystem tools');
+
       // If an injected rustBackend exists, attach it to filesystem tools
-      if (this.rustBackend !== null) {
+      if (this.rustBackend) {
         try {
-          if (this.rustBackend) {
-            this.filesystemTools.setRustBackend(this.rustBackend as RealRustExecutionBackend);
-            this.logger.info('Injected Rust execution backend attached to filesystem tools');
-          } else {
-            this.logger.warn('Provided rustBackend is null or undefined');
-          }
+          this.filesystemTools.setRustBackend(this.rustBackend as RealRustExecutionBackend);
+          this.logger.info('Injected Rust execution backend attached to filesystem tools');
         } catch (error) {
           this.logger.warn('Failed to attach injected Rust backend to filesystem tools', error);
         }
@@ -114,17 +105,51 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
       const fsTools = this.filesystemTools.getTools();
       for (const tool of fsTools) {
         if (tool?.id) {
-          // Ensure inputSchema has 'properties' (and optionally 'required')
-          const inputSchema = tool.inputSchema as { properties: Record<string, unknown>; required?: string[] } | undefined;
-          const safeTool = {
-            ...tool,
+          // Normalize input schema
+          const inputSchema = tool.inputSchema as
+            | { properties: Record<string, unknown>; required?: string[] }
+            | undefined;
+          const safeTool: ToolDefinition = {
+            id: tool.id,
+            // Preserve a callable name when provided by the underlying tool (e.g., filesystem_read_file)
+            name: (tool as unknown as { name?: string })?.name,
+            description: tool.description,
             inputSchema: {
               properties: inputSchema?.properties ?? {},
               required: inputSchema?.required ?? [],
             },
+            execute: tool.execute as ToolDefinition['execute'],
           };
-          this.availableTools.set(tool.id, safeTool);
+          // Register under both id and name to align LLM function names and executor lookup
+          this.availableTools.set(safeTool.id, safeTool);
+          if (safeTool.name && safeTool.name !== safeTool.id) {
+            this.availableTools.set(safeTool.name, safeTool);
+          }
         }
+      }
+
+      // Register core tool suite (bash, file, grep, glob, agent)
+      try {
+        const { CoreToolSuite } = await import('./core-tools.js');
+        const coreTools = new CoreToolSuite().getTools();
+        for (const tool of coreTools) {
+          if (!tool?.id) continue;
+          const inputSchema = tool.inputSchema as { properties: Record<string, unknown>; required?: string[] } | undefined;
+          const safeTool: ToolDefinition = {
+            id: tool.id,
+            name: (tool as unknown as { name?: string }).name ?? tool.id,
+            description: tool.description,
+            inputSchema: {
+              properties: inputSchema?.properties ?? {},
+              required: inputSchema?.required ?? [],
+            },
+            execute: tool.execute as ToolDefinition['execute'],
+          };
+          this.availableTools.set(safeTool.id, safeTool);
+          this.availableTools.set(safeTool.name!, safeTool);
+        }
+      } catch (err) {
+        this.logger.warn('Failed to load CoreToolSuite', err);
       }
 
       this.isInitialized = true;
@@ -133,8 +158,9 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
       );
     } catch (error) {
       this.logger.error('Failed to initialize tools:', error);
-      // Don't throw - allow system to continue without tools
-      this.isInitialized = true; // Mark as initialized to prevent retry loops
+      throw new Error(
+        `Tool initialization failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   /**
@@ -143,13 +169,18 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
   public async getLLMFunctions(): Promise<LLMFunction[]> {
     await this.ensureInitialized();
 
+    const seen = new Set<string>();
     const functions: LLMFunction[] = [];
 
     for (const tool of this.availableTools.values()) {
+      // Prefer the callable name when available (e.g., filesystem_read_file); fallback to id
+      const callable = (tool as { name?: string }).name || tool.id;
+      if (seen.has(callable)) continue;
+      seen.add(callable);
       functions.push({
         type: 'function',
         function: {
-          name: tool.id,
+          name: callable,
           description: tool.description,
           parameters: {
             type: 'object',
@@ -199,24 +230,70 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
 
     try {
       const functionName = toolCall.function.name;
-      const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+      // Parse args robustly
+      const rawArgs = toolCall.function.arguments;
+      let args: Record<string, unknown> = {};
+      if (typeof rawArgs === 'string') {
+        try {
+          args = rawArgs ? JSON.parse(rawArgs) : {};
+        } catch {
+          args = { $raw: rawArgs };
+        }
+      } else if (rawArgs && typeof rawArgs === 'object') {
+        args = rawArgs as Record<string, unknown>;
+      }
 
-      this.logger.info(`Executing tool: ${functionName} with args:`, args);
+      this.logger.info(`Executing tool (MCP preferred): ${functionName} with args:`, args);
 
-      const tool = this.availableTools.get(functionName);
+      // Preferred path: JSON-RPC 2.0 through MCP manager
+      try {
+        const mcpResult = await this.mcpManager.executeTool(
+          functionName,
+          args,
+          {
+            sessionId: `tool_${Date.now()}`,
+            toolName: functionName,
+            executionMode: 'sync',
+          } as unknown as ToolExecutionContext
+        );
+        if (mcpResult && typeof mcpResult === 'object' && 'success' in mcpResult) {
+          return mcpResult as ToolExecutionResult;
+        }
+      } catch (mcpError) {
+        this.logger.warn('MCP tool execution failed; falling back to internal handlers', mcpError);
+      }
+
+      // Lookup by callable name first, then by id fallback
+      let tool = this.availableTools.get(functionName);
+      if (!tool) {
+        // Heuristic fallback: try common id variants
+        const variants = [
+          functionName,
+          functionName.toLowerCase(),
+          functionName.replace(/_file$/, ''),
+          functionName.replace(/^mcp_/, ''),
+        ];
+        for (const v of variants) {
+          tool = this.availableTools.get(v);
+          if (tool) break;
+        }
+      }
+
       if (!tool) {
         const availableTools = Array.from(this.availableTools.keys());
         throw new Error(
-          `Unknown tool: ${functionName}. Available tools: ${availableTools.join(', ')}`
+          `Unknown tool: ${functionName}. Available tools: ${availableTools.slice(0, 20).join(', ')}...`
         );
       }
 
       const context: ToolExecutionContext = {
-        startTime: Date.now(),
         userId: 'system',
+        sessionId: `session_${Date.now()}`,
         requestId: `tool_${Date.now()}`,
-        environment: 'development',
-      };
+        environment: { NODE_ENV: 'development' },
+        toolName: functionName,
+        executionMode: 'sync',
+      } as unknown as ToolExecutionContext;
 
       const result: ToolExecutionResult = await tool.execute(args, context);
 
@@ -237,7 +314,11 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
    */
   public async getAvailableToolNames(): Promise<string[]> {
     await this.ensureInitialized();
-    return Array.from(this.availableTools.keys());
+    const names = new Set<string>();
+    for (const t of this.availableTools.values()) {
+      names.add((t as unknown as { name?: string }).name || t.id);
+    }
+    return Array.from(names);
   }
 
   /**
@@ -247,7 +328,11 @@ public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
     if (!this.isInitialized) {
       return [];
     }
-    return Array.from(this.availableTools.keys());
+    const names = new Set<string>();
+    for (const t of this.availableTools.values()) {
+      names.add((t as unknown as { name?: string }).name || t.id);
+    }
+    return Array.from(names);
   }
 
   /**
@@ -281,12 +366,17 @@ export function setGlobalToolIntegrationRustBackend(backend: RustExecutionBacken
   if (globalToolIntegration) {
     try {
       // Attach if method exists
-      if (typeof (globalToolIntegration as unknown as { setRustBackend?: (b: RustExecutionBackend) => void }).setRustBackend === 'function') {
-        (globalToolIntegration as unknown as { setRustBackend: (b: RustExecutionBackend) => void }).setRustBackend(backend);
+      if (
+        typeof (
+          globalToolIntegration as unknown as { setRustBackend?: (b: RustExecutionBackend) => void }
+        ).setRustBackend === 'function'
+      ) {
+        (
+          globalToolIntegration as unknown as { setRustBackend: (b: RustExecutionBackend) => void }
+        ).setRustBackend(backend);
       }
     } catch (e) {
       // ignore
     }
   }
 }
-

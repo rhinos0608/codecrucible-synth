@@ -18,6 +18,7 @@ import {
   WorkflowRequest,
 } from '../../domain/interfaces/workflow-orchestrator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 interface FileInfo {
   path: string;
@@ -114,7 +115,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
       };
     } catch (error) {
       const duration = performance.now() - startTime;
-      logger.error('Directory analysis failed:', error);
+      logger.error('Directory analysis failed', toErrorOrUndefined(error));
 
       return {
         success: false,
@@ -133,10 +134,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
     }
   }
 
-  private scanDirectory(
-    directoryPath: string,
-    maxDepth: number
-  ): DirectoryStructure {
+  private scanDirectory(directoryPath: string, maxDepth: number): DirectoryStructure {
     const files: FileInfo[] = [];
     const dependencies = new Set<string>();
 
@@ -168,7 +166,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
           }
         }
       } catch (error) {
-        logger.warn(`Failed to scan directory ${currentPath}:`, error);
+        logger.warn(`Failed to scan directory ${currentPath}`, { error: toReadonlyRecord(error) });
       }
     };
 
@@ -339,7 +337,10 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
       const fileName = basename(filePath).toLowerCase();
 
       if (fileName === 'package.json') {
-        const packageJson = JSON.parse(content) as { dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
+        const packageJson = JSON.parse(content) as {
+          dependencies?: Record<string, unknown>;
+          devDependencies?: Record<string, unknown>;
+        };
         if (packageJson && typeof packageJson === 'object') {
           if (packageJson.dependencies && typeof packageJson.dependencies === 'object') {
             dependencies.push(...Object.keys(packageJson.dependencies));

@@ -45,7 +45,10 @@ export abstract class BaseTool implements ITool {
     context: Readonly<ToolExecutionContext>
   ): Promise<ToolExecutionResult>;
 
-  public validateArguments(args: Readonly<Record<string, unknown>>): { valid: boolean; errors?: string[] } {
+  public validateArguments(args: Readonly<Record<string, unknown>>): {
+    valid: boolean;
+    errors?: string[];
+  } {
     const errors: string[] = [];
 
     // Check required parameters
@@ -90,8 +93,9 @@ export abstract class BaseTool implements ITool {
 
     // Check permissions
     return this.definition.permissions.every((permission: { type: string; resource: string }) =>
-      context.permissions.some((contextPerm: { type: string; resource: string }) =>
-        contextPerm.type === permission.type && contextPerm.resource === permission.resource
+      context.permissions.some(
+        (contextPerm: { type: string; resource: string }) =>
+          contextPerm.type === permission.type && contextPerm.resource === permission.resource
       )
     );
   }
@@ -125,7 +129,11 @@ export abstract class BaseTool implements ITool {
     return `tool_${name.toLowerCase().replace(/\s+/g, '_')}`;
   }
 
-  private validateParameter(paramName: string, value: unknown, paramDef: Readonly<ParameterDefinition>): string | null {
+  private validateParameter(
+    paramName: string,
+    value: unknown,
+    paramDef: Readonly<ParameterDefinition>
+  ): string | null {
     // Type validation
     if (paramDef.type === 'string' && typeof value !== 'string') {
       return `Parameter ${paramName} must be a string`;
@@ -179,10 +187,12 @@ interface ParameterDefinition {
  */
 export interface ToolDecorator {
   name: string;
-  preProcess?: ((
-    args: Record<string, unknown>,
-    context: ToolExecutionContext
-  ) => Promise<Record<string, unknown>>) | undefined;
+  preProcess?:
+    | ((
+        args: Record<string, unknown>,
+        context: ToolExecutionContext
+      ) => Promise<Record<string, unknown>>)
+    | undefined;
   postProcess: (
     result: ToolExecutionResult,
     args: Record<string, unknown>,
@@ -213,7 +223,9 @@ export class SecurityDecorator implements ToolDecorator {
           timestamp: new Date(),
           operationType: 'input',
           environment: 'sandbox',
-          permissions: (context.permissions as readonly { type: string }[]).map((p: { type: string }) => p.type),
+          permissions: (context.permissions as readonly { type: string }[]).map(
+            (p: { type: string }) => p.type
+          ),
         });
 
         if (!validation.isValid) {
@@ -228,9 +240,9 @@ export class SecurityDecorator implements ToolDecorator {
   }
 
   public async postProcess(
-    result: Readonly<ToolExecutionResult>,
-    _args: Readonly<Record<string, unknown>>,
-    _context: Readonly<ToolExecutionContext>
+    result: ToolExecutionResult,
+    _args: Record<string, unknown>,
+    _context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
     // Sanitize output if needed
     if (typeof result.result === 'string') {
@@ -407,21 +419,31 @@ export class LoggingDecorator implements ToolDecorator {
 }
 
 /**
- * Retry decorator that retries failed tool executions
+ * Enhanced RetryDecorator
+ *
+ * Reworked to accept a reexecute function that performs the actual tool invocation
+ * (usually the underlying tool's execute method without decorators). This
+ * prevents retry loops (re-applying the retry decorator) and lets the
+ * executor supply the correct execution implementation.
  */
 export class RetryDecorator implements ToolDecorator {
   public readonly name = 'retry';
 
+  // Optional reexecute callback: (args, context) => Promise<ToolExecutionResult>
   public constructor(
     private readonly maxRetries: number = 3,
     private readonly backoffMs: number = 1000,
-    private readonly backoffMultiplier: number = 2
+    private readonly backoffMultiplier: number = 2,
+    private readonly reexecute?: (
+      args: Record<string, unknown>,
+      context: ToolExecutionContext
+    ) => Promise<ToolExecutionResult>
   ) {}
 
   public async postProcess(
     result: Readonly<ToolExecutionResult>,
-    _args: Readonly<Record<string, unknown>>,
-    _context: Readonly<ToolExecutionContext>
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<ToolExecutionResult> {
     if (result.success) {
       return result;
@@ -432,34 +454,72 @@ export class RetryDecorator implements ToolDecorator {
       return result;
     }
 
-    let lastResult = result;
+    // Prefer an explicitly provided reexecute function, else try to use one from context.metadata
+    const reexecutor =
+      this.reexecute ??
+      (context.metadata &&
+        (context.metadata.reexecute as
+          | ((a: Record<string, unknown>, c: ToolExecutionContext) => Promise<ToolExecutionResult>)
+          | undefined));
+
+    if (!reexecutor) {
+      // If we cannot reexecute, return original result
+      return result;
+    }
+
+    let lastResult: ToolExecutionResult = result;
     let delay = this.backoffMs;
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-      // Note: logger not available in decorator context, would need to be injected
-      // this.logger.info(`Retrying tool execution, attempt ${attempt}/${this.maxRetries}`);
-
-      // Wait before retry
-      await this.delay(delay);
-      delay *= this.backoffMultiplier;
-
       try {
-        // Re-execute the tool (this is a bit tricky since we don't have access to the execute method here)
-        // In a real implementation, we'd need to restructure this to work with the executor
-        // Note: logger not available in decorator context, would need to be injected
-        // this.logger.info(`Retry attempt ${attempt} - would re-execute here`);
+        // Wait before retry (exponential backoff)
+        await this.delay(delay);
+        delay *= this.backoffMultiplier;
+
+        const retryResult = await reexecutor(
+          args as Record<string, unknown>,
+          context as ToolExecutionContext
+        );
+
+        // If successful, return immediately (attach retry metadata)
+        if (retryResult.success) {
+          return {
+            ...retryResult,
+            metadata: {
+              ...retryResult.metadata,
+              retry: {
+                attempts: attempt,
+                backoffMs: delay / this.backoffMultiplier,
+              },
+            },
+          };
+        }
+
+        // Otherwise preserve the last failure and continue
+        lastResult = {
+          ...retryResult,
+          metadata: {
+            ...retryResult.metadata,
+            retryAttempt: attempt,
+          },
+        };
       } catch (error) {
         lastResult = {
           success: false,
           error: {
             code: 'retry_failed',
-            message: `Retry attempt ${attempt} failed: ${error}`,
+            message: error instanceof Error ? error.message : String(error),
           },
           executionTimeMs: 0,
+          metadata: {
+            ...(lastResult.metadata ?? {}),
+            retryAttempt: attempt,
+          },
         };
       }
     }
 
+    // Return the last observed result after exhausting retries
     return lastResult;
   }
 
@@ -472,6 +532,8 @@ export class RetryDecorator implements ToolDecorator {
       'temporary_failure',
       'rate_limited',
       'service_unavailable',
+      'transient_error',
+      'connection_reset',
     ];
 
     return retryableErrors.includes(error.code);
@@ -487,28 +549,54 @@ export class RetryDecorator implements ToolDecorator {
  */
 export class PerformanceDecorator implements ToolDecorator {
   public readonly name = 'performance';
-  private readonly metrics = new Map<string, { count: number; totalTime: number; errors: number }>();
+  private readonly metrics = new Map<
+    string,
+    { count: number; totalTime: number; errors: number }
+  >();
 
   public async preProcess(
-    args: Record<string, unknown>,
-    context: ToolExecutionContext
+    args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<Record<string, unknown>> {
     // Record start time
-    context.metadata = context.metadata || {};
-    context.metadata.startTime = Date.now();
-    return args;
+    // Cast to mutable context so we can write metadata safely; the incoming type is Readonly.
+    const mutableCtx = context as ToolExecutionContext;
+
+    if (!mutableCtx.metadata) {
+      mutableCtx.metadata = {};
+    }
+
+    // Strongly type metadata to avoid 'any' and unsafe member access
+    const metadata = mutableCtx.metadata as Record<string, unknown> & {
+      startTime?: number;
+      toolId?: string;
+    };
+
+    metadata.startTime = Date.now();
+
+    return args as Record<string, unknown>;
   }
 
   public async postProcess(
-    result: ToolExecutionResult,
-    args: Record<string, unknown>,
-    context: ToolExecutionContext
+    result: Readonly<ToolExecutionResult>,
+    _args: Readonly<Record<string, unknown>>,
+    context: Readonly<ToolExecutionContext>
   ): Promise<ToolExecutionResult> {
-    const executionTime = Date.now() - (Number(context.metadata?.startTime) || 0);
-    const toolId = 'unknown'; // Would need access to tool ID
+    const mutableCtx = context as ToolExecutionContext;
+
+    const metadata = (mutableCtx.metadata ?? {}) as Record<string, unknown> & {
+      startTime?: number;
+      toolId?: string;
+    };
+
+    const startTime = Number(metadata.startTime ?? 0);
+    const executionTime = Date.now() - startTime;
+
+    // Safely extract toolId from metadata with a string fallback
+    const toolId = typeof metadata.toolId === 'string' ? metadata.toolId : 'unknown';
 
     // Update metrics
-    const current = this.metrics.get(toolId) || { count: 0, totalTime: 0, errors: 0 };
+    const current = this.metrics.get(toolId) ?? { count: 0, totalTime: 0, errors: 0 };
     current.count++;
     current.totalTime += executionTime;
     if (!result.success) {
@@ -557,11 +645,14 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
     this.tools.set(tool.definition.id, tool);
 
     // Update category index
-    const category = tool.definition.category;
+    const { category } = tool.definition;
     if (!this.categories.has(category)) {
       this.categories.set(category, new Set());
     }
-    this.categories.get(category)!.add(tool.definition.id);
+    const categorySet = this.categories.get(category);
+    if (categorySet) {
+      categorySet.add(tool.definition.id);
+    }
 
     this.emit('toolRegistered', { tool: tool.definition });
     this.logger.info(`Tool registered: ${tool.definition.name} (${tool.definition.id})`);
@@ -604,7 +695,7 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
     this.tools.delete(id);
 
     // Remove from category index
-    const category = tool.definition.category;
+    const { category } = tool.definition;
     const categoryTools = this.categories.get(category);
     if (categoryTools) {
       categoryTools.delete(id);
@@ -722,6 +813,11 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
       // Apply decorators and execute
       const decoratedTool = this.applyDecorators(tool, request);
 
+      // Ensure context.metadata exists and surface some helpful metadata for decorators
+      request.context.metadata = request.context.metadata || {};
+      // Provide toolId in metadata so decorators (performance, etc.) can access it
+      request.context.metadata.toolId = tool.definition.id;
+
       try {
         const result = await decoratedTool.execute(request.arguments, request.context);
         return {
@@ -753,7 +849,9 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
     }
   }
 
-  public async executeSequence(requests: readonly ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
+  public async executeSequence(
+    requests: readonly ToolExecutionRequest[]
+  ): Promise<ToolExecutionResult[]> {
     const results: ToolExecutionResult[] = [];
 
     for (const request of requests) {
@@ -769,19 +867,23 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
     return results;
   }
 
-  public async executeParallel(requests: readonly ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
-    const promises = requests.map(async (request): Promise<ToolExecutionResult> => this.execute(request));
+  public async executeParallel(
+    requests: readonly ToolExecutionRequest[]
+  ): Promise<ToolExecutionResult[]> {
+    const promises = requests.map(
+      async (request): Promise<ToolExecutionResult> => this.execute(request)
+    );
     return Promise.all(promises);
   }
 
   private applyDecorators(tool: ITool, request: ToolExecutionRequest): ITool {
-    // Create a copy of the tool with decorators applied
+    // Create a shallow copy of the tool object so we can attach decorators without mutating registry
     const decoratedTool: ITool = Object.create(tool) as ITool;
 
     // Apply standard decorators based on context
     const decorators: ToolDecorator[] = [];
 
-    // Always apply logging
+    // Always apply logging (inject executor event bus if available)
     decorators.push(new LoggingDecorator(undefined, this.eventBus));
 
     // Apply security if validator is available
@@ -799,7 +901,30 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
 
     // Apply retry for network operations
     if (this.isNetworkOperation(request)) {
-      decorators.push(new RetryDecorator(3, 1000));
+      // Provide a reexecute function that invokes the underlying tool implementation directly
+      // This bypasses decorators (including retry) to avoid recursive retry loops.
+      const reexecute = async (
+        args: Record<string, unknown>,
+        ctx: ToolExecutionContext
+      ): Promise<ToolExecutionResult> => {
+        try {
+          // Call the raw tool implementation (not decorated). We intentionally pass the original context.
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore - tool.execute exists on concrete tool implementations
+          return await tool.execute(args, ctx);
+        } catch (e) {
+          return {
+            success: false,
+            error: {
+              code: isErrorWithCode(e) ? e.code : 'execution_error',
+              message: e instanceof Error ? e.message : String(e),
+            },
+            executionTimeMs: 0,
+          };
+        }
+      };
+
+      decorators.push(new RetryDecorator(3, 1000, 2, reexecute));
     }
 
     // Add decorators to tool if the implementation supports it
@@ -808,6 +933,25 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
         decoratedTool.addDecorator(decorator);
       }
     });
+
+    // Also surface a reexecute function in context.metadata for decorators that may prefer it
+    request.context.metadata = request.context.metadata ?? {};
+    // Attach a reexecute callback that calls the underlying tool implementation (used by RetryDecorator fallback)
+    (
+      request.context.metadata as {
+        reexecute?: (
+          args: Readonly<Record<string, unknown>>,
+          ctx: Readonly<ToolExecutionContext>
+        ) => Promise<ToolExecutionResult>;
+      }
+    ).reexecute = async (
+      args: Readonly<Record<string, unknown>>,
+      ctx: Readonly<ToolExecutionContext>
+    ): Promise<ToolExecutionResult> => {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - calling underlying tool implementation directly
+      return tool.execute(args, ctx);
+    };
 
     return decoratedTool;
   }
@@ -834,4 +978,13 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
 
     return networkPatterns.some(pattern => request.toolId.toLowerCase().includes(pattern));
   }
+}
+
+function isErrorWithCode(e: unknown): e is { code: string } {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    'code' in e &&
+    typeof (e as Record<string, unknown>).code === 'string'
+  );
 }

@@ -12,14 +12,14 @@ import {
   RoutingContext,
   IntelligentRoutingDecision,
   RoutingPreferences,
-} from '../../../src/core/routing/intelligent-routing-coordinator.js';
+} from '../../../src/application/routing/intelligent-routing-coordinator.js';
 
 // Mock dependencies
 import { ProcessingRequest } from '../../../src/domain/entities/request.js';
 import { IModelSelectionService } from '../../../src/domain/services/model-selection-service.js';
 import { IVoiceOrchestrationService } from '../../../src/domain/services/voice-orchestration-service.js';
-import { IProviderSelectionStrategy } from '../../../src/core/providers/provider-selection-strategy.js';
-import { HybridLLMRouter } from '../../../src/core/hybrid/hybrid-llm-router.js';
+import { IProviderSelectionStrategy } from '../../../src/providers/provider-selection-strategy.js';
+import { HybridLLMRouter } from '../../../src/providers/hybrid/hybrid-llm-router.js';
 import { PerformanceMonitor } from '../../../src/utils/performance.js';
 
 describe('IntelligentRoutingCoordinator', () => {

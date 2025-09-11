@@ -94,7 +94,7 @@ export class SecurityValidator {
     'worker_threads',
   ]);
 
-  async validateCode(request: CodeValidationRequest): Promise<SecurityValidationResult> {
+  public validateCode(request: Readonly<CodeValidationRequest>): SecurityValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
     let riskLevel: SecurityValidationResult['riskLevel'] = 'low';
@@ -125,7 +125,7 @@ export class SecurityValidator {
     };
   }
 
-  async validateEnvironment(environment: string): Promise<SecurityValidationResult> {
+  public validateEnvironment(environment: Readonly<string>): SecurityValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
     let riskLevel: SecurityValidationResult['riskLevel'] = 'low';
@@ -156,7 +156,10 @@ export class SecurityValidator {
     };
   }
 
-  async validateApiAccess(api: string, context?: Record<string, any>): Promise<boolean> {
+  public validateApiAccess(
+    api: Readonly<string>,
+    context?: Readonly<Record<string, unknown>>
+  ): boolean {
     // Check against blocked APIs
     if (this.blockedApis.has(api)) {
       return false;
@@ -178,7 +181,10 @@ export class SecurityValidator {
     }
 
     // Additional context-based validation
-    if (context?.riskLevel === 'high' || context?.riskLevel === 'critical') {
+    if (
+      (context && (context as { riskLevel?: string }).riskLevel === 'high') ||
+      (context as { riskLevel?: string }).riskLevel === 'critical'
+    ) {
       return false;
     }
 

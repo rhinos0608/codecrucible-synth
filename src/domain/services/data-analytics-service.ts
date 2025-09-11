@@ -185,9 +185,7 @@ export class DataAnalyticsService {
     }>
   ): CodeAnalysisInsights {
     const totalAnalyses = analyses.length;
-    const averageQualityScore = this.calculateMean(
-      analyses.map(a => a.qualityScore)
-    );
+    const averageQualityScore = this.calculateMean(analyses.map(a => a.qualityScore));
 
     // Analysis type distribution
     const analysisTypeDistribution = this.calculateDistribution(analyses, a => a.analysisType);
@@ -269,21 +267,25 @@ export class DataAnalyticsService {
     recommendations.push(...this.generateDatabaseOptimizationRecommendations(dbAnalytics));
 
     // Sort by impact and priority
-    return recommendations.sort((a: Readonly<OptimizationRecommendation>, b: Readonly<OptimizationRecommendation>) => {
-      const impactOrder = { high: 3, medium: 2, low: 1 };
-      return impactOrder[b.impact] - impactOrder[a.impact];
-    });
+    return recommendations.sort(
+      (a: Readonly<OptimizationRecommendation>, b: Readonly<OptimizationRecommendation>) => {
+        const impactOrder = { high: 3, medium: 2, low: 1 };
+        return impactOrder[b.impact] - impactOrder[a.impact];
+      }
+    );
   }
 
   // Private helper methods for voice analysis
 
   private analyzeVoicePerformance(
-    interactions: ReadonlyArray<Readonly<{
-      voiceName: string;
-      confidence: number;
-      tokensUsed: number;
-      responseTime?: number;
-    }>>
+    interactions: ReadonlyArray<
+      Readonly<{
+        voiceName: string;
+        confidence: number;
+        tokensUsed: number;
+        responseTime?: number;
+      }>
+    >
   ): Map<string, VoicePerformanceMetrics> {
     const voiceGroups = this.groupBy(interactions, i => i.voiceName);
     const performanceMap = new Map<string, VoicePerformanceMetrics>();
@@ -293,7 +295,9 @@ export class DataAnalyticsService {
       const averageConfidence = this.calculateMean(voiceInteractions.map(i => i.confidence));
       const averageLatency = this.calculateMean(
         voiceInteractions
-          .filter((i): i is typeof i & { responseTime: number } => typeof i.responseTime === 'number')
+          .filter(
+            (i): i is typeof i & { responseTime: number } => typeof i.responseTime === 'number'
+          )
           .map(i => i.responseTime)
       );
       const successRate = voiceInteractions.filter(i => i.confidence > 0.7).length / totalUsage;
@@ -417,23 +421,30 @@ export class DataAnalyticsService {
       readonly createdAt: Date;
     }>
   ): ProjectInsight[] {
-    const projectGroups = this.groupBy(analyses, (a: Readonly<{
-      readonly projectId: number;
-      readonly filePath: string;
-      readonly qualityScore: number;
-      readonly createdAt: Date;
-    }>) => a.projectId);
+    const projectGroups = this.groupBy(
+      analyses,
+      (
+        a: Readonly<{
+          readonly projectId: number;
+          readonly filePath: string;
+          readonly qualityScore: number;
+          readonly createdAt: Date;
+        }>
+      ) => a.projectId
+    );
     const insights: ProjectInsight[] = [];
 
     for (const [projectId, projectAnalyses] of projectGroups) {
       const totalAnalyses = projectAnalyses.length;
       const averageQuality = this.calculateMean(
-        (projectAnalyses as ReadonlyArray<{
-          readonly projectId: number;
-          readonly filePath: string;
-          readonly qualityScore: number;
-          readonly createdAt: Date;
-        }>).map(a => a.qualityScore)
+        (
+          projectAnalyses as ReadonlyArray<{
+            readonly projectId: number;
+            readonly filePath: string;
+            readonly qualityScore: number;
+            readonly createdAt: Date;
+          }>
+        ).map(a => a.qualityScore)
       );
 
       const fileFrequency = this.calculateDistribution(
@@ -453,8 +464,18 @@ export class DataAnalyticsService {
       // Calculate quality improvement over time (simplified)
       const sortedAnalyses = Array.from(projectAnalyses).sort(
         (
-          a: { readonly projectId: number; readonly filePath: string; readonly qualityScore: number; readonly createdAt: Date },
-          b: { readonly projectId: number; readonly filePath: string; readonly qualityScore: number; readonly createdAt: Date }
+          a: {
+            readonly projectId: number;
+            readonly filePath: string;
+            readonly qualityScore: number;
+            readonly createdAt: Date;
+          },
+          b: {
+            readonly projectId: number;
+            readonly filePath: string;
+            readonly qualityScore: number;
+            readonly createdAt: Date;
+          }
         ) => a.createdAt.getTime() - b.createdAt.getTime()
       );
 
@@ -487,7 +508,9 @@ export class DataAnalyticsService {
     for (const [extension, fileAnalyses] of fileTypeGroups) {
       const analysisCount = fileAnalyses.length;
       const averageQuality = this.calculateMean(
-        (fileAnalyses as ReadonlyArray<Readonly<{ filePath: string; qualityScore: number }>>).map(a => a.qualityScore)
+        (fileAnalyses as ReadonlyArray<Readonly<{ filePath: string; qualityScore: number }>>).map(
+          a => a.qualityScore
+        )
       );
 
       analytics.push({
@@ -644,16 +667,18 @@ export class DataAnalyticsService {
   ): OptimizationRecommendation[] {
     const recommendations: OptimizationRecommendation[] = [];
 
-    (analytics.indexRecommendations as ReadonlyArray<IndexRecommendation>).forEach((indexRec: Readonly<IndexRecommendation>) => {
-      recommendations.push({
-        type: 'database-performance',
-        title: `Add Index to ${indexRec.tableName}`,
-        description: `Index on ${indexRec.columns.join(', ')} could improve performance by ${(indexRec.expectedImprovement * 100).toFixed(0)}%`,
-        impact: indexRec.priority,
-        effort: 'low',
-        estimatedImprovement: `${(indexRec.expectedImprovement * 100).toFixed(0)}% query performance improvement`,
-      });
-    });
+    (analytics.indexRecommendations as ReadonlyArray<IndexRecommendation>).forEach(
+      (indexRec: Readonly<IndexRecommendation>) => {
+        recommendations.push({
+          type: 'database-performance',
+          title: `Add Index to ${indexRec.tableName}`,
+          description: `Index on ${indexRec.columns.join(', ')} could improve performance by ${(indexRec.expectedImprovement * 100).toFixed(0)}%`,
+          impact: indexRec.priority,
+          effort: 'low',
+          estimatedImprovement: `${(indexRec.expectedImprovement * 100).toFixed(0)}% query performance improvement`,
+        });
+      }
+    );
 
     return recommendations;
   }
@@ -679,7 +704,10 @@ export class DataAnalyticsService {
     return map;
   }
 
-  private calculateDistribution<T>(array: ReadonlyArray<T>, keyFn: (item: T) => string): Map<string, number> {
+  private calculateDistribution<T>(
+    array: ReadonlyArray<T>,
+    keyFn: (item: T) => string
+  ): Map<string, number> {
     const distribution = new Map<string, number>();
     for (const item of array) {
       const key = keyFn(item);

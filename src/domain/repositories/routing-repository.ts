@@ -73,7 +73,10 @@ export interface ModelAvailabilityRepository {
   /**
    * Find model by name and provider
    */
-  findByNameAndProvider: (name: Readonly<string>, provider: Readonly<string>) => Promise<Model | null>;
+  findByNameAndProvider: (
+    name: Readonly<string>,
+    provider: Readonly<string>
+  ) => Promise<Model | null>;
 
   /**
    * Find all available models
@@ -120,7 +123,10 @@ export interface RoutingAnalyticsRepository {
   /**
    * Record routing outcome for learning
    */
-  recordRoutingOutcome: (decision: Readonly<RoutingDecision>, outcome: Readonly<RoutingOutcome>) => Promise<void>;
+  recordRoutingOutcome: (
+    decision: Readonly<RoutingDecision>,
+    outcome: Readonly<RoutingOutcome>
+  ) => Promise<void>;
 
   /**
    * Get routing success rates by model
@@ -312,7 +318,9 @@ export interface RoutingQueryRepository {
   /**
    * Find optimal model for specific criteria
    */
-  findOptimalModel: (criteria: Readonly<OptimalModelCriteria>) => Promise<OptimalModelRecommendation>;
+  findOptimalModel: (
+    criteria: Readonly<OptimalModelCriteria>
+  ) => Promise<OptimalModelRecommendation>;
 }
 
 export interface RoutingAnalyticsResult {

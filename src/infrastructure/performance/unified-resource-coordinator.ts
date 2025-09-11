@@ -15,6 +15,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface ResourceLimits {
   memory: {
@@ -283,7 +284,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
 
       return true;
     } catch (error) {
-      logger.error(`Error allocating resource for ${systemName}:`, error);
+      logger.error(`Error allocating resource for ${systemName}:`, toErrorOrUndefined(error));
       return false;
     }
   }
@@ -436,7 +437,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
 
       this.activeOperations.delete(operationId);
 
-      logger.error(`❌ Coordinated operation failed: ${operationId}`, error);
+      logger.error(`❌ Coordinated operation failed: ${operationId}`, toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -533,7 +534,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         queueSize: this.operationQueue.length,
       });
     } catch (error) {
-      logger.error('Resource coordination cycle error:', error);
+      logger.error('Resource coordination cycle error:', toErrorOrUndefined(error));
       this.emit('coordination-error', error);
     }
   }
@@ -685,7 +686,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         await op.callback();
         logger.info(`✅ Queued operation processed: ${op.id}`);
       } catch (error) {
-        logger.error(`❌ Queued operation failed: ${op.id}`, error);
+        logger.error(`❌ Queued operation failed: ${op.id}`, toErrorOrUndefined(error));
       }
     }
   }

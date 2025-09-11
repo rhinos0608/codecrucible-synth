@@ -1,5 +1,5 @@
-import { EventEmitter } from 'events';
-import { ResilientCLIWrapper } from '../../../infrastructure/resilience/resilient-cli-wrapper.js';
+import type { EventEmitter } from 'events';
+import type { ResilientCLIWrapper } from '../../../infrastructure/resilience/resilient-cli-wrapper.js';
 
 export class CLIResilienceManager {
   public constructor(private readonly wrapper: ResilientCLIWrapper) {}

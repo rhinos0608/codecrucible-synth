@@ -73,7 +73,9 @@ export class MultiVoiceSynthesisUseCase {
     private readonly modelSelectionService: IModelSelectionService
   ) {}
 
-  public async execute(input: Readonly<MultiVoiceSynthesisInput>): Promise<MultiVoiceSynthesisOutput> {
+  public async execute(
+    input: Readonly<MultiVoiceSynthesisInput>
+  ): Promise<MultiVoiceSynthesisOutput> {
     const startTime = Date.now();
 
     // Input validation and transformation
@@ -112,9 +114,7 @@ export class MultiVoiceSynthesisUseCase {
         synthesisMethod: string;
         confidenceScore: number;
       };
-      detectVoiceConflicts: (
-        voiceResponses: ReadonlyArray<VoiceResponse>
-      ) => Promise<Conflict[]>;
+      detectVoiceConflicts: (voiceResponses: ReadonlyArray<VoiceResponse>) => Promise<Conflict[]>;
       resolveVoiceConflicts: (
         conflicts: ReadonlyArray<Conflict>,
         voices: ReadonlyArray<Voice>
@@ -159,10 +159,7 @@ export class MultiVoiceSynthesisUseCase {
 
     // Domain orchestration - Conflict Resolution
     const conflicts = await orchestration.detectVoiceConflicts(voiceResponses);
-    const conflictResolutions = await orchestration.resolveVoiceConflicts(
-      conflicts,
-      allVoices
-    );
+    const conflictResolutions = await orchestration.resolveVoiceConflicts(conflicts, allVoices);
 
     // Output transformation
     return this.transformToOutput(
@@ -175,7 +172,9 @@ export class MultiVoiceSynthesisUseCase {
     );
   }
 
-  private transformToProcessingRequest(input: Readonly<MultiVoiceSynthesisInput>): ProcessingRequest {
+  private transformToProcessingRequest(
+    input: Readonly<MultiVoiceSynthesisInput>
+  ): ProcessingRequest {
     // Import the correct enums for RequestType and RequestPriority
     // import { RequestType, RequestPriority } from '../../domain/entities/request.js';
 
@@ -205,7 +204,9 @@ export class MultiVoiceSynthesisUseCase {
     );
   }
 
-  private transformToVoicePreferences(input: Readonly<MultiVoiceSynthesisInput>): VoiceSelectionPreferences {
+  private transformToVoicePreferences(
+    input: Readonly<MultiVoiceSynthesisInput>
+  ): VoiceSelectionPreferences {
     return {
       maxVoices: input.voiceCount || 3,
       minVoices: Math.max(2, Math.min(input.voiceCount || 2, 2)), // At least 2 for multi-voice
@@ -281,16 +282,18 @@ export class MultiVoiceSynthesisUseCase {
     conflictResolutions: ReadonlyArray<{ reasoning: string } | undefined>,
     startTime: number
   ): MultiVoiceSynthesisOutput {
-    const voiceContributions: VoiceContribution[] = voiceResponses.map((response: VoiceResponse) => {
-      const voice = voices.find((v: Voice) => v.id === response.voiceId);
-      return {
-        voiceId: response.voiceId,
-        voiceName: voice?.name ?? 'Unknown Voice',
-        content: response.content,
-        confidence: response.confidence,
-        expertise: voice?.expertise ? [...voice.expertise] : [],
-      };
-    });
+    const voiceContributions: VoiceContribution[] = voiceResponses.map(
+      (response: VoiceResponse) => {
+        const voice = voices.find((v: Voice) => v.id === response.voiceId);
+        return {
+          voiceId: response.voiceId,
+          voiceName: voice?.name ?? 'Unknown Voice',
+          content: response.content,
+          confidence: response.confidence,
+          expertise: voice?.expertise ? [...voice.expertise] : [],
+        };
+      }
+    );
 
     const conflictSummaries: ConflictSummary[] = conflicts.map((conflict, index) => {
       const resolution = conflictResolutions[index];

@@ -292,7 +292,9 @@ export interface ExecutionQueryRepository {
   /**
    * Get execution insights for optimization
    */
-  getExecutionInsights: (timeRange: Readonly<{ from: Date; to: Date }>) => Promise<ExecutionInsights>;
+  getExecutionInsights: (
+    timeRange: Readonly<{ from: Date; to: Date }>
+  ) => Promise<ExecutionInsights>;
 }
 
 export interface ExecutionInsights {

@@ -13,6 +13,7 @@ import {
 import { WebSiteManagementClient, Site } from '@azure/arm-appservice';
 import { DefaultAzureCredential } from '@azure/identity';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface AzureDeploymentConfig {
   subscriptionId: string;
@@ -78,7 +79,7 @@ export class AzureProvider {
       logger.info(`Resource group ready: ${resourceGroup.name}`);
       return resourceGroup;
     } catch (error) {
-      logger.error('Failed to create resource group:', error);
+      logger.error('Failed to create resource group:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -152,7 +153,7 @@ export class AzureProvider {
 
       return containerGroup;
     } catch (error) {
-      logger.error('Failed to deploy container instance:', error);
+      logger.error('Failed to deploy container instance:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -218,7 +219,7 @@ export class AzureProvider {
 
       return webApp;
     } catch (error) {
-      logger.error('Failed to deploy App Service:', error);
+      logger.error('Failed to deploy App Service:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -332,7 +333,7 @@ export class AzureProvider {
       logger.info(`Virtual Machine created: ${vm.name}`);
       return vm;
     } catch (error) {
-      logger.error('Failed to create VM:', error);
+      logger.error('Failed to create VM:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -433,7 +434,7 @@ export class AzureProvider {
       logger.info(`VM Scale Set created: ${scaleSet.name}`);
       return scaleSet;
     } catch (error) {
-      logger.error('Failed to create VM Scale Set:', error);
+      logger.error('Failed to create VM Scale Set:', toErrorOrUndefined(error));
       throw error;
     }
   }
@@ -470,7 +471,7 @@ export class AzureProvider {
       // Wait for deployment to complete
       await this.waitForDeployment(deploymentName);
     } catch (error) {
-      logger.error('Failed to deploy ARM template:', error);
+      logger.error('Failed to deploy ARM template:', toErrorOrUndefined(error));
       throw error;
     }
   }

@@ -17,6 +17,7 @@ import { randomUUID } from 'node:crypto';
 import { WorkflowContext } from '../../domain/interfaces/workflow-orchestrator.js';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined } from '../../utils/type-guards.js';
 
 // Enhanced session interface with backward compatibility
 export interface CLISession {
@@ -319,7 +320,7 @@ export class SessionManager extends EventEmitter {
       try {
         this.cleanupExpiredSessions();
       } catch (error: unknown) {
-        logger.error('Error during periodic session cleanup:', error);
+        logger.error('Error during periodic session cleanup:', toErrorOrUndefined(error));
       }
     }, intervalMs);
 

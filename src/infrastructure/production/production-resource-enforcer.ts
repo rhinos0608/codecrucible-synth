@@ -6,6 +6,9 @@ import {
   ResourceType,
   OperationResourceContext,
 } from './resource-types.js';
+
+// Re-export types for external consumption
+export type { ResourceType, ResourceSnapshot } from './resource-types.js';
 import { ResourceMonitor } from './resource-monitor.js';
 import { QuotaEnforcer } from './quota-enforcer.js';
 import { ScalingController } from './scaling-controller.js';
@@ -17,40 +20,40 @@ import { CapacityPlanner } from './capacity-planner.js';
 
 const DEFAULT_LIMITS: ResourceLimits = {
   memory: {
-    hardLimit: 1024,
-    softLimit: 768,
-    emergencyLimit: 900,
-    gcThreshold: 0.8,
+    hardLimit: 1_024 * 1_024 * 1_024, // 1GB in MB
+    softLimit: 768 * 1_024 * 1_024, // 768MB
+    emergencyLimit: 1_280 * 1_024 * 1_024, // 1.25GB
+    gcThreshold: 0.85,
     leakDetectionEnabled: true,
-    maxAllocationSize: 256,
+    maxAllocationSize: 100 * 1_024 * 1_024, // 100MB
   },
   cpu: {
     maxUsagePercent: 90,
-    throttleThreshold: 80,
-    measurementWindow: 1000,
+    throttleThreshold: 75,
+    measurementWindow: 1_000,
     throttleDelay: 100,
     maxConcurrentCpuOps: 4,
   },
   concurrency: {
     maxConcurrentOperations: 10,
-    maxQueueSize: 100,
-    operationTimeout: 60000,
+    maxQueueSize: 50,
+    operationTimeout: 30_000,
     priorityLevels: 3,
     fairnessEnabled: true,
     starvationPrevention: true,
   },
   network: {
     maxConnections: 100,
-    maxBandwidthMbps: 1000,
-    connectionTimeout: 30000,
-    idleTimeout: 60000,
-    maxConcurrentRequests: 100,
+    maxBandwidthMbps: 1_000,
+    connectionTimeout: 30_000,
+    idleTimeout: 30_000,
+    maxConcurrentRequests: 50,
   },
   filesystem: {
-    maxOpenFiles: 100,
-    maxDiskUsageMB: 1024,
-    tempFileQuotaMB: 100,
-    maxFileSize: 50,
+    maxOpenFiles: 1_000,
+    maxDiskUsageMB: 10_000,
+    tempFileQuotaMB: 1_000,
+    maxFileSize: 1_000,
     ioThrottleThreshold: 80,
   },
 };
@@ -89,7 +92,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
     this.monitor.start();
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     this.monitor.stop();
   }
 
@@ -99,6 +102,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
       ctx.state = 'running';
       ctx.startTime = Date.now();
       this.activeOperations.set(ctx.operationId, ctx);
+
       this.emit('operation-started', ctx.operationId);
       this.updateConcurrencyStats();
       return true;
@@ -108,6 +112,25 @@ export class ProductionResourceEnforcer extends EventEmitter {
       this.operationQueue.push(ctx);
       this.updateConcurrencyStats();
       return true;
+
+      this.emit('operation-start', ctx.operationId);
+    } else if (this.operationQueue.length < this.limits.concurrency.maxQueueSize) {
+      ctx.state = 'pending';
+      this.operationQueue.push(ctx);
+    } else {
+      ctx.state = 'failed';
+      this.rejectedOperations += 1;
+      const violation = this.quota.enforce(
+        ResourceType.CONCURRENCY,
+        this.operationQueue.length,
+        'queued',
+        ctx.operationId
+      );
+      if (violation) {
+        this.recordViolation(violation);
+      }
+      return;
+
     }
 
     this.rejectedOperations += 1;
@@ -124,6 +147,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
     return false;
   }
 
+  /** Complete an operation and promote the next queued operation if available. */
   completeOperation(id: string): void {
     this.activeOperations.delete(id);
     if (this.operationQueue.length > 0) {
@@ -166,6 +190,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
   }
 
   /**
+
    * Executes an operation while enforcing concurrency limits.
    *
    * The operation is registered with the enforcer and may execute immediately
@@ -177,6 +202,19 @@ export class ProductionResourceEnforcer extends EventEmitter {
    * @param operationId - Unique identifier for the operation.
    * @param fn - Function to execute once resources are available.
    * @param options - Optional resource requirements, priority, and timeout.
+
+   * Executes a function while enforcing resource constraints.
+   *
+   * The operation is registered and may be queued if concurrency limits are reached.
+   * Execution begins only when the operation is promoted to running. If the operation
+   * is rejected due to resource limits, an error is thrown and the callback is not executed.
+   *
+   * @param operationId Unique identifier for the operation.
+   * @param fn Callback to execute once resources are granted.
+   * @param options Optional execution parameters including resource requirements,
+   * priority, and timeout.
+   * @throws Error if the operation is rejected by the resource enforcer.
+
    */
   async executeWithEnforcement<T>(
     operationId: string,
@@ -197,9 +235,15 @@ export class ProductionResourceEnforcer extends EventEmitter {
       state: 'pending',
     };
 
+
     const accepted = this.registerOperation(ctx);
     if (!accepted) {
       ctx.state = 'rejected';
+
+    this.registerOperation(ctx);
+
+    if (ctx.state === 'failed') {
+
       throw new Error(`Operation ${operationId} rejected due to resource limits`);
     }
 
@@ -207,6 +251,7 @@ export class ProductionResourceEnforcer extends EventEmitter {
       await new Promise<void>((resolve, reject) => {
         const onStart = (id: string): void => {
           if (id === operationId) {
+
             cleanup();
             resolve();
           }
@@ -220,6 +265,26 @@ export class ProductionResourceEnforcer extends EventEmitter {
         const timeoutId = setTimeout(() => {
           cleanup();
           reject(new Error(`Timeout waiting for operation ${operationId} to start`));
+
+            clearTimeout(timeoutHandle);
+            this.off('operation-start', onStart);
+            resolve();
+          }
+        };
+        this.on('operation-start', onStart);
+        try {
+          // The Promise will resolve when onStart is called.
+        } finally {
+          // Ensure cleanup if the Promise is rejected or interrupted.
+          this.off('operation-start', onStart);
+        }
+        const timeoutMs =
+          ctx.timeout > 0 ? ctx.timeout : (this.limits?.concurrency?.operationTimeout ?? 60000);
+        const timeoutHandle = setTimeout(() => {
+          this.off('operation-start', onStart);
+          ctx.state = 'failed';
+          reject(new Error(`Operation ${operationId} timed out waiting for start event`));
+
         }, timeoutMs);
       });
     }
@@ -239,9 +304,14 @@ export class ProductionResourceEnforcer extends EventEmitter {
   /**
    * Triggers an emergency cleanup of all active and queued operations.
    *
+
    * This method should be called in critical situations where the system is in
    * an unrecoverable state, such as severe resource violations, persistent
    * instability, or when normal operation cannot continue safely.
+
+   * This method should be called in critical situations where the system is in an unrecoverable state,
+   * such as severe resource violations, persistent instability, or when normal operation cannot continue safely.
+
    *
    * The cleanup process involves:
    * - Clearing all active operations.
@@ -251,10 +321,15 @@ export class ProductionResourceEnforcer extends EventEmitter {
    * - Emitting an 'emergency-cleanup' event with the provided reason.
    *
    * Potential side effects:
+
    * - Abrupt termination of all in-progress and queued operations, which may
    *   result in loss of work or inconsistent state.
    * - Listeners to the 'emergency-cleanup' event should handle any necessary
    *   recovery or alerting.
+
+   * - Abrupt termination of all in-progress and queued operations, which may result in loss of work or inconsistent state.
+   * - Listeners to the 'emergency-cleanup' event should handle any necessary recovery or alerting.
+
    *
    * @param reason - A descriptive reason for triggering the emergency cleanup.
    */
@@ -266,16 +341,11 @@ export class ProductionResourceEnforcer extends EventEmitter {
     this.emit('emergency-cleanup', reason);
   }
 
-  getEnforcementStats(): {
-    activeOperations: number;
-    queuedOperations: number;
-    rejectedOperations: number;
-  } {
-    return {
-      activeOperations: this.activeOperations.size,
-      queuedOperations: this.operationQueue.length,
-      rejectedOperations: this.rejectedOperations,
-    };
+  /**
+   * Performs emergency cleanup - alias for triggerEmergencyCleanup for compatibility
+   */
+  async performEmergencyCleanup(): Promise<void> {
+    await this.triggerEmergencyCleanup('Emergency cleanup requested');
   }
 
   private handleSnapshot(snapshot: ResourceSnapshot): void {
@@ -325,11 +395,30 @@ export class ProductionResourceEnforcer extends EventEmitter {
     this.violations.push(v);
     this.alerts.notify('error', `Resource violation: ${v.resourceType} (${v.violationType})`, v);
     this.emit('violation', v);
+    this.emit('resource-violation', v);
   }
 
   private updateConcurrencyStats(): void {
     const active = this.activeOperations.size;
     const queued = this.operationQueue.length;
     this.monitor.updateConcurrency(active, queued, this.rejectedOperations, 0);
+  }
+
+  async shutdown(): Promise<void> {
+    await this.stop();
+  }
+
+  getEnforcementStats(): {
+    activeOperations: number;
+    queuedOperations: number;
+    rejectedOperations: number;
+    violations: number;
+  } {
+    return {
+      activeOperations: this.activeOperations.size,
+      queuedOperations: this.operationQueue.length,
+      rejectedOperations: this.rejectedOperations,
+      violations: this.violations.length,
+    };
   }
 }

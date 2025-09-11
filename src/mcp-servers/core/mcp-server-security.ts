@@ -13,6 +13,7 @@ import { outputConfig } from '../../utils/output-config.js';
 import * as path from 'path';
 import { promises as fs } from 'fs';
 import { PathUtilities } from '../../utils/path-utilities.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface SecurityConfig {
   maxFileSize: number; // Maximum file size for read operations
@@ -55,7 +56,12 @@ export class MCPServerSecurity {
   private concurrentOperations = 0;
   private blockedOperations = 0; // Track actual blocked operations
   private blockedPathPatterns: RegExp[] = [];
-  private riskLevelCounts: Record<'low' | 'medium' | 'high' | 'critical', number> = { low: 0, medium: 0, high: 0, critical: 0 }; // Track risk levels
+  private riskLevelCounts: Record<'low' | 'medium' | 'high' | 'critical', number> = {
+    low: 0,
+    medium: 0,
+    high: 0,
+    critical: 0,
+  }; // Track risk levels
 
   // Throttling for verbose path debug logs
   private readonly pathLogThrottler = {
@@ -124,7 +130,9 @@ export class MCPServerSecurity {
   /**
    * Track security validation results and update counters
    */
-  private trackSecurityResult(result: Readonly<SecurityValidationResult>): SecurityValidationResult {
+  private trackSecurityResult(
+    result: Readonly<SecurityValidationResult>
+  ): SecurityValidationResult {
     // Track blocked operations
     if (!result.allowed) {
       this.blockedOperations++;
@@ -149,7 +157,9 @@ export class MCPServerSecurity {
   ): Promise<SecurityValidationResult> {
     // Check cache first for performance
     const cacheKey = `${filePath}:${context.operation}`;
-    const cached = this.pathCache.get(cacheKey) as (SecurityValidationResult & { timestamp?: number }) | undefined;
+    const cached = this.pathCache.get(cacheKey) as
+      | (SecurityValidationResult & { timestamp?: number })
+      | undefined;
     if (cached && cached.timestamp !== undefined && Date.now() - cached.timestamp < 30000) {
       // 30s cache
       return cached;
@@ -427,7 +437,10 @@ export class MCPServerSecurity {
 
     // High-risk operations require approval (not implemented yet)
     if (riskLevel === 'high') {
-      logger.warn('High-risk operation detected - manual approval required', context);
+      logger.warn(
+        'High-risk operation detected - manual approval required',
+        toReadonlyRecord(context)
+      );
       return false; // Conservative default
     }
 

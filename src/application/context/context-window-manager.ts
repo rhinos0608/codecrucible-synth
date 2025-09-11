@@ -15,6 +15,7 @@ import { Stats } from 'fs';
 import { dirname, extname, join, relative } from 'path';
 import { glob } from 'glob';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface ContextWindow {
   maxTokens: number;
@@ -226,7 +227,7 @@ export class ContextWindowManager {
       // Filter by supported extensions
       return files.filter(file => this.supportedExtensions.has(extname(file).toLowerCase()));
     } catch (error) {
-      logger.warn('Failed to discover files:', error);
+      logger.warn('Failed to discover files:', toReadonlyRecord(error));
       return [];
     }
   }
@@ -264,7 +265,7 @@ export class ContextWindowManager {
           );
         }
       } catch (error) {
-        logger.warn(`Failed to analyze batch ${i}-${i + batchSize}:`, error);
+        logger.warn(`Failed to analyze batch ${i}-${i + batchSize}:`, toReadonlyRecord(error));
       }
 
       // Progress logging for large codebases

@@ -82,9 +82,9 @@ function findNAPIBinary(searchPaths, baseName) {
 
 // Test binary search
 const searchPaths = [
-  join(__dirname, 'rust-executor'),
+  join(__dirname, 'rust'),
   __dirname,
-  join(__dirname, '../rust-executor'),
+  join(__dirname, '../rust'),
 ];
 
 const binaryPath = findNAPIBinary(searchPaths, 'codecrucible-rust-executor');

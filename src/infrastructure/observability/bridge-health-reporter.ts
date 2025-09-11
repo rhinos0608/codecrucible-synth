@@ -1,5 +1,5 @@
 import type { MetricsCollector } from './metrics-collector.js';
-import type { IRustExecutionBridge } from '../execution/rust-executor/bridge-adapter.js';
+import type { IRustExecutionBridge } from '../execution/rust/bridge-adapter.js';
 
 export interface BridgeHealthReporterOptions {
   intervalMs?: number;

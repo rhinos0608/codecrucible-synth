@@ -69,7 +69,7 @@ export class RustBridgeManager {
         });
       } else {
         // Fallback to dynamic import relative to dist file location
-        // dist path: dist/infrastructure/execution/rust-executor/rust-bridge-manager.js
+        // dist path: dist/infrastructure/execution/rust/rust-bridge-manager.js
         // repo NAPI loader path: ../../../../rust-executor/index.js (from dist file)
         const candidatePaths = [
           '../../../../rust-executor/index.js',

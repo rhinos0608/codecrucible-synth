@@ -5,7 +5,7 @@
 
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { FilesystemTools } from './filesystem-tools.js';
-import type { RustExecutionBackend as RealRustExecutionBackend } from '../execution/rust-executor/rust-execution-backend.js';
+import type { RustExecutionBackend as RealRustExecutionBackend } from '../execution/rust/rust-execution-backend.js';
 import {
   ToolExecutionContext,
   ToolExecutionResult,
@@ -134,7 +134,9 @@ export class ToolIntegration {
         const coreTools = new CoreToolSuite().getTools();
         for (const tool of coreTools) {
           if (!tool?.id) continue;
-          const inputSchema = tool.inputSchema as { properties: Record<string, unknown>; required?: string[] } | undefined;
+          const inputSchema = tool.inputSchema as
+            | { properties: Record<string, unknown>; required?: string[] }
+            | undefined;
           const safeTool: ToolDefinition = {
             id: tool.id,
             name: (tool as unknown as { name?: string }).name ?? tool.id,
@@ -247,15 +249,11 @@ export class ToolIntegration {
 
       // Preferred path: JSON-RPC 2.0 through MCP manager
       try {
-        const mcpResult = await this.mcpManager.executeTool(
-          functionName,
-          args,
-          {
-            sessionId: `tool_${Date.now()}`,
-            toolName: functionName,
-            executionMode: 'sync',
-          } as unknown as ToolExecutionContext
-        );
+        const mcpResult = await this.mcpManager.executeTool(functionName, args, {
+          sessionId: `tool_${Date.now()}`,
+          toolName: functionName,
+          executionMode: 'sync',
+        } as unknown as ToolExecutionContext);
         if (mcpResult && typeof mcpResult === 'object' && 'success' in mcpResult) {
           return mcpResult as ToolExecutionResult;
         }

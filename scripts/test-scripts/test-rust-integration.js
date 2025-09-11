@@ -3,7 +3,7 @@ import {
   RustExecutor,
   createRustExecutor,
   initLogging,
-} from './src/core/execution/rust-executor/rust-native-module.js';
+} from './src/core/execution/rust/rust-native-module.js';
 
 async function testRustIntegration() {
   try {

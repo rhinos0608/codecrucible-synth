@@ -49,7 +49,7 @@ codecrucible-synth/
 │   ├── package.json           # NPM build configuration
 │   └── yarn.lock              # Yarn dependencies
 ├── src/utils/rust-module-loader.ts  # Runtime loading logic
-├── src/infrastructure/execution/rust-executor/ # TypeScript bindings
+├── src/infrastructure/execution/rust/ # TypeScript bindings
 └── .github/workflows/napi-build.yml # Cross-platform CI
 ```
 

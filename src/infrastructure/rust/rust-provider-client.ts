@@ -6,7 +6,7 @@
  */
 
 import { logger } from '../../infrastructure/logging/logger.js';
-import { RustBridgeManager } from '../execution/rust-executor/rust-bridge-manager.js';
+import { RustBridgeManager } from '../execution/rust/rust-bridge-manager.js';
 import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface RustProviderConfig {

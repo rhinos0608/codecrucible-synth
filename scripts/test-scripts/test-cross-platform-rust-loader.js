@@ -70,7 +70,7 @@ try {
 
     console.log('\nSuggested actions:');
     console.log('1. Run "npm run build:rust" to build the Rust executor');
-    console.log('2. Check that the binary exists in the rust-executor/ directory');
+    console.log('2. Check that the binary exists in the rust/ directory');
     console.log('3. Verify the binary name matches your platform');
   }
 } catch (error) {

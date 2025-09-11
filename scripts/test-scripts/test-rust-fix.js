@@ -4,7 +4,7 @@ console.log('Testing Rust executor initialization...');
 async function testRustExecutor() {
   try {
     const { RustExecutionBackend } = await import(
-      './dist/infrastructure/execution/rust-executor/rust-execution-backend.js'
+      './dist/infrastructure/execution/rust/rust-execution-backend.js'
     );
     const backend = new RustExecutionBackend();
     console.log('✅ RustExecutionBackend created');

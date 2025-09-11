@@ -271,7 +271,7 @@ Voice System Flow:
 
 ### Infrastructure & Execution
 
-- `src/infrastructure/execution/rust-executor/rust-execution-backend.ts` – Rust performance backend
+- `src/infrastructure/execution/rust/rust-execution-backend.ts` – Rust performance backend
 - `src/infrastructure/execution/execution-backend-factory.ts` – backend selection and fallback
 - `src/mcp-servers/mcp-bootstrap.ts` – MCP server initialization (centralized)
 - `src/infrastructure/security/enterprise-auth-manager.ts` – enterprise security framework

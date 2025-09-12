@@ -448,6 +448,13 @@ export class UnifiedToolRegistry {
   }
 
   /**
+   * Get all registered tool definitions
+   */
+  public getAllTools(): ToolDefinition[] {
+    return Array.from(this.tools.values());
+  }
+
+  /**
    * Get tool metrics
    */
   public getToolMetrics(toolName: string): ToolMetrics | null {

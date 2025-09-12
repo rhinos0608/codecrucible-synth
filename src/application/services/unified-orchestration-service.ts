@@ -30,6 +30,8 @@ import { PluginDispatchHandler } from '../cqrs/handlers/plugin-dispatch-handler.
 import { discoverPlugins } from '../../infrastructure/plugins/plugin-loader.js';
 import { CommandRegistry } from './command-registry.js';
 import { OrchestrationRequest, OrchestrationResponse } from './orchestration-types.js';
+import { HealthMonitor } from '../../domain/services/mcp-discovery/health-monitor.js';
+import { MetricsCollector } from '../../domain/services/mcp-discovery/metrics-collector.js';
 
 // Re-export types for external consumption
 export type { OrchestrationRequest, OrchestrationResponse } from './orchestration-types.js';
@@ -115,6 +117,8 @@ export class UnifiedOrchestrationService extends EventEmitter {
   private performanceSystem!: UnifiedPerformanceSystem;
   private agentSystem!: UnifiedAgentSystem;
   private serverSystem!: UnifiedServerSystem;
+  private readonly healthMonitor = new HealthMonitor();
+  private readonly metricsCollector = new MetricsCollector();
 
   // Application services
   private commandBus!: CommandBus;
@@ -192,6 +196,14 @@ export class UnifiedOrchestrationService extends EventEmitter {
       this.registerCleanup(async (): Promise<void> => {
         await this.serverSystem.stopAllServers();
       });
+
+      const initialMcpServers = this.serverSystem.getMCPServers();
+      await Promise.all(
+        initialMcpServers.map(async s => {
+          await this.healthMonitor.checkHealth(s as any);
+          this.metricsCollector.record(s as any, 'startup', 1);
+        })
+      );
 
       // Also inject rust backend into server system if available
       try {

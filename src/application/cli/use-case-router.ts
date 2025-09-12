@@ -12,17 +12,20 @@
  */
 
 import { logger } from '../../infrastructure/logging/unified-logger.js';
-import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
-import { UseCaseDependencies, getDependencyContainer } from '../services/dependency-container.js';
-import { AnalysisRequest, GenerationRequest } from '../use-cases/index.js';
+import { toReadonlyRecord } from '../../utils/type-guards.js';
+import {
+  type UseCaseDependencies,
+  getDependencyContainer,
+} from '../services/dependency-container.js';
+import type { AnalysisRequest, GenerationRequest } from '../use-cases/index.js';
 import { FileReferenceParser } from './file-reference-parser.js';
 import {
-  CombinedProjectConfig,
+  type CombinedProjectConfig,
   projectConfigurationLoader,
 } from '../config/project-config-loader.js';
-import { CodebaseAnalysisResult } from '../context/context-window-manager.js';
-import { ParsedCommand, naturalLanguageInterface } from './natural-language-interface.js';
-import {
+import type { CodebaseAnalysisResult } from '../context/context-window-manager.js';
+import { type ParsedCommand, naturalLanguageInterface } from './natural-language-interface.js';
+import type {
   IWorkflowOrchestrator,
   WorkflowContext,
   WorkflowRequest,
@@ -419,26 +422,44 @@ export class UseCaseRouter {
   private isCodeGenerationRequest(prompt: string): boolean {
     // REFINED: Distinguish between code generation and simple file operations
     const lowerPrompt = prompt.toLowerCase();
-    
-    // If it's a simple text/data file creation, use tools not code generation
-    const simpleFilePatterns = [
-      /create.*test.*file/,
-      /create.*text.*file/,
-      /write.*to.*file/,
+
+    // 1. Explicit programming file extensions or language keywords take precedence
+    const codeFileExtensions = ['.ts', '.js', '.py', '.java', '.cpp', '.cs', '.go', '.rs', '.php'];
+    const languageKeywords = [
+      'typescript',
+      'javascript',
+      'python',
+      'java',
+      'c#',
+      'c++',
+      'golang',
+      'rust',
+      'php',
+    ];
+    if (
+      codeFileExtensions.some(ext => lowerPrompt.includes(ext)) ||
+      languageKeywords.some(lang => lowerPrompt.includes(`${lang} file`))
+    ) {
+      return true;
+    }
+
+    // 2. Data/text file creation should not trigger code generation
+    const dataFileExtensions = ['.json', '.yaml', '.yml', '.csv', '.md', '.txt'];
+    const dataFilePatterns = [
+      /create.*(json|yaml|yml|csv|markdown|md|text|txt).*file/,
+      /generate.*(json|yaml|yml|csv|markdown|md|text|txt).*file/,
+      /write.*(json|yaml|yml|csv|markdown|md|text|txt).*file/,
       /create.*file.*with.*content/,
       /write.*content.*to/,
     ];
-    if (simpleFilePatterns.some(pattern => pattern.test(lowerPrompt))) {
-      return false; // Use tool execution for simple file operations
+    if (
+      dataFileExtensions.some(ext => lowerPrompt.includes(ext)) ||
+      dataFilePatterns.some(pattern => pattern.test(lowerPrompt))
+    ) {
+      return false;
     }
-    
-    // Code generation for programming files
-    const codeFileExtensions = ['.ts', '.js', '.py', '.java', '.cpp', '.cs', '.go', '.rs', '.php'];
-    if (codeFileExtensions.some(ext => lowerPrompt.includes(ext))) {
-      return true;
-    }
-    
-    // Strong code generation keywords with programming context
+
+    // 3. Strong code generation keywords with programming context
     const codeGenerationKeywords = [
       'implement function',
       'create class',
@@ -452,10 +473,10 @@ export class UseCaseRouter {
     if (codeGenerationKeywords.some(pattern => lowerPrompt.includes(pattern))) {
       return true;
     }
-    
-    // Programming-specific keywords only count if they appear with creation context
+
+    // 4. Programming-specific keywords only count if they appear with creation context
     const codeKeywords = ['function', 'class', 'component', 'module', 'interface', 'api'];
-    const creationContext = ['implement', 'scaffold', 'bootstrap'];
+    const creationContext = ['implement', 'scaffold', 'bootstrap', 'generate', 'build', 'create'];
     return codeKeywords.some(
       keyword =>
         lowerPrompt.includes(keyword) &&

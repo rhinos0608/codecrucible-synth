@@ -38,6 +38,8 @@ import type { IModelProvider } from '../../domain/interfaces/model-client.js';
 import type { ProviderType, ProjectContext } from '../../domain/types/unified-types.js';
 import type { Provider } from '../../infrastructure/execution/request-execution-manager.js';
 import { toError } from '../../utils/type-guards.js';
+import { SequentialToolExecutor } from '../../infrastructure/tools/sequential-tool-executor.js';
+import { unifiedToolRegistry } from '../../infrastructure/tools/unified-tool-registry.js';
 
 /**
  * ToolExecutionError type definition for error mapping in executeTool
@@ -105,6 +107,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   private readonly streamingManager: IStreamingManager;
   private readonly toolExecutionRouter: IToolExecutionRouter;
   private readonly providerCapabilityRegistry: IProviderCapabilityRegistry;
+  private readonly sequentialToolExecutor: SequentialToolExecutor;
 
   // Request tracking
   private readonly activeRequests: Map<
@@ -135,6 +138,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     this.streamingManager = streamingManager;
     this.toolExecutionRouter = toolExecutionRouter;
     this.providerCapabilityRegistry = providerCapabilityRegistry;
+    this.sequentialToolExecutor = new SequentialToolExecutor();
     // Register default provider capabilities (now configurable)
     this.providerCapabilityRegistry.register('default', providerCapabilities);
 
@@ -473,13 +477,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
    */
   private isSmallModel(modelName?: string): boolean {
     if (!modelName) return false;
-    
+
     // Check for common 8B or smaller model patterns
-    const smallModelPatterns = [
-      /8b/i, /7b/i, /3b/i, /1b/i, /0.5b/i,
-      /small/i, /mini/i, /lite/i
-    ];
-    
+    const smallModelPatterns = [/8b/i, /7b/i, /3b/i, /1b/i, /0.5b/i, /small/i, /mini/i, /lite/i];
+
     return smallModelPatterns.some(pattern => pattern.test(modelName));
   }
 
@@ -499,7 +500,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     }
 
     const isSmall = this.isSmallModel(modelName);
-    
+
     if (isSmall) {
       // Simplified zero-shot approach for small models (8B and under)
       return this.createZeroShotToolPrompt(userPrompt, toolNames);
@@ -516,9 +517,10 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   private createZeroShotToolPrompt(userPrompt: string, toolNames?: readonly string[]): string {
     // Limit tools to avoid overwhelming small models
     const limitedTools = Array.isArray(toolNames) ? toolNames.slice(0, 3) : [];
-    const toolList = limitedTools.length > 0 
-      ? `\nAVAILABLE_TOOLS = [${limitedTools.map(t => `"${t}"`).join(', ')}]` 
-      : '';
+    const toolList =
+      limitedTools.length > 0
+        ? `\nAVAILABLE_TOOLS = [${limitedTools.map(t => `"${t}"`).join(', ')}]`
+        : '';
 
     return `${userPrompt}
 
@@ -549,9 +551,13 @@ EXECUTE process_request("${userPrompt}")${toolList}`;
    * Combines the clarity of pseudo code with comprehensive tool instructions
    */
   private createComprehensiveToolPrompt(userPrompt: string, toolNames?: readonly string[]): string {
-    const toolList = Array.isArray(toolNames) && toolNames.length > 0
-      ? `\nAVAILABLE_TOOLS = [${toolNames.slice(0, 20).map(t => `"${t}"`).join(', ')}]`
-      : '';
+    const toolList =
+      Array.isArray(toolNames) && toolNames.length > 0
+        ? `\nAVAILABLE_TOOLS = [${toolNames
+            .slice(0, 20)
+            .map(t => `"${t}"`)
+            .join(', ')}]`
+        : '';
 
     return `${userPrompt}
 
@@ -608,14 +614,39 @@ EXECUTE TaskProcessor.process_request("${userPrompt}")${toolList}`;
 
     // Prepare tools and prompt
     const { mcpTools, enhancedPrompt } = await this.prepareMCPToolsAndPrompt(request);
+    if (mcpTools.length > 0) {
+      const toolDefs = unifiedToolRegistry.getAllTools();
+      const availableTools = toolDefs.map(def => ({
+        name: def.name,
+        function: { name: def.name, description: def.description },
+      }));
 
-    // Build model request
+      const modelClientAdapter = {
+        generateText: async (
+          prompt: string,
+          options: { temperature?: number; maxTokens?: number; tools?: unknown[] }
+        ): Promise<string> => {
+          const res = await this.processModelRequest({
+            id: request.id,
+            prompt,
+            temperature: options.temperature,
+            maxTokens: options.maxTokens,
+            tools: options.tools as ModelTool[],
+          });
+          return typeof res.content === 'string' ? res.content : JSON.stringify(res.content);
+        },
+      };
+
+      return this.sequentialToolExecutor.executeWithReasoning(
+        enhancedPrompt,
+        availableTools,
+        modelClientAdapter,
+        5
+      );
+    }
+
     const modelRequest = this.buildModelRequest(request, enhancedPrompt, mcpTools);
-
-    // Execute request (streaming or non-streaming)
     const response = await this.executeModelRequest(modelRequest);
-
-    // Handle tool calls if present
     return this.processToolCalls(response, request, modelRequest);
   }
 

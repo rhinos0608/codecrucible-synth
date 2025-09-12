@@ -34,6 +34,7 @@ const PLATFORM_ARCH_MAP = {
   'linux-riscv64-gnu': 'linux-riscv64-gnu',
   'linux-riscv64-musl': 'linux-riscv64-musl',
   'linux-s390x': 'linux-s390x-gnu',
+  'freebsd-x64': 'freebsd-x64',
 };
 
 function resolveKey() {

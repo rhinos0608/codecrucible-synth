@@ -14,6 +14,8 @@ export class UnifiedAgentSystem {
   private contextAnalyzer = new ProjectContextAnalyzer();
   private collaboration = new CollaborationEngine();
   private initialized = false;
+  private completedTasks = 0;
+  private totalResponseTime = 0;
 
   registerAgent(agent: IAgent): void {
     this.registry.registerAgent(agent);
@@ -38,11 +40,14 @@ export class UnifiedAgentSystem {
         conflictResolution: 'user-choice',
       },
     });
+    const duration = Date.now() - startTime;
+    this.completedTasks++;
+    this.totalResponseTime += duration;
     return {
       taskId: task.id,
       output: collabResponse.result.output,
       success: collabResponse.result.success,
-      duration: Date.now() - startTime,
+      duration,
     };
   }
 
@@ -141,8 +146,9 @@ export class UnifiedAgentSystem {
     return {
       totalAgents: agents.length,
       activeAgents: agents.filter(agent => agent.isActive ?? true).length,
-      completedTasks: 0, // Would need to track this
-      averageResponseTime: 0, // Would need to track this
+      completedTasks: this.completedTasks,
+      averageResponseTime:
+        this.completedTasks === 0 ? 0 : this.totalResponseTime / this.completedTasks,
     };
   }
 

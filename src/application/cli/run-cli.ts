@@ -5,6 +5,8 @@ import { enterpriseErrorHandler } from '../../infrastructure/error-handling/ente
 import { ErrorSeverity } from '../../infrastructure/error-handling/structured-error-system.js';
 import { showHelp, showStatus } from './help.js';
 import initialize from '../bootstrap/initialize.js';
+import parseCLIArgs from './args-parser.js';
+import { bootstrapToolRegistration } from './bootstrap/tool-registration.js';
 
 export async function runCLI(
   args: readonly string[],
@@ -12,42 +14,36 @@ export async function runCLI(
   isInteractive: boolean
 ): Promise<void> {
   try {
-    const cliArgs = args.length > 0 ? args : process.argv.slice(2);
+    const parsed = parseCLIArgs(args);
 
-    if (cliArgs.includes('--version') || cliArgs.includes('-v')) {
+    if (parsed.command === 'version') {
       const { getVersion } = await import('../../utils/version.js');
       console.log(`CodeCrucible Synth v${await getVersion()} (Unified Architecture)`);
       return;
     }
 
-    if (cliArgs.includes('--help') || cliArgs.includes('-h')) {
+    if (parsed.command === 'help') {
       showHelp();
       return;
     }
 
-    if (cliArgs[0] === 'status') {
+    if (parsed.command === 'status') {
       await showStatus();
       return;
     }
 
-    if (cliArgs[0] === 'models') {
-      const { ModelsCommand, parseModelsArgs } = await import('./models-command.js');
+    if (parsed.command === 'models') {
+      const { ModelsCommand } = await import('./models-command.js');
       const modelsCommand = new ModelsCommand();
-      const modelsOptions = parseModelsArgs(cliArgs.slice(1));
-      await modelsCommand.execute(modelsOptions);
+      await modelsCommand.execute(parsed.options);
       return;
     }
 
-    if (cliArgs[0] === 'tools') {
-      // Initialize MCP system before showing tools
-      logger.info('Initializing MCP system for tools command...');
-      const { bootstrapMcpServers } = await import('../../mcp-servers/mcp-bootstrap.js');
-      await bootstrapMcpServers();
-      
-      const { ToolsCommand, parseToolsArgs } = await import('./tools-command.js');
+    if (parsed.command === 'tools') {
+      await bootstrapToolRegistration();
+      const { ToolsCommand } = await import('./tools-command.js');
       const toolsCommand = new ToolsCommand();
-      const toolsOptions = parseToolsArgs(cliArgs.slice(1));
-      await toolsCommand.execute(toolsOptions);
+      await toolsCommand.execute(parsed.options);
       return;
     }
 
@@ -71,7 +67,7 @@ export async function runCLI(
       void cleanup();
     });
 
-    await cli.run(cliArgs);
+    await cli.run(parsed.args);
     if (!isInteractive) {
       await cleanup();
     }

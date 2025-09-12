@@ -1,303 +1,86 @@
 const { existsSync, readFileSync } = require('fs');
 const { join } = require('path');
+const { execSync } = require('child_process');
 
 const { platform, arch } = process;
 
-let nativeBinding = null;
-let localFileExisted = false;
-let loadError = null;
+let bindingCache = null;
 
 function isMusl() {
-  // For Node 10
   if (!process.report || typeof process.report.getReport !== 'function') {
     try {
-      const lddPath = require('child_process').execSync('which ldd').toString().trim();
+      const lddPath = execSync('which ldd').toString().trim();
       return readFileSync(lddPath, 'utf8').includes('musl');
-    } catch (e) {
+    } catch {
       return true;
     }
-  } else {
-    const { glibcVersionRuntime } = process.report.getReport().header;
-    return !glibcVersionRuntime;
+  }
+  const { glibcVersionRuntime } = process.report.getReport().header;
+  return !glibcVersionRuntime;
+}
+
+const PLATFORM_ARCH_MAP = {
+  'android-arm': 'android-arm-eabi',
+  'android-arm64': 'android-arm64',
+  'win32-ia32': 'win32-ia32-msvc',
+  'win32-x64': 'win32-x64-msvc',
+  'win32-arm64': 'win32-arm64-msvc',
+  'darwin-universal': 'darwin-universal',
+  'linux-x64-gnu': 'linux-x64-gnu',
+  'linux-x64-musl': 'linux-x64-musl',
+  'linux-arm64-gnu': 'linux-arm64-gnu',
+  'linux-arm64-musl': 'linux-arm64-musl',
+  'linux-arm': 'linux-arm-gnueabihf',
+  'linux-riscv64-gnu': 'linux-riscv64-gnu',
+  'linux-riscv64-musl': 'linux-riscv64-musl',
+  'linux-s390x': 'linux-s390x-gnu',
+};
+
+function resolveKey() {
+  if (platform === 'darwin') return 'darwin-universal';
+  if (platform === 'linux') {
+    if (['x64', 'arm64', 'riscv64'].includes(arch)) {
+      return `linux-${arch}-${isMusl() ? 'musl' : 'gnu'}`;
+    }
+    if (arch === 'arm') return 'linux-arm';
+    if (arch === 's390x') return 'linux-s390x';
+    return null;
+  }
+  return `${platform}-${arch}`;
+}
+
+function handleError(message, cause) {
+  const error = new Error(message);
+  if (cause && cause.stack) {
+    error.stack += `\nCaused by: ${cause.stack}`;
+  }
+  throw error;
+}
+
+function loadBinding() {
+  if (bindingCache) return bindingCache;
+
+  const key = resolveKey();
+  const fileToken = key && PLATFORM_ARCH_MAP[key];
+  if (!fileToken) {
+    handleError(`Unsupported platform or architecture: ${platform} ${arch}`);
+  }
+
+  const filename = `codecrucible-rust-executor.${fileToken}.node`;
+  const localFile = join(__dirname, filename);
+  const packageName = `@codecrucible/rust-executor-${fileToken}`;
+
+  const localExists = existsSync(localFile);
+  try {
+    bindingCache = localExists ? require(localFile) : require(packageName);
+    return bindingCache;
+  } catch (err) {
+    const source = localExists ? localFile : packageName;
+    handleError(`Missing native binding for ${platform} ${arch}. Tried to load ${source}`, err);
   }
 }
 
-switch (platform) {
-  case 'android':
-    switch (arch) {
-      case 'arm64':
-        localFileExisted = existsSync(
-          join(__dirname, 'codecrucible-rust-executor.android-arm64.node')
-        );
-        try {
-          if (localFileExisted) {
-            nativeBinding = require('./codecrucible-rust-executor.android-arm64.node');
-          } else {
-            nativeBinding = require('@codecrucible/rust-executor-android-arm64');
-          }
-        } catch (e) {
-          loadError = e;
-        }
-        break;
-      case 'arm':
-        localFileExisted = existsSync(
-          join(__dirname, 'codecrucible-rust-executor.android-arm-eabi.node')
-        );
-        try {
-          if (localFileExisted) {
-            nativeBinding = require('./codecrucible-rust-executor.android-arm-eabi.node');
-          } else {
-            nativeBinding = require('@codecrucible/rust-executor-android-arm-eabi');
-          }
-        } catch (e) {
-          loadError = e;
-        }
-        break;
-      default:
-        throw new Error(`Unsupported architecture on Android ${arch}`);
-    }
-    break;
-  case 'win32':
-    switch (arch) {
-      case 'x64':
-        localFileExisted = existsSync(
-          join(__dirname, 'codecrucible-rust-executor.win32-x64-msvc.node')
-        );
-        try {
-          if (localFileExisted) {
-            nativeBinding = require('./codecrucible-rust-executor.win32-x64-msvc.node');
-          } else {
-            nativeBinding = require('@codecrucible/rust-executor-win32-x64-msvc');
-          }
-        } catch (e) {
-          loadError = e;
-        }
-        break;
-      case 'ia32':
-        localFileExisted = existsSync(
-          join(__dirname, 'codecrucible-rust-executor.win32-ia32-msvc.node')
-        );
-        try {
-          if (localFileExisted) {
-            nativeBinding = require('./codecrucible-rust-executor.win32-ia32-msvc.node');
-          } else {
-            nativeBinding = require('@codecrucible/rust-executor-win32-ia32-msvc');
-          }
-        } catch (e) {
-          loadError = e;
-        }
-        break;
-      case 'arm64':
-        localFileExisted = existsSync(
-          join(__dirname, 'codecrucible-rust-executor.win32-arm64-msvc.node')
-        );
-        try {
-          if (localFileExisted) {
-            nativeBinding = require('./codecrucible-rust-executor.win32-arm64-msvc.node');
-          } else {
-            nativeBinding = require('@codecrucible/rust-executor-win32-arm64-msvc');
-          }
-        } catch (e) {
-          loadError = e;
-        }
-        break;
-      default:
-        throw new Error(`Unsupported architecture on Windows: ${arch}`);
-    }
-    break;
-  case 'darwin':
-    localFileExisted = existsSync(
-      join(__dirname, 'codecrucible-rust-executor.darwin-universal.node')
-    );
-    try {
-      if (localFileExisted) {
-        nativeBinding = require('./codecrucible-rust-executor.darwin-universal.node');
-      } else {
-        nativeBinding = require('@codecrucible/rust-executor-darwin-universal');
-      }
-      break;
-    } catch (e) {
-      loadError = e;
-    }
-    switch (arch) {
-      case 'x64':
-        localFileExisted = existsSync(
-          join(__dirname, 'codecrucible-rust-executor.darwin-x64.node')
-        );
-        try {
-          if (localFileExisted) {
-            nativeBinding = require('./codecrucible-rust-executor.darwin-x64.node');
-          } else {
-            nativeBinding = require('@codecrucible/rust-executor-darwin-x64');
-          }
-        } catch (e) {
-          loadError = e;
-        }
-        break;
-      case 'arm64':
-        localFileExisted = existsSync(
-          join(__dirname, 'codecrucible-rust-executor.darwin-arm64.node')
-        );
-        try {
-          if (localFileExisted) {
-            nativeBinding = require('./codecrucible-rust-executor.darwin-arm64.node');
-          } else {
-            nativeBinding = require('@codecrucible/rust-executor-darwin-arm64');
-          }
-        } catch (e) {
-          loadError = e;
-        }
-        break;
-      default:
-        throw new Error(`Unsupported architecture on macOS: ${arch}`);
-    }
-    break;
-  case 'freebsd':
-    if (arch !== 'x64') {
-      throw new Error(`Unsupported architecture on FreeBSD: ${arch}`);
-    }
-    localFileExisted = existsSync(join(__dirname, 'codecrucible-rust-executor.freebsd-x64.node'));
-    try {
-      if (localFileExisted) {
-        nativeBinding = require('./codecrucible-rust-executor.freebsd-x64.node');
-      } else {
-        nativeBinding = require('@codecrucible/rust-executor-freebsd-x64');
-      }
-    } catch (e) {
-      loadError = e;
-    }
-    break;
-  case 'linux':
-    switch (arch) {
-      case 'x64':
-        if (isMusl()) {
-          localFileExisted = existsSync(
-            join(__dirname, 'codecrucible-rust-executor.linux-x64-musl.node')
-          );
-          try {
-            if (localFileExisted) {
-              nativeBinding = require('./codecrucible-rust-executor.linux-x64-musl.node');
-            } else {
-              nativeBinding = require('@codecrucible/rust-executor-linux-x64-musl');
-            }
-          } catch (e) {
-            loadError = e;
-          }
-        } else {
-          localFileExisted = existsSync(
-            join(__dirname, 'codecrucible-rust-executor.linux-x64-gnu.node')
-          );
-          try {
-            if (localFileExisted) {
-              nativeBinding = require('./codecrucible-rust-executor.linux-x64-gnu.node');
-            } else {
-              nativeBinding = require('@codecrucible/rust-executor-linux-x64-gnu');
-            }
-          } catch (e) {
-            loadError = e;
-          }
-        }
-        break;
-      case 'arm64':
-        if (isMusl()) {
-          localFileExisted = existsSync(
-            join(__dirname, 'codecrucible-rust-executor.linux-arm64-musl.node')
-          );
-          try {
-            if (localFileExisted) {
-              nativeBinding = require('./codecrucible-rust-executor.linux-arm64-musl.node');
-            } else {
-              nativeBinding = require('@codecrucible/rust-executor-linux-arm64-musl');
-            }
-          } catch (e) {
-            loadError = e;
-          }
-        } else {
-          localFileExisted = existsSync(
-            join(__dirname, 'codecrucible-rust-executor.linux-arm64-gnu.node')
-          );
-          try {
-            if (localFileExisted) {
-              nativeBinding = require('./codecrucible-rust-executor.linux-arm64-gnu.node');
-            } else {
-              nativeBinding = require('@codecrucible/rust-executor-linux-arm64-gnu');
-            }
-          } catch (e) {
-            loadError = e;
-          }
-        }
-        break;
-      case 'arm':
-        localFileExisted = existsSync(
-          join(__dirname, 'codecrucible-rust-executor.linux-arm-gnueabihf.node')
-        );
-        try {
-          if (localFileExisted) {
-            nativeBinding = require('./codecrucible-rust-executor.linux-arm-gnueabihf.node');
-          } else {
-            nativeBinding = require('@codecrucible/rust-executor-linux-arm-gnueabihf');
-          }
-        } catch (e) {
-          loadError = e;
-        }
-        break;
-      case 'riscv64':
-        if (isMusl()) {
-          localFileExisted = existsSync(
-            join(__dirname, 'codecrucible-rust-executor.linux-riscv64-musl.node')
-          );
-          try {
-            if (localFileExisted) {
-              nativeBinding = require('./codecrucible-rust-executor.linux-riscv64-musl.node');
-            } else {
-              nativeBinding = require('@codecrucible/rust-executor-linux-riscv64-musl');
-            }
-          } catch (e) {
-            loadError = e;
-          }
-        } else {
-          localFileExisted = existsSync(
-            join(__dirname, 'codecrucible-rust-executor.linux-riscv64-gnu.node')
-          );
-          try {
-            if (localFileExisted) {
-              nativeBinding = require('./codecrucible-rust-executor.linux-riscv64-gnu.node');
-            } else {
-              nativeBinding = require('@codecrucible/rust-executor-linux-riscv64-gnu');
-            }
-          } catch (e) {
-            loadError = e;
-          }
-        }
-        break;
-      case 's390x':
-        localFileExisted = existsSync(
-          join(__dirname, 'codecrucible-rust-executor.linux-s390x-gnu.node')
-        );
-        try {
-          if (localFileExisted) {
-            nativeBinding = require('./codecrucible-rust-executor.linux-s390x-gnu.node');
-          } else {
-            nativeBinding = require('@codecrucible/rust-executor-linux-s390x-gnu');
-          }
-        } catch (e) {
-          loadError = e;
-        }
-        break;
-      default:
-        throw new Error(`Unsupported architecture on Linux: ${arch}`);
-    }
-    break;
-  default:
-    throw new Error(`Unsupported OS: ${platform}, architecture: ${arch}`);
-}
-
-if (!nativeBinding) {
-  if (loadError) {
-    throw loadError;
-  }
-  throw new Error(`Failed to load native binding`);
-}
+const nativeBinding = loadBinding();
 
 const {
   RustExecutor,
@@ -308,9 +91,11 @@ const {
   SecurityLevel,
 } = nativeBinding;
 
-module.exports.RustExecutor = RustExecutor;
-module.exports.createRustExecutor = createRustExecutor;
-module.exports.initLogging = initLogging;
-module.exports.getVersion = getVersion;
-module.exports.benchmarkExecution = benchmarkExecution;
-module.exports.SecurityLevel = SecurityLevel;
+module.exports = {
+  RustExecutor,
+  createRustExecutor,
+  initLogging,
+  getVersion,
+  benchmarkExecution,
+  SecurityLevel,
+};

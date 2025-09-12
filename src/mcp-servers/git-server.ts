@@ -5,11 +5,10 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { getRustExecutor } from '../infrastructure/execution/rust/index.js';
+import type { ToolExecutionRequest, ToolExecutionResult } from '@/domain/interfaces/tool-system.js';
 import { logger } from '../infrastructure/logging/logger.js';
 
-const execAsync = promisify(exec);
 
 interface GitConfig {
   repoPath?: string;
@@ -250,42 +249,37 @@ export class GitMCPServer {
   }
 
   private async executeGitCommand(command: string): Promise<GitResult> {
-    try {
-      const { stdout, stderr } = await execAsync(command, {
-        cwd: this.config.repoPath,
-        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-      });
-      return { stdout, stderr, exitCode: 0 };
-    } catch (error: unknown) {
-      let stdout = '';
-      let stderr = '';
-      let exitCode = 1;
-
-      if (typeof error === 'object' && error !== null) {
-        if ('stdout' in error && typeof (error as { stdout?: unknown }).stdout === 'string') {
-          ({ stdout } = error as { stdout: string });
-        }
-        if ('stderr' in error && typeof (error as { stderr?: unknown }).stderr === 'string') {
-          ({ stderr } = error as { stderr: string });
-        } else if (
-          'message' in error &&
-          typeof (error as { message?: unknown }).message === 'string'
-        ) {
-          ({ message: stderr } = error as { message: string });
-        }
-        if ('code' in error && typeof (error as { code?: unknown }).code === 'number') {
-          exitCode = (error as { code: number }).code;
-        }
-      } else if (typeof error === 'string') {
-        stderr = error;
-      }
-
-      return {
-        stdout,
-        stderr,
-        exitCode,
-      };
-    }
+    const split = (cmd: string): { c: string; a: string[] } => {
+      const parts = cmd.split(/\s+/).filter(Boolean);
+      const c = parts.shift() || 'git';
+      return { c, a: parts };
+    };
+    const { c, a } = split(command);
+    const rust = getRustExecutor();
+    await rust.initialize();
+    const req: ToolExecutionRequest = {
+      toolId: 'command',
+      arguments: { command: c, args: a },
+      context: {
+        sessionId: 'git-mcp',
+        workingDirectory: this.config.repoPath || process.cwd(),
+        environment: process.env as Record<string, string>,
+        securityLevel: 'medium',
+        permissions: [],
+        timeoutMs: 60000,
+      },
+    };
+    const result: ToolExecutionResult = await rust.execute(req);
+    const data: unknown = result.result;
+    const outObj = (typeof data === 'object' && data !== null ? (data as any) : {}) as {
+      stdout?: string;
+      stderr?: string;
+      exitCode?: number;
+    };
+    const stdout = typeof outObj.stdout === 'string' ? outObj.stdout : typeof data === 'string' ? (data as string) : '';
+    const stderr = typeof outObj.stderr === 'string' ? outObj.stderr : '';
+    const exitCode = typeof outObj.exitCode === 'number' ? outObj.exitCode : result.success ? 0 : 1;
+    return { stdout, stderr, exitCode };
   }
 
   private async gitStatus(

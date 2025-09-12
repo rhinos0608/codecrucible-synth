@@ -10,15 +10,21 @@ import { createLogger } from '../logging/logger-adapter.js';
 import {
   unifiedToolRegistry,
   ToolDefinition,
-  ToolExecutionContext,
+  ToolExecutionContext as BaseToolExecutionContext,
   ToolExecutionResult,
 } from './unified-tool-registry.js';
+
+// Extend the base context to include recursion prevention flag
+interface ExtendedToolExecutionContext extends BaseToolExecutionContext {
+  _isFromToolRegistry?: boolean;
+}
 import {
   TYPED_TOOL_CATALOG,
   ToolRegistryKey,
   TypedToolIdentifiers,
 } from './typed-tool-identifiers.js';
 import { IMcpManager } from '../../domain/interfaces/mcp-manager.js';
+import { mcpServerRegistry } from '../../mcp-servers/core/mcp-server-registry.js';
 
 const logger = createLogger('ToolRegistrationService');
 
@@ -210,7 +216,10 @@ export class ToolRegistrationService {
               items: { type: 'string' },
               description: 'Command arguments',
             },
-            working_directory: { type: 'string', description: 'Working directory' },
+            workingDirectory: { 
+              type: 'string', 
+              description: 'Working directory - MUST use absolute paths. Use project root or resolve paths relative to it. Example: resolve_project_root() or process.cwd()' 
+            },
           },
           required: ['command'],
         };
@@ -249,43 +258,135 @@ export class ToolRegistrationService {
   }
 
   /**
-   * Create a handler function for a tool that delegates to MCP servers
+   * Create a handler function for a tool that delegates directly to MCP servers
+   * FIXED: Avoid recursive calls to MCPServerManager.executeTool by calling servers directly
    */
   private createHandlerForTool(toolKey: ToolRegistryKey) {
     return async (
       args: Readonly<Record<string, unknown>>,
-      context?: ToolExecutionContext
+      context?: ExtendedToolExecutionContext
     ): Promise<unknown> => {
-      if (!this.mcpManager) {
-        throw new Error(`MCP manager not available for tool ${toolKey}`);
-      }
-
-      // Map tool registry key to actual MCP server tool name
-      const mcpToolName = this.mapToMcpToolName(toolKey);
+      // Map tool registry key to actual MCP server and tool name
+      const serverInfo = this.mapToMcpServer(toolKey);
       const mcpArgs = this.mapArgsToMcpFormat(toolKey, args);
 
-      logger.debug(`Executing tool via MCP: ${toolKey} -> ${mcpToolName}`, {
-        originalArgs: args,
-        mappedArgs: mcpArgs,
-      });
+      logger.debug(
+        `Executing tool directly via MCP server: ${toolKey} -> ${serverInfo.serverId}:${serverInfo.toolName}`,
+        {
+          originalArgs: args,
+          mappedArgs: mcpArgs,
+        }
+      );
 
-      // Call the MCP server through the manager
-      const result = await this.mcpManager.executeTool(mcpToolName, mcpArgs, context || {});
+      try {
+        // FIXED: Call MCP server directly instead of going through MCPServerManager.executeTool
+        // This prevents the circular dependency where ToolRegistrationService -> MCPServerManager -> UnifiedToolRegistry -> ToolRegistrationService
+        const server = await mcpServerRegistry.getServer(serverInfo.serverId);
 
-      if (!result.success) {
-        const errorMessage =
-          typeof result.error === 'string'
-            ? result.error
-            : (result.error as any)?.message || `Tool execution failed: ${mcpToolName}`;
-        throw new Error(errorMessage);
+        if (!server || typeof server !== 'object') {
+          throw new Error(`MCP server ${serverInfo.serverId} not available`);
+        }
+
+        // Check if server has callTool method (direct MCP server call)
+        if ('callTool' in server && typeof (server as any).callTool === 'function') {
+          const result = await (server as any).callTool(serverInfo.toolName, mcpArgs);
+
+          // Handle different result formats from MCP servers
+          if (result && typeof result === 'object' && 'content' in result) {
+            // Standard MCP response format
+            if (result.isError) {
+              throw new Error(
+                Array.isArray(result.content)
+                  ? result.content.map((c: any) => c.text).join('\n')
+                  : 'Tool execution failed'
+              );
+            }
+            return Array.isArray(result.content)
+              ? result.content.map((c: any) => c.text).join('\n')
+              : result.content;
+          }
+
+          return result;
+        }
+
+        // Fallback to direct method calls on server if available
+        const methodName = this.getDirectMethodName(toolKey);
+        if (
+          methodName &&
+          methodName in server &&
+          typeof (server as any)[methodName] === 'function'
+        ) {
+          return await (server as any)[methodName](mcpArgs);
+        }
+
+        // Last resort removed to avoid potential recursion through unified registry
+
+        throw new Error(
+          `No execution method available for tool ${toolKey} on server ${serverInfo.serverId}`
+        );
+      } catch (error) {
+        logger.error(`Direct MCP server call failed for ${toolKey}:`, error);
+        throw error;
       }
-
-      return result.data;
     };
   }
 
   /**
+   * Map tool registry key to MCP server and tool name
+   * FIXED: New method to support direct server routing
+   */
+  private mapToMcpServer(toolKey: ToolRegistryKey): { serverId: string; toolName: string } {
+    switch (toolKey) {
+      case 'filesystem_list':
+        return { serverId: 'filesystem', toolName: 'list_directory' };
+      case 'filesystem_read':
+        return { serverId: 'filesystem', toolName: 'read_file' };
+      case 'filesystem_write':
+        return { serverId: 'filesystem', toolName: 'write_file' };
+      case 'filesystem_stats':
+        return { serverId: 'filesystem', toolName: 'file_stats' };
+      case 'git_status':
+        return { serverId: 'git', toolName: 'git_status' };
+      case 'git_add':
+        return { serverId: 'git', toolName: 'git_add' };
+      case 'git_commit':
+        return { serverId: 'git', toolName: 'git_commit' };
+      case 'execute_command':
+        return { serverId: 'terminal', toolName: 'run_command' };
+      case 'npm_install':
+        return { serverId: 'packageManager', toolName: 'npm_install' };
+      case 'npm_run':
+        return { serverId: 'packageManager', toolName: 'npm_run' };
+      case 'smithery_status':
+        return { serverId: 'smithery', toolName: 'smithery_status' };
+      case 'smithery_refresh':
+        return { serverId: 'smithery', toolName: 'smithery_refresh' };
+      default:
+        return { serverId: 'filesystem', toolName: toolKey };
+    }
+  }
+
+  /**
+   * Get direct method name for server calls (fallback)
+   */
+  private getDirectMethodName(toolKey: ToolRegistryKey): string | null {
+    switch (toolKey) {
+      case 'filesystem_list':
+        return 'listDirectorySecure';
+      case 'filesystem_read':
+        return 'readFileSecure';
+      case 'filesystem_write':
+        return 'writeFileSecure';
+      case 'execute_command':
+        return 'runCommand';
+      default:
+        return null;
+    }
+  }
+
+  /**
    * Map tool registry key to actual MCP server tool name
+   * DEPRECATED: Use mapToMcpServer instead
    */
   private mapToMcpToolName(toolKey: ToolRegistryKey): string {
     switch (toolKey) {

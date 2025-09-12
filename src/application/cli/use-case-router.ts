@@ -417,40 +417,46 @@ export class UseCaseRouter {
    * The AI system prompt should handle the decision of whether to generate code or provide explanations.
    */
   private isCodeGenerationRequest(prompt: string): boolean {
-    // SIMPLIFIED: Let the AI decide based on context and system prompt,
-    // but include explicit checks for very clear generation intents.
+    // REFINED: Distinguish between code generation and simple file operations
     const lowerPrompt = prompt.toLowerCase();
-
-    // Extremely explicit file creation requests
-    const explicitFileCreation = [
-      'create file',
-      'write file',
-      'generate file',
-      'save to file',
-      'write to disk',
-      'create new file',
+    
+    // If it's a simple text/data file creation, use tools not code generation
+    const simpleFilePatterns = [
+      /create.*test.*file/,
+      /create.*text.*file/,
+      /write.*to.*file/,
+      /create.*file.*with.*content/,
+      /write.*content.*to/,
     ];
-    if (explicitFileCreation.some(pattern => lowerPrompt.includes(pattern))) {
+    if (simpleFilePatterns.some(pattern => pattern.test(lowerPrompt))) {
+      return false; // Use tool execution for simple file operations
+    }
+    
+    // Code generation for programming files
+    const codeFileExtensions = ['.ts', '.js', '.py', '.java', '.cpp', '.cs', '.go', '.rs', '.php'];
+    if (codeFileExtensions.some(ext => lowerPrompt.includes(ext))) {
       return true;
     }
-
-    // Strong generation keywords that strongly imply generation intent
-    const strongGenerationKeywords = [
-      'generate',
-      'implement',
-      'scaffold',
-      'bootstrap',
-      'create',
-      'build',
+    
+    // Strong code generation keywords with programming context
+    const codeGenerationKeywords = [
+      'implement function',
+      'create class',
+      'generate component',
+      'scaffold project',
+      'bootstrap app',
+      'build api',
+      'create module',
+      'implement interface',
     ];
-    if (strongGenerationKeywords.some(keyword => lowerPrompt.includes(keyword))) {
+    if (codeGenerationKeywords.some(pattern => lowerPrompt.includes(pattern))) {
       return true;
     }
-
-    // Weaker keywords only count if they appear with an explicit creation context
-    const weakKeywords = ['function', 'class', 'component', 'module'];
-    const creationContext = ['new', 'create', 'make', 'add', 'build'];
-    return weakKeywords.some(
+    
+    // Programming-specific keywords only count if they appear with creation context
+    const codeKeywords = ['function', 'class', 'component', 'module', 'interface', 'api'];
+    const creationContext = ['implement', 'scaffold', 'bootstrap'];
+    return codeKeywords.some(
       keyword =>
         lowerPrompt.includes(keyword) &&
         creationContext.some(context => lowerPrompt.includes(context))

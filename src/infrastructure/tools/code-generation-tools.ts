@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool';
+import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
 import { dirname, isAbsolute, join } from 'path';
-import { UnifiedModelClient } from '../../application/services/client';
+import { UnifiedModelClient } from '../../application/services/client.js';
 
 const GenerateCodeSchema = z.object({
   specification: z.string().describe('Natural language description of what code to generate'),

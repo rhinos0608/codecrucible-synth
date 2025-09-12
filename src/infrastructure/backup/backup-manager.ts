@@ -17,7 +17,7 @@ import { Upload } from '@aws-sdk/lib-storage';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import archiver from 'archiver';
-import tar from 'tar';
+import * as tar from 'tar';
 
 const execAsync = promisify(exec);
 

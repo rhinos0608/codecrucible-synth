@@ -1,6 +1,6 @@
 /**
  * MCP Connection Pool
- * 
+ *
  * Implements connection pooling for MCP servers to address bottlenecks identified
  * in the architectural analysis. Provides:
  * - Connection reuse and pooling
@@ -112,7 +112,7 @@ export class MCPConnectionPool extends EventEmitter {
 
     // Try to get existing idle connection
     let connection = this.getIdleConnection(serverId);
-    
+
     if (!connection) {
       // Create new connection if under limits
       if (this.canCreateNewConnection(serverId)) {
@@ -136,7 +136,11 @@ export class MCPConnectionPool extends EventEmitter {
   /**
    * Return a connection to the pool
    */
-  public releaseConnection(connectionId: string, responseTime?: number, wasError: boolean = false): void {
+  public releaseConnection(
+    connectionId: string,
+    responseTime?: number,
+    wasError: boolean = false
+  ): void {
     const connection = this.findConnectionById(connectionId);
     if (!connection) {
       this.logger.warn(`Attempted to release unknown connection: ${connectionId}`);
@@ -150,7 +154,7 @@ export class MCPConnectionPool extends EventEmitter {
     if (responseTime) {
       // Update rolling average response time
       const weight = 0.1; // Weight for new sample
-      connection.averageResponseTime = 
+      connection.averageResponseTime =
         connection.averageResponseTime * (1 - weight) + responseTime * weight;
     }
 
@@ -163,8 +167,8 @@ export class MCPConnectionPool extends EventEmitter {
     }
 
     this.updateStats();
-    this.emit('connectionReleased', { 
-      connectionId, 
+    this.emit('connectionReleased', {
+      connectionId,
       serverId: connection.serverId,
       wasError,
       responseTime,
@@ -180,7 +184,7 @@ export class MCPConnectionPool extends EventEmitter {
       if (index !== -1) {
         const connection = connections[index];
         connections.splice(index, 1);
-        
+
         // Clean up empty server pools
         if (connections.length === 0) {
           this.connections.delete(serverId);
@@ -235,7 +239,7 @@ export class MCPConnectionPool extends EventEmitter {
     this.connections.clear();
     this.circuitBreakers.clear();
     this.removeAllListeners();
-    
+
     this.logger.info('MCP Connection Pool disposed');
   }
 
@@ -246,8 +250,8 @@ export class MCPConnectionPool extends EventEmitter {
     if (!connections) return null;
 
     // Find healthy, idle connection
-    const idleConnection = connections.find(c => 
-      !c.isActive && c.isHealthy && c.errorCount < this.config.circuitBreakerThreshold
+    const idleConnection = connections.find(
+      c => !c.isActive && c.isHealthy && c.errorCount < this.config.circuitBreakerThreshold
     );
 
     return idleConnection || null;
@@ -256,14 +260,16 @@ export class MCPConnectionPool extends EventEmitter {
   private canCreateNewConnection(serverId: string): boolean {
     const serverConnections = this.connections.get(serverId)?.length || 0;
     const totalConnections = this.getTotalConnectionCount();
-    
-    return serverConnections < this.config.maxConnectionsPerServer &&
-           totalConnections < this.config.maxTotalConnections;
+
+    return (
+      serverConnections < this.config.maxConnectionsPerServer &&
+      totalConnections < this.config.maxTotalConnections
+    );
   }
 
   private async createConnection(serverId: string, serverUrl: string): Promise<MCPConnection> {
     const connectionId = `${serverId}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    
+
     const connection: MCPConnection = {
       id: connectionId,
       serverId,
@@ -335,7 +341,7 @@ export class MCPConnectionPool extends EventEmitter {
 
   private handleConnectionError(connection: MCPConnection): void {
     const serverId = connection.serverId;
-    
+
     // Check if we should open circuit breaker
     if (connection.errorCount >= this.config.circuitBreakerThreshold) {
       let breaker = this.circuitBreakers.get(serverId);
@@ -393,7 +399,8 @@ export class MCPConnectionPool extends EventEmitter {
       activeConnections,
       idleConnections: totalConnections - activeConnections,
       unhealthyConnections,
-      circuitBreakerOpenCount: Array.from(this.circuitBreakers.values()).filter(b => b.isOpen).length,
+      circuitBreakerOpenCount: Array.from(this.circuitBreakers.values()).filter(b => b.isOpen)
+        .length,
       totalRequestsServed: totalRequests,
       averageResponseTime: totalRequests > 0 ? totalResponseTime / totalRequests : 0,
       connectionUtilization: totalConnections > 0 ? activeConnections / totalConnections : 0,
@@ -417,12 +424,12 @@ export class MCPConnectionPool extends EventEmitter {
         try {
           // Perform health check (ping, lightweight request, etc.)
           const isHealthy = await this.checkConnectionHealth(connection);
-          
+
           if (connection.isHealthy !== isHealthy) {
             connection.isHealthy = isHealthy;
             this.logger.info(`Connection ${connection.id} health changed to ${isHealthy}`);
-            this.emit('connectionHealthChanged', { 
-              connectionId: connection.id, 
+            this.emit('connectionHealthChanged', {
+              connectionId: connection.id,
               serverId,
               isHealthy,
             });
@@ -455,7 +462,7 @@ export class MCPConnectionPool extends EventEmitter {
     for (const [serverId, connections] of this.connections.entries()) {
       for (let i = connections.length - 1; i >= 0; i--) {
         const connection = connections[i];
-        
+
         // Remove connections that have been idle too long
         const idleTime = now - connection.lastUsed.getTime();
         if (!connection.isActive && idleTime > this.config.idleTimeoutMs) {

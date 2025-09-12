@@ -13,17 +13,17 @@
  */
 
 import { EventEmitter } from 'events';
-import { IEventBus } from '../../interfaces/event-bus';
-import { IUserInteraction } from '../../interfaces/user-interaction';
+import { IEventBus } from '../../interfaces/event-bus.js';
+import { IUserInteraction } from '../../interfaces/user-interaction.js';
 import {
   UnifiedConfiguration,
   AgentTask,
   AgentResponse,
   ExecutionResult,
   SecurityValidationContext,
-} from '../../types/unified-types';
-import { UnifiedSecurityValidator } from './unified-security-validator';
-import { UnifiedPerformanceSystem } from './unified-performance-system';
+} from '../../types/unified-types.js';
+import { UnifiedSecurityValidator } from './unified-security-validator.js';
+import { UnifiedPerformanceSystem } from './unified-performance-system.js';
 
 // Core Agent Interfaces
 export interface IAgent {

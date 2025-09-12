@@ -105,6 +105,20 @@ export class RustStreamingClient extends EventEmitter {
   }
 
   /**
+   * Send input to an interactive command stream if supported by Rust executor
+   */
+  public async sendInput(sessionId: string, input: string): Promise<boolean> {
+    if (!this.isRustAvailable() || !this.rustExecutor) return false;
+    try {
+      if (typeof (this.rustExecutor as any).send_input === 'function') {
+        (this.rustExecutor as any).send_input(sessionId, input);
+        return true;
+      }
+    } catch {}
+    return false;
+  }
+
+  /**
    * Stream file content with true chunked processing
    */
   public async streamFile(

@@ -197,7 +197,7 @@ export const TYPED_TOOL_CATALOG: Record<ToolRegistryKey, TypedToolDefinition> = 
     description: 'Execute system commands securely',
     isCore: false,
     riskLevel: 'high',
-    aliases: ['exec', 'run', 'command', 'mcp_execute_command'],
+    aliases: ['exec', 'run', 'command', 'bash_run', 'shell_exec', 'mcp_execute_command'],
   },
 
   // Package management

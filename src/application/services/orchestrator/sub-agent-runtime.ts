@@ -10,7 +10,10 @@ export function setSubAgentDependencies(modelClient: IModelClient, mcpManager: I
   mcpManagerRef = mcpManager;
 }
 
-export async function runSubAgent(goal: string, options?: Readonly<SubAgentOptions>): Promise<{
+export async function runSubAgent(
+  goal: string,
+  options?: Readonly<SubAgentOptions>
+): Promise<{
   success: boolean;
   content: string;
   steps: Array<{ action: string; result: unknown }>;
@@ -21,4 +24,3 @@ export async function runSubAgent(goal: string, options?: Readonly<SubAgentOptio
   const agent = new SubAgentOrchestrator(modelClientRef, mcpManagerRef);
   return agent.run(goal, options);
 }
-

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool';
+import { BaseTool } from './base-tool.js';
 import { isAbsolute, join, relative } from 'path';
 // Cache for import results to prevent circular dependency issues
 const importCache = new Map<string, unknown>();

@@ -1,6 +1,6 @@
 /**
  * Voice Memory Manager
- * 
+ *
  * Optimizes memory usage in voice synthesis operations by implementing:
  * - Session-based memory limits
  * - Context window management
@@ -81,7 +81,7 @@ export class VoiceMemoryManager extends EventEmitter {
    */
   public getSession(sessionId: string): VoiceSession {
     let session = this.sessions.get(sessionId);
-    
+
     if (!session) {
       // Check if we're at max concurrent sessions
       if (this.sessions.size >= this.config.maxConcurrentSessions) {
@@ -97,7 +97,7 @@ export class VoiceMemoryManager extends EventEmitter {
         synthesisHistory: [],
         voiceOutputs: new Map(),
       };
-      
+
       this.sessions.set(sessionId, session);
       this.logger.info(`Created new voice session: ${sessionId}`);
     } else {
@@ -112,10 +112,10 @@ export class VoiceMemoryManager extends EventEmitter {
    */
   public addVoiceOutput(sessionId: string, voiceId: string, output: VoiceOutput): void {
     const session = this.getSession(sessionId);
-    
+
     // Calculate memory usage of the new output
     const outputSize = this.calculateOutputSize(output);
-    
+
     // Check session memory limit
     if (session.memoryUsageBytes + outputSize > this.config.maxSessionMemoryMB * 1024 * 1024) {
       this.compressSession(session);
@@ -144,8 +144,10 @@ export class VoiceMemoryManager extends EventEmitter {
     this.updateStats();
 
     // Check for memory alerts
-    if (this.config.enableMemoryAlerts && 
-        session.memoryUsageBytes > this.config.memoryAlertThresholdMB * 1024 * 1024) {
+    if (
+      this.config.enableMemoryAlerts &&
+      session.memoryUsageBytes > this.config.memoryAlertThresholdMB * 1024 * 1024
+    ) {
       this.emitMemoryAlert(session);
     }
   }
@@ -155,7 +157,7 @@ export class VoiceMemoryManager extends EventEmitter {
    */
   public addSynthesisResult(sessionId: string, result: SynthesisResult): void {
     const session = this.getSession(sessionId);
-    
+
     // Keep only last 10 synthesis results to limit memory
     session.synthesisHistory.push(result);
     if (session.synthesisHistory.length > 10) {
@@ -193,7 +195,9 @@ export class VoiceMemoryManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (session) {
       this.sessions.delete(sessionId);
-      this.logger.info(`Cleaned up voice session: ${sessionId}, freed ${(session.memoryUsageBytes / 1024 / 1024).toFixed(2)}MB`);
+      this.logger.info(
+        `Cleaned up voice session: ${sessionId}, freed ${(session.memoryUsageBytes / 1024 / 1024).toFixed(2)}MB`
+      );
       this.updateStats();
     }
   }
@@ -227,7 +231,7 @@ export class VoiceMemoryManager extends EventEmitter {
 
     this.stats.cleanupEvents++;
     this.stats.lastCleanup = new Date();
-    
+
     const cleanedSessions = beforeSessions - this.sessions.size;
     if (cleanedSessions > 0) {
       this.logger.info(`Memory cleanup: removed ${cleanedSessions} expired sessions`);
@@ -251,12 +255,12 @@ export class VoiceMemoryManager extends EventEmitter {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = undefined;
     }
-    
+
     // Clean up all sessions
     for (const sessionId of this.sessions.keys()) {
       this.cleanupSession(sessionId);
     }
-    
+
     this.removeAllListeners();
     this.logger.info('Voice memory manager disposed');
   }
@@ -282,7 +286,7 @@ export class VoiceMemoryManager extends EventEmitter {
 
   private compressSession(session: VoiceSession): void {
     const originalSize = session.memoryUsageBytes;
-    
+
     // Remove older voice outputs, keeping only the most recent ones
     for (const [_voiceId, outputs] of session.voiceOutputs.entries()) {
       if (outputs.length > 20) {
@@ -295,7 +299,8 @@ export class VoiceMemoryManager extends EventEmitter {
 
     // Compress context window if needed
     if (session.contextWindow.length > this.config.maxContextWindowSize / 2) {
-      const toRemove = session.contextWindow.length - Math.floor(this.config.maxContextWindowSize / 2);
+      const toRemove =
+        session.contextWindow.length - Math.floor(this.config.maxContextWindowSize / 2);
       const removed = session.contextWindow.splice(0, toRemove);
       for (const output of removed) {
         session.memoryUsageBytes -= this.calculateOutputSize(output);
@@ -308,7 +313,9 @@ export class VoiceMemoryManager extends EventEmitter {
     }
 
     const savedMemory = originalSize - session.memoryUsageBytes;
-    this.logger.info(`Compressed session ${session.sessionId}, saved ${(savedMemory / 1024 / 1024).toFixed(2)}MB`);
+    this.logger.info(
+      `Compressed session ${session.sessionId}, saved ${(savedMemory / 1024 / 1024).toFixed(2)}MB`
+    );
   }
 
   private cleanupOldestSession(): void {
@@ -340,15 +347,15 @@ export class VoiceMemoryManager extends EventEmitter {
 
     this.stats.totalMemoryUsageMB = totalMemory / 1024 / 1024;
     this.stats.activeSessions = this.sessions.size;
-    this.stats.averageSessionSizeMB = this.sessions.size > 0 ? 
-      this.stats.totalMemoryUsageMB / this.sessions.size : 0;
+    this.stats.averageSessionSizeMB =
+      this.sessions.size > 0 ? this.stats.totalMemoryUsageMB / this.sessions.size : 0;
     this.stats.largestSessionMB = largestSession / 1024 / 1024;
   }
 
   private emitMemoryAlert(session: VoiceSession): void {
     this.stats.memoryAlerts++;
     const memoryMB = session.memoryUsageBytes / 1024 / 1024;
-    
+
     this.logger.warn(`Memory alert: Session ${session.sessionId} using ${memoryMB.toFixed(2)}MB`);
     this.emit('memoryAlert', {
       sessionId: session.sessionId,

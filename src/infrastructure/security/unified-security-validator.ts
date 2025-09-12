@@ -1,6 +1,6 @@
 /**
  * Unified Security Validator Implementation
- * 
+ *
  * Infrastructure implementation of the security validation domain interface.
  * This provides concrete security validation functionality.
  */

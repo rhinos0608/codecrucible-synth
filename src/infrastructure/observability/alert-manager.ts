@@ -97,6 +97,7 @@ export class AlertManager {
   private readonly active: Map<string, Alert> = new Map();
   private history: Alert[] = [];
   private logger: ILogger = createConsoleLogger('AlertManager');
+  private metricProvider?: (metric: string, aggregation: AlertCondition['aggregation'], windowMs: number) => number | Promise<number>;
 
   constructor(private config: AlertConfig) {}
 
@@ -113,9 +114,26 @@ export class AlertManager {
   evaluateRules(): void {
     for (const rule of this.rules.values()) {
       if (!rule.enabled) continue;
-      const shouldTrigger = Math.random() < 0.01; // placeholder
-      if (shouldTrigger && !this.active.has(rule.id)) {
-        this.trigger(rule);
+      try {
+        const metricValue = this.getMetricValue(rule.condition);
+        const { warning, critical } = rule.threshold;
+        const shouldTrigger =
+          rule.condition.operator === 'gt'
+            ? metricValue > (rule.severity === 'critical' ? critical : warning)
+            : rule.condition.operator === 'gte'
+              ? metricValue >= (rule.severity === 'critical' ? critical : warning)
+              : rule.condition.operator === 'lt'
+                ? metricValue < (rule.severity === 'critical' ? critical : warning)
+                : rule.condition.operator === 'lte'
+                  ? metricValue <= (rule.severity === 'critical' ? critical : warning)
+                  : rule.condition.operator === 'eq'
+                    ? metricValue === (rule.severity === 'critical' ? critical : warning)
+                    : false;
+        if (shouldTrigger && !this.active.has(rule.id)) {
+          this.trigger(rule, metricValue);
+        }
+      } catch (e) {
+        this.logger.warn(`Alert evaluation error for rule ${rule.name}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
   }
@@ -155,7 +173,35 @@ export class AlertManager {
 
   async shutdown(): Promise<void> {}
 
-  private trigger(rule: AlertRule): void {
+  public setMetricProvider(provider: (metric: string, aggregation: AlertCondition['aggregation'], windowMs: number) => number | Promise<number>): void {
+    this.metricProvider = provider;
+  }
+
+  private getMetricValue(condition: AlertCondition): number {
+    const { metric, aggregation, timeWindow } = condition;
+    if (this.metricProvider) {
+      const v = this.metricProvider(metric, aggregation, timeWindow);
+      if (typeof (v as any)?.then === 'function') {
+        // Note: evaluateRules is sync; for now, use best-effort by ignoring async resolution.
+        // In a future iteration, we can make evaluation async.
+        return NaN;
+      }
+      return v as number;
+    }
+    // Default provider: use process/os metrics
+    if (metric === 'cpu.load1') {
+      try { return require('os').loadavg?.()[0] ?? 0; } catch { return 0; }
+    }
+    if (metric === 'memory.heapUsedMB') {
+      try { return Math.round((process.memoryUsage?.().heapUsed ?? 0) / (1024 * 1024)); } catch { return 0; }
+    }
+    if (metric === 'alerts.active') {
+      return this.active.size;
+    }
+    return 0;
+  }
+
+  private trigger(rule: AlertRule, metricValue?: number): void {
     const alert: Alert = {
       id: Math.random().toString(36).slice(2),
       ruleId: rule.id,
@@ -163,7 +209,7 @@ export class AlertManager {
       status: 'active',
       triggeredAt: new Date(),
       message: `Alert triggered: ${rule.name}`,
-      details: {},
+      details: metricValue !== undefined ? { metric: rule.condition.metric, value: metricValue } : {},
     };
     this.active.set(rule.id, alert);
     this.history.push(alert);

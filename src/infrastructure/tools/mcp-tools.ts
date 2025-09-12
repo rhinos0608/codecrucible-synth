@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool';
-import { logger } from '../logging/logger';
+import { BaseTool } from './base-tool.js';
+import { logger } from '../logging/logger.js';
 import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
-import { ExaSearchTool } from '../../mcp-tools/exa-search-tool';
+import { ExaSearchTool } from '../../mcp-tools/exa-search-tool.js';
 
 // Schema definitions
 const RefDocumentationSchema = z.object({

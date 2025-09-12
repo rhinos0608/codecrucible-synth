@@ -98,8 +98,11 @@ function createParametersForTool(registryKey: ToolRegistryKey): {
       return {
         type: 'object',
         properties: {
-          command: { type: 'string', description: 'The command to execute' },
-          args: { type: 'array', items: { type: 'string' }, description: 'Command arguments' },
+          command: { 
+            type: 'string', 
+            description: 'The command to execute. Valid commands include: node, npm, git, tsc, eslint, prettier, jest, python, pip, cargo, rustc, curl, ping. Use system commands like "node" directly, not wrapper commands.' 
+          },
+          args: { type: 'array', items: { type: 'string' }, description: 'Command arguments as separate array elements' },
           working_directory: {
             type: 'string',
             description: 'Working directory for command execution',

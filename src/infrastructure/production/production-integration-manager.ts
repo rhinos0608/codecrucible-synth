@@ -93,6 +93,16 @@ export class ProductionIntegrationManager extends EventEmitter {
 
   async initializeProductionSystem(): Promise<void> {
     this.emit('initialize:start');
+    // Bootstrap MCP servers for production tool execution (execute_command etc.)
+    try {
+      const { bootstrapMcpServers } = await import('../../mcp-servers/mcp-bootstrap.js');
+      const mcp = await bootstrapMcpServers();
+      if (mcp) {
+        this.orchestrator.setMcpManager(mcp as unknown as import('../../domain/interfaces/mcp-manager.js').IMcpManager);
+      }
+    } catch (e) {
+      logger.warn('Failed to bootstrap MCP servers for production orchestrator', toReadonlyRecord(e));
+    }
     await this.getIntegratedSystemHealth();
     this.emit('initialize:completed');
   }

@@ -16,7 +16,8 @@ child.stderr.on('data', d => {
 
 // Send a prompt a couple seconds after startup
 setTimeout(() => {
-  const prompt = 'Could you do a thorough audit of the rust execution layer? scan the files for issues\n';
+  const prompt =
+    'Could you do a thorough audit of the rust execution layer? scan the files for issues\n';
   try {
     child.stdin.write(prompt);
   } catch {}
@@ -24,7 +25,8 @@ setTimeout(() => {
 
 // Stop after 25s
 setTimeout(() => {
-  try { child.kill(); } catch {}
+  try {
+    child.kill();
+  } catch {}
   process.exit(0);
 }, 25000);
-

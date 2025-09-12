@@ -311,7 +311,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
           processManager,
           providerRepository,
           injectedRustBackend as unknown as
-            | import('../../infrastructure/execution/rust/index.js').RustExecutionBackend
+            | import('../../infrastructure/execution/rust/index.js').ConsolidatedRustSystem
             | null
         );
         logger.info(
@@ -469,21 +469,133 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   }
 
   /**
-   * Create enhanced prompt with explicit tool usage instructions
-   * This is critical to ensure AI uses available tools instead of hallucinating responses
+   * Detect if we're using a small model (8B or less) that needs simplified prompting
    */
-  private createEnhancedPrompt(userPrompt: string, toolsAvailable: boolean): string {
+  private isSmallModel(modelName?: string): boolean {
+    if (!modelName) return false;
+    
+    // Check for common 8B or smaller model patterns
+    const smallModelPatterns = [
+      /8b/i, /7b/i, /3b/i, /1b/i, /0.5b/i,
+      /small/i, /mini/i, /lite/i
+    ];
+    
+    return smallModelPatterns.some(pattern => pattern.test(modelName));
+  }
+
+  /**
+   * Create enhanced prompt with adaptive strategy based on model capabilities
+   * Small models (8B and under) get simplified zero-shot prompts
+   * Large models get comprehensive tool instructions
+   */
+  private createEnhancedPrompt(
+    userPrompt: string,
+    toolsAvailable: boolean,
+    toolNames?: readonly string[],
+    modelName?: string
+  ): string {
     if (!toolsAvailable) {
       return userPrompt;
     }
 
-    // Add concise, direct instructions for tool usage
-    // This works with the system prompt from OllamaProvider
-    const enhancedPrompt = `${userPrompt}
+    const isSmall = this.isSmallModel(modelName);
+    
+    if (isSmall) {
+      // Simplified zero-shot approach for small models (8B and under)
+      return this.createZeroShotToolPrompt(userPrompt, toolNames);
+    } else {
+      // Comprehensive approach for larger models
+      return this.createComprehensiveToolPrompt(userPrompt, toolNames);
+    }
+  }
 
-IMPORTANT: You have access to tools for filesystem operations, git, and system commands. Use these tools proactively to complete the user's request. Don't just describe what you would do - actually use the tools to examine files, run commands, and provide real results based on what you find.`;
+  /**
+   * Pseudo code + natural language hybrid prompt for small models (8B and under)
+   * Uses code-like structures that AI models parse more efficiently
+   */
+  private createZeroShotToolPrompt(userPrompt: string, toolNames?: readonly string[]): string {
+    // Limit tools to avoid overwhelming small models
+    const limitedTools = Array.isArray(toolNames) ? toolNames.slice(0, 3) : [];
+    const toolList = limitedTools.length > 0 
+      ? `\nAVAILABLE_TOOLS = [${limitedTools.map(t => `"${t}"`).join(', ')}]` 
+      : '';
 
-    return enhancedPrompt;
+    return `${userPrompt}
+
+// ALGORITHM: ProcessUserRequest
+// INPUT: user_query, available_tools
+// OUTPUT: tool_call_json OR direct_response
+
+FUNCTION process_request(user_query):
+    IF requires_tool_execution(user_query) THEN
+        selected_tool = analyze_requirements(user_query, AVAILABLE_TOOLS)
+        RETURN tool_call_json(selected_tool, extract_parameters(user_query))
+    ELSE
+        RETURN direct_text_response(user_query)
+    END IF
+
+// TOOL_CALL_JSON FORMAT:
+// {"name": "tool_name", "parameters": {...}}
+
+// EXAMPLES:
+// execute_command: {"name": "execute_command", "parameters": {"command": "node", "args": ["--version"], "workingDirectory": "PROJECT_ROOT_DIRECTORY"}}
+// filesystem_read: {"name": "filesystem_read_file", "parameters": {"path": "/path/to/file"}}
+
+EXECUTE process_request("${userPrompt}")${toolList}`;
+  }
+
+  /**
+   * Pseudo code enhanced comprehensive prompt for larger models
+   * Combines the clarity of pseudo code with comprehensive tool instructions
+   */
+  private createComprehensiveToolPrompt(userPrompt: string, toolNames?: readonly string[]): string {
+    const toolList = Array.isArray(toolNames) && toolNames.length > 0
+      ? `\nAVAILABLE_TOOLS = [${toolNames.slice(0, 20).map(t => `"${t}"`).join(', ')}]`
+      : '';
+
+    return `${userPrompt}
+
+// COMPREHENSIVE ALGORITHM: AdvancedTaskProcessor
+// CAPABILITIES: filesystem_ops, git_ops, system_commands, analysis
+// STRATEGY: proactive_tool_usage, real_results_only
+
+CLASS TaskProcessor:
+    PROPERTY tools = AVAILABLE_TOOLS
+    PROPERTY strategy = "proactive_execution"
+    
+    METHOD process_request(user_query):
+        analysis = analyze_task_requirements(user_query)
+        
+        WHILE NOT task_complete(analysis):
+            IF requires_file_operation(analysis) THEN
+                CALL filesystem_tool(extract_file_params(analysis))
+            ELIF requires_command_execution(analysis) THEN
+                CALL execute_command_tool(extract_cmd_params(analysis))
+            ELIF requires_git_operation(analysis) THEN
+                CALL git_tool(extract_git_params(analysis))
+            END IF
+            
+            UPDATE analysis WITH tool_results
+        END WHILE
+        
+        RETURN comprehensive_response(analysis, tool_results)
+    
+    // TOOL CALL SPECIFICATIONS:
+    METHOD execute_command_tool(params):
+        // Use direct system commands only
+        VALID_COMMANDS = ["node", "npm", "git", "tsc", "eslint", "python", "curl"]
+        INVALID_COMMANDS = ["bash_run", "shell_exec", "wrapper_cmd"]
+        
+        RETURN {"name": "execute_command", "parameters": {
+            "command": select_from(VALID_COMMANDS),
+            "args": split_arguments_array(params.arguments),
+            "workingDirectory": resolve_path(params.directory)
+        }}
+
+// EXECUTION DIRECTIVE: Don't describe actions - execute them
+// OUTPUT REQUIREMENT: Provide real results from actual tool usage
+
+EXECUTE TaskProcessor.process_request("${userPrompt}")${toolList}`;
   }
 
   private async handlePromptRequest(request: WorkflowRequest): Promise<any> {
@@ -519,11 +631,13 @@ IMPORTANT: You have access to tools for filesystem operations, git, and system c
       prompt?: string;
       options?: {
         useTools?: boolean;
+        model?: string;
       };
     }
     const { payload } = request;
     const payloadTyped = payload as PromptPayload;
     const originalPrompt = (payloadTyped.input || payloadTyped.prompt) ?? '';
+    const modelName = payloadTyped.options?.model;
 
     // Get MCP tools for AI model with smart selection (unless disabled)
     const mcpTools =
@@ -531,8 +645,13 @@ IMPORTANT: You have access to tools for filesystem operations, git, and system c
         ? await this.getMCPToolsForModel(originalPrompt)
         : [];
 
-    // Create enhanced prompt with explicit tool usage instructions
-    const enhancedPrompt = this.createEnhancedPrompt(originalPrompt, mcpTools.length > 0);
+    // Create enhanced prompt with adaptive strategy based on model capabilities
+    const enhancedPrompt = this.createEnhancedPrompt(
+      originalPrompt,
+      mcpTools.length > 0,
+      mcpTools.map(t => t.function.name),
+      modelName
+    );
 
     // Log tool usage status
     if (mcpTools.length > 0) {
@@ -629,22 +748,20 @@ IMPORTANT: You have access to tools for filesystem operations, git, and system c
       length: response.toolCalls?.length,
     });
 
-    if (
-      response.toolCalls &&
-      response.toolCalls.length > 0 &&
-      (!modelRequest.provider ||
-        this.providerCapabilityRegistry.supports(modelRequest.provider, 'toolCalling'))
-    ) {
-      return this.toolExecutionRouter.handleToolCalls(
+    // Always give ToolExecutionRouter a chance to extract structured tool calls
+    // from plain text (JSON-as-intent) even when provider didn't emit toolCalls.
+    // The router will no-op and return the original response when nothing is found.
+    try {
+      return await this.toolExecutionRouter.handleToolCalls(
         response,
         request,
         modelRequest,
         async (req: Readonly<ModelRequest>) => this.processModelRequest(req)
       );
+    } catch {
+      // If routing fails for any reason, fall back to the original response
+      return response;
     }
-
-    // If no tool calls or not handled, return the original response
-    return response;
   }
 
   // Tool execution handler

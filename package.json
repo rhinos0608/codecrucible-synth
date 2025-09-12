@@ -42,7 +42,7 @@
     "code-quality": "npm run lint && npm run format:check && npm run typecheck",
     "dev-check": "npm run code-quality && npm run test:smoke",
     "pre-commit": "npm run format && npm run lint:fix",
-    "start": "node dist/index.js",
+    "start": "node dist/index.js --interactive",
     "cli": "npm run build && node dist/index.js",
     "install-global": "npm run build && npm link",
     "test-install": "node scripts/install-and-test.js",
@@ -58,7 +58,9 @@
     "version": "npm run build",
     "postversion": "echo 'Version updated. Run: git push && git push --tags' to deploy manually",
     "release": "npm run build && npm run package:all && npm version patch && npm publish",
-    "artifacts": "cd rust-executor && napi artifacts"
+    "artifacts": "cd rust-executor && napi artifacts",
+    "postinstall": "node scripts/fetch-tree-sitter-grammars.js || true",
+    "build:ts-grammars": "node scripts/build-tree-sitter-grammars.js"
   },
   "publishConfig": {
     "access": "public"
@@ -113,6 +115,7 @@
     "@azure/identity": "^4.0.1",
     "@e2b/code-interpreter": "^1.5.1",
     "@huggingface/inference": "^4.7.1",
+    "@lancedb/lancedb": "^0.22.0",
     "@lmstudio/sdk": "^1.5.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@opentelemetry/api": "^1.9.0",
@@ -162,7 +165,6 @@
     "jsonwebtoken": "^9.0.2",
     "kleur": "^4.1.5",
     "knex": "^3.1.0",
-    "lancedb": "^0.0.1",
     "listr2": "^8.0.1",
     "log-symbols": "^6.0.0",
     "lru-cache": "^11.1.0",
@@ -191,6 +193,7 @@
     "terminal-link": "^3.0.0",
     "tree-kill": "^1.2.2",
     "update-notifier": "^7.0.0",
+    "web-tree-sitter": "^0.20.8",
     "winston": "^3.17.0",
     "wrap-ansi": "^9.0.0",
     "yaml": "^2.8.1",
@@ -213,6 +216,8 @@
     "@types/js-yaml": "^4.0.9",
     "@types/micromatch": "^4.0.6",
     "@types/node": "^20.19.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
     "@types/socket.io": "^3.0.1",
     "@types/tar": "^6.1.13",
     "@types/ws": "^8.5.0",
@@ -238,7 +243,11 @@
     "directories": {
       "output": "build/desktop"
     },
-    "files": ["dist/**/*", "config/**/*", "node_modules/**/*"],
+    "files": [
+      "dist/**/*",
+      "config/**/*",
+      "node_modules/**/*"
+    ],
     "mac": {
       "category": "public.app-category.developer-tools"
     },

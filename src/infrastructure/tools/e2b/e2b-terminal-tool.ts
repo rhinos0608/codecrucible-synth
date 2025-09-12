@@ -4,7 +4,7 @@
  */
 
 import { TerminalMCPServer } from '../../../mcp-servers/terminal-server.js';
-import { AdvancedProcessTool } from '../process-management-tools.js';
+import { RustProcessManager } from '../rust-process-manager.js';
 import { createLogger } from '../../logging/logger-adapter.js';
 import { SecurityValidator } from './security-validator.js';
 import { validateCommand } from '../../../utils/command-security.js';
@@ -41,7 +41,7 @@ export class E2BTerminalTool {
   private sessionCounter = 0;
   private readonly logger = createLogger('E2BTerminal');
   private readonly terminalServer: TerminalMCPServer;
-  private readonly processManager: AdvancedProcessTool;
+  private readonly processManager: RustProcessManager;
   private readonly securityValidator: SecurityValidator;
 
   public constructor(workingDirectory: string = process.cwd()) {
@@ -52,7 +52,7 @@ export class E2BTerminalTool {
       environment: process.env as Record<string, string>,
     });
 
-    this.processManager = new AdvancedProcessTool({ workingDirectory });
+    this.processManager = new RustProcessManager({ workingDirectory });
     this.securityValidator = new SecurityValidator();
 
     this.logger.info('E2BTerminalTool initialized with real backend integrations');
@@ -148,34 +148,34 @@ export class E2BTerminalTool {
           action: 'start',
           command: fullCommand,
           interactive: true,
-          environment: { ...session.environment, ...command.environment },
           timeout: command.timeout || 30000,
         });
 
-        // Handle ProcessManagerResult union type with type guard
-        if ('error' in processResult) {
+        // Handle ProcessManagerResult union type with proper type assertion
+        const result = processResult as { error: string } | { success: true; sessionId: string; initialOutput: string };
+        if ('error' in result) {
           return {
             success: false,
             stdout: '',
-            stderr: processResult.error,
+            stderr: result.error,
             exitCode: 1,
             executionTime: Date.now() - startTime,
           };
         }
 
-        // Store process session ID for later interaction
-        if ('success' in processResult && processResult.success && processResult.sessionId) {
-          session.processSessionId = processResult.sessionId;
+        // Store process session ID for later interaction  
+        if ('success' in result && result.success && result.sessionId) {
+          session.processSessionId = result.sessionId;
         }
 
         return {
-          success: 'success' in processResult ? processResult.success : true,
-          stdout: ('initialOutput' in processResult ? processResult.initialOutput : '') || '',
+          success: 'success' in result ? result.success : true,
+          stdout: ('initialOutput' in result ? result.initialOutput : '') || '',
           stderr: '',
           exitCode: 0,
           executionTime: Date.now() - startTime,
           sessionId:
-            'sessionId' in processResult ? processResult.sessionId || undefined : undefined,
+            'sessionId' in result ? result.sessionId || undefined : undefined,
         };
       }
 
@@ -365,7 +365,7 @@ export class E2BTerminalTool {
       }
 
       // Send input to the interactive process
-      const result = await this.processManager.execute({
+      const rawResult = await this.processManager.execute({
         action: 'interact',
         sessionId: session.processSessionId,
         input,
@@ -373,9 +373,10 @@ export class E2BTerminalTool {
         interactive: true, // Required property
       });
 
+      // Handle ProcessManagerResult union type with proper type assertion
+      const result = rawResult as { error: string } | { success: true; sessionId: string; input: string; output: string; newLines: number };
       session.lastActivity = Date.now();
 
-      // Handle ProcessManagerResult union type with type guard
       if ('error' in result) {
         return {
           success: false,

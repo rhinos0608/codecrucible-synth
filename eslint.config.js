@@ -239,12 +239,14 @@ export default [
           paths: [
             {
               name: '../../domain/services/**',
-              message: 'Infrastructure layer cannot import domain services directly. Use dependency injection with domain interfaces instead.',
+              message:
+                'Infrastructure layer cannot import domain services directly. Use dependency injection with domain interfaces instead.',
               allowTypeImports: false,
             },
             {
               name: '../../../infrastructure/**',
-              message: 'Domain layer cannot import infrastructure. Domain must remain pure and infrastructure-agnostic.',
+              message:
+                'Domain layer cannot import infrastructure. Domain must remain pure and infrastructure-agnostic.',
               allowTypeImports: false,
             },
           ],
@@ -252,13 +254,15 @@ export default [
             {
               group: ['**/infrastructure/**'],
               importNames: ['*'],
-              message: 'Domain layer cannot import from infrastructure layer. Use interfaces and dependency injection.',
+              message:
+                'Domain layer cannot import from infrastructure layer. Use interfaces and dependency injection.',
               allowTypeImports: false,
             },
             {
               group: ['**/domain/services/**'],
               importNames: ['*'],
-              message: 'Infrastructure should not import domain services directly. Use interfaces with dependency injection.',
+              message:
+                'Infrastructure should not import domain services directly. Use interfaces with dependency injection.',
               allowTypeImports: false,
             },
           ],

@@ -8,6 +8,7 @@ config();
 
 import { buildProgram } from './application/cli/program.js';
 import { logger } from './infrastructure/logging/logger.js';
+import { initializeRustExecutor } from './infrastructure/execution/rust/index.js';
 
 // Public re‑exports (preserve package surface)
 export { UnifiedCLI as CLI } from './application/interfaces/unified-cli.js';
@@ -33,6 +34,17 @@ export type * from './domain/interfaces/event-bus.js';
 export type { CLIOptions, CLIContext } from './application/interfaces/unified-cli.js';
 
 export async function main(): Promise<void> {
+  // Initialize Rust bridge early to catch errors at startup
+  try {
+    const ok = await initializeRustExecutor();
+    if (!ok) {
+      logger.warn('Rust executor not available at startup; execution will fallback where configured');
+    } else {
+      logger.info('Rust executor initialized successfully at startup');
+    }
+  } catch (error) {
+    logger.error('Rust executor initialization failed at startup', error instanceof Error ? error : new Error(String(error)));
+  }
   const program = await buildProgram();
   await program.parseAsync(process.argv);
 }

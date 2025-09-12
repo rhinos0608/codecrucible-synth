@@ -390,7 +390,8 @@ export class UnifiedCLICoordinator extends EventEmitter {
         isHealthy,
         healthScore,
         errorStats: {
-          recentErrors: errorStats?.recentErrors as number ?? healthObj.totalErrors as number ?? 0,
+          recentErrors:
+            (errorStats?.recentErrors as number) ?? (healthObj.totalErrors as number) ?? 0,
         },
         ...rawHealth, // Include any additional properties
       };

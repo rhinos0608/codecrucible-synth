@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool';
+import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';

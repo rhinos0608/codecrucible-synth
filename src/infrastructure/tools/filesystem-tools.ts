@@ -5,7 +5,7 @@
  * Eliminates memory accumulation through Rust-backed chunked processing
  */
 
-import { RustExecutionBackend } from '../execution/rust/rust-execution-backend.js';
+import { ConsolidatedRustSystem } from '../execution/rust/index.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { rustStreamingClient } from '../streaming/rust-streaming-client.js';
 import { logger } from '../logging/unified-logger.js';
@@ -17,10 +17,13 @@ import type {
 } from '../streaming/stream-chunk-protocol.js';
 
 export class FilesystemTools {
-  private rustBackend: RustExecutionBackend | null = null;
+  private rustBackend: ConsolidatedRustSystem | null = null;
   private mcpManager: MCPServerManager | null = null;
+  // FIXED: Cache RustExecutor instance to prevent per-call instantiation
+  private cachedRustExecutor: any = null;
+  private rustExecutorInitialized = false;
 
-  public setRustBackend(backend: RustExecutionBackend): void {
+  public setRustBackend(backend: ConsolidatedRustSystem): void {
     this.rustBackend = backend;
   }
 
@@ -28,34 +31,66 @@ export class FilesystemTools {
     this.mcpManager = manager;
   }
 
+  /**
+   * FIXED: Get or create cached RustExecutor instance to avoid per-call instantiation
+   */
+  private async getCachedRustExecutor(): Promise<any | null> {
+    if (this.cachedRustExecutor && this.rustExecutorInitialized) {
+      return this.cachedRustExecutor;
+    }
+
+    try {
+      const { loadRustExecutorSafely } = await import('../../utils/rust-module-loader.js');
+      const { module: rustExecutorModule } = loadRustExecutorSafely();
+
+      if (rustExecutorModule?.RustExecutor) {
+        if (!this.cachedRustExecutor) {
+          this.cachedRustExecutor = new rustExecutorModule.RustExecutor();
+        }
+
+        if (!this.rustExecutorInitialized) {
+          const initialized = await this.cachedRustExecutor.initialize();
+          if (initialized) {
+            this.rustExecutorInitialized = true;
+            logger.info('✅ Cached RustExecutor initialized successfully');
+            return this.cachedRustExecutor;
+          } else {
+            logger.warn('❌ Failed to initialize cached RustExecutor');
+            this.cachedRustExecutor = null;
+            return null;
+          }
+        }
+
+        return this.cachedRustExecutor;
+      }
+    } catch (error) {
+      logger.warn('Failed to create cached RustExecutor:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      this.cachedRustExecutor = null;
+      this.rustExecutorInitialized = false;
+    }
+
+    return null;
+  }
+
   public async readFile(path: Readonly<string>): Promise<string> {
     const startTime = Date.now();
     let lastError: Error | undefined;
 
     // Method 1: Try fast Rust file read (spawn_blocking with std::fs)
-    if (this.rustBackend?.isAvailable()) {
+    // FIXED: Use cached RustExecutor instead of creating new instance per call
+    const cachedExecutor = await this.getCachedRustExecutor();
+    if (cachedExecutor) {
       try {
-        logger.info(`🦀 Using fast Rust file read: ${path}`);
+        logger.info(`🦀 Using cached Rust executor for fast file read: ${path}`);
 
-        // Use the new fast file read method from Rust
-        const { loadRustExecutorSafely } = await import('../../utils/rust-module-loader.js');
-        const { module: rustExecutorModule } = loadRustExecutorSafely();
-
-        if (rustExecutorModule?.RustExecutor) {
-          const executor = new rustExecutorModule.RustExecutor();
-          // Type-safe async initialization
-          const initialized = await executor.initialize();
-          if (initialized) {
-            const content = await executor.read_file_fast(path);
-            logger.info(`✅ Fast Rust read succeeded for ${path} in ${Date.now() - startTime}ms`);
-            return content;
-          }
-        }
-
-        throw new Error('Rust executor not available for fast file read');
+        const content = await cachedExecutor.read_file_fast(path);
+        logger.info(`✅ Cached Rust read succeeded for ${path} in ${Date.now() - startTime}ms`);
+        return content;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        logger.warn('Fast Rust read failed, trying next method', {
+        logger.warn('Cached Rust read failed, trying next method', {
           path,
           error: lastError.message,
         });

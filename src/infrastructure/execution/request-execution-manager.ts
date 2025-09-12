@@ -26,7 +26,7 @@ import { DomainAwareToolOrchestrator } from '../tools/domain-aware-tool-orchestr
 import { requestBatcher } from '../performance/intelligent-request-batcher.js';
 import { adaptiveTuner } from '../performance/adaptive-performance-tuner.js';
 import { requestTimeoutOptimizer } from '../performance/request-timeout-optimizer.js';
-import { RustExecutionBackend } from './rust/index.js';
+import { ConsolidatedRustSystem } from './rust/index.js';
 
 // Define a type for tool results to avoid 'any' and unsafe property access
 export interface ToolResult {
@@ -183,7 +183,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   private readonly providerRepository: Readonly<{
     getProvider: (providerType: ProviderType) => Provider | undefined;
   }>;
-  private _rustBackend: RustExecutionBackend | null;
+  private _rustBackend: ConsolidatedRustSystem | null;
 
   public constructor(
     config: Readonly<ExecutionConfig>,
@@ -191,7 +191,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     providerRepository: Readonly<{
       getProvider: (providerType: ProviderType) => Provider | undefined;
     }>,
-    rustBackend: RustExecutionBackend | null = null
+    rustBackend: ConsolidatedRustSystem | null = null
   ) {
     super();
     this.config = config;
@@ -1049,7 +1049,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   /**
    * Get the Rust execution backend instance
    */
-  public getRustBackend(): RustExecutionBackend | null {
+  public getRustBackend(): ConsolidatedRustSystem | null {
     return this._rustBackend;
   }
 }

@@ -9,10 +9,8 @@ import { createRequire } from 'module';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 import { promisify } from 'util';
-
-const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const require = createRequire(import.meta.url);
@@ -105,6 +103,8 @@ async function checkAutoSetup() {
 async function findMainEntry() {
   // Try different possible locations for the main entry
   const possiblePaths = [
+    // Prefer built distribution first
+    join(__dirname, '../dist/index.js'),
     join(__dirname, '../index.js'),
     join(__dirname, '../src/index.ts'),
     join(__dirname, '../cli.js'),
@@ -125,11 +125,23 @@ async function findMainEntry() {
     process.chdir(packageRoot);
 
     if (existsSync(join(packageRoot, 'package.json'))) {
-      await execAsync('npm run build');
+      // Use spawn to stream output and avoid maxBuffer limits
+      await new Promise((resolve, reject) => {
+        const child = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build'], {
+          cwd: packageRoot,
+          stdio: 'inherit',
+          env: { ...process.env, NODE_OPTIONS: '--max_old_space_size=4096' },
+        });
+        child.on('exit', code => {
+          if (code === 0) resolve();
+          else reject(new Error(`Build failed with exit code ${code}`));
+        });
+        child.on('error', reject);
+      });
       logSuccess('Build completed successfully');
 
       // Check again for dist files
-      const distPath = join(__dirname, '../index.js');
+      const distPath = join(__dirname, '../dist/index.js');
       if (existsSync(distPath)) {
         return distPath;
       }

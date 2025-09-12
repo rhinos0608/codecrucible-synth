@@ -9,6 +9,11 @@
 
 import { logger } from '../infrastructure/logging/unified-logger.js';
 import { toErrorOrUndefined, toReadonlyRecord } from '../utils/type-guards.js';
+import { safeStringify, safeLogger } from '../utils/safe-json.js';
+import {
+  crossPlatformCommands,
+  executeCrossPlatformCommand,
+} from '../utils/cross-platform-commands.js';
 import { type MCPServerDefinition, mcpServerRegistry } from './core/mcp-server-registry.js';
 import { mcpServerLifecycle } from './core/mcp-server-lifecycle.js';
 import { mcpServerMonitoring } from './core/mcp-server-monitoring.js';
@@ -408,7 +413,14 @@ export class MCPServerManager {
           success: true,
           data: result,
           output: {
-            content: typeof result === 'string' ? result : JSON.stringify(result),
+            content:
+              typeof result === 'string'
+                ? result
+                : safeStringify(result, {
+                    maxDepth: 8,
+                    maxStringLength: 2000,
+                    showTypeInfo: false,
+                  }),
             format: typeof result === 'string' ? 'text' : 'json',
           },
           metadata: {
@@ -430,8 +442,8 @@ export class MCPServerManager {
             message: 'Unified tool registry is not available.',
             details: {
               toolName,
-              args: JSON.stringify(args),
-              context: JSON.stringify(context),
+              args: safeLogger.toLogSafe(args),
+              context: safeLogger.toLogSafe(context),
             },
           },
           metadata: {
@@ -449,7 +461,7 @@ export class MCPServerManager {
         resource: 'mcp_tool',
         context: {
           toolName,
-          args: JSON.stringify(args).substring(0, 200),
+          args: safeStringify(args, { maxDepth: 3, maxStringLength: 200, showTypeInfo: false }),
           serverId: this.getServerIdForTool(toolName),
         },
       });
@@ -474,8 +486,8 @@ export class MCPServerManager {
           message: error instanceof Error ? error.message : String(error),
           details: {
             toolName,
-            args: JSON.stringify(args),
-            context: JSON.stringify(context),
+            args: safeLogger.toLogSafe(args),
+            context: safeLogger.toLogSafe(context),
           },
           stack: error instanceof Error ? error.stack : undefined,
         },
@@ -494,8 +506,8 @@ export class MCPServerManager {
   }
 
   /**
-   * Windows fallback for common POSIX command patterns (grep/ls/cat/pwd)
-   * Returns a ToolExecutionResult when handled, otherwise null to continue normal flow.
+   * FIXED: Robust cross-platform command handler replacing brittle regex-based translation
+   * Uses structured command mapping instead of fragile pattern matching
    */
   private async executeCommandWithWindowsFallback(
     rawArgs: Readonly<Record<string, unknown>>,
@@ -510,81 +522,76 @@ export class MCPServerManager {
     const workingDirectory = (rawArgs as { workingDirectory?: string }).workingDirectory;
     const timeout = (rawArgs as { timeout?: number }).timeout as number | undefined;
 
-    // Heuristic: translate common grep usage to Windows pipeline using findstr
-    const fullCmd = argsArray.length > 0 ? `${command} ${argsArray.join(' ')}` : command;
-    const grepMatch = /grep\s+(-[\w]*r[\w]*n?[\w]*E?\b)?\s+["']([^"']+)["']\s+([^|\r\n]+)/i.exec(fullCmd);
-    const excludeMatch = /\|\s*grep\s+-vE?\s+["']([^"']+)["']/i.exec(fullCmd);
-
-    const isGrep = /(^|\s)grep\b/i.test(fullCmd);
-    const isLs = /^ls(\s|$)/i.test(command);
-    const isCat = /^cat(\s|$)/i.test(command);
-    const isPwd = /^pwd(\s|$)/i.test(command);
-
-    // If no recognizable pattern, do not intercept
-    if (!isGrep && !isLs && !isCat && !isPwd) {
+    // Check if we have a cross-platform mapping for this command
+    if (!crossPlatformCommands.hasMapping(command)) {
+      logger.debug(`No cross-platform mapping available for command: ${command}`);
       return null;
     }
 
-    // Build Windows-friendly command via cmd /c
-    let windowsShellCommand = '';
-    if (isGrep) {
-      // Default pattern/path if not captured
-      const pattern = grepMatch?.[2] ?? '';
-      const target = grepMatch?.[3]?.trim() || '.';
-      // Convert glob like src/infrastructure/* → dir /s /b src\infrastructure
-      const normalizedTarget = target.replace(/\*/g, '').replace(/\//g, '\\');
-      const exclude = excludeMatch?.[1];
-      const excludePipe = exclude ? ` | findstr /V /R "${exclude}"` : '';
-      windowsShellCommand = `dir /S /B ${normalizedTarget} | findstr /R /N "${pattern}"${excludePipe}`;
-    } else if (isLs) {
-      windowsShellCommand = 'dir';
-    } else if (isCat) {
-      // cat file → type file (keep original args)
-      const file = argsArray[0] ? String(argsArray[0]) : '';
-      windowsShellCommand = `type ${file}`;
-    } else if (isPwd) {
-      windowsShellCommand = 'cd';
-    }
-
-    if (!windowsShellCommand) return null;
-
     try {
-      // Execute via Terminal server directly to avoid recursion on registry
-      const terminal = (await mcpServerRegistry.getServer('terminal')) as unknown as {
-        callTool: (
-          name: string,
-          args: Readonly<{ command: string; args?: string[]; workingDirectory?: string; timeout?: number; captureOutput?: boolean }>
-        ) => Promise<{ content: Array<{ type: 'text'; text: string }>; isError: boolean }>;
-      };
+      logger.info(
+        `Executing cross-platform command: ${command} with args [${argsArray.join(', ')}]`
+      );
 
-      const result = await terminal.callTool('run_command', {
-        command: 'cmd',
-        args: ['/c', windowsShellCommand],
+      const result = await executeCrossPlatformCommand(command, argsArray, {
         workingDirectory: workingDirectory as string | undefined,
         timeout: typeof timeout === 'number' ? timeout : 30000,
-        captureOutput: true,
+        encoding: 'utf8',
       });
 
-      const outputText = Array.isArray(result.content)
-        ? result.content.map(c => c.text).join('\n')
-        : '';
+      logger.info(
+        `Cross-platform command completed: ${result.translatedCommand} (${result.duration}ms)`
+      );
 
       return {
-        success: !result.isError,
-        data: outputText,
+        success: result.success,
+        data: result.success ? result.stdout : result.stderr,
+        output: {
+          content: result.stdout,
+          format: 'text',
+        },
+        error: result.success
+          ? undefined
+          : {
+              code: 'CommandExecutionError',
+              message: result.stderr || `Command failed with exit code ${result.exitCode}`,
+              details: {
+                originalCommand: result.originalCommand,
+                translatedCommand: result.translatedCommand,
+                exitCode: result.exitCode,
+                stdout: result.stdout,
+                stderr: result.stderr,
+              },
+            },
         metadata: {
-          executionTime: 0,
+          executionTime: result.duration,
           toolName: 'execute_command',
           requestId: (context as { requestId?: string } | undefined)?.requestId,
+          platformTranslation: {
+            original: result.originalCommand,
+            translated: result.translatedCommand,
+            platform: process.platform,
+          },
         },
       } as ToolExecutionResult;
-    } catch (err) {
-      logger.warn('Terminal execution via Windows fallback failed', toReadonlyRecord(err));
+    } catch (error) {
+      logger.error('Cross-platform command execution failed:', {
+        command,
+        args: argsArray,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
       return {
         success: false,
         error: {
-          code: 'WindowsFallbackError',
-          message: err instanceof Error ? err.message : String(err),
+          code: 'CrossPlatformExecutionError',
+          message: error instanceof Error ? error.message : String(error),
+          details: {
+            command,
+            args: argsArray,
+            workingDirectory,
+            supportedCommands: crossPlatformCommands.getSupportedCommands(),
+          },
         },
         metadata: {
           executionTime: 0,
@@ -815,6 +822,7 @@ export class MCPServerManager {
       totalServers: number;
       registryStatus: string;
       smitheryEnabled?: boolean;
+      unknownToolAttempts?: number;
     };
   }> {
     const serverIds = await this.listServers();
@@ -845,6 +853,14 @@ export class MCPServerManager {
         totalServers: serverIds.length,
         registryStatus: 'active',
         smitheryEnabled: !!this.smitheryServer,
+        unknownToolAttempts: (() => {
+          try {
+            const status = unifiedToolRegistry.getRegistryStatus();
+            return status.unknownToolAttempts;
+          } catch {
+            return undefined;
+          }
+        })(),
       },
     };
   }

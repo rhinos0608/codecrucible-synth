@@ -3,7 +3,10 @@
  * Enhanced security validation with enterprise-grade features
  */
 
-import { IUnifiedSecurityValidator, SecurityValidationResult } from '../../domain/interfaces/security-validator.js';
+import {
+  IUnifiedSecurityValidator,
+  SecurityValidationResult,
+} from '../../domain/interfaces/security-validator.js';
 import { ModernInputSanitizer } from './modern-input-sanitizer.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 import type { ILogger } from '../../domain/interfaces/logger.js';
@@ -118,9 +121,10 @@ export class AdvancedSecurityValidator {
         timestamp: new Date(),
         operationType: 'advanced-security-validation',
         userId: typeof context.userId === 'string' ? context.userId : undefined,
-        workingDirectory: typeof context.workingDirectory === 'string' ? context.workingDirectory : process.cwd(),
+        workingDirectory:
+          typeof context.workingDirectory === 'string' ? context.workingDirectory : process.cwd(),
         environment: this.options.enableStrictMode ? 'production' : 'development',
-        permissions: Array.isArray(context.permissions) ? context.permissions as string[] : [],
+        permissions: Array.isArray(context.permissions) ? (context.permissions as string[]) : [],
         metadata: {
           securityLevel: this.options.enableStrictMode ? 'high' : 'medium',
           timeoutMs: 30000,
@@ -221,11 +225,17 @@ export class AdvancedSecurityValidator {
   /**
    * Validate input (alias for validate method for backward compatibility)
    */
-  async validateInput(input: unknown, context: Record<string, unknown> = {}): Promise<ValidationResult> {
+  async validateInput(
+    input: unknown,
+    context: Record<string, unknown> = {}
+  ): Promise<ValidationResult> {
     return await this.validate(input, context);
   }
 
-  async validateBatch(inputs: unknown[], context: Record<string, unknown> = {}): Promise<ValidationResult[]> {
+  async validateBatch(
+    inputs: unknown[],
+    context: Record<string, unknown> = {}
+  ): Promise<ValidationResult[]> {
     const results = await Promise.all(inputs.map(async input => this.validate(input, context)));
 
     // Log batch summary if logging is enabled
@@ -254,7 +264,11 @@ export class AdvancedSecurityValidator {
   }
 
   // Private validation methods
-  private validatePatterns(input: unknown): { isValid: boolean; errors: string[]; warnings: string[] } {
+  private validatePatterns(input: unknown): {
+    isValid: boolean;
+    errors: string[];
+    warnings: string[];
+  } {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -354,7 +368,11 @@ export class AdvancedSecurityValidator {
     return Math.max(depth, ...depths);
   }
 
-  private logValidationResult(result: ValidationResult, input: unknown, context: Record<string, unknown>): void {
+  private logValidationResult(
+    result: ValidationResult,
+    input: unknown,
+    context: Record<string, unknown>
+  ): void {
     const level = result.isValid ? 'info' : 'warn';
     const message =
       `Security validation ${result.isValid ? 'passed' : 'failed'}: ` +

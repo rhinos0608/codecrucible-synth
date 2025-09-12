@@ -31,7 +31,9 @@ export async function buildProgram(): Promise<Command> {
           noResilience?: boolean;
         }>
       ) => {
-        const args = options.interactive ? ['interactive'] : prompt;
+        // Default to interactive mode if no arguments provided
+        const shouldBeInteractive = options.interactive || (prompt.length === 0);
+        const args = shouldBeInteractive ? ['interactive'] : prompt;
         const cliOptions: CLIOptions = {
           verbose: options.verbose ?? false,
           stream: !options.noStream,
@@ -40,7 +42,7 @@ export async function buildProgram(): Promise<Command> {
           performance: !options.noPerformance,
           resilience: !options.noResilience,
         };
-        await runCLI(args, cliOptions, !!options.interactive);
+        await runCLI(args, cliOptions, shouldBeInteractive);
       }
     );
 
@@ -70,6 +72,27 @@ export async function buildProgram(): Promise<Command> {
       const { showStatus } = await import('./help.js');
       await showStatus();
     });
+
+  program
+    .command('tools')
+    .description('List available tools and telemetry')
+    .option('--json', 'Output as JSON')
+    .option('--limit <n>', 'Limit number of names shown', (v: string) => parseInt(v, 10), 50)
+    .action(async (options: Readonly<{ json?: boolean; limit?: number }>) => {
+      // Initialize MCP system before showing tools
+      const { logger } = await import('../../infrastructure/logging/logger.js');
+      logger.info('Initializing MCP system for tools command...');
+      const { bootstrapMcpServers } = await import('../../mcp-servers/mcp-bootstrap.js');
+      await bootstrapMcpServers();
+      
+      const { ToolsCommand } = await import('./tools-command.js');
+      const cmd = new ToolsCommand();
+      await cmd.execute({ json: !!options.json, limit: options.limit });
+    });
+
+  // Vector index commands
+  const { attachIndexCommands } = await import('./index-command.js');
+  attachIndexCommands(program);
 
   return program;
 }

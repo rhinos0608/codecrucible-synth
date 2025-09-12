@@ -1,8 +1,6 @@
 import { access } from 'fs/promises';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { getRustExecutor } from '../infrastructure/execution/rust/index.js';
+import type { ToolExecutionRequest, ToolExecutionResult } from '@/domain/interfaces/tool-system.js';
 import type { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system.js';
 import { type ILogger, createLogger } from '../infrastructure/logging/logger-adapter.js';
 import { type IModelClient } from '../domain/interfaces/model-client.js';
@@ -10,7 +8,12 @@ import type { RuntimeContext } from './enterprise-voice-prompts.js';
 import { type VoiceDefinition, createArchetypeDefinitions } from './archetype-definitions.js';
 import { selectVoices } from './voice-selector.js';
 import { CouncilMode, CouncilOrchestrator } from './council-orchestrator.js';
-import { type SynthesisResult, type VoiceOutput, formatSynthesisResult, synthesizePerspectives } from './perspective-synthesizer.js';
+import {
+  type SynthesisResult,
+  type VoiceOutput,
+  formatSynthesisResult,
+  synthesizePerspectives,
+} from './perspective-synthesizer.js';
 import { CouncilDecisionEngine } from './collaboration/council-decision-engine.js';
 import { VOICE_GROUPS } from './voice-constants.js';
 import { VoiceMemoryManager } from './voice-memory-manager.js';
@@ -48,7 +51,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
       enableMemoryAlerts: true,
       memoryAlertThresholdMB: 128,
     });
-    
+
     // Define types for memory manager events
     interface MemoryAlert {
       sessionId: string;
@@ -61,13 +64,15 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
 
     // Set up memory manager event listeners
     this.memoryManager.on('memoryAlert', (alert: MemoryAlert) => {
-      this.logger.warn(`Voice memory alert: Session ${alert.sessionId} using ${alert.memoryUsageMB.toFixed(2)}MB`);
+      this.logger.warn(
+        `Voice memory alert: Session ${alert.sessionId} using ${alert.memoryUsageMB.toFixed(2)}MB`
+      );
     });
-    
+
     this.memoryManager.on('cleanup', (event: CleanupEvent) => {
       this.logger.info(`Voice memory cleanup: removed ${event.sessionsRemoved} sessions`);
     });
-    
+
     // NOTE: Call initialize() explicitly after construction.
   }
 
@@ -105,8 +110,25 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
 
   private async getCurrentBranch(): Promise<string> {
     try {
-      const { stdout } = await execAsync('git branch --show-current', { encoding: 'utf8' });
-      return stdout.trim();
+      const rust = getRustExecutor();
+      await rust.initialize();
+      const req: ToolExecutionRequest = {
+        toolId: 'command',
+        arguments: { command: 'git', args: ['branch', '--show-current'] },
+        context: {
+          sessionId: 'voice-system',
+          workingDirectory: process.cwd(),
+          environment: process.env as Record<string, string>,
+          securityLevel: 'low',
+          permissions: [],
+          timeoutMs: 10000,
+        },
+      };
+      const res: ToolExecutionResult = await rust.execute(req);
+      const out: unknown = res.result;
+      const outObj = (typeof out === 'object' && out !== null ? (out as any) : {}) as { stdout?: string };
+      const stdout = typeof outObj.stdout === 'string' ? outObj.stdout : typeof out === 'string' ? (out as string) : '';
+      return stdout.trim() || 'unknown';
     } catch {
       return 'unknown';
     }

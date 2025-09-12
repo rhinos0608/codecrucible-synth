@@ -180,10 +180,12 @@ export async function initialize(
 
     // Expose SubAgent dependencies for agent_spawn tool
     try {
-      const { setSubAgentDependencies } = await import('../services/orchestrator/sub-agent-runtime.js');
+      const { setSubAgentDependencies } = await import(
+        '../services/orchestrator/sub-agent-runtime.js'
+      );
       setSubAgentDependencies(
-        (modelClient as unknown) as import('../../domain/interfaces/model-client.js').IModelClient,
-        (mcpServerManager as unknown) as import('../../domain/interfaces/mcp-manager.js').IMcpManager
+        modelClient as unknown as import('../../domain/interfaces/model-client.js').IModelClient,
+        mcpServerManager as unknown as import('../../domain/interfaces/mcp-manager.js').IMcpManager
       );
     } catch (e) {
       logger.warn('Failed to set SubAgent dependencies', toReadonlyRecord(e));
@@ -200,13 +202,14 @@ export async function initialize(
       const fs = await import('fs/promises');
       const path = await import('path');
       const file = path.resolve(process.cwd(), 'codecrucible.md');
-      const content = `# CodeCrucible Synth Overview\n\n`
-        + `This file is generated at startup to summarize the architecture.\n\n`
-        + `## Layers\n- Domain: Core interfaces and types under \`src/domain\`.\n- Application: Orchestrators, services, CLI under \`src/application\`.\n- Infrastructure: Providers, tools, logging, MCP, Rust backend under \`src/infrastructure\`.\n- Providers: Local and hybrid model providers under \`src/providers\`.\n\n`
-        + `## Orchestration\n- Main orchestrator: ConcreteWorkflowOrchestrator.\n- Sub-agent: SubAgentOrchestrator (own context window) via \`agent_spawn\`.\n- Request execution: RequestExecutionManager with Rust backend.\n\n`
-        + `## Tools\n- Built-in suite: bash_run, file_read, file_write, glob_search, grep_search, agent_spawn.\n- Tool calls prefer MCP (JSON-RPC 2.0) via MCPServerManager.\n- Domain-aware selection narrows tools for accuracy/performance.\n\n`
-        + `## Rust Execution\n- High-performance ops via \`RustExecutionBackend\` (N-API).\n- Integrated through RequestExecutionManager and FilesystemTools.\n\n`
-        + `For details, see ARCHITECTURE.md and docs/TOOL_SUITE.md.\n`;
+      const content =
+        `# CodeCrucible Synth Overview\n\n` +
+        `This file is generated at startup to summarize the architecture.\n\n` +
+        `## Layers\n- Domain: Core interfaces and types under \`src/domain\`.\n- Application: Orchestrators, services, CLI under \`src/application\`.\n- Infrastructure: Providers, tools, logging, MCP, Rust backend under \`src/infrastructure\`.\n- Providers: Local and hybrid model providers under \`src/providers\`.\n\n` +
+        `## Orchestration\n- Main orchestrator: ConcreteWorkflowOrchestrator.\n- Sub-agent: SubAgentOrchestrator (own context window) via \`agent_spawn\`.\n- Request execution: RequestExecutionManager with Rust backend.\n\n` +
+        `## Tools\n- Built-in suite: bash_run, file_read, file_write, glob_search, grep_search, agent_spawn.\n- Tool calls prefer MCP (JSON-RPC 2.0) via MCPServerManager.\n- Domain-aware selection narrows tools for accuracy/performance.\n\n` +
+        `## Rust Execution\n- High-performance ops via \`RustExecutionBackend\` (N-API).\n- Integrated through RequestExecutionManager and FilesystemTools.\n\n` +
+        `For details, see ARCHITECTURE.md and docs/TOOL_SUITE.md.\n`;
       await fs.writeFile(file, content, 'utf-8');
       logger.info('Generated codecrucible.md overview at startup');
     } catch (e) {

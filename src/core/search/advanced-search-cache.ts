@@ -1,4 +1,4 @@
-import type { RAGResult } from './types';
+import type { RAGResult } from './types.js';
 
 interface CacheEntry {
   result: RAGResult;

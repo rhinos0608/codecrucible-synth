@@ -95,9 +95,20 @@ export class OllamaProvider implements LLMProvider {
       messages,
       stream: !!onStreamingToken,
       options: {
-        num_ctx: parseEnvInt('MODEL_MAX_CONTEXT_WINDOW', 131072, 1024, 131072),
+        num_ctx:
+          process.env.OLLAMA_NUM_CTX
+            ? parseEnvInt('OLLAMA_NUM_CTX', 8192, 1024, 131072)
+            : parseEnvInt('MODEL_MAX_CONTEXT_WINDOW', 131072, 1024, 131072),
         temperature: typeof options.temperature === 'number' ? options.temperature : 0.7,
         top_p: typeof options.top_p === 'number' ? options.top_p : 0.9,
+        // GPU hints (best-effort): allow env-driven control; safe to include even if ignored by backend
+        ...(process.env.OLLAMA_NUM_GPU
+          ? { num_gpu: parseEnvInt('OLLAMA_NUM_GPU', 1, 0, 64) }
+          : {}),
+        ...(process.env.OLLAMA_NUM_GPU_LAYERS
+          ? { num_gpu_layers: parseEnvInt('OLLAMA_NUM_GPU_LAYERS', 999, 0, 4096) }
+          : {}),
+        ...(process.env.OLLAMA_LOW_VRAM ? { low_vram: true } : {}),
       },
     };
     // If tools were provided by the adapter, include them in the chat request
@@ -164,6 +175,7 @@ export class OllamaProvider implements LLMProvider {
         responseTime: 0,
         model,
         provider: this.name,
+        // LLMResponse uses a flat toolCalls shape; adapters normalize downstream
         toolCalls: toolCalls.map(tc => ({
           id: tc.id ?? '',
           type: 'function',

@@ -126,10 +126,10 @@ export class EnhancedToolIntegration extends EventEmitter {
         // Use the orchestrator to analyze the domain and then execute with base integration
         const toolPrompt = `${toolCall.function.name}: ${toolCall.function.arguments}`;
         // Map LLMFunction[] to expected tool shape
-          const availableTools = (await this.baseToolIntegration.getLLMFunctions()).map(fn => ({
-            name: fn.function.name,
-            function: { name: fn.function.name },
-          }));
+        const availableTools = (await this.baseToolIntegration.getLLMFunctions()).map(fn => ({
+          name: fn.function.name,
+          function: { name: fn.function.name },
+        }));
         const domainAnalysis = this.orchestrator.getToolsForPrompt(toolPrompt, availableTools);
         // Log domain analysis for debugging
         console.log('Domain analysis:', domainAnalysis);
@@ -158,10 +158,10 @@ export class EnhancedToolIntegration extends EventEmitter {
   }
 
   public async getAvailableTools(domain?: string): Promise<LLMFunction[]> {
-      if (!this.baseToolIntegration) {
-        throw new Error('MCP server manager not set for EnhancedToolIntegration');
-      }
-      const baseFunctions: LLMFunction[] = await this.baseToolIntegration.getLLMFunctions();
+    if (!this.baseToolIntegration) {
+      throw new Error('MCP server manager not set for EnhancedToolIntegration');
+    }
+    const baseFunctions: LLMFunction[] = await this.baseToolIntegration.getLLMFunctions();
 
     if (domain && this.config.enableIntelligentRouting) {
       // Map LLMFunction[] to expected tool shape

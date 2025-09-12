@@ -12,13 +12,12 @@ import {
 } from '../runtime/runtime-context.js';
 
 import {
-  RustExecutionBackend,
-  initializeRustExecutor,
-  getRustExecutor,
+  ConsolidatedRustSystem,
+  createRustToolExecutor,
 } from '../../infrastructure/execution/rust/index.js';
 
 interface RuntimeContext extends BaseRuntimeContext {
-  rustBackend?: RustExecutionBackend;
+  rustSystem?: ConsolidatedRustSystem;
 }
 import {
   UnifiedOrchestrationService,
@@ -90,9 +89,9 @@ export class ServiceFactory {
     // Optionally expose unified metrics on the context in the future
     // (kept local for now to minimize API changes)
     void createUnifiedMetrics(metrics);
-    // Initialize Rust execution backend asynchronously and attach to runtime context
+    // Initialize Rust execution system asynchronously and attach to runtime context
     this.ensureRustBackend().catch(err => {
-      this.logger.warn('Error initializing RustExecutionBackend in constructor', err);
+      this.logger.warn('Error initializing ConsolidatedRustSystem in constructor', err);
     });
   }
 
@@ -216,53 +215,28 @@ export class ServiceFactory {
 
   private async ensureRustBackend(): Promise<void> {
     try {
-      // Create bridge and backend
-      const bridge = new BridgeAdapter();
-      await bridge.initialize();
-      await initializeRustExecutor({}, undefined, bridge);
-      const rustBackend = getRustExecutor();
+      // Create consolidated Rust system
+      const rustSystem = createRustToolExecutor();
+      await rustSystem.initialize();
 
-      this.runtimeContext.rustBackend = rustBackend;
+      this.runtimeContext.rustSystem = rustSystem;
 
-      // Also expose the backend to the unified tool registry so tool handlers can use it
+      // Also expose the system to the unified tool registry so tool handlers can use it
       try {
-        unifiedToolRegistry.setRustBackend(rustBackend);
+        unifiedToolRegistry.setRustBackend(rustSystem);
         // Also set the backend on the global ToolIntegration if present
-        setGlobalToolIntegrationRustBackend(rustBackend);
+        setGlobalToolIntegrationRustBackend(rustSystem);
       } catch (e) {
-        this.logger?.warn('Failed to set rustBackend on unifiedToolRegistry', e);
+        this.logger?.warn('Failed to set rustSystem on unifiedToolRegistry', e);
       }
 
-      this.logger?.info('RustExecutionBackend initialized and attached to RuntimeContext');
+      this.logger?.info('ConsolidatedRustSystem initialized and attached to RuntimeContext');
 
-      // Start health reporter using ObservabilityCoordinator's metrics if available
-      try {
-        const obs = getGlobalObservability();
-        if (obs) {
-          const metrics = obs.getMetricsCollector();
-          this.stopBridgeHealth = startBridgeHealthReporter(metrics, bridge, {
-            service: 'rust_bridge',
-            intervalMs: 30000,
-          });
-        } else {
-          // Fallback to a local collector to avoid missing telemetry in dev
-          const metrics = new MetricsCollector({
-            enabled: true,
-            retentionDays: 7,
-            exportInterval: 0,
-            exporters: [],
-          });
-          this.stopBridgeHealth = startBridgeHealthReporter(metrics, bridge, {
-            service: 'rust_bridge',
-            intervalMs: 30000,
-          });
-        }
-      } catch (err) {
-        this.logger?.warn('Failed to start bridge health reporter', err);
-      }
+      // The ConsolidatedRustSystem has built-in health monitoring
+      this.logger?.debug('ConsolidatedRustSystem health monitoring is built-in');
     } catch (err) {
-      this.logger?.warn('Failed to create or initialize RustExecutionBackend', err);
-      this.logger?.info('RustExecutionBackend not available; TypeScript fallback will be used');
+      this.logger?.warn('Failed to create or initialize ConsolidatedRustSystem', err);
+      this.logger?.info('ConsolidatedRustSystem not available; TypeScript fallback will be used');
     }
   }
 }

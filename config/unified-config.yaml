@@ -74,6 +74,27 @@ agent:
   enable_security: true
 
 # ============================================================================
+# REPO INDEXER CONFIGURATION
+# ============================================================================
+indexer:
+  include_globs:
+    - "**/*.{ts,js,tsx,jsx,py,md,mdx,json,yaml,yml}"
+  exclude_globs:
+    - "**/node_modules/**"
+    - "**/.git/**"
+    - "**/dist/**"
+    - "**/build/**"
+    - "**/.next/**"
+    - "**/.cache/**"
+    - "**/*.{png,jpg,jpeg,gif,ico,svg,pdf,zip,tar,gz}"
+  chunk_size: 1200
+  chunk_overlap: 200
+  embeddings:
+    provider: "${EMBEDDING_PROVIDER:openai}"  # openai | huggingface
+    model: "${EMBEDDING_MODEL:text-embedding-3-small}"  # e.g., BAAI/bge-small-en-v1.5
+    prefix: "${EMBEDDING_PREFIX:}"  # Optional instruction prefix for instructor models
+
+# ============================================================================
 # DEBUG CONFIGURATION (from codecrucible.config.json)
 # ============================================================================
 debug:

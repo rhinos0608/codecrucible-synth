@@ -3,7 +3,7 @@
  *
  * Domain layer now only exports interfaces and types.
  * Concrete implementation has been moved to infrastructure layer.
- * 
+ *
  * This maintains backward compatibility for imports while enforcing
  * clean architecture principles.
  */

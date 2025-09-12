@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool';
+import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
 import { dirname, extname, isAbsolute, join } from 'path';
-import { UnifiedModelClient } from '../../application/services/client';
+import { UnifiedModelClient } from '../../application/services/client.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { getRustExecutor } from '../execution/rust/index.js';
 
 const execAsync = promisify(exec);
 
@@ -358,11 +359,26 @@ export class CoverageAnalyzerTool extends BaseTool<typeof AnalyzeCoverageSchema.
 
       console.log(`Analyzing coverage with command: ${coverageCommand}`);
 
-      const { stdout, stderr } = await execAsync(coverageCommand, {
-        cwd: this.agentContext.workingDirectory,
-        timeout: 60000, // 1 minute timeout for coverage analysis
-        maxBuffer: 1024 * 1024 * 10, // 10MB buffer
-      });
+      const rust = getRustExecutor();
+      await rust.initialize();
+      const covParts = coverageCommand.split(' ');
+      const covCmd = covParts[0];
+      const covArgs = covParts.slice(1);
+      const res = await rust.execute({
+        toolId: 'command',
+        arguments: { command: covCmd, args: covArgs },
+        context: {
+          sessionId: 'coverage',
+          workingDirectory: this.agentContext.workingDirectory,
+          environment: process.env as Record<string, string>,
+          securityLevel: 'medium',
+          permissions: [],
+          timeoutMs: 60000,
+        },
+      } as any);
+      const data: any = res.result || {};
+      const stdout = typeof data.stdout === 'string' ? data.stdout : '';
+      const stderr = typeof data.stderr === 'string' ? data.stderr : '';
 
       let result = `Coverage Analysis Complete\n\n`;
 

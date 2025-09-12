@@ -66,6 +66,8 @@ export class UnifiedToolRegistry {
   // Optional runtime-provided execution backend (injected by application layer)
   private rustBackend?: unknown;
   private logger = createLogger('UnifiedToolRegistry');
+  private unknownToolAttempts = 0;
+  private recentUnknownToolRequests: Array<{ name: string; timestamp: number }> = [];
 
   /**
    * Allow application layer to attach a concrete execution backend (e.g. Rust).
@@ -73,6 +75,17 @@ export class UnifiedToolRegistry {
    */
   public setRustBackend(backend: unknown): void {
     this.rustBackend = backend;
+  }
+
+  /**
+   * Record an attempt to execute an unknown tool (for telemetry/health).
+   */
+  public incrementUnknownToolAttempt(name: string): void {
+    this.unknownToolAttempts++;
+    this.recentUnknownToolRequests.push({ name, timestamp: Date.now() });
+    if (this.recentUnknownToolRequests.length > 50) {
+      this.recentUnknownToolRequests.shift();
+    }
   }
 
   public constructor() {
@@ -450,6 +463,8 @@ export class UnifiedToolRegistry {
     totalAliases: number;
     categories: Record<string, number>;
     topTools: Array<{ id: string; successRate: number; avgDuration: number }>;
+    unknownToolAttempts: number;
+    recentUnknownTools: string[];
   } {
     const topTools = Array.from(this.metrics.entries())
       .map(([id, metrics]: readonly [string, ToolMetrics]) => ({
@@ -477,6 +492,11 @@ export class UnifiedToolRegistry {
       totalAliases: this.aliases.size,
       categories,
       topTools,
+      unknownToolAttempts: this.unknownToolAttempts,
+      recentUnknownTools: this.recentUnknownToolRequests
+        .slice(-10)
+        .reverse()
+        .map(e => e.name),
     };
   }
 }

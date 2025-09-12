@@ -16,9 +16,9 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool';
-import { SecureExecutionManager } from '../security/secure-execution-manager';
-import { logger } from '../logging/logger';
+import { BaseTool } from './base-tool.js';
+import { SecureExecutionManager } from '../security/secure-execution-manager.js';
+import { logger } from '../logging/logger.js';
 
 // Schema definitions
 const SecureTerminalExecuteSchema = z.object({

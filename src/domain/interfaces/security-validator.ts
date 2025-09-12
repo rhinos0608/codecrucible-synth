@@ -1,6 +1,6 @@
 /**
  * Domain Security Validator Interface
- * 
+ *
  * Defines contracts for security validation services.
  * Infrastructure implementations must implement these interfaces.
  */
@@ -175,7 +175,7 @@ export interface SecurityMetrics {
 
 /**
  * Unified Security Validator Interface
- * 
+ *
  * This interface must be implemented by infrastructure layer security validators.
  * Domain layer should never depend on concrete implementations.
  */
@@ -185,24 +185,24 @@ export interface IUnifiedSecurityValidator {
     input: string,
     context: SecurityValidationContext
   ): Promise<SecurityValidationResult>;
-  
+
   validateCommand(
     command: string,
     context: SecurityValidationContext
   ): Promise<SecurityValidationResult>;
-  
+
   validateCode(
     code: string,
     language: string,
     context: SecurityValidationContext
   ): Promise<SecurityValidationResult>;
-  
+
   validateFileOperation(
     operation: string,
     path: string,
     context: SecurityValidationContext
   ): Promise<SecurityValidationResult>;
-  
+
   validateNetworkRequest(
     url: string,
     method: string,
@@ -226,7 +226,7 @@ export interface IUnifiedSecurityValidator {
   // Audit and logging
   logSecurityEvent(event: SecurityEvent): void;
   getSecurityMetrics(): SecurityMetrics;
-  
+
   // Lifecycle
   initialize?(): Promise<void>;
   readonly isInitialized?: boolean;

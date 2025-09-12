@@ -27,9 +27,11 @@ import { cleanupApprovalManager } from '../../infrastructure/security/approval-m
 import chalk from 'chalk';
 import { enrichContext, formatOutput, parseCommand, routeThroughTools } from '../cli/index.js';
 import { ApprovalHandler } from '../cli/approval-handler.js';
-import { InteractiveSessionHandler } from '../cli/interactive-session-handler.js';
+import { SessionManager } from '../cli/session-manager.js';
 import { createUnifiedOrchestrationServiceWithContext } from '../services/unified-orchestration-service.js';
 import type { UnifiedConfigurationManager as DomainUnifiedConfigurationManager } from '../../domain/config/config-manager.js';
+import * as readline from 'readline';
+import { getApprovalManager } from '../../infrastructure/security/approval-modes-manager.js';
 
 // NOTE: Some service type declaration files may be missing or RuntimeContext may not be exported
 // from the original module; declare minimal local types here to avoid compile errors while keeping
@@ -84,7 +86,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
 
   // Modular components
   private readonly approvalHandler: ApprovalHandler;
-  private readonly interactiveSessionHandler: InteractiveSessionHandler;
+  private readonly sessionManager: SessionManager;
 
   private readonly context: CLIContext;
   private currentSession: CLISession | null = null;
@@ -136,34 +138,13 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
 
     // Initialize modular components
     this.approvalHandler = new ApprovalHandler(this.userInteraction);
-    this.interactiveSessionHandler = new InteractiveSessionHandler(this.userInteraction, {
-      enableHelp: true,
-      enableStatus: true,
-      enableSuggestions: true,
-      defaultToDryRun: true,
-      showWelcomeMessage: true,
+    this.sessionManager = new SessionManager({
+      historyLimit: 50,
+      sessionTimeout: 300000, // 5 minutes
+      maxConcurrentSessions: 10,
     });
 
-    // Set up callbacks for interactive session handler
-    this.interactiveSessionHandler.setCallbacks({
-      processPrompt: async (prompt: string, options?: Readonly<Record<string, unknown>>) =>
-        this.processPrompt(prompt, options),
-      getSuggestions: async () => {
-        const suggestions = await this.getSuggestions();
-        return suggestions.map(
-          (s: Readonly<{ command: string; description: string; relevance: number }>) => ({
-            command: s.command,
-            description: s.description,
-            relevance: s.relevance,
-          })
-        );
-      },
-      showStatus: async () => {
-        await this.showStatus();
-      },
-      execCommand: async (name: string, args: readonly unknown[]) =>
-        this.execCommand(name, Array.from(args)),
-    });
+    // Session manager is now initialized and ready to use
 
     this.setupEventHandlers();
   }
@@ -203,7 +184,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
     }
 
     const svc = createUnifiedOrchestrationServiceWithContext(
-      runtimeContext as unknown as import('../runtime/runtime-context').RuntimeContext,
+      runtimeContext as unknown as import('../runtime/runtime-context.js').RuntimeContext,
       configurationManager,
       this.userInteraction
     );
@@ -470,8 +451,8 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
       // Silent fail for context status
     }
 
-    // Delegate to InteractiveSessionHandler
-    await this.interactiveSessionHandler.startInteractive(contextInfo);
+    // Create a session for interactive mode
+    this.sessionManager.createSession(this.context.workingDirectory);
   }
 
   /**
@@ -929,6 +910,42 @@ ${chalk.yellow('Capabilities:')}
     // Store wrappers for removal
     this._sigintWrapper = sigintWrapper;
     this._sigtermWrapper = sigtermWrapper;
+
+    // Keybinding: Alt+M toggles approval mode
+    try {
+      if (process.stdin && process.stdin.isTTY) {
+        readline.emitKeypressEvents(process.stdin as unknown as NodeJS.ReadableStream);
+        if (typeof (process.stdin as any).setRawMode === 'function') {
+          (process.stdin as any).setRawMode(true);
+        }
+        process.stdin.on('keypress', async (_str: string, key: any) => {
+          try {
+            if (key && (key.name === 'm') && (key.meta || key.alt)) {
+              const mgr = getApprovalManager();
+              const modes: ReadonlyArray<import('../../infrastructure/security/approval-modes-manager.js').ApprovalMode> = [
+                'auto',
+                'read-only',
+                'full-access',
+                'interactive',
+                'enterprise-audit',
+                'voice-collaborative',
+              ];
+              const current = mgr.getCurrentMode();
+              const idx = Math.max(0, modes.findIndex(m => m === current));
+              const next = modes[(idx + 1) % modes.length];
+              mgr.setMode(next);
+              await this.userInteraction.display(`Approval mode: ${current} → ${next}`);
+              // Note: Terminal command config was removed as part of refactoring
+              // TODO: Implement equivalent functionality in security framework
+            }
+          } catch {
+            // ignore key handling errors
+          }
+        });
+      }
+    } catch {
+      // ignore keybinding setup failures (terminal may not support raw mode)
+    }
   }
 
   // REPLInterface implementation

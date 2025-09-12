@@ -45,6 +45,14 @@ export class WorkflowEngine {
         );
         // Simulate task execution (could be replaced with actual logic)
         const result = await this.deps.scheduler.executeTask(task, resources);
+        // Attempt to release reserved resources if supported
+        try {
+          if (typeof (this.deps.resources as unknown as { release: (id: string, type?: string) => void }).release === 'function') {
+            (this.deps.resources as unknown as { release: (id: string, type?: string) => void }).release(task.id);
+          }
+        } catch {
+          // best-effort
+        }
         taskResults.push({ taskId: task.id, result });
       }
 

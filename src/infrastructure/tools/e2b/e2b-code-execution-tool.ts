@@ -3,7 +3,7 @@
  * Integrates with RustExecutionBackend and security validation for real code execution
  */
 
-import { RustExecutionBackend } from '../../execution/rust/rust-execution-backend.js';
+import { ConsolidatedRustSystem } from '../../execution/rust/index.js';
 import { SecurityValidator } from './security-validator.js';
 import { createLogger } from '../../logging/logger-adapter.js';
 import { TerminalMCPServer } from '@/mcp-servers/terminal-server.js';
@@ -61,7 +61,7 @@ export class E2BCodeExecutionTool {
     'php',
   ];
 
-  private rustBackend: RustExecutionBackend | null;
+  private rustBackend: ConsolidatedRustSystem | null;
   private readonly securityValidator: SecurityValidator;
   private readonly terminalServer: TerminalMCPServer;
   private readonly environments: Map<string, ExecutionEnvironment> = new Map();
@@ -69,7 +69,7 @@ export class E2BCodeExecutionTool {
 
   public constructor(
     workingDirectory: Readonly<string> = process.cwd(),
-    rustBackend?: RustExecutionBackend | null
+    rustBackend?: ConsolidatedRustSystem | null
   ) {
     this.rustBackend = rustBackend ?? null;
 
@@ -84,7 +84,7 @@ export class E2BCodeExecutionTool {
     logger.info('E2BCodeExecutionTool initialized with production backend');
   }
 
-  public setRustBackend(backend: RustExecutionBackend): void {
+  public setRustBackend(backend: ConsolidatedRustSystem): void {
     this.rustBackend = backend;
   }
 

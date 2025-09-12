@@ -1,5 +1,9 @@
 import { randomUUID } from 'crypto';
-import type { IModelClient, ModelRequest, ModelResponse } from '../../../domain/interfaces/model-client.js';
+import type {
+  IModelClient,
+  ModelRequest,
+  ModelResponse,
+} from '../../../domain/interfaces/model-client.js';
 import type { IMcpManager } from '../../../domain/interfaces/mcp-manager.js';
 import type { WorkflowRequest } from '../../../domain/interfaces/workflow-orchestrator.js';
 import { ToolExecutionRouter } from './tool-execution-router.js';
@@ -19,7 +23,11 @@ export class SubAgentOrchestrator {
   private readonly modelClient: IModelClient;
   private readonly mcpManager: IMcpManager;
   private readonly toolRouter: ToolExecutionRouter;
-  private messages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string; tool_call_id?: string }> = [];
+  private messages: Array<{
+    role: 'system' | 'user' | 'assistant' | 'tool';
+    content: string;
+    tool_call_id?: string;
+  }> = [];
 
   public constructor(modelClient: IModelClient, mcpManager: IMcpManager) {
     this.modelClient = modelClient;
@@ -27,7 +35,10 @@ export class SubAgentOrchestrator {
     this.toolRouter = new ToolExecutionRouter(mcpManager);
   }
 
-  public async run(goal: string, options: Readonly<SubAgentOptions> = {}): Promise<{
+  public async run(
+    goal: string,
+    options: Readonly<SubAgentOptions> = {}
+  ): Promise<{
     success: boolean;
     content: string;
     steps: Array<{ action: string; result: unknown }>;
@@ -55,28 +66,34 @@ export class SubAgentOrchestrator {
         model: options.model,
         temperature: options.temperature ?? 0.7,
         stream: false,
-        messages: this.messages.map(m => ({ role: m.role === 'tool' ? 'assistant' : m.role as 'system' | 'user' | 'assistant', content: m.content })),
+        messages: this.messages.map(m => ({
+          role: m.role === 'tool' ? 'assistant' : (m.role as 'system' | 'user' | 'assistant'),
+          content: m.content,
+        })),
       } as ModelRequest;
 
       logger.info('SubAgent step request', { step: i + 1, goal: goal.substring(0, 60) });
       let response: ModelResponse = await this.modelClient.request(req);
 
-      // If tool calls present, process via ToolExecutionRouter to ensure MCP JSON-RPC path
-      if (response.toolCalls && response.toolCalls.length > 0) {
-        const wfReq: WorkflowRequest = {
-          id: workflowId,
-          type: 'tool-execution',
-          payload: {},
-          context: { sessionId: workflowId, workingDirectory: process.cwd(), securityLevel: 'medium' },
-        } as unknown as WorkflowRequest;
+      // Always give ToolExecutionRouter a chance to extract/execute tool calls
+      // (It will return the original response if nothing is detected)
+      const wfReq: WorkflowRequest = {
+        id: workflowId,
+        type: 'tool-execution',
+        payload: {},
+        context: {
+          sessionId: workflowId,
+          workingDirectory: process.cwd(),
+          securityLevel: 'medium',
+        },
+      } as unknown as WorkflowRequest;
 
-        response = await this.toolRouter.handleToolCalls(
-          response,
-          wfReq,
-          req,
-          async (r: Readonly<ModelRequest>) => this.modelClient.request(r)
-        );
-      }
+      response = await this.toolRouter.handleToolCalls(
+        response,
+        wfReq,
+        req,
+        async (r: Readonly<ModelRequest>) => this.modelClient.request(r)
+      );
 
       if (response.content) {
         this.messages.push({ role: 'assistant', content: response.content });
@@ -89,8 +106,10 @@ export class SubAgentOrchestrator {
       }
     }
 
-    const final = this.messages.filter(m => m.role === 'assistant').map(m => m.content).join('\n\n');
+    const final = this.messages
+      .filter(m => m.role === 'assistant')
+      .map(m => m.content)
+      .join('\n\n');
     return { success: true, content: final, steps };
   }
 }
-

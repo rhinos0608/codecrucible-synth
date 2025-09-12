@@ -5,11 +5,14 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { ChildProcess, spawn } from 'child_process';
+import { ChildProcess } from 'child_process';
 import * as path from 'path';
 import { logger } from '../infrastructure/logging/logger.js';
 import { ToolExecutionArgs } from '../domain/interfaces/tool-execution.js';
 import { ToolCallResponse } from './smithery-mcp-server.js';
+import { terminalCommandConfig, TerminalCommandPolicy } from '../config/terminal-command-config.js';
+import { getRustExecutor } from '../infrastructure/execution/rust/index.js';
+import type { ToolExecutionRequest, ToolExecutionResult } from '@/domain/interfaces/tool-system.js';
 
 // Secure command execution using spawn instead of exec to prevent shell injection
 
@@ -36,92 +39,18 @@ export class TerminalMCPServer {
   private readonly config: TerminalConfig;
   private initialized: boolean = false;
   private readonly activeProcesses: Map<string, ChildProcess> = new Map();
+  // FIXED: Use external configuration instead of hard-coded command lists
+  private commandPolicy: TerminalCommandPolicy | null = null;
 
   public constructor(config: TerminalConfig = {}) {
-    const isWin = process.platform === 'win32';
+    // FIXED: Load configuration from external file instead of hard-coding
     this.config = {
       workingDirectory: config.workingDirectory ?? process.cwd(),
-      allowedCommands:
-        config.allowedCommands ??
-        (isWin
-          ? [
-              'cmd',
-              'powershell',
-              'where',
-              'dir',
-              'type',
-              'findstr',
-              'npm',
-              'node',
-              'git',
-              'tsc',
-              'tsx',
-              'eslint',
-              'prettier',
-              'jest',
-              'mocha',
-              'vitest',
-              'python',
-              'pip',
-              'cargo',
-              'rustc',
-              'go',
-            ]
-          : [
-              'npm',
-              'node',
-              'git',
-              'ls',
-              'cat',
-              'pwd',
-              'echo',
-              'mkdir',
-              'touch',
-              'grep',
-              'find',
-              'head',
-              'tail',
-              'wc',
-              'sort',
-              'uniq',
-              'tree',
-              'tsc',
-              'tsx',
-              'eslint',
-              'prettier',
-              'jest',
-              'mocha',
-              'vitest',
-              'curl',
-              'wget',
-              'python',
-              'python3',
-              'pip',
-              'pip3',
-              'cargo',
-              'rustc',
-              'go',
-            ]),
-      blockedCommands: config.blockedCommands ?? [
-        'rm',
-        'del',
-        'sudo',
-        'su',
-        'chmod',
-        'chown',
-        'kill',
-        'killall',
-        'shutdown',
-        'reboot',
-        'halt',
-        'format',
-        'fdisk',
-        'dd',
-        'mkfs',
-        'mount',
-      ],
-      timeout: config.timeout ?? 30000, // 30 seconds default
-      maxOutputSize: config.maxOutputSize ?? 1000000, // 1MB default
+      // These will be loaded from external configuration in initialize()
+      allowedCommands: config.allowedCommands ?? [],
+      blockedCommands: config.blockedCommands ?? [],
+      timeout: config.timeout ?? 30000, // Will be updated from config
+      maxOutputSize: config.maxOutputSize ?? 1000000, // Will be updated from config
       environment: config.environment ?? {},
     };
 
@@ -279,21 +208,40 @@ export class TerminalMCPServer {
     });
   }
 
-  private isCommandAllowed(command: string): boolean {
-    const baseCommand = command.split(' ')[0].toLowerCase();
-
-    // Check blocked commands first
-    for (const blocked of this.config.blockedCommands ?? []) {
-      if (baseCommand.includes(blocked) || command.toLowerCase().includes(blocked)) {
-        return false;
-      }
+  private async isCommandAllowed(command: string, args: string[] = []): Promise<boolean> {
+    // FIXED: Use external configuration for command validation with enhanced checking
+    if (!this.commandPolicy) {
+      logger.warn('Command policy not loaded, denying command execution');
+      return false;
     }
 
-    // Check if command is in allowed list
-    return (this.config.allowedCommands ?? []).some(
-      allowed =>
-        baseCommand === allowed.toLowerCase() || baseCommand.startsWith(allowed.toLowerCase())
-    );
+    try {
+      const validation = await terminalCommandConfig.isCommandAllowed(command, args);
+
+      if (!validation.allowed) {
+        logger.warn(`Command denied: ${command}`, { reason: validation.reason });
+        return false;
+      }
+
+      // Check for suspicious patterns
+      const suspiciousPatterns = await terminalCommandConfig.checkSuspiciousPatterns(command, args);
+      if (suspiciousPatterns.length > 0) {
+        logger.warn(`Suspicious patterns detected in command: ${command}`, {
+          patterns: suspiciousPatterns,
+        });
+        // Log but don't block - this is for monitoring
+      }
+
+      if (validation.requiresApproval) {
+        logger.info(`Command requires approval: ${command}`, { args });
+        // For now, log the requirement - in a full implementation, this would trigger an approval workflow
+      }
+
+      return true;
+    } catch (error) {
+      logger.error('Error validating command:', { command, error });
+      return false; // Fail secure
+    }
   }
 
   private async executeCommand(
@@ -305,85 +253,68 @@ export class TerminalMCPServer {
     const startTime = Date.now();
 
     // Security: Check command against allow-list before parsing arguments
-    if (!this.isCommandAllowed(command)) {
-      throw new Error(`Command not allowed: ${command}`);
+    if (!(await this.isCommandAllowed(command, [...args]))) {
+      const allowedCommands = this.commandPolicy?.allowedCommands.slice(0, 10).join(', ') || 'none';
+      throw new Error(`Command not allowed: ${command}. Available commands include: ${allowedCommands}. Use system commands like 'node', 'npm', 'git' directly instead of wrapper commands.`);
     }
 
-    // Security: Use spawn instead of exec to prevent shell injection
-    // Arguments are passed as separate array elements, not concatenated into shell command
-    return new Promise(resolve => {
-      let stdout = '';
-      let stderr = '';
-      let timedOut = false;
+    const commandTimeout = this.commandPolicy
+      ? await terminalCommandConfig.getCommandTimeout(command)
+      : timeout || this.config.timeout;
 
-      const child = spawn(command, [...args], {
-        cwd: workingDirectory || this.config.workingDirectory,
-        env: { ...process.env, ...this.config.environment },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
+    const rust = getRustExecutor();
+    await rust.initialize();
 
-      // Set up timeout
-      const timeoutMs = timeout || this.config.timeout;
-      const timeoutHandle = setTimeout(() => {
-        timedOut = true;
-        child.kill('SIGTERM');
-        setTimeout(() => {
-          if (!child.killed) {
-            child.kill('SIGKILL');
-          }
-        }, 5000);
-      }, timeoutMs);
+    const req: ToolExecutionRequest = {
+      toolId: 'command',
+      arguments: {
+        command,
+        args: [...args],
+      },
+      context: {
+        sessionId: 'terminal-mcp',
+        workingDirectory: workingDirectory || this.config.workingDirectory || process.cwd(),
+        environment: Object.fromEntries(
+          Object.entries({ ...process.env, ...this.config.environment }).filter(
+            ([_, value]) => value !== undefined
+          )
+        ) as Record<string, string>,
+        securityLevel: 'medium',
+        permissions: [],
+        timeoutMs: commandTimeout,
+      },
+    };
 
-      // Collect stdout
-      child.stdout.on('data', (data: Readonly<Buffer>) => {
-        stdout += data.toString() || '';
-        if (stdout.length > (this.config.maxOutputSize ?? 1024 * 1024)) {
-          child.kill('SIGTERM');
-        }
-      });
-
-      // Collect stderr
-      child.stderr.on('data', (data: Readonly<Buffer>) => {
-        stderr += data.toString() || '';
-        if (stderr.length > (this.config.maxOutputSize ?? 1024 * 1024)) {
-          child.kill('SIGTERM');
-        }
-      });
-
-      // Handle completion
-      child.on('close', (code, signal) => {
-        clearTimeout(timeoutHandle);
-        const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
-
-        resolve({
-          stdout,
-          stderr,
-          exitCode: code ?? (signal ? 128 : 1),
-          duration: Date.now() - startTime,
-          command: fullCommand,
-          error: timedOut
-            ? 'Command timed out'
-            : signal
-              ? `Killed by signal: ${signal}`
-              : undefined,
-        });
-      });
-
-      // Handle spawn errors
-      child.on('error', error => {
-        clearTimeout(timeoutHandle);
-        const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
-
-        resolve({
-          stdout,
-          stderr,
-          exitCode: 1,
-          duration: Date.now() - startTime,
-          command: fullCommand,
-          error: `Failed to start command: ${error.message}`,
-        });
-      });
-    });
+    try {
+      const result: ToolExecutionResult = await rust.execute(req);
+      const data: unknown = result.result;
+      const outObj = (typeof data === 'object' && data !== null ? (data as any) : {}) as {
+        stdout?: string;
+        stderr?: string;
+        exitCode?: number;
+      };
+      const stdout = typeof outObj.stdout === 'string' ? outObj.stdout : typeof data === 'string' ? (data as string) : '';
+      const stderr = typeof outObj.stderr === 'string' ? outObj.stderr : '';
+      const exitCode = typeof outObj.exitCode === 'number' ? outObj.exitCode : result.success ? 0 : 1;
+      const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+      return {
+        stdout,
+        stderr,
+        exitCode,
+        duration: Date.now() - startTime,
+        command: fullCommand,
+      };
+    } catch (error) {
+      const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+      return {
+        stdout: '',
+        stderr: error instanceof Error ? error.message : String(error),
+        exitCode: 1,
+        duration: Date.now() - startTime,
+        command: fullCommand,
+        error: 'Rust execution failed',
+      };
+    }
   }
 
   public async runCommand(
@@ -577,10 +508,40 @@ export class TerminalMCPServer {
     }
   }
 
-  public initialize(): void {
+  public async initialize(): Promise<void> {
     if (this.initialized) return;
-    this.initialized = true;
-    logger.info('Terminal MCP Server initialized');
+
+    try {
+      // Load command policy from external configuration
+      this.commandPolicy = await terminalCommandConfig.getPolicy();
+
+      // Update config with loaded policy
+      this.config.allowedCommands = this.commandPolicy.allowedCommands;
+      this.config.blockedCommands = this.commandPolicy.blockedCommands;
+      this.config.maxOutputSize = this.commandPolicy.maxOutputSize;
+      this.config.timeout = this.commandPolicy.timeouts.default;
+
+      this.initialized = true;
+      logger.info('Terminal MCP Server initialized with external configuration', {
+        allowedCommands: this.commandPolicy.allowedCommands.length,
+        blockedCommands: this.commandPolicy.blockedCommands.length,
+        maxOutputSize: this.commandPolicy.maxOutputSize,
+        logAllCommands: this.commandPolicy.logAllCommands,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        logger.error('Failed to initialize Terminal MCP Server with external config:', error);
+      } else {
+        logger.error('Failed to initialize Terminal MCP Server with external config:', {
+          error: String(error),
+        });
+      }
+      // Fall back to empty lists for safety
+      this.config.allowedCommands = [];
+      this.config.blockedCommands = [];
+      this.initialized = true;
+      logger.warn('Terminal MCP Server initialized with empty command lists due to config error');
+    }
   }
 
   public shutdown(): void {

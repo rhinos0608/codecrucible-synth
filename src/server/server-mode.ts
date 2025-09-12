@@ -7,7 +7,10 @@
  * @deprecated Use UnifiedServerSystem from domain/services instead
  */
 
-import type { ServerConfiguration, ServerStatus } from '../domain/services/unified-server-system.js';
+import type {
+  ServerConfiguration,
+  ServerStatus,
+} from '../domain/services/unified-server-system.js';
 import { UnifiedServerSystem } from '../domain/services/unified-server-system.js';
 import { UnifiedConfigurationManager } from '../domain/config/config-manager.js';
 import { createEventBus } from '../infrastructure/messaging/event-bus-factory.js';
@@ -108,9 +111,11 @@ export class ServerMode implements ServerModeInterface {
               context !== null &&
               ('interactive' in context || 'isInteractive' in context)
             ) {
-              return Boolean((context as { interactive?: boolean; isInteractive?: boolean }).interactive ??
-                (context as { isInteractive?: boolean }).isInteractive ??
-                false);
+              return Boolean(
+                (context as { interactive?: boolean; isInteractive?: boolean }).interactive ??
+                  (context as { isInteractive?: boolean }).isInteractive ??
+                  false
+              );
             }
             return false;
           } catch {
@@ -128,12 +133,18 @@ export class ServerMode implements ServerModeInterface {
               context !== null &&
               typeof (context as { prompt?: unknown }).prompt === 'function'
             ) {
-              const promptFn = ((context as unknown) as { prompt: (q: string) => Promise<string> | string }).prompt;
+              const promptFn = (
+                context as unknown as { prompt: (q: string) => Promise<string> | string }
+              ).prompt;
               const result = promptFn(question);
               if (result instanceof Promise) {
                 return await Promise.race([
                   result,
-                  new Promise<string | undefined>((res) => { setTimeout(() => { res(undefined); }, timeoutMs); }),
+                  new Promise<string | undefined>(res => {
+                    setTimeout(() => {
+                      res(undefined);
+                    }, timeoutMs);
+                  }),
                 ]);
               }
               return String(result);
@@ -181,7 +192,8 @@ export class ServerMode implements ServerModeInterface {
           },
 
           async progress(message: string, progress?: number): Promise<void> {
-            const pct = typeof progress === 'number' ? ` (${Math.max(0, Math.min(100, progress))}%)` : '';
+            const pct =
+              typeof progress === 'number' ? ` (${Math.max(0, Math.min(100, progress))}%)` : '';
             logger.info(`[Server] Progress: ${message}${pct}`);
             console.log(`[Server] Progress: ${message}${pct}`);
             publishEvent('user.interaction.progress', { message, progress });
@@ -198,12 +210,17 @@ export class ServerMode implements ServerModeInterface {
                 'prompt' in context &&
                 typeof (context as { prompt?: unknown }).prompt === 'function'
               ) {
-                const promptFn = (context as { prompt: (q: string) => string | Promise<string> }).prompt;
+                const promptFn = (context as { prompt: (q: string) => string | Promise<string> })
+                  .prompt;
                 const resp = promptFn(question);
                 if (resp instanceof Promise) {
                   const result = await Promise.race([
                     resp,
-                    new Promise<string>((res) => { setTimeout(() => { res('yes'); }, 15000); }),
+                    new Promise<string>(res => {
+                      setTimeout(() => {
+                        res('yes');
+                      }, 15000);
+                    }),
                   ]);
                   publishEvent('user.interaction.response', { type: 'prompt', response: result });
                   return result;
@@ -219,7 +236,11 @@ export class ServerMode implements ServerModeInterface {
 
             const defaultResp = 'yes';
             logger.info(`[Server] Prompt fallback auto-responding: ${defaultResp}`);
-            publishEvent('user.interaction.response', { type: 'prompt', response: defaultResp, fallback: true });
+            publishEvent('user.interaction.response', {
+              type: 'prompt',
+              response: defaultResp,
+              fallback: true,
+            });
             return defaultResp;
           },
 
@@ -228,13 +249,19 @@ export class ServerMode implements ServerModeInterface {
             publishEvent('user.interaction.request', { type: 'confirm', question });
 
             try {
-              const ctxWithConfirm = context as { confirm?: (q: string) => boolean | Promise<boolean> };
+              const ctxWithConfirm = context as {
+                confirm?: (q: string) => boolean | Promise<boolean>;
+              };
               if (typeof ctxWithConfirm.confirm === 'function') {
                 const resp = ctxWithConfirm.confirm(question);
                 if (resp instanceof Promise) {
                   const result = await Promise.race([
-                    resp.then((v) => typeof v === 'boolean' ? v : true),
-                    new Promise<boolean>((res) => { setTimeout(() => { res(true); }, 15000); }),
+                    resp.then(v => (typeof v === 'boolean' ? v : true)),
+                    new Promise<boolean>(res => {
+                      setTimeout(() => {
+                        res(true);
+                      }, 15000);
+                    }),
                   ]);
                   publishEvent('user.interaction.response', { type: 'confirm', response: result });
                   return result as boolean;
@@ -250,7 +277,11 @@ export class ServerMode implements ServerModeInterface {
 
             const fallback = true;
             logger.info(`[Server] Confirm fallback auto-responding: ${fallback}`);
-            publishEvent('user.interaction.response', { type: 'confirm', response: fallback, fallback: true });
+            publishEvent('user.interaction.response', {
+              type: 'confirm',
+              response: fallback,
+              fallback: true,
+            });
             return fallback;
           },
 
@@ -263,8 +294,14 @@ export class ServerMode implements ServerModeInterface {
               : [];
             if (normalizedChoices.length === 0) {
               const fallbackChoice = 'default';
-              logger.warn(`[Server] Select called with no choices; returning fallback '${fallbackChoice}'`);
-              publishEvent('user.interaction.response', { type: 'select', response: fallbackChoice, fallback: true });
+              logger.warn(
+                `[Server] Select called with no choices; returning fallback '${fallbackChoice}'`
+              );
+              publishEvent('user.interaction.response', {
+                type: 'select',
+                response: fallbackChoice,
+                fallback: true,
+              });
               return fallbackChoice;
             }
 
@@ -275,26 +312,40 @@ export class ServerMode implements ServerModeInterface {
                   DEFAULT_PROMPT_TIMEOUT_MS
                 );
                 if (typeof external === 'string') {
-                  const match = normalizedChoices.find((c) => typeof c === 'string' && c.toLowerCase() === external.toLowerCase());
+                  const match = normalizedChoices.find(
+                    c => typeof c === 'string' && c.toLowerCase() === external.toLowerCase()
+                  );
                   const response: string = match ?? normalizedChoices[0];
                   publishEvent('user.interaction.response', { type: 'select', response, external });
                   return response;
                 }
               } else {
-                const ctx = context as { select?: (q: string, choices: readonly string[]) => Promise<string> | string };
+                const ctx = context as {
+                  select?: (q: string, choices: readonly string[]) => Promise<string> | string;
+                };
                 if (ctx && typeof ctx.select === 'function') {
                   const resp = ctx.select(question, normalizedChoices);
                   const resolved: string =
                     resp instanceof Promise
                       ? await Promise.race([
                           resp,
-                          new Promise<string>((res) => { setTimeout(() => { res(''); }, DEFAULT_PROMPT_TIMEOUT_MS); }),
+                          new Promise<string>(res => {
+                            setTimeout(() => {
+                              res('');
+                            }, DEFAULT_PROMPT_TIMEOUT_MS);
+                          }),
                         ])
                       : String(resp);
                   if (resolved) {
-                    const match = normalizedChoices.find((c) => typeof c === 'string' && c.toLowerCase() === resolved.toLowerCase());
+                    const match = normalizedChoices.find(
+                      c => typeof c === 'string' && c.toLowerCase() === resolved.toLowerCase()
+                    );
                     const response: string = match ?? normalizedChoices[0];
-                    publishEvent('user.interaction.response', { type: 'select', response, external: resolved });
+                    publishEvent('user.interaction.response', {
+                      type: 'select',
+                      response,
+                      external: resolved,
+                    });
                     return response;
                   }
                 }
@@ -305,7 +356,11 @@ export class ServerMode implements ServerModeInterface {
 
             const [fallback]: string[] = normalizedChoices;
             logger.info(`[Server] Select fallback auto-responding: ${fallback}`);
-            publishEvent('user.interaction.response', { type: 'select', response: fallback, fallback: true });
+            publishEvent('user.interaction.response', {
+              type: 'select',
+              response: fallback,
+              fallback: true,
+            });
             return fallback;
           },
         };
@@ -394,7 +449,8 @@ export class ServerMode implements ServerModeInterface {
         logger.info('Server shutdown initiated via SIGINT');
         console.log(chalk.yellow('\n🛑 Shutting down server...'));
         if (this.unifiedServer) {
-          this.unifiedServer.stopAllServers()
+          this.unifiedServer
+            .stopAllServers()
             .catch((err: unknown) => {
               logger.error('Error during server shutdown', { error: err });
             })
@@ -408,7 +464,8 @@ export class ServerMode implements ServerModeInterface {
         logger.info('Server shutdown initiated via SIGTERM');
         console.log(chalk.yellow('\n🛑 Received SIGTERM, shutting down server...'));
         if (this.unifiedServer) {
-          this.unifiedServer.stopAllServers()
+          this.unifiedServer
+            .stopAllServers()
             .catch((err: unknown) => {
               logger.error('Error during server shutdown', { error: err });
             })

@@ -1,0 +1,350 @@
+# Terminal Command Policy Configuration
+# 
+# Defines allowed and blocked commands for the Terminal MCP Server
+# Addresses Issue: Rigid allow-list in Terminal MCP server
+
+# Default command policies by platform
+command_policies:
+  # Windows command policies
+  windows:
+    allowed_commands:
+      # Basic commands
+      - cmd
+      - powershell
+      - where
+      - dir
+      - type
+      - findstr
+      - echo
+      - cd
+      - mkdir
+      - copy
+      - move
+      - del
+      - rmdir
+      - bash
+      - bash_run
+      - sh
+      
+      # Development tools
+      - npm
+      - node
+      - git
+      - tsc
+      - tsx
+      - ts-node
+      - npx
+      - eslint
+      - prettier
+      - jest
+      - mocha
+      - vitest
+      
+      # Programming languages
+      - python
+      - python3
+      - pip
+      - pip3
+      - cargo
+      - rustc
+      - go
+      
+      # Text processing
+      - more
+      - clip
+      - sort
+      - fc
+      
+      # Network tools
+      - curl
+      - ping
+      - netstat
+      - ipconfig
+      
+    blocked_commands:
+      - format
+      - fdisk
+      - diskpart
+      - shutdown
+      - restart
+      - taskkill
+      - net
+      - sc
+      - reg
+      - runas
+      - psexec
+      - wmic
+      - bcdedit
+      - fsutil
+      
+  # Unix/Linux command policies  
+  unix:
+    allowed_commands:
+      # File operations
+      - ls
+      - cat
+      - head
+      - tail
+      - grep
+      - find
+      - wc
+      - sort
+      - uniq
+      - cut
+      - awk
+      - sed
+      - tr
+      - file
+      - stat
+      - du
+      - df
+      
+      # Directory operations
+      - pwd
+      - cd
+      - mkdir
+      - rmdir
+      - cp
+      - mv
+      - ln
+      - tree
+      - basename
+      - dirname
+      
+      # Text editors
+      - nano
+      - vim
+      - emacs
+      
+      # Development tools
+      - npm
+      - node
+      - git
+      - make
+      - cmake
+      - gcc
+      - clang
+      - tsc
+      - tsx
+      - ts-node
+      - npx
+      - eslint
+      - prettier
+      - jest
+      - mocha
+      - vitest
+      
+      # Programming languages
+      - python
+      - python3
+      - pip
+      - pip3
+      - cargo
+      - rustc
+      - go
+      - java
+      - javac
+      - ruby
+      - php
+      - perl
+      
+      # System information
+      - ps
+      - top
+      - htop
+      - uname
+      - whoami
+      - id
+      - date
+      - uptime
+      - free
+      - lscpu
+      - lsblk
+      - lsusb
+      - which
+      - whereis
+      
+      # Network tools
+      - curl
+      - wget
+      - ping
+      - netstat
+      - ss
+      - dig
+      - nslookup
+      
+      # Archive tools
+      - tar
+      - gzip
+      - gunzip
+      - zip
+      - unzip
+      
+      # Shell utilities
+      - bash
+      - sh
+      - zsh
+      - fish
+      - dash
+      - env
+      - export
+      - alias
+      - history
+      - jobs
+      - bg
+      - fg
+      - nohup
+      - screen
+      - tmux
+      
+    blocked_commands:
+      - sudo
+      - su
+      - rm
+      - chmod
+      - chown
+      - chgrp
+      - mount
+      - umount
+      - fdisk
+      - mkfs
+      - fsck
+      - dd
+      - kill
+      - killall
+      - pkill
+      - halt
+      - shutdown
+      - reboot
+      - poweroff
+      - init
+      - systemctl
+      - service
+      - crontab
+      - at
+      - passwd
+      - adduser
+      - userdel
+      - groupadd
+      - groupdel
+      - iptables
+      - ufw
+      - firewall-cmd
+
+# Environment-specific overrides
+environments:
+  development:
+    # Allow more commands in development
+    additional_allowed:
+      - rm  # Allow rm in development with caution
+      - chmod
+      - kill
+      
+    additional_blocked: []
+    
+  production:
+    # Stricter policies in production
+    additional_allowed: []
+    
+    additional_blocked:
+      - rm
+      - dd
+      - mkfs
+      - fdisk
+      - kill
+      - killall
+      
+  testing:
+    # Similar to development but with some restrictions
+    additional_allowed:
+      - chmod
+      
+    additional_blocked:
+      - rm
+      - dd
+
+# Command argument restrictions
+argument_restrictions:
+  # Prevent dangerous argument patterns
+  rm:
+    blocked_patterns:
+      - ".*-rf.*/"  # Prevent recursive force deletion of root-like paths
+      - ".*/.*"     # Prevent deletion of paths with slashes
+      
+  chmod:
+    blocked_patterns:
+      - ".*777.*"   # Prevent making files world-writable
+      - ".*666.*"   # Prevent making files world-writable
+      
+  kill:
+    blocked_patterns:
+      - ".*-9.*1$"  # Prevent killing init process
+      - ".*-KILL.*1$"
+
+# Timeout settings by command category
+timeouts:
+  default: 30000  # 30 seconds
+  
+  categories:
+    development:
+      - npm: 300000    # 5 minutes for npm operations
+      - cargo: 300000  # 5 minutes for Rust builds
+      - go: 180000     # 3 minutes for Go builds
+      - make: 300000   # 5 minutes for make
+      - cmake: 300000  # 5 minutes for cmake
+      
+    network:
+      - curl: 60000    # 1 minute for curl
+      - wget: 60000    # 1 minute for wget
+      - ping: 15000    # 15 seconds for ping
+      
+    system:
+      - find: 120000   # 2 minutes for find operations
+      - grep: 60000    # 1 minute for grep operations
+      - du: 60000      # 1 minute for disk usage
+      
+# Security settings
+security:
+  # Maximum output size to prevent memory issues
+  max_output_size: 1048576  # 1MB
+  
+  # Working directory restrictions
+  allowed_working_directories:
+    - "."                    # Current directory
+    - "./src"               # Source directory
+    - "./config"            # Config directory
+    - "./docs"              # Documentation
+    - "./tests"             # Test directory
+    - "./scripts"           # Scripts directory
+    - "/tmp"                # Temporary directory
+    - "${HOME}/projects"    # User projects (Unix)
+    - "${USERPROFILE}\\Documents"  # User documents (Windows)
+    
+  # Environment variable restrictions
+  blocked_env_vars:
+    - "PATH"          # Prevent PATH manipulation
+    - "LD_PRELOAD"    # Prevent library hijacking
+    - "SHELL"         # Prevent shell changes
+    
+  # Require explicit approval for high-risk commands
+  require_approval:
+    - rm
+    - chmod
+    - kill
+    - dd
+    - fdisk
+    
+# Logging and monitoring
+monitoring:
+  # Log all command executions
+  log_all_commands: true
+  
+  # Log failed commands with additional context
+  log_failures_verbose: true
+  
+  # Alert on suspicious patterns
+  alert_patterns:
+    - ".*\\.\\./.*"         # Path traversal attempts
+    - ".*; *rm.*"           # Command injection attempts
+    - ".*&& *rm.*"          # Chained dangerous commands
+    - ".*\\| *rm.*"         # Piped dangerous commands

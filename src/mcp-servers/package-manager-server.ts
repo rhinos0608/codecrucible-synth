@@ -5,15 +5,14 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { getRustExecutor } from '../infrastructure/execution/rust/index.js';
+import type { ToolExecutionRequest, ToolExecutionResult } from '@/domain/interfaces/tool-system.js';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { logger } from '../infrastructure/logging/logger.js';
 import { ToolExecutionArgs } from '../domain/interfaces/tool-execution.js';
 import { ToolCallResponse } from './smithery-mcp-server.js';
 
-const execAsync = promisify(exec);
 
 interface PackageManagerConfig {
   workingDirectory?: string;
@@ -169,11 +168,28 @@ export class PackageManagerMCPServer {
       throw new Error(`Package manager ${pkgManager} not allowed`);
     }
 
-    const command = `${pkgManager} install ${name}`;
-    const { stdout, stderr }: { stdout: string; stderr: string } = await execAsync(command, {
-      cwd: this.config.workingDirectory,
-    });
-
+    const rust = getRustExecutor();
+    await rust.initialize();
+    const req: ToolExecutionRequest = {
+      toolId: 'command',
+      arguments: { command: pkgManager, args: ['install', name] },
+      context: {
+        sessionId: 'package-manager-mcp',
+        workingDirectory: this.config.workingDirectory || process.cwd(),
+        environment: process.env as Record<string, string>,
+        securityLevel: 'medium',
+        permissions: [],
+        timeoutMs: 300000,
+      },
+    };
+    const result: ToolExecutionResult = await rust.execute(req);
+    const data: unknown = result.result;
+    const outObj = (typeof data === 'object' && data !== null ? (data as any) : {}) as {
+      stdout?: string;
+      stderr?: string;
+    };
+    const stdout = typeof outObj.stdout === 'string' ? outObj.stdout : typeof data === 'string' ? (data as string) : '';
+    const stderr = typeof outObj.stderr === 'string' ? outObj.stderr : '';
     return { stdout, stderr };
   }
 

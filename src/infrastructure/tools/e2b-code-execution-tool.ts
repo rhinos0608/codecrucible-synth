@@ -1,6 +1,6 @@
-import { BaseTool } from './base-tool';
-import { E2BService, ExecutionResult } from './e2b/e2b-service';
-import { createLogger } from '../logging/logger-adapter';
+import { BaseTool } from './base-tool.js';
+import { E2BService, ExecutionResult } from './e2b/e2b-service.js';
+import { createLogger } from '../logging/logger-adapter.js';
 import { z } from 'zod';
 
 // Define the schema at the top level so we can reference it in the class generic
@@ -60,7 +60,7 @@ export class E2BCodeExecutionTool extends BaseTool<typeof E2BExecuteCodeSchema.s
   ): Promise<ExecutionResult & { sandbox: string; security: string }> {
     try {
       // ✅ SECURITY: Check authentication requirement from centralized security policies
-      const { SecurityPolicyLoader } = await import('../security/security-policy-loader');
+      const { SecurityPolicyLoader } = await import('../security/security-policy-loader.js');
       const policyLoader = SecurityPolicyLoader.getInstance();
       const authConfig = await policyLoader.getAuthConfig();
 

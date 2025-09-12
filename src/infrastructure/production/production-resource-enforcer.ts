@@ -98,41 +98,26 @@ export class ProductionResourceEnforcer extends EventEmitter {
 
   /** Register a new operation with required resources. */
   registerOperation(ctx: OperationResourceContext): boolean {
+    // Start immediately if capacity allows
     if (this.activeOperations.size < this.limits.concurrency.maxConcurrentOperations) {
       ctx.state = 'running';
       ctx.startTime = Date.now();
       this.activeOperations.set(ctx.operationId, ctx);
-
       this.emit('operation-started', ctx.operationId);
       this.updateConcurrencyStats();
       return true;
     }
+
+    // Otherwise, queue if there's space
     if (this.operationQueue.length < this.limits.concurrency.maxQueueSize) {
       ctx.state = 'pending';
       this.operationQueue.push(ctx);
       this.updateConcurrencyStats();
       return true;
-
-      this.emit('operation-start', ctx.operationId);
-    } else if (this.operationQueue.length < this.limits.concurrency.maxQueueSize) {
-      ctx.state = 'pending';
-      this.operationQueue.push(ctx);
-    } else {
-      ctx.state = 'failed';
-      this.rejectedOperations += 1;
-      const violation = this.quota.enforce(
-        ResourceType.CONCURRENCY,
-        this.operationQueue.length,
-        'queued',
-        ctx.operationId
-      );
-      if (violation) {
-        this.recordViolation(violation);
-      }
-      return;
-
     }
 
+    // Reject when queue is full
+    ctx.state = 'failed';
     this.rejectedOperations += 1;
     const violation = this.quota.enforce(
       ResourceType.CONCURRENCY,
@@ -235,57 +220,37 @@ export class ProductionResourceEnforcer extends EventEmitter {
       state: 'pending',
     };
 
-
     const accepted = this.registerOperation(ctx);
     if (!accepted) {
-      ctx.state = 'rejected';
-
-    this.registerOperation(ctx);
-
-    if (ctx.state === 'failed') {
-
+      // Rejected due to resource limits
       throw new Error(`Operation ${operationId} rejected due to resource limits`);
     }
 
+    // If queued, wait until it starts running or times out
     if (ctx.state === 'pending') {
       await new Promise<void>((resolve, reject) => {
         const onStart = (id: string): void => {
           if (id === operationId) {
-
             cleanup();
             resolve();
           }
         };
-        const cleanup = () => {
+
+        const timeoutMs =
+          ctx.timeout && ctx.timeout > 0 ? ctx.timeout : this.limits.concurrency.operationTimeout;
+
+        const timeoutId = setTimeout(() => {
+          this.off('operation-started', onStart);
+          ctx.state = 'failed';
+          reject(new Error(`Timeout waiting for operation ${operationId} to start`));
+        }, timeoutMs);
+
+        const cleanup = (): void => {
           clearTimeout(timeoutId);
           this.off('operation-started', onStart);
         };
+
         this.on('operation-started', onStart);
-        const timeoutMs = ctx.timeout && ctx.timeout > 0 ? ctx.timeout : 60000;
-        const timeoutId = setTimeout(() => {
-          cleanup();
-          reject(new Error(`Timeout waiting for operation ${operationId} to start`));
-
-            clearTimeout(timeoutHandle);
-            this.off('operation-start', onStart);
-            resolve();
-          }
-        };
-        this.on('operation-start', onStart);
-        try {
-          // The Promise will resolve when onStart is called.
-        } finally {
-          // Ensure cleanup if the Promise is rejected or interrupted.
-          this.off('operation-start', onStart);
-        }
-        const timeoutMs =
-          ctx.timeout > 0 ? ctx.timeout : (this.limits?.concurrency?.operationTimeout ?? 60000);
-        const timeoutHandle = setTimeout(() => {
-          this.off('operation-start', onStart);
-          ctx.state = 'failed';
-          reject(new Error(`Operation ${operationId} timed out waiting for start event`));
-
-        }, timeoutMs);
       });
     }
 

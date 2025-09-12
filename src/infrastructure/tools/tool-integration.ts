@@ -4,8 +4,9 @@
  */
 
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
+import { unifiedToolRegistry } from './unified-tool-registry.js';
 import { FilesystemTools } from './filesystem-tools.js';
-import type { RustExecutionBackend as RealRustExecutionBackend } from '../execution/rust/rust-execution-backend.js';
+import type { ConsolidatedRustSystem } from '../execution/rust/index.js';
 import {
   ToolExecutionContext,
   ToolExecutionResult,
@@ -32,8 +33,8 @@ export interface ToolCall {
     arguments: string;
   };
 }
-// Use the real RustExecutionBackend type for type safety
-export type RustExecutionBackend = Readonly<RealRustExecutionBackend>;
+// Use the ConsolidatedRustSystem for type safety
+export type RustExecutionBackend = Readonly<ConsolidatedRustSystem>;
 
 export interface ToolDefinition<TArgs = Record<string, unknown>, TResult = ToolExecutionResult> {
   id: string;
@@ -51,16 +52,58 @@ export interface ToolDefinition<TArgs = Record<string, unknown>, TResult = ToolE
 
 export class ToolIntegration {
   private readonly mcpManager: MCPServerManager;
-  private rustBackend: RustExecutionBackend | null;
+  // Store as read-only to prevent accidental mutation and fix assignability
+  private rustBackend: Readonly<ConsolidatedRustSystem> | null;
   private filesystemTools: FilesystemTools;
   private isInitialized: boolean = false;
   private availableTools: Map<string, ToolDefinition> = new Map();
   private logger = console;
 
-  public constructor(mcpManager: MCPServerManager, rustBackend?: Readonly<RustExecutionBackend>) {
+  public constructor(mcpManager: MCPServerManager, rustBackend?: Readonly<ConsolidatedRustSystem>) {
     this.mcpManager = mcpManager;
     this.rustBackend = rustBackend ?? null;
     this.filesystemTools = new FilesystemTools();
+  }
+
+  private normalizeFunctionName(name: string): string[] {
+    const variants = new Set<string>();
+    const base = name.trim();
+    const lower = base.toLowerCase();
+    const underscore = lower.replace(/[\s-]+/g, '_');
+    const noFileSuffix = underscore.replace(/_file$/, '');
+    const noMcpPrefix = underscore.replace(/^mcp_/, '');
+
+    const withFsPrefix = (n: string) => (n.startsWith('filesystem_') ? n : `filesystem_${n}`);
+    const withFilePrefix = (n: string) => (n.startsWith('file_') ? n : `file_${n}`);
+
+    [base, lower, underscore, noFileSuffix, noMcpPrefix].forEach(v => variants.add(v));
+    [underscore, noFileSuffix, noMcpPrefix].forEach(v => {
+      variants.add(withFsPrefix(v));
+      variants.add(withFilePrefix(v));
+    });
+
+    return Array.from(variants);
+  }
+
+  private suggestTools(input: string, limit = 3): string[] {
+    const names = Array.from(this.availableTools.keys());
+    const distance = (a: string, b: string): number => {
+      const dp: number[][] = Array.from({ length: b.length + 1 }, () => Array(a.length + 1).fill(0));
+      for (let i = 0; i <= a.length; i++) dp[0][i] = i;
+      for (let j = 0; j <= b.length; j++) dp[j][0] = j;
+      for (let j = 1; j <= b.length; j++) {
+        for (let i = 1; i <= a.length; i++) {
+          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          dp[j][i] = Math.min(dp[j][i - 1] + 1, dp[j - 1][i] + 1, dp[j - 1][i - 1] + cost);
+        }
+      }
+      return dp[b.length][a.length];
+    };
+    return names
+      .map(n => ({ n, d: distance(input.toLowerCase(), n.toLowerCase()) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, limit)
+      .map(x => x.n);
   }
 
   /**
@@ -75,11 +118,11 @@ export class ToolIntegration {
   /**
    * Allows setting or updating the Rust backend after construction.
    */
-  public setRustBackend(backend: Readonly<RustExecutionBackend>): void {
+  public setRustBackend(backend: Readonly<ConsolidatedRustSystem>): void {
     this.rustBackend = backend;
     if (typeof this.filesystemTools.setRustBackend === 'function') {
       // Cast to the correct type for FilesystemTools
-      this.filesystemTools.setRustBackend(backend as RealRustExecutionBackend);
+      this.filesystemTools.setRustBackend(backend as ConsolidatedRustSystem);
       this.logger.info('Rust backend updated via setRustBackend');
     }
   }
@@ -96,7 +139,8 @@ export class ToolIntegration {
       // If an injected rustBackend exists, attach it to filesystem tools
       if (this.rustBackend) {
         try {
-          this.filesystemTools.setRustBackend(this.rustBackend as RealRustExecutionBackend);
+          // Pass a mutable view to FilesystemTools when wiring
+          this.filesystemTools.setRustBackend(this.rustBackend as ConsolidatedRustSystem);
           this.logger.info('Injected Rust execution backend attached to filesystem tools');
         } catch (error) {
           this.logger.warn('Failed to attach injected Rust backend to filesystem tools', error);
@@ -210,7 +254,8 @@ export class ToolIntegration {
       functions.push({
         type: 'function',
         function: {
-          name: tool.id,
+          // Prefer the callable name if available to align with what LLM will call
+          name: (tool as unknown as { name?: string }).name || tool.id,
           description: tool.description,
           parameters: {
             type: 'object',
@@ -261,27 +306,49 @@ export class ToolIntegration {
         this.logger.warn('MCP tool execution failed; falling back to internal handlers', mcpError);
       }
 
-      // Lookup by callable name first, then by id fallback
+      // Lookup by callable name first, then by id fallback with normalization variants
       let tool = this.availableTools.get(functionName);
       if (!tool) {
-        // Heuristic fallback: try common id variants
-        const variants = [
-          functionName,
-          functionName.toLowerCase(),
-          functionName.replace(/_file$/, ''),
-          functionName.replace(/^mcp_/, ''),
-        ];
-        for (const v of variants) {
+        for (const v of this.normalizeFunctionName(functionName)) {
           tool = this.availableTools.get(v);
           if (tool) break;
         }
       }
 
       if (!tool) {
+        // As a last resort, try unified registry resolution (wider alias support)
+        try {
+          const registryResult = await unifiedToolRegistry.executeTool(functionName, args, {
+            sessionId: `session_${Date.now()}`,
+            requestId: `tool_${Date.now()}`,
+          });
+          if (registryResult.success) {
+            return {
+              success: true,
+              data: registryResult.data,
+              metadata: {
+                executionTime: registryResult.metadata?.executionTime ?? undefined,
+                toolName: functionName,
+                requestId: `tool_${Date.now()}`,
+              },
+            };
+          }
+        } catch (e) {
+          // ignore, proceed to suggestions
+        }
+
+        // Telemetry: record unknown tool attempt
+        try {
+          unifiedToolRegistry.incrementUnknownToolAttempt(functionName);
+        } catch {}
+
         const availableTools = Array.from(this.availableTools.keys());
-        throw new Error(
-          `Unknown tool: ${functionName}. Available tools: ${availableTools.slice(0, 20).join(', ')}...`
-        );
+        const suggestions = this.suggestTools(functionName, 3);
+        const message = suggestions.length
+          ? `Unknown tool: ${functionName}. Did you mean: ${suggestions.join(', ')}?`
+          : `Unknown tool: ${functionName}. Available: ${availableTools.slice(0, 20).join(', ')}...`;
+        this.logger.warn(message);
+        throw new Error(message);
       }
 
       const context: ToolExecutionContext = {
@@ -360,17 +427,21 @@ export function getGlobalToolIntegration(): ToolIntegration | null {
   return globalToolIntegration;
 }
 
-export function setGlobalToolIntegrationRustBackend(backend: RustExecutionBackend): void {
+export function setGlobalToolIntegrationRustBackend(backend: ConsolidatedRustSystem): void {
   if (globalToolIntegration) {
     try {
       // Attach if method exists
       if (
         typeof (
-          globalToolIntegration as unknown as { setRustBackend?: (b: RustExecutionBackend) => void }
+          globalToolIntegration as unknown as {
+            setRustBackend?: (b: ConsolidatedRustSystem) => void;
+          }
         ).setRustBackend === 'function'
       ) {
         (
-          globalToolIntegration as unknown as { setRustBackend: (b: RustExecutionBackend) => void }
+          globalToolIntegration as unknown as {
+            setRustBackend: (b: ConsolidatedRustSystem) => void;
+          }
         ).setRustBackend(backend);
       }
     } catch (e) {

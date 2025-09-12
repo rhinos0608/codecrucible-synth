@@ -60,7 +60,7 @@ export class EnhancedMCPClientManager extends EventEmitter {
       packageManager: { enabled: false, autoInstall: false, securityScan: true },
     };
     this.baseManager = new MCPServerManager(defaultMCPConfig);
-    
+
     // Initialize connection pool with optimized settings
     this.connectionPool = new MCPConnectionPool(this.logger, {
       maxConnectionsPerServer: this.config.maxConnections || 5,
@@ -76,16 +76,16 @@ export class EnhancedMCPClientManager extends EventEmitter {
     });
 
     // Set up connection pool event listeners
-    this.connectionPool.on('connectionCreated', (event) => {
+    this.connectionPool.on('connectionCreated', event => {
       this.logger.debug(`MCP connection created: ${event.connectionId} for ${event.serverId}`);
     });
 
-    this.connectionPool.on('circuitBreakerOpened', (event) => {
+    this.connectionPool.on('circuitBreakerOpened', event => {
       this.logger.warn(`MCP circuit breaker opened for server: ${event.serverId}`);
       this.emit('serverUnavailable', event);
     });
 
-    this.connectionPool.on('connectionsCleanedUp', (event) => {
+    this.connectionPool.on('connectionsCleanedUp', event => {
       this.logger.info(`MCP connections cleaned up: ${event.removedCount} connections removed`);
     });
 
@@ -136,7 +136,11 @@ export class EnhancedMCPClientManager extends EventEmitter {
   /**
    * Release a connection back to the pool
    */
-  public releaseConnection(connectionId: string, responseTime?: number, wasError: boolean = false): void {
+  public releaseConnection(
+    connectionId: string,
+    responseTime?: number,
+    wasError: boolean = false
+  ): void {
     this.connectionPool.releaseConnection(connectionId, responseTime, wasError);
   }
 

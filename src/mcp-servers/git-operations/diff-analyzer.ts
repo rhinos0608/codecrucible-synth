@@ -1,17 +1,30 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { getRustExecutor } from '../../infrastructure/execution/rust/index.js';
 import type { GitDiffResult } from '../git-types.js';
 
-const execAsync = promisify(exec);
 
 export class DiffAnalyzer {
   public constructor(private readonly repoPath: string = process.cwd()) {}
 
   public async diff(files: string[] = []): Promise<GitDiffResult[]> {
     const target = files.length > 0 ? files.join(' ') : '';
-    const { stdout } = await execAsync(`git diff --numstat ${target}`, {
-      cwd: this.repoPath,
-    });
+    const rust = getRustExecutor();
+    await rust.initialize();
+    const args = ['diff', '--numstat'];
+    if (target) args.push(target);
+    const res = await rust.execute({
+      toolId: 'command',
+      arguments: { command: 'git', args },
+      context: {
+        sessionId: 'git-diff',
+        workingDirectory: this.repoPath,
+        environment: process.env as Record<string, string>,
+        securityLevel: 'low',
+        permissions: [],
+        timeoutMs: 20000,
+      },
+    } as any);
+    const data: any = res.result;
+    const stdout: string = typeof data?.stdout === 'string' ? data.stdout : '';
     return stdout
       .split('\n')
       .filter(Boolean)

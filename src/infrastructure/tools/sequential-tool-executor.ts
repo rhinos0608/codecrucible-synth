@@ -2,7 +2,7 @@ import { createLogger } from '../logging/logger-adapter.js';
 import { ResponseNormalizer } from '../../utils/response-normalizer.js';
 import { DomainAnalysis, DomainAwareToolOrchestrator } from './domain-aware-tool-orchestrator.js';
 import { PerformanceProfiler } from '../performance/profiler.js';
-import { RustExecutionBackend } from '../execution/rust/index.js';
+import { ConsolidatedRustSystem } from '../execution/rust/index.js';
 
 /**
  * Sequential Tool Executor with Chain-of-Thought Reasoning
@@ -83,11 +83,11 @@ export class SequentialToolExecutor {
   private maxReasoningSteps: number = 10;
   private currentExecutionId: string = '';
   private readonly performanceProfiler?: PerformanceProfiler;
-  private readonly rustBackend?: RustExecutionBackend;
+  private readonly rustBackend?: ConsolidatedRustSystem;
 
   public constructor(
     performanceProfiler?: PerformanceProfiler,
-    rustBackend?: RustExecutionBackend
+    rustBackend?: ConsolidatedRustSystem
   ) {
     this.domainOrchestrator = new DomainAwareToolOrchestrator();
     this.performanceProfiler = performanceProfiler;

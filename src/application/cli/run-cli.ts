@@ -38,6 +38,19 @@ export async function runCLI(
       return;
     }
 
+    if (cliArgs[0] === 'tools') {
+      // Initialize MCP system before showing tools
+      logger.info('Initializing MCP system for tools command...');
+      const { bootstrapMcpServers } = await import('../../mcp-servers/mcp-bootstrap.js');
+      await bootstrapMcpServers();
+      
+      const { ToolsCommand, parseToolsArgs } = await import('./tools-command.js');
+      const toolsCommand = new ToolsCommand();
+      const toolsOptions = parseToolsArgs(cliArgs.slice(1));
+      await toolsCommand.execute(toolsOptions);
+      return;
+    }
+
     const { cli, serviceFactory } = await initialize(cliOptions as CLIOptions, isInteractive);
 
     // Graceful shutdown

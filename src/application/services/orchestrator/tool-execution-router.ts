@@ -6,6 +6,8 @@ import { createLogger } from '../../../infrastructure/logging/logger-adapter.js'
 import { getErrorMessage } from '../../../utils/error-utils.js';
 import { toErrorOrUndefined } from '../../../utils/type-guards.js';
 import { getGlobalEnhancedToolIntegration } from '../../../infrastructure/tools/enhanced-tool-integration.js';
+import { AgentStateManager, ProjectPaths } from '../../../utils/project-paths.js';
+import { ToolIntrospector } from '../../../utils/tool-introspector.js';
 
 const logger = createLogger('ToolExecutionRouter');
 
@@ -84,26 +86,104 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
 
   public constructor(private readonly mcpManager: IMcpManager) {}
 
+  /**
+   * Generate or extract session ID for agent state tracking
+   */
+  private getSessionId(request: Readonly<WorkflowRequest>): string {
+    // Use request ID as session ID, or generate one
+    return request.id || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Resolve path placeholders and inject proper working directory
+   */
+  private resolvePathsInArgs(
+    args: Record<string, unknown>, 
+    executionContext: { workingDirectory: string; projectRoot: string }
+  ): Record<string, unknown> {
+    const resolvedArgs = { ...args };
+    
+    // Handle execute_command tool specifically - inject workingDirectory if missing
+    if (!resolvedArgs.workingDirectory && (resolvedArgs.command || resolvedArgs.args)) {
+      resolvedArgs.workingDirectory = executionContext.workingDirectory;
+      logger.debug('[ToolExecutionRouter] Injected workingDirectory for execute_command', {
+        workingDirectory: resolvedArgs.workingDirectory
+      });
+    }
+    
+    // Resolve PROJECT_ROOT_DIRECTORY placeholders throughout the args
+    const resolveValue = (value: unknown): unknown => {
+      if (typeof value === 'string') {
+        return value.replace(/PROJECT_ROOT_DIRECTORY/g, executionContext.projectRoot);
+      }
+      if (Array.isArray(value)) {
+        return value.map(resolveValue);
+      }
+      if (value && typeof value === 'object') {
+        const resolved: Record<string, unknown> = {};
+        for (const [key, val] of Object.entries(value)) {
+          resolved[key] = resolveValue(val);
+        }
+        return resolved;
+      }
+      return value;
+    };
+    
+    // Apply recursive path resolution
+    for (const [key, value] of Object.entries(resolvedArgs)) {
+      resolvedArgs[key] = resolveValue(value);
+    }
+    
+    return resolvedArgs;
+  }
+
   public async handleToolCalls(
     response: Readonly<ModelResponse>,
     request: Readonly<WorkflowRequest>,
     modelRequest: Readonly<ModelRequest>,
     processModelRequest: (req: Readonly<ModelRequest>) => Promise<ModelResponse>
   ): Promise<ModelResponse> {
-    if (!response.toolCalls || response.toolCalls.length === 0) {
+    // Initialize agent state for this session
+    const sessionId = this.getSessionId(request);
+    const agentState = AgentStateManager.getOrCreateState(sessionId);
+    const executionContext = AgentStateManager.getExecutionContext(sessionId);
+
+    logger.debug('[ToolExecutionRouter] Session context', {
+      sessionId,
+      projectRoot: executionContext.projectRoot,
+      workingDirectory: executionContext.workingDirectory,
+      recentCommands: executionContext.recentCommands
+    });
+
+    // Prefer provider-declared tool calls; otherwise attempt to extract from content heuristically
+    const candidateToolCalls: ReadonlyArray<import('../../../domain/interfaces/model-client.js').ToolCall> =
+      (response.toolCalls && response.toolCalls.length > 0)
+        ? response.toolCalls
+        : this.extractToolCallsFromContent(response.content);
+
+    if (!candidateToolCalls || candidateToolCalls.length === 0) {
       return response;
     }
 
-    logger.info(`Processing ${response.toolCalls.length} tool calls`, {
+    logger.info(`[ToolExecutionRouter] Processing ${candidateToolCalls.length} tool calls`, {
       requestId: request.id,
-      toolNames: response.toolCalls.map(tc => tc.function.name),
+      toolNames: candidateToolCalls.map(tc => tc.function.name),
+    });
+    
+    // Debug log the actual tool calls
+    candidateToolCalls.forEach((tc, index) => {
+      logger.debug(`[ToolExecutionRouter] Tool call ${index + 1}: ${tc.function.name}`, {
+        id: tc.id,
+        function: tc.function.name,
+        arguments: tc.function.arguments
+      });
     });
 
     const toolResults: Array<{ id: string; result: unknown; error?: string }> = [];
     const errors: ToolExecutionError[] = [];
 
     // Process tool calls with proper error handling and metrics
-    for (const toolCall of response.toolCalls) {
+    for (const toolCall of candidateToolCalls) {
       const toolName = toolCall.function.name;
       const toolCallId = toolCall.id || `${toolName}_${Date.now()}`;
       const startTime = Date.now();
@@ -116,16 +196,66 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
           toolCallId
         );
 
+        // Introspector validation - explicit schema compliance check
+        const validationResult = ToolIntrospector.validateToolCall(toolName, parsedArgs);
+        
+        if (!validationResult.isValid) {
+          const feedback = ToolIntrospector.generateFeedback(validationResult, toolName);
+          logger.warn('[ToolExecutionRouter] Tool validation failed', {
+            toolName,
+            toolCallId,
+            errors: validationResult.errors,
+            warnings: validationResult.warnings
+          });
+          
+          // Return explicit validation failure instead of allowing AI to guess
+          toolResults.push({
+            id: toolCallId,
+            result: null,
+            error: feedback
+          });
+          
+          this.updateMetrics(toolName, false, Date.now() - startTime);
+          continue; // Skip execution, move to next tool
+        }
+
+        // Use normalized/validated arguments for execution
+        const normalizedArgs = validationResult.normalizedArgs || parsedArgs;
+
         // Execute tool with retry logic and circuit breaker
         const toolResult = await this.executeToolWithResilience(
           toolName,
           toolCallId,
-          parsedArgs,
+          normalizedArgs,
           request,
           startTime
         );
 
-        toolResults.push({ id: toolCallId, result: toolResult });
+        // Normalize diagnostics for known external tools (eslint, flake8, mypy, pylint)
+        let diagnostics: Array<{
+          tool: string;
+          type: 'diagnostic';
+          file: string;
+          line: number;
+          message: string;
+          column?: number;
+          code?: string;
+          severity?: 'error' | 'warning' | 'info';
+        }> | undefined;
+        try {
+          const { normalizeToolOutput } = await import('../../../infrastructure/tools/tool-output-normalizer.js');
+          // If executing execute_command, try to infer tool from args.command
+          const inferred = ((): string => {
+            const cmd = (normalizedArgs as any)?.command as string | undefined;
+            if (typeof cmd === 'string' && cmd.length) return cmd;
+            return toolName;
+          })();
+          diagnostics = normalizeToolOutput(inferred, (toolResult as any)?.data ?? toolResult);
+        } catch {
+          // ignore normalization errors, keep original result only
+        }
+
+        toolResults.push({ id: toolCallId, result: toolResult, ...(diagnostics && diagnostics.length ? { diagnostics } : {}) });
         this.updateMetrics(toolName, true, Date.now() - startTime);
       } catch (error) {
         const toolError = this.createToolExecutionError(error, toolName, toolCallId);
@@ -214,6 +344,206 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
     });
 
     return processModelRequest(followUpRequest);
+  }
+
+  // Heuristic fallback: extract tool calls from assistant content when provider didn't emit tool_calls
+  private extractToolCallsFromContent(
+    content?: string
+  ): import('../../../domain/interfaces/model-client.js').ToolCall[] {
+    if (!content || typeof content !== 'string') return [];
+
+    const calls: import('../../../domain/interfaces/model-client.js').ToolCall[] = [];
+    
+    // Strategy 1: Extract from code blocks first (most reliable)
+    const codeBlockMatches = this.extractFromCodeBlocks(content);
+    calls.push(...codeBlockMatches);
+    
+    if (calls.length > 0) {
+      logger.debug('[ToolExecutionRouter] Extracted tool calls from code blocks', { count: calls.length });
+      return calls;
+    }
+    
+    // Strategy 2: Robust nested JSON extraction using brace counting
+    const nestedJsonMatches = this.extractNestedJsonToolCalls(content);
+    calls.push(...nestedJsonMatches);
+    
+    if (calls.length > 0) {
+      logger.debug('[ToolExecutionRouter] Extracted tool calls from nested JSON', { count: calls.length });
+      return calls;
+    }
+    
+    // Strategy 3: Full content fallback for small responses
+    if (content.length < 2000 && content.includes('{') && content.includes('}')) {
+      const fullContentMatches = this.tryParseFullContent(content);
+      calls.push(...fullContentMatches);
+      
+      if (calls.length > 0) {
+        logger.debug('[ToolExecutionRouter] Extracted tool calls from full content', { count: calls.length });
+      }
+    }
+    
+    return calls;
+  }
+
+  /**
+   * Extract tool calls from code blocks (```json ... ```)
+   */
+  private extractFromCodeBlocks(content: string): import('../../../domain/interfaces/model-client.js').ToolCall[] {
+    const calls: import('../../../domain/interfaces/model-client.js').ToolCall[] = [];
+    const codeBlockRegex = /```(?:json)?\n([\s\S]*?)```/gim;
+    let match: RegExpExecArray | null;
+    
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      const block = match[1].trim();
+      const parsedCalls = this.parseJsonBlock(block);
+      calls.push(...parsedCalls);
+    }
+    
+    return calls;
+  }
+
+  /**
+   * Robust nested JSON extraction using brace counting to handle nested objects
+   */
+  private extractNestedJsonToolCalls(content: string): import('../../../domain/interfaces/model-client.js').ToolCall[] {
+    const calls: import('../../../domain/interfaces/model-client.js').ToolCall[] = [];
+    
+    // Find all potential JSON objects that contain "name" field
+    let index = 0;
+    while (index < content.length) {
+      const startIndex = content.indexOf('{', index);
+      if (startIndex === -1) break;
+      
+      // Use brace counting to find the complete JSON object
+      const jsonStr = this.extractCompleteJsonObject(content, startIndex);
+      if (jsonStr && jsonStr.includes('"name"')) {
+        const parsedCalls = this.parseJsonBlock(jsonStr);
+        calls.push(...parsedCalls);
+        
+        // If we found valid tool calls, we're done
+        if (parsedCalls.length > 0) {
+          break;
+        }
+      }
+      
+      index = startIndex + 1;
+    }
+    
+    return calls;
+  }
+
+  /**
+   * Extract a complete JSON object using brace counting
+   */
+  private extractCompleteJsonObject(text: string, startIndex: number): string | null {
+    let braceCount = 0;
+    let inString = false;
+    let escaped = false;
+    
+    for (let i = startIndex; i < text.length; i++) {
+      const char = text[i];
+      
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      
+      if (!inString) {
+        if (char === '{') {
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            return text.substring(startIndex, i + 1);
+          }
+        }
+      }
+    }
+    
+    return null; // Incomplete JSON
+  }
+
+  /**
+   * Try to parse full content as JSON
+   */
+  private tryParseFullContent(content: string): import('../../../domain/interfaces/model-client.js').ToolCall[] {
+    // Clean up common AI text artifacts
+    const cleaned = content
+      .replace(/^[^{]*/, '') // Remove text before first brace
+      .replace(/[^}]*$/, '') // Remove text after last brace
+      .trim();
+    
+    return this.parseJsonBlock(cleaned);
+  }
+
+  /**
+   * Parse a JSON block and extract tool calls
+   */
+  private parseJsonBlock(jsonStr: string): import('../../../domain/interfaces/model-client.js').ToolCall[] {
+    const calls: import('../../../domain/interfaces/model-client.js').ToolCall[] = [];
+    
+    try {
+      const obj = JSON.parse(jsonStr) as Record<string, unknown>;
+      
+      // Single tool call format: { name, arguments|parameters }
+      if (obj && typeof obj === 'object' && typeof obj.name === 'string') {
+        const toolCall = this.createToolCallFromObject(obj);
+        if (toolCall) {
+          calls.push(toolCall);
+        }
+      }
+      
+      // Array format: [{ name, arguments|parameters }, ...]
+      if (Array.isArray(obj)) {
+        for (const item of obj) {
+          if (item && typeof item === 'object' && typeof (item as any).name === 'string') {
+            const toolCall = this.createToolCallFromObject(item as Record<string, unknown>);
+            if (toolCall) {
+              calls.push(toolCall);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      // Silently ignore parse errors for fallback extraction
+      logger.debug('[ToolExecutionRouter] JSON parse error during extraction', { 
+        error: error instanceof Error ? error.message : String(error),
+        jsonStr: jsonStr.length > 200 ? jsonStr.substring(0, 200) + '...' : jsonStr
+      });
+    }
+    
+    return calls;
+  }
+
+  /**
+   * Create a tool call object from parsed JSON
+   */
+  private createToolCallFromObject(obj: Record<string, unknown>): import('../../../domain/interfaces/model-client.js').ToolCall | null {
+    if (!obj.name || typeof obj.name !== 'string') {
+      return null;
+    }
+    
+    const args = (obj.arguments ?? obj.parameters) as unknown;
+    const argStr = typeof args === 'string' ? args : JSON.stringify(args ?? {});
+    
+    return {
+      id: `extracted_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: 'function',
+      function: { 
+        name: obj.name as string, 
+        arguments: argStr 
+      },
+    };
   }
 
   private parseToolArguments(
@@ -317,6 +647,24 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
     args: Record<string, unknown>,
     request: WorkflowRequest
   ): Promise<unknown> {
+    // Get session context and resolve paths dynamically
+    const sessionId = this.getSessionId(request);
+    const executionContext = AgentStateManager.getExecutionContext(sessionId);
+    
+    // Resolve PROJECT_ROOT_DIRECTORY placeholder and inject proper workingDirectory
+    const enhancedArgs = this.resolvePathsInArgs(args, executionContext);
+    
+    // Track tool call start
+    AgentStateManager.updateAfterToolCall(sessionId, toolName, enhancedArgs, 'pending');
+    
+    logger.debug('[ToolExecutionRouter] Executing tool with resolved paths', {
+      toolName,
+      sessionId,
+      originalArgs: args,
+      enhancedArgs,
+      workingDirectory: executionContext.workingDirectory
+    });
+
     // Try enhanced integration first
     const enhancedIntegration = getGlobalEnhancedToolIntegration();
 
@@ -325,35 +673,51 @@ export class ToolExecutionRouter implements IToolExecutionRouter {
         id: `${toolName}_${Date.now()}`,
         function: {
           name: toolName,
-          arguments: JSON.stringify(args),
+          arguments: JSON.stringify(enhancedArgs),
         },
       };
 
       const context = {
-        sessionId: request.context?.sessionId || request.id,
+        sessionId: sessionId,
         priority: 'medium' as const,
         metadata: {
           workflowRequestId: request.id,
           originalContext: request.context,
+          resolvedPaths: true,
         },
       };
 
-      return await enhancedIntegration.executeToolCall(toolCallObj, context);
+      try {
+        const result = await enhancedIntegration.executeToolCall(toolCallObj, context);
+        AgentStateManager.updateAfterToolCall(sessionId, toolName, enhancedArgs, 'success', JSON.stringify(result));
+        return result;
+      } catch (error) {
+        AgentStateManager.updateAfterToolCall(sessionId, toolName, enhancedArgs, 'error', error instanceof Error ? error.message : String(error));
+        throw error;
+      }
     }
 
     // Fallback to MCP manager
-    const mcpResult = await this.mcpManager.executeTool(toolName, args, request.context);
+    try {
+      const mcpResult = await this.mcpManager.executeTool(toolName, enhancedArgs, request.context);
+      
+      // Check success flag and propagate errors properly
+      if (!mcpResult.success) {
+        const errorMessage =
+          typeof mcpResult.error === 'string'
+            ? mcpResult.error
+            : (mcpResult.error as any)?.message || `Tool execution failed: ${toolName}`;
+        
+        AgentStateManager.updateAfterToolCall(sessionId, toolName, enhancedArgs, 'error', errorMessage);
+        throw new Error(errorMessage);
+      }
 
-    // Check success flag and propagate errors properly
-    if (!mcpResult.success) {
-      const errorMessage =
-        typeof mcpResult.error === 'string'
-          ? mcpResult.error
-          : (mcpResult.error as any)?.message || `Tool execution failed: ${toolName}`;
-      throw new Error(errorMessage);
+      AgentStateManager.updateAfterToolCall(sessionId, toolName, enhancedArgs, 'success', JSON.stringify(mcpResult.data));
+      return mcpResult.data;
+    } catch (error) {
+      AgentStateManager.updateAfterToolCall(sessionId, toolName, enhancedArgs, 'error', error instanceof Error ? error.message : String(error));
+      throw error;
     }
-
-    return mcpResult.data;
   }
 
   private createToolExecutionError(

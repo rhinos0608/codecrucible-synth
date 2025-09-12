@@ -12,10 +12,13 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
+import { getRustExecutor } from '../execution/rust/index.js';
 import micromatch from 'micromatch';
 import { ToolDefinition } from './tool-integration.js';
-import type { ToolExecutionContext, ToolExecutionResult } from '../../domain/interfaces/tool-execution.js';
+import type {
+  ToolExecutionContext,
+  ToolExecutionResult,
+} from '../../domain/interfaces/tool-execution.js';
 
 function isWithin(baseDir: string, target: string): boolean {
   const rel = path.relative(baseDir, target);
@@ -62,8 +65,8 @@ export class CoreToolSuite {
   public getTools(): ReadonlyArray<ToolDefinition> {
     const tools: ToolDefinition[] = [
       {
-        id: 'bash_run',
-        name: 'bash_run',
+        id: 'execute_command',
+        name: 'execute_command',
         description: 'Run a shell command safely (requires explicit consent)',
         inputSchema: {
           properties: {
@@ -81,48 +84,53 @@ export class CoreToolSuite {
           if (!consent) {
             return {
               success: false,
-              error: { code: 'CONSENT_REQUIRED', message: 'Consent required to run shell commands. Pass consent=true or set ALLOW_SHELL_TOOL=true.' },
+              error: {
+                code: 'CONSENT_REQUIRED',
+                message:
+                  'Consent required to run shell commands. Pass consent=true or set ALLOW_SHELL_TOOL=true.',
+              },
               metadata: { executionTime: Date.now() - start },
             };
           }
           const cmd = String(args.command || '').trim();
           if (!cmd) {
-            return { success: false, error: { code: 'VALIDATION_ERROR', message: 'command is required' }, metadata: { executionTime: Date.now() - start } };
+            return {
+              success: false,
+              error: { code: 'VALIDATION_ERROR', message: 'command is required' },
+              metadata: { executionTime: Date.now() - start },
+            };
           }
           const disallowed = ['rm', 'rmdir', 'del', 'mkfs', 'shutdown', 'reboot'];
           if (disallowed.includes(cmd)) {
-            return { success: false, error: { code: 'COMMAND_DISALLOWED', message: `Command '${cmd}' is disallowed` }, metadata: { executionTime: Date.now() - start } };
+            return {
+              success: false,
+              error: { code: 'COMMAND_DISALLOWED', message: `Command '${cmd}' is disallowed` },
+              metadata: { executionTime: Date.now() - start },
+            };
           }
           const argsList = Array.isArray(args.args) ? (args.args as unknown[]).map(String) : [];
           const cwd = args.cwd ? ensureWorkspacePath(String(args.cwd)) : process.cwd();
           const timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : 15000;
-          const result = await new Promise<ToolExecutionResult>((resolve) => {
-            const child = spawn(cmd, argsList, { cwd, shell: process.platform === 'win32' });
-            let stdout = '';
-            let stderr = '';
-            let finished = false;
-            const killTimer = setTimeout(() => {
-              if (finished) return;
-              finished = true;
-              child.kill('SIGKILL');
-              resolve({ success: false, error: { code: 'TIMEOUT', message: `Command timed out after ${timeoutMs}ms` }, metadata: { executionTime: Date.now() - start } });
-            }, timeoutMs);
-            child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
-            child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
-            child.on('error', (err) => {
-              if (finished) return;
-              finished = true;
-              clearTimeout(killTimer);
-              resolve({ success: false, error: { code: 'SPAWN_ERROR', message: err.message }, metadata: { executionTime: Date.now() - start } });
-            });
-            child.on('close', (code) => {
-              if (finished) return;
-              finished = true;
-              clearTimeout(killTimer);
-              resolve({ success: code === 0, data: { code, stdout, stderr }, metadata: { executionTime: Date.now() - start } });
-            });
-          });
-          return result;
+          const rust = getRustExecutor();
+          await rust.initialize();
+          const res = await rust.execute({
+            toolId: 'command',
+            arguments: { command: cmd, args: argsList },
+            context: {
+              sessionId: 'core-tool-exec',
+              workingDirectory: cwd,
+              environment: process.env as Record<string, string>,
+              securityLevel: 'medium',
+              permissions: [],
+              timeoutMs,
+            },
+          } as any);
+          const data: any = res.result;
+          return {
+            success: res.success,
+            data: { code: typeof data?.exitCode === 'number' ? data.exitCode : res.success ? 0 : 1, stdout: typeof data?.stdout === 'string' ? data.stdout : '', stderr: typeof data?.stderr === 'string' ? data.stderr : '' },
+            metadata: { executionTime: Date.now() - start },
+          };
         },
       },
       {
@@ -130,10 +138,15 @@ export class CoreToolSuite {
         name: 'file_read',
         description: 'Read the contents of a file',
         inputSchema: {
-          properties: { path: { type: 'string', description: 'Path to file' }, encoding: { type: 'string' } },
+          properties: {
+            path: { type: 'string', description: 'Path to file' },
+            encoding: { type: 'string' },
+          },
           required: ['path'],
         },
-        execute: async (args: Readonly<Record<string, unknown>>): Promise<ToolExecutionResult<string>> => {
+        execute: async (
+          args: Readonly<Record<string, unknown>>
+        ): Promise<ToolExecutionResult<string>> => {
           const start = Date.now();
           const p = ensureWorkspacePath(String(args.path || ''));
           const enc = (args.encoding as string) || 'utf-8';
@@ -146,16 +159,26 @@ export class CoreToolSuite {
         name: 'file_write',
         description: 'Write content to a file',
         inputSchema: {
-          properties: { path: { type: 'string' }, content: { type: 'string' }, encoding: { type: 'string' } },
+          properties: {
+            path: { type: 'string' },
+            content: { type: 'string' },
+            encoding: { type: 'string' },
+          },
           required: ['path', 'content'],
         },
-        execute: async (args: Readonly<Record<string, unknown>>): Promise<ToolExecutionResult<string>> => {
+        execute: async (
+          args: Readonly<Record<string, unknown>>
+        ): Promise<ToolExecutionResult<string>> => {
           const start = Date.now();
           const p = ensureWorkspacePath(String(args.path || ''));
           const enc = (args.encoding as string) || 'utf-8';
           await fs.mkdir(path.dirname(p), { recursive: true });
           await fs.writeFile(p, String(args.content ?? ''), enc as BufferEncoding);
-          return { success: true, data: `Wrote ${p}`, metadata: { executionTime: Date.now() - start } };
+          return {
+            success: true,
+            data: `Wrote ${p}`,
+            metadata: { executionTime: Date.now() - start },
+          };
         },
       },
       {
@@ -171,13 +194,21 @@ export class CoreToolSuite {
           },
           required: ['patterns'],
         },
-        execute: async (args: Readonly<Record<string, unknown>>): Promise<ToolExecutionResult<string[]>> => {
+        execute: async (
+          args: Readonly<Record<string, unknown>>
+        ): Promise<ToolExecutionResult<string[]>> => {
           const start = Date.now();
           const cwd = ensureWorkspacePath(String(args.cwd || process.cwd()));
-          const ignore = Array.isArray(args.ignore) ? (args.ignore as string[]) : ['**/node_modules/**', '**/.git/**'];
+          const ignore = Array.isArray(args.ignore)
+            ? (args.ignore as string[])
+            : ['**/node_modules/**', '**/.git/**'];
           const all = await collectFiles(cwd, ignore);
           const pats = (args.patterns as string[]).map(s => s.replace(/\\/g, '/'));
-          const matches = micromatch(all.map(f => path.relative(cwd, f).replace(/\\/g, '/')), pats, { ignore });
+          const matches = micromatch(
+            all.map(f => path.relative(cwd, f).replace(/\\/g, '/')),
+            pats,
+            { ignore }
+          );
           const maxResults = typeof args.maxResults === 'number' ? args.maxResults : 5000;
           const resolved = matches.slice(0, maxResults).map(rel => path.resolve(cwd, rel));
           return { success: true, data: resolved, metadata: { executionTime: Date.now() - start } };
@@ -190,25 +221,41 @@ export class CoreToolSuite {
         inputSchema: {
           properties: {
             pattern: { type: 'string', description: 'Regex or literal pattern' },
-            files: { type: 'array', items: { type: 'string' }, description: 'Explicit files to search' },
-            glob: { type: 'array', items: { type: 'string' }, description: 'Glob patterns if files not provided' },
+            files: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Explicit files to search',
+            },
+            glob: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Glob patterns if files not provided',
+            },
             literal: { type: 'boolean', description: 'Treat pattern as literal instead of regex' },
             ignore: { type: 'array', items: { type: 'string' } },
             maxResults: { type: 'number' },
           },
           required: ['pattern'],
         },
-        execute: async (args: Readonly<Record<string, unknown>>): Promise<ToolExecutionResult<Array<{ file: string; line: number; text: string }>>> => {
+        execute: async (
+          args: Readonly<Record<string, unknown>>
+        ): Promise<ToolExecutionResult<Array<{ file: string; line: number; text: string }>>> => {
           const start = Date.now();
           const pattern = String(args.pattern || '');
-          const ignore = Array.isArray(args.ignore) ? (args.ignore as string[]) : ['**/node_modules/**', '**/.git/**'];
+          const ignore = Array.isArray(args.ignore)
+            ? (args.ignore as string[])
+            : ['**/node_modules/**', '**/.git/**'];
           let files: string[] = [];
           if (Array.isArray(args.files) && (args.files as string[]).length > 0) {
             files = (args.files as string[]).map(p => ensureWorkspacePath(p));
           } else if (Array.isArray(args.glob) && (args.glob as string[]).length > 0) {
             const all = await collectFiles(process.cwd(), ignore);
             const pats = (args.glob as string[]).map(s => s.replace(/\\/g, '/'));
-            const rels = micromatch(all.map(f => path.relative(process.cwd(), f).replace(/\\/g, '/')), pats, { ignore });
+            const rels = micromatch(
+              all.map(f => path.relative(process.cwd(), f).replace(/\\/g, '/')),
+              pats,
+              { ignore }
+            );
             files = rels.map(r => path.resolve(process.cwd(), r));
           } else {
             files = await collectFiles(process.cwd(), ignore);
@@ -220,7 +267,11 @@ export class CoreToolSuite {
           for (const file of files) {
             if (results.length >= maxResults) break;
             let content: string;
-            try { content = await fs.readFile(file, 'utf-8'); } catch { continue; }
+            try {
+              content = await fs.readFile(file, 'utf-8');
+            } catch {
+              continue;
+            }
             const lines = content.split(/\r?\n/);
             for (let i = 0; i < lines.length && results.length < maxResults; i++) {
               const line = lines[i];
@@ -252,10 +303,16 @@ export class CoreToolSuite {
           const start = Date.now();
           const goal = String(args.goal || '').trim();
           if (!goal) {
-            return { success: false, error: { code: 'VALIDATION_ERROR', message: 'goal is required' }, metadata: { executionTime: Date.now() - start } };
+            return {
+              success: false,
+              error: { code: 'VALIDATION_ERROR', message: 'goal is required' },
+              metadata: { executionTime: Date.now() - start },
+            };
           }
 
-          const { runSubAgent } = await import('../../application/services/orchestrator/sub-agent-runtime.js');
+          const { runSubAgent } = await import(
+            '../../application/services/orchestrator/sub-agent-runtime.js'
+          );
           const result = await runSubAgent(goal, {
             maxSteps: typeof args.maxSteps === 'number' ? (args.maxSteps as number) : undefined,
             maxChars: typeof args.maxChars === 'number' ? (args.maxChars as number) : undefined,

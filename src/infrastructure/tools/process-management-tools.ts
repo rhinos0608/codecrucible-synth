@@ -1,9 +1,14 @@
 import { z } from 'zod';
-import { BaseTool } from './base-tool';
-import { ChildProcess, exec, spawn } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
-import { logger } from '../logging/logger';
-import { validateCommand } from '../../utils/command-security';
+import { exec } from 'child_process';
+import { BaseTool } from './base-tool.js';
+import { logger } from '../logging/logger.js';
+import { validateCommand } from '../../utils/command-security.js';
+import { rustStreamingClient } from '../streaming/rust-streaming-client.js';
+import type { StreamChunk, StreamProcessor } from '../streaming/stream-chunk-protocol.js';
+
+const execAsync = promisify(exec);
 
 // Schema definitions
 const AdvancedProcessSchema = z.object({
@@ -15,8 +20,6 @@ const AdvancedProcessSchema = z.object({
   interactive: z.boolean().optional().default(false).describe('Start interactive session'),
   environment: z.record(z.string()).optional().describe('Environment variables'),
 });
-
-const execAsync = promisify(exec);
 
 type ProcessManagerArgs = z.infer<typeof AdvancedProcessSchema>;
 type ProcessManagerResult =
@@ -64,12 +67,12 @@ type ProcessManagerResult =
 
 interface ProcessSession {
   id: string;
-  process: ChildProcess;
   command: string;
   startTime: number;
   lastActivity: number;
   outputBuffer: string[];
   isInteractive: boolean;
+  process: ChildProcess;
 }
 
 interface ProcessSessionSummary {

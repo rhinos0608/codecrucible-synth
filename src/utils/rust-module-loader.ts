@@ -237,6 +237,7 @@ export interface RustExecutorModule {
       callback?: unknown
     ) => string;
     terminateStream?: (sessionId: string) => void;
+    send_input?: (sessionId: string, input: string) => void;
   };
   createRustExecutor?: () => unknown;
   initLogging?: (level?: string) => void;
@@ -307,7 +308,24 @@ export function loadRustExecutorSafely(baseDir?: string): {
   error?: string;
   binaryPath?: string;
   source: 'prebuilt' | 'local' | 'none';
+  diagnostics?: {
+    platform: string;
+    arch: string;
+    abi?: string;
+    searchPaths?: string[];
+    triedPackages?: string[];
+    nodeVersion: string;
+  };
 } {
+  const diagnostics = {
+    platform: process.platform,
+    arch: process.arch,
+    abi: getPlatformInfo().abi,
+    nodeVersion: process.version,
+    searchPaths: [] as string[],
+    triedPackages: [] as string[],
+  };
+
   try {
     const rustModule = loadRustExecutor(baseDir);
 
@@ -318,11 +336,13 @@ export function loadRustExecutorSafely(baseDir?: string): {
     try {
       // Check if prebuilt package exists
       let packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}`;
+      diagnostics.triedPackages.push(packageName);
 
       // Add ABI suffix for platforms that need it
       const { abi } = getPlatformInfo();
       if (abi && (process.platform === 'win32' || process.platform === 'linux')) {
         packageName = `@codecrucible/rust-executor-${process.platform}-${process.arch}-${abi}`;
+        diagnostics.triedPackages.push(packageName);
       }
 
       require.resolve(packageName);
@@ -331,50 +351,81 @@ export function loadRustExecutorSafely(baseDir?: string): {
     } catch {
       // Must be loaded from local build
       source = 'local';
-      binaryPath =
-        findNAPIBinary(
-          baseDir
-            ? [join(baseDir, 'rust-executor'), baseDir]
-            : [
-                join(dirname(fileURLToPath(import.meta.url)), '../..', 'rust-executor'),
-                join(dirname(fileURLToPath(import.meta.url)), '../..'),
-              ],
-          'codecrucible-rust-executor'
-        ) || undefined;
+      const searchPaths = baseDir
+        ? [join(baseDir, 'rust-executor'), baseDir]
+        : [
+            join(dirname(fileURLToPath(import.meta.url)), '../..', 'rust-executor'),
+            join(dirname(fileURLToPath(import.meta.url)), '../..'),
+          ];
+
+      diagnostics.searchPaths = searchPaths;
+      binaryPath = findNAPIBinary(searchPaths, 'codecrucible-rust-executor') || undefined;
     }
 
-    logger.info(`Rust executor loaded from ${source} source`);
+    logger.info(`Rust executor loaded from ${source} source`, { binaryPath });
 
     return {
       module: rustModule,
       available: true,
       binaryPath,
       source,
+      diagnostics,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    // FIXED: Reduce noise - use debug level for expected missing binaries in development
-    logger.debug('Rust executor not available:', toReadonlyRecord({ message: errorMessage }));
 
+    // FIXED: Provide comprehensive error reporting instead of silencing failures
+    logger.warn('Rust executor load failed - comprehensive diagnostics:', {
+      error: errorMessage,
+      diagnostics,
+      possibleCauses: [
+        'Rust binary not built for this platform',
+        'Missing napi-rs dependencies',
+        'Incorrect Node.js ABI version',
+        'Platform-specific compilation issues',
+      ],
+      suggestedActions: [
+        'Run `npm run build:rust` to build Rust executor',
+        'Check if prebuilt binaries exist for your platform',
+        'Verify Node.js version compatibility',
+        'Review Rust compilation logs',
+      ],
+    });
+
+    // Return fallback module with detailed diagnostic information
     return {
-      module: null,
+      module: createFallbackRustExecutor(
+        `${errorMessage} | Platform: ${diagnostics.platform}-${diagnostics.arch}${diagnostics.abi ? `-${diagnostics.abi}` : ''} | Node: ${diagnostics.nodeVersion}`
+      ),
       available: false,
       error: errorMessage,
       source: 'none',
+      diagnostics,
     };
   }
 }
 
 /**
  * Create fallback Rust executor for when binary is not available
+ * FIXED: Provide detailed error information instead of silencing failures
  */
 export function createFallbackRustExecutor(error: string): RustExecutorModule {
+  const detailedError = `Rust module not available: ${error}`;
+
+  // Log the initialization failure with context
+  logger.warn('Creating fallback Rust executor due to initialization failure', {
+    error: detailedError,
+    platform: process.platform,
+    arch: process.arch,
+    nodeVersion: process.version,
+  });
+
   const fallbackExecutor = {
     id: (): never => {
-      throw new Error(`Rust module not available: ${error}`);
+      throw new Error(detailedError);
     },
     initialize: async (): Promise<never> => {
-      throw new Error(`Rust module not available: ${error}`);
+      throw new Error(detailedError);
     },
     execute: (): never => {
       throw new Error(`Rust module not available: ${error}`);

@@ -30,6 +30,11 @@ export function createMcpServerManager(): MCPServerManager {
             'git',
             'npm',
             'node',
+            // scaling/ops tools (user-configurable allow-list via REPL)
+            'kubectl',
+            'docker',
+            'pm2',
+            'pm2-runtime',
           ]
         : [
             // POSIX-friendly commands
@@ -43,6 +48,11 @@ export function createMcpServerManager(): MCPServerManager {
             'git',
             'npm',
             'node',
+            // scaling/ops tools (user-configurable allow-list via REPL)
+            'kubectl',
+            'docker',
+            'pm2',
+            'pm2-runtime',
           ]) as string[],
       blockedCommands: ['rm', 'del', 'rmdir', 'sudo', 'su'],
     },

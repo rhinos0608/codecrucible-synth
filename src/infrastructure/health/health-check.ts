@@ -504,10 +504,8 @@ export class HealthMonitor extends EventEmitter {
       const { UnifiedSecurityValidator } = await import(
         '../security/unified-security-validator.js'
       );
-      const { createLogger } = await import(
-        '../logging/logger-adapter.js'
-      );
-      
+      const { createLogger } = await import('../logging/logger-adapter.js');
+
       const securityLogger = createLogger('HealthCheckSecurity');
       const securityValidator = new UnifiedSecurityValidator(securityLogger);
       const security = new EnterpriseSecurityFramework(securityValidator, securityLogger);

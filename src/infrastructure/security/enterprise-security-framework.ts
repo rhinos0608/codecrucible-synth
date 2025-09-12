@@ -66,10 +66,7 @@ export class EnterpriseSecurityFramework {
   private inputSanitizer: ModernInputSanitizer;
   private defaultPolicy: SecurityPolicy;
 
-  constructor(
-    securityValidator: IUnifiedSecurityValidator,
-    logger: ILogger
-  ) {
+  constructor(securityValidator: IUnifiedSecurityValidator, logger: ILogger) {
     this.securityValidator = securityValidator;
     this.inputSanitizer = new ModernInputSanitizer();
     this.defaultPolicy = {

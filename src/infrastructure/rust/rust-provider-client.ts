@@ -7,6 +7,7 @@
 
 import { logger } from '../../infrastructure/logging/logger.js';
 import { RustBridgeManager } from '../execution/rust/rust-bridge-manager.js';
+import { initializeRustBridge } from '../execution/rust/initialize-rust-bridge.js';
 import { toErrorOrUndefined, toReadonlyRecord } from '../../utils/type-guards.js';
 
 export interface RustProviderConfig {
@@ -88,10 +89,7 @@ export class RustProviderClient {
         capabilities: this.config.capabilities,
       });
 
-      const success = await this.bridgeManager.initialize();
-      if (!success) {
-        throw new Error('Failed to initialize Rust bridge');
-      }
+      await initializeRustBridge();
     } catch (error) {
       logger.error('Error initializing Rust provider client:', toErrorOrUndefined(error));
       throw error;

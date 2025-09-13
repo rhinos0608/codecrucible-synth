@@ -3,6 +3,7 @@
  * This keeps RustExecutionBackend free of NAPI/module-loading concerns.
  */
 import { RustBridgeManager, type BridgeHealth } from './rust-bridge-manager.js';
+import { initializeRustBridge } from './initialize-rust-bridge.js';
 
 export interface BridgeResult {
   success: boolean;
@@ -50,13 +51,16 @@ type NativeExecutor = {
 };
 
 export class BridgeAdapter implements IRustExecutionBridge {
-  private manager = RustBridgeManager.getInstance();
+  private manager: RustBridgeManager = RustBridgeManager.getInstance();
   private executor: NativeExecutor | null = null;
   private available = false;
 
   async initialize(): Promise<boolean> {
-    const ok = await this.manager.initialize().catch(() => false);
-    if (!ok) return false;
+    try {
+      this.manager = await initializeRustBridge();
+    } catch {
+      return false;
+    }
     const mod: any = this.manager.getRustModule();
     if (!mod) return false;
     const exec: NativeExecutor = (

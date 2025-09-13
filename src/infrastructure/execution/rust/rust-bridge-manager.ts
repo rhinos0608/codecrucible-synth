@@ -30,7 +30,7 @@ export interface BridgeHealth {
 export class RustBridgeManager {
   private static instance: RustBridgeManager | null = null;
   private static initializationPromise: Promise<boolean> | null = null;
-  
+
   private config: BridgeConfiguration;
   private rustModule: any = null;
   private health: BridgeHealth;
@@ -67,7 +67,9 @@ export class RustBridgeManager {
    * Initialize the singleton instance (idempotent)
    * Returns the same promise if initialization is already in progress
    */
-  public static async initializeInstance(config: Partial<BridgeConfiguration> = {}): Promise<boolean> {
+  public static async initializeInstance(
+    config: Partial<BridgeConfiguration> = {}
+  ): Promise<boolean> {
     if (!RustBridgeManager.initializationPromise) {
       const instance = RustBridgeManager.getInstance(config);
       RustBridgeManager.initializationPromise = instance.initialize();
@@ -80,6 +82,11 @@ export class RustBridgeManager {
    */
   async initialize(): Promise<boolean> {
     try {
+      if (this.rustModule) {
+        logger.debug('Rust bridge already initialized');
+        return true;
+      }
+
       logger.info('Initializing Rust bridge...', {
         modulePath: this.config.modulePath,
         timeout: this.config.initializationTimeout,

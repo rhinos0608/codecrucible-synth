@@ -261,13 +261,19 @@ export class SequentialToolExecutor {
       let currentStep = 2;
       let taskCompleted = false;
       let accumulatedContext = prompt;
+      let retryWithAllTools = false;
+      const maxNoToolRetries = 2;
+      let noToolRetryCount = 0;
 
       while (currentStep <= maxSteps && !taskCompleted) {
         // Reasoning step: What should I do next?
+        const toolsForReasoning = (
+          retryWithAllTools ? availableTools : domainResult.tools
+        ) as ReadonlyArray<Tool>;
         const reasoningResult = await this.generateReasoning(
           accumulatedContext,
           reasoningChain,
-          domainResult.tools,
+          toolsForReasoning,
           modelClient
         );
 
@@ -294,6 +300,32 @@ export class SequentialToolExecutor {
           });
           taskCompleted = true;
           break;
+        }
+
+        // If model explicitly selected no tool, retry with broader set or conclude
+        if (reasoningResult.selectedTool === null) {
+          logger.info('Model selected no tool; retrying if possible', {
+            attempt: noToolRetryCount + 1,
+            reasoning: reasoningResult.thought,
+          });
+
+          if (noToolRetryCount < maxNoToolRetries) {
+            noToolRetryCount++;
+            retryWithAllTools = true;
+            currentStep += 1; // account for thought step
+            continue; // retry reasoning with broader toolset
+          }
+
+          reasoningChain.push({
+            step: currentStep + 1,
+            type: 'conclusion',
+            content: 'No tool selected after retries. Providing direct response.',
+            confidence: reasoningResult.confidence,
+            timestamp: new Date(),
+          });
+          taskCompleted = true;
+          currentStep += 2;
+          continue;
         }
 
         // Action step: Execute selected tool
@@ -564,7 +596,7 @@ export class SequentialToolExecutor {
     modelClient: ModelClient
   ): Promise<{
     thought: string;
-    selectedTool?: Tool;
+    selectedTool?: Tool | null;
     toolArgs?: unknown;
     confidence: number;
     shouldStop: boolean;
@@ -639,7 +671,7 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
     availableTools: ReadonlyArray<Tool>
   ): {
     thought: string;
-    selectedTool?: Tool;
+    selectedTool?: Tool | null;
     toolArgs?: unknown;
     confidence: number;
     shouldStop: boolean;
@@ -672,7 +704,7 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
     }
 
     // Find selected tool
-    let selectedTool: Tool | undefined = undefined;
+    let selectedTool: Tool | null | undefined = undefined;
     let toolArgs: unknown = undefined;
 
     if (actionName && actionName !== 'NONE' && actionName !== 'N/A') {
@@ -693,6 +725,8 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
           toolArgs = {};
         }
       }
+    } else if (actionName === 'NONE' || actionName === 'N/A') {
+      selectedTool = null;
     }
 
     return {

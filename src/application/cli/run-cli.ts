@@ -3,10 +3,10 @@ import { logger } from '../../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import { enterpriseErrorHandler } from '../../infrastructure/error-handling/enterprise-error-handler.js';
 import { ErrorSeverity } from '../../infrastructure/error-handling/structured-error-system.js';
-import { showHelp, showStatus } from './help.js';
-import initialize from '../bootstrap/initialize.js';
-import parseCLIArgs from './args-parser.js';
-import { bootstrapToolRegistration } from './bootstrap/tool-registration.js';
+import parseArguments from './parse-arguments.js';
+import dispatchCommand from './command-dispatcher.js';
+import initializeCLI from './initialize-cli.js';
+import setupCleanup from './setup-cleanup.js';
 
 export async function runCLI(
   args: readonly string[],
@@ -14,58 +14,14 @@ export async function runCLI(
   isInteractive: boolean
 ): Promise<void> {
   try {
-    const parsed = parseCLIArgs(args);
-
-    if (parsed.command === 'version') {
-      const { getVersion } = await import('../../utils/version.js');
-      console.log(`CodeCrucible Synth v${await getVersion()} (Unified Architecture)`);
+    const parsed = parseArguments(args);
+    const handled = await dispatchCommand(parsed);
+    if (handled) {
       return;
     }
 
-    if (parsed.command === 'help') {
-      showHelp();
-      return;
-    }
-
-    if (parsed.command === 'status') {
-      await showStatus();
-      return;
-    }
-
-    if (parsed.command === 'models') {
-      const { ModelsCommand } = await import('./models-command.js');
-      const modelsCommand = new ModelsCommand();
-      await modelsCommand.execute(parsed.options);
-      return;
-    }
-
-    if (parsed.command === 'tools') {
-      await bootstrapToolRegistration();
-      const { ToolsCommand } = await import('./tools-command.js');
-      const toolsCommand = new ToolsCommand();
-      await toolsCommand.execute(parsed.options);
-      return;
-    }
-
-    const { cli, serviceFactory } = await initialize(cliOptions as CLIOptions, isInteractive);
-
-    // Graceful shutdown
-    let cleanedUp = false;
-    const cleanup = async (): Promise<void> => {
-      if (cleanedUp) return;
-      cleanedUp = true;
-      logger.info('Application shutdown initiated');
-      console.log('\n🔻 Shutting down gracefully...');
-      cli.shutdown();
-      await serviceFactory.dispose();
-    };
-
-    process.on('SIGINT', () => {
-      void cleanup();
-    });
-    process.on('SIGTERM', () => {
-      void cleanup();
-    });
+    const { cli, serviceFactory } = await initializeCLI(cliOptions, isInteractive);
+    const cleanup = setupCleanup(cli, serviceFactory);
 
     await cli.run(parsed.args);
     if (!isInteractive) {

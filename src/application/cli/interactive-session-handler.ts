@@ -4,6 +4,7 @@ import { InteractionManager } from './interaction-manager.js';
 import { CommandParser } from './command-parser.js';
 import { CLISession, SessionManager } from './session-manager.js';
 import { UnifiedCLICoordinator, CLIOperationRequest } from '../services/unified-cli-coordinator.js';
+import { formatOutput } from './output-formatter.js';
 
 export type SessionMode = 'interactive' | 'command';
 
@@ -56,9 +57,19 @@ export class InteractiveSessionHandler extends EventEmitter {
       };
 
       try {
-        await this.coordinator.processOperation(request);
+        const response = await this.coordinator.processOperation(request);
+
+        if (response.success) {
+          const output = formatOutput(response.result);
+          if (output.trim().length > 0) {
+            this.interaction.say(output);
+          }
+        } else {
+          this.interaction.say(`Error: ${response.error ?? 'Operation failed'}`);
+        }
       } catch (error) {
         this.emit('error', error);
+        this.interaction.say(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
 

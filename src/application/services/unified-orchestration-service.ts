@@ -19,7 +19,10 @@ import {
   getUnifiedConfigurationManager,
 } from '../../domain/config/config-manager.js';
 import { ProjectContext, UnifiedAgentSystem } from '../../domain/services/unified-agent/index.js';
-import { UnifiedServerSystem } from '../../domain/services/unified-server-system.js';
+import {
+  UnifiedServerSystem,
+  type MCPServerInfo,
+} from '../../domain/services/unified-server-system.js';
 import { type IUnifiedSecurityValidator } from '../../domain/interfaces/security-validator.js';
 import { UnifiedSecurityValidator } from '../../infrastructure/security/unified-security-validator.js';
 import { UnifiedPerformanceSystem } from '../../domain/services/unified-performance-system.js';
@@ -32,6 +35,10 @@ import { CommandRegistry } from './command-registry.js';
 import { OrchestrationRequest, OrchestrationResponse } from './orchestration-types.js';
 import { HealthMonitor } from '../../domain/services/mcp-discovery/health-monitor.js';
 import { MetricsCollector } from '../../domain/services/mcp-discovery/metrics-collector.js';
+import {
+  type MCPServerProfile,
+  ServerProfileStatus,
+} from '../../domain/services/mcp-discovery/discovery-types.js';
 
 // Re-export types for external consumption
 export type { OrchestrationRequest, OrchestrationResponse } from './orchestration-types.js';
@@ -199,9 +206,10 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
       const initialMcpServers = this.serverSystem.getMCPServers();
       await Promise.all(
-        initialMcpServers.map(async s => {
-          await this.healthMonitor.checkHealth(s as any);
-          this.metricsCollector.record(s as any, 'startup', 1);
+        initialMcpServers.map(async serverInfo => {
+          const profile = this.toServerProfile(serverInfo);
+          await this.healthMonitor.checkHealth(profile);
+          this.metricsCollector.record(profile, 'startup', 1);
         })
       );
 
@@ -829,6 +837,44 @@ export class UnifiedOrchestrationService extends EventEmitter {
       throw new Error(`Plugin command not found: ${name}`);
     }
     return handler(...args);
+  }
+
+  private toServerProfile(info: MCPServerInfo): MCPServerProfile {
+    return {
+      id: info.id,
+      name: info.name,
+      description: info.description,
+      vendor: undefined,
+      version: info.version,
+      capabilities: [],
+      performance: {
+        averageLatency: 0,
+        throughput: 0,
+        concurrentConnectionLimit: 0,
+        memoryUsage: 0,
+        cpuUsage: 0,
+        errorRate: 0,
+        uptime: 0,
+      },
+      reliability: {
+        availabilityScore: 1,
+        mttr: 0,
+        mtbf: 0,
+        errorCount: 0,
+        successRate: 1,
+        consecutiveFailures: 0,
+      },
+      compatibility: {
+        protocolVersions: [],
+        requiredFeatures: [],
+        optionalFeatures: [],
+        platformSupport: [],
+        dependencies: [],
+      },
+      cost: undefined,
+      lastSeen: info.lastPing ?? new Date(),
+      status: info.status === 'active' ? ServerProfileStatus.ACTIVE : ServerProfileStatus.INACTIVE,
+    };
   }
 
   // === Helper Methods for Performance Stats ===

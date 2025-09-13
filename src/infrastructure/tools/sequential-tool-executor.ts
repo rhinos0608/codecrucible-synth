@@ -186,13 +186,19 @@ export class SequentialToolExecutor {
       let currentStep = 2;
       let taskCompleted = false;
       let accumulatedContext = prompt;
+      let retryWithAllTools = false;
+      const maxNoToolRetries = 2;
+      let noToolRetryCount = 0;
 
       while (currentStep <= maxSteps && !taskCompleted) {
         // Reasoning step: What should I do next?
+        const toolsForReasoning = (
+          retryWithAllTools ? availableTools : domainResult.tools
+        ) as ReadonlyArray<Tool>;
         const reasoningResult = await this.generateReasoning(
           accumulatedContext,
           reasoningChain,
-          domainResult.tools,
+          toolsForReasoning,
           modelClient
         );
 
@@ -219,6 +225,32 @@ export class SequentialToolExecutor {
           });
           taskCompleted = true;
           break;
+        }
+
+        // If model explicitly selected no tool, retry with broader set or conclude
+        if (reasoningResult.selectedTool === null) {
+          logger.info('Model selected no tool; retrying if possible', {
+            attempt: noToolRetryCount + 1,
+            reasoning: reasoningResult.thought,
+          });
+
+          if (noToolRetryCount < maxNoToolRetries) {
+            noToolRetryCount++;
+            retryWithAllTools = true;
+            currentStep += 1; // account for thought step
+            continue; // retry reasoning with broader toolset
+          }
+
+          reasoningChain.push({
+            step: currentStep + 1,
+            type: 'conclusion',
+            content: 'No tool selected after retries. Providing direct response.',
+            confidence: reasoningResult.confidence,
+            timestamp: new Date(),
+          });
+          taskCompleted = true;
+          currentStep += 2;
+          continue;
         }
 
         // Action step: Execute selected tool
@@ -424,7 +456,7 @@ export class SequentialToolExecutor {
     modelClient: ModelClient
   ): Promise<{
     thought: string;
-    selectedTool?: Tool;
+    selectedTool?: Tool | null;
     toolArgs?: unknown;
     confidence: number;
     shouldStop: boolean;
@@ -499,7 +531,7 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
     availableTools: ReadonlyArray<Tool>
   ): {
     thought: string;
-    selectedTool?: Tool;
+    selectedTool?: Tool | null;
     toolArgs?: unknown;
     confidence: number;
     shouldStop: boolean;
@@ -532,7 +564,7 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
     }
 
     // Find selected tool
-    let selectedTool: Tool | undefined = undefined;
+    let selectedTool: Tool | null | undefined = undefined;
     let toolArgs: unknown = undefined;
 
     if (actionName && actionName !== 'NONE' && actionName !== 'N/A') {
@@ -553,6 +585,8 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
           toolArgs = {};
         }
       }
+    } else if (actionName === 'NONE' || actionName === 'N/A') {
+      selectedTool = null;
     }
 
     return {
@@ -588,7 +622,7 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
 
     logger.info('🔧 First attempt failed, trying alternative approaches', {
       toolName,
-      originalError: result.error
+      originalError: result.error,
     });
 
     // Attempt 2: Try alternative argument formats (for common issues)
@@ -596,14 +630,14 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
     for (const [attemptNum, altArgs] of alternatives.entries()) {
       logger.info(`🔧 Retry ${attemptNum + 2}: Trying alternative args`, {
         toolName,
-        altArgs
+        altArgs,
       });
 
       result = await this.executeTool(tool, altArgs, availableTools);
       if (result.success) {
         logger.info('🔧 Tool execution succeeded with alternative args', {
           toolName,
-          attempt: attemptNum + 2
+          attempt: attemptNum + 2,
         });
         return result;
       }
@@ -615,14 +649,14 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
       const similarToolName = similarTool.function?.name || similarTool.name || 'unknown';
       logger.info('🔧 Trying similar tool', {
         originalTool: toolName,
-        similarTool: similarToolName
+        similarTool: similarToolName,
       });
 
       result = await this.executeTool(similarTool, args, availableTools);
       if (result.success) {
         logger.info('🔧 Tool execution succeeded with similar tool', {
           originalTool: toolName,
-          successfulTool: similarToolName
+          successfulTool: similarToolName,
         });
         return result;
       }
@@ -634,13 +668,13 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
     logger.warn('🔧 All tool execution attempts failed', {
       toolName,
       attemptsCount: alternatives.length + similarTools.length + 1,
-      finalError
+      finalError,
     });
 
     return {
       result: finalError,
       success: false,
-      error: finalError
+      error: finalError,
     };
   }
 
@@ -654,7 +688,11 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
       const args = originalArgs as Record<string, unknown>;
 
       // For filesystem tools, try different path formats
-      if (toolName.includes('filesystem') || toolName.includes('file') || toolName.includes('directory')) {
+      if (
+        toolName.includes('filesystem') ||
+        toolName.includes('file') ||
+        toolName.includes('directory')
+      ) {
         if (args.path && typeof args.path === 'string') {
           const originalPath = args.path;
 
@@ -697,12 +735,12 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
 
     // Define tool similarity mappings
     const similarityMappings: Record<string, string[]> = {
-      'filesystem_read_file': ['file_read', 'mcp_read_file', 'read_file'],
-      'filesystem_write_file': ['file_write', 'mcp_write_file', 'write_file'],
-      'filesystem_list_directory': ['file_list', 'mcp_list_directory', 'list_directory'],
-      'file_read': ['filesystem_read_file', 'mcp_read_file'],
-      'file_write': ['filesystem_write_file', 'mcp_write_file'],
-      'mcp_list_directory': ['filesystem_list_directory', 'file_list'],
+      filesystem_read_file: ['file_read', 'mcp_read_file', 'read_file'],
+      filesystem_write_file: ['file_write', 'mcp_write_file', 'write_file'],
+      filesystem_list_directory: ['file_list', 'mcp_list_directory', 'list_directory'],
+      file_read: ['filesystem_read_file', 'mcp_read_file'],
+      file_write: ['filesystem_write_file', 'mcp_write_file'],
+      mcp_list_directory: ['filesystem_list_directory', 'file_list'],
     };
 
     const possibleAlternatives = similarityMappings[toolName] || [];

@@ -512,13 +512,8 @@ Type your request or command:
             return;
           }
 
-          // For piped input, apply the same logic as regular prompts
-          const isCodeGeneration = this.isLikelyCodeGeneration(prompt);
-          const dryRunOption = !isCodeGeneration; // Code generation executes, others are informational
-          
-          if (dryRunOption && this.context.options.verbose) {
-            await this.userInteraction.display('ℹ️  Running in analysis mode (no files will be modified)');
-          }
+          // Let AI decide naturally whether to use tools or generate text
+          const dryRunOption = false; // Always allow tool usage - AI will decide
           
           const response = await this.processPrompt(prompt, { dryRun: dryRunOption });
           await this.userInteraction.display(response);
@@ -602,32 +597,22 @@ Type your request or command:
           const promptArgs = args.filter(a => a !== '--write' && a !== '-w' && a !== '--dry-run');
           const prompt = promptArgs.join(' ');
 
-          // Determine if this is likely a code generation request
-          const isCodeGeneration = this.isLikelyCodeGeneration(prompt);
-
-          // Improved logic: Let users and context determine execution mode
+          // Simple execution mode logic - let AI decide naturally what to do
           let dryRunOption: boolean;
           if (dryRunFlag) {
             dryRunOption = true; // Explicit --dry-run always takes precedence
           } else if (writeFlag) {
             dryRunOption = false; // Explicit --write always takes precedence
-          } else if (isCodeGeneration) {
-            dryRunOption = false; // Code generation defaults to writing files
           } else {
-            // For non-code generation, use analysis mode by default but allow tool execution
-            // This makes the behavior more predictable - analysis questions get analysis, 
-            // action requests get action (via tool selection in orchestrator)
-            dryRunOption = false; 
+            dryRunOption = false; // Default to allowing tool usage - AI will decide
           }
-          
+
           // Provide clear feedback about execution mode
           if (this.context.options.verbose) {
             if (dryRunOption) {
               await this.userInteraction.display('🔍 Analysis mode: No files will be modified');
-            } else if (isCodeGeneration) {
-              await this.userInteraction.display('🛠️  Code generation mode: Files may be created/modified');
             } else {
-              await this.userInteraction.display('⚡ Execution mode: Tools will be used as needed');
+              await this.userInteraction.display('⚡ Execution mode: AI will decide whether to use tools or generate text');
             }
           }
 
@@ -635,7 +620,7 @@ Type your request or command:
           const approved = await this.checkOperationApproval(
             'process_prompt',
             `Process user prompt: ${prompt}`,
-            isCodeGeneration ? 'medium' : 'low',
+            'medium', // Default to medium risk since AI can choose to use tools
             !dryRunOption
           );
 
@@ -716,12 +701,7 @@ ${chalk.yellow('Examples:')}
     await this.userInteraction.display(help);
   }
 
-  /**
-   * Check if a prompt is likely a code generation request
-   */
-  private isLikelyCodeGeneration(prompt: string): boolean {
-    return this.approvalHandler.isLikelyCodeGeneration(prompt);
-  }
+  // Removed isLikelyCodeGeneration - let AI decide naturally what to do
 
   /**
    * Show system status

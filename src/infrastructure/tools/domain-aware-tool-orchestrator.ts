@@ -112,7 +112,7 @@ export class DomainAwareToolOrchestrator {
           'mcp_write_file',
         ],
         priority: 1,
-        maxTools: 3, // CRITICAL: Ollama performance optimization
+        maxTools: 15, // Allow more tools - let AI choose naturally
       },
       {
         name: 'research',
@@ -154,7 +154,7 @@ export class DomainAwareToolOrchestrator {
           'filesystem_find_files', // For finding relevant files
         ],
         priority: 2,
-        maxTools: 5,
+        maxTools: 15,
       },
       {
         name: 'system',
@@ -197,7 +197,7 @@ export class DomainAwareToolOrchestrator {
           'filesystem_file_stats',
         ],
         priority: 3,
-        maxTools: 6,
+        maxTools: 15,
       },
       {
         name: 'planning',
@@ -235,7 +235,7 @@ export class DomainAwareToolOrchestrator {
           'mcp_read_file', // For reading project docs
         ],
         priority: 4,
-        maxTools: 4,
+        maxTools: 15,
       },
       {
         name: 'mixed',
@@ -423,12 +423,12 @@ export class DomainAwareToolOrchestrator {
       });
     }
 
-    // Apply aggressive domain tool limit (CRITICAL: Ollama 500 error fix)
-    const maxTools = primaryDomain.maxTools ?? 3; // Reduced from 8 to 3 for Ollama performance
+    // Apply reasonable tool limit - let AI choose from more options
+    const maxTools = primaryDomain.maxTools ?? 15; // Allow more tools for natural AI selection
     if (selectedToolNames.size > maxTools) {
-      // Prioritize primary domain tools
+      // Prioritize primary domain tools but be less aggressive
       selectedToolNames = new Set<string>([
-        ...primaryDomain.tools.slice(0, maxTools - 1), // More aggressive primary selection
+        ...primaryDomain.tools.slice(0, Math.min(primaryDomain.tools.length, maxTools - 2)),
         ...Array.from(selectedToolNames).slice(primaryDomain.tools.length, maxTools),
       ]);
     }

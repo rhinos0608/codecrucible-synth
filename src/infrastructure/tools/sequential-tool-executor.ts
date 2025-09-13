@@ -256,7 +256,7 @@ export class SequentialToolExecutor {
             );
           }
 
-          const actionResult = await this.executeTool(
+          const actionResult = await this.executeToolWithRetries(
             reasoningResult.selectedTool,
             reasoningResult.toolArgs,
             domainResult.tools
@@ -441,7 +441,7 @@ export class SequentialToolExecutor {
       )
       .join('\n');
 
-    const reasoningPrompt = `You are an AI assistant working step-by-step to help the user.
+    const reasoningPrompt = `You are an AI assistant that USES TOOLS to help users. When tools are available, you should USE them to get real results.
 
 CONTEXT: ${context}
 
@@ -451,17 +451,23 @@ ${stepsSummary}
 AVAILABLE TOOLS:
 ${toolOptions}
 
-TASK: Based on the context and previous steps, what should I do next?
+CRITICAL: You have tools available that can perform real actions. Use them!
+- For filesystem operations (list/read/write files), use filesystem tools
+- For git operations, use git tools
+- For commands, use execute_command tool
+- Only use "NONE" if no relevant tool exists for the request
+
+TASK: What specific tool should I use to help with this request?
 
 Respond in this exact format:
-THOUGHT: [your reasoning about what to do next]
-ACTION: [tool name to use, or "NONE" if no tool needed]
-ARGS: [tool arguments in JSON format, or "N/A"]
+THOUGHT: [explain why you're choosing this specific tool]
+ACTION: [exact tool name from available tools - USE A TOOL when relevant!]
+ARGS: [tool arguments in JSON format with correct parameter names]
 CONFIDENCE: [0.0 to 1.0]
-COMPLETE: [YES if task is done, NO if more steps needed]
-CONCLUSION: [final answer if COMPLETE=YES, or "N/A"]
+COMPLETE: [YES only after using tools and getting results, NO if more actions needed]
+CONCLUSION: [final answer with tool results if COMPLETE=YES, or "N/A"]
 
-Be specific and focused. Choose the most relevant tool for the immediate next step.`;
+REMEMBER: Use the available tools! Don't just describe what you would do - actually do it with the tools.`;
 
     try {
       const response = await modelClient.generateText(reasoningPrompt, {
@@ -557,6 +563,158 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
       shouldStop,
       conclusion: shouldStop ? conclusion : undefined,
     };
+  }
+
+  /**
+   * Execute tool with retry logic and alternative approaches
+   */
+  private async executeToolWithRetries(
+    tool: Tool,
+    args: unknown,
+    availableTools: ReadonlyArray<Tool>
+  ): Promise<{
+    result: unknown;
+    success: boolean;
+    error?: string;
+  }> {
+    const toolName = tool.function?.name || tool.name || 'unknown';
+    logger.info('🔧 Starting tool execution with retries', { toolName, args });
+
+    // Attempt 1: Try original arguments
+    let result = await this.executeTool(tool, args, availableTools);
+    if (result.success) {
+      return result;
+    }
+
+    logger.info('🔧 First attempt failed, trying alternative approaches', {
+      toolName,
+      originalError: result.error
+    });
+
+    // Attempt 2: Try alternative argument formats (for common issues)
+    const alternatives = this.generateAlternativeArgs(toolName, args);
+    for (const [attemptNum, altArgs] of alternatives.entries()) {
+      logger.info(`🔧 Retry ${attemptNum + 2}: Trying alternative args`, {
+        toolName,
+        altArgs
+      });
+
+      result = await this.executeTool(tool, altArgs, availableTools);
+      if (result.success) {
+        logger.info('🔧 Tool execution succeeded with alternative args', {
+          toolName,
+          attempt: attemptNum + 2
+        });
+        return result;
+      }
+    }
+
+    // Attempt 3: Try similar tools if available
+    const similarTools = this.findSimilarTools(toolName, availableTools);
+    for (const similarTool of similarTools) {
+      const similarToolName = similarTool.function?.name || similarTool.name || 'unknown';
+      logger.info('🔧 Trying similar tool', {
+        originalTool: toolName,
+        similarTool: similarToolName
+      });
+
+      result = await this.executeTool(similarTool, args, availableTools);
+      if (result.success) {
+        logger.info('🔧 Tool execution succeeded with similar tool', {
+          originalTool: toolName,
+          successfulTool: similarToolName
+        });
+        return result;
+      }
+    }
+
+    // All attempts failed - provide helpful error message
+    const finalError = `Tool ${toolName} failed after multiple attempts. Tried ${alternatives.length + 1} argument variations and ${similarTools.length} similar tools. Last error: ${result.error}`;
+
+    logger.warn('🔧 All tool execution attempts failed', {
+      toolName,
+      attemptsCount: alternatives.length + similarTools.length + 1,
+      finalError
+    });
+
+    return {
+      result: finalError,
+      success: false,
+      error: finalError
+    };
+  }
+
+  /**
+   * Generate alternative argument formats for common failure cases
+   */
+  private generateAlternativeArgs(toolName: string, originalArgs: unknown): unknown[] {
+    const alternatives: unknown[] = [];
+
+    if (typeof originalArgs === 'object' && originalArgs !== null) {
+      const args = originalArgs as Record<string, unknown>;
+
+      // For filesystem tools, try different path formats
+      if (toolName.includes('filesystem') || toolName.includes('file') || toolName.includes('directory')) {
+        if (args.path && typeof args.path === 'string') {
+          const originalPath = args.path;
+
+          // Try absolute path
+          if (!originalPath.startsWith('/') && !originalPath.match(/^[A-Z]:/)) {
+            alternatives.push({ ...args, path: `/${originalPath}` });
+          }
+
+          // Try relative path
+          if (originalPath.startsWith('/')) {
+            alternatives.push({ ...args, path: originalPath.substring(1) });
+          }
+
+          // Try normalized paths
+          alternatives.push({ ...args, path: originalPath.replace(/\\/g, '/') });
+          alternatives.push({ ...args, path: originalPath.replace(/\//g, '\\') });
+
+          // Try with current directory prefix
+          alternatives.push({ ...args, path: `./${originalPath}` });
+        }
+      }
+
+      // For search/find tools, try broader searches
+      if (toolName.includes('search') || toolName.includes('find')) {
+        if (args.pattern && typeof args.pattern === 'string') {
+          alternatives.push({ ...args, pattern: `*${args.pattern}*` });
+          alternatives.push({ ...args, case_sensitive: false });
+        }
+      }
+    }
+
+    return alternatives;
+  }
+
+  /**
+   * Find similar tools that might accomplish the same task
+   */
+  private findSimilarTools(toolName: string, availableTools: ReadonlyArray<Tool>): Tool[] {
+    const similar: Tool[] = [];
+
+    // Define tool similarity mappings
+    const similarityMappings: Record<string, string[]> = {
+      'filesystem_read_file': ['file_read', 'mcp_read_file', 'read_file'],
+      'filesystem_write_file': ['file_write', 'mcp_write_file', 'write_file'],
+      'filesystem_list_directory': ['file_list', 'mcp_list_directory', 'list_directory'],
+      'file_read': ['filesystem_read_file', 'mcp_read_file'],
+      'file_write': ['filesystem_write_file', 'mcp_write_file'],
+      'mcp_list_directory': ['filesystem_list_directory', 'file_list'],
+    };
+
+    const possibleAlternatives = similarityMappings[toolName] || [];
+
+    for (const tool of availableTools) {
+      const currentToolName = tool.function?.name || tool.name || '';
+      if (possibleAlternatives.includes(currentToolName)) {
+        similar.push(tool);
+      }
+    }
+
+    return similar;
   }
 
   /**

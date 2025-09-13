@@ -345,28 +345,9 @@ export class UseCaseRouter {
       throw new Error('Use cases not available');
     }
 
-    // Check if this is a code generation request using ORIGINAL user input, not enhanced context
-    const originalInput =
-      typeof request.input === 'string' ? request.input : JSON.stringify(request.input);
-    if (this.isCodeGenerationRequest(originalInput)) {
-      const generationRequest: GenerationRequest = {
-        prompt: enhancedInput as string,
-        context: this.extractGenerationContext(request),
-        options: {
-          includeTests: options.includeTests,
-          includeDocumentation: options.includeDocumentation,
-          // For explicit code generation requests, default to actually writing files
-          // Only dry-run if explicitly requested via options
-          dryRun: options.dryRun ?? false,
-        },
-      };
-      const result = await this.useCases.generateCodeUseCase.execute(generationRequest);
-      return result as unknown as CLIOperationResponse;
-    } else {
-      // Regular prompt - fallback to orchestrator
-      const result = await this.executeViaOrchestrator(request, enhancedInput, options);
-      return result as CLIOperationResponse;
-    }
+    // All prompts go to orchestrator - let AI decide naturally what to do
+    const result = await this.executeViaOrchestrator(request, enhancedInput, options);
+    return result as CLIOperationResponse;
   }
 
   /**
@@ -413,112 +394,7 @@ export class UseCaseRouter {
     return workflowResponse.result as CLIOperationResponse;
   }
 
-  /**
-   * Check if a prompt is requesting code generation
-   *
-   * Improved logic to distinguish between code generation and simple file operations.
-   * Focus on explicit programming intent vs. data/configuration file operations.
-   */
-  private isCodeGenerationRequest(prompt: string): boolean {
-    const lowerPrompt = prompt.toLowerCase();
-
-    // 1. Explicit simple file operations should NOT trigger code generation
-    const simpleFileOperations = [
-      /^(create|write|add|generate)\s+(a\s+)?readme/,
-      /^(create|write|add|generate)\s+(a\s+)?(file|document)\s+(called|named|with)/,
-      /^(create|write|add|generate)\s+(a\s+)?.*\.(json|yaml|yml|csv|md|txt|xml|ini|conf|config)/,
-      /^write\s+(content|text|data)\s+to/,
-      /^add\s+(content|text|data)\s+to/,
-      /^create\s+(a\s+)?configuration/,
-      /^create\s+(a\s+)?config\s+file/,
-      /^create\s+(a\s+)?package\.json/,
-      /^create\s+(a\s+)?tsconfig\.json/,
-    ];
-    
-    if (simpleFileOperations.some(pattern => pattern.test(lowerPrompt))) {
-      return false;
-    }
-
-    // 2. Explicit programming language and code file extensions
-    const codeFileExtensions = ['.ts', '.js', '.jsx', '.tsx', '.py', '.java', '.cpp', '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt'];
-    const languageKeywords = [
-      'typescript',
-      'javascript',
-      'python',
-      'java',
-      'c#',
-      'c++',
-      'golang',
-      'rust',
-      'php',
-      'ruby',
-      'swift',
-      'kotlin'
-    ];
-    
-    // Strong indicators: specific language + creation intent
-    if (
-      codeFileExtensions.some(ext => lowerPrompt.includes(ext)) ||
-      languageKeywords.some(lang => 
-        lowerPrompt.includes(`${lang} file`) || 
-        lowerPrompt.includes(`${lang} code`) ||
-        lowerPrompt.includes(`${lang} script`) ||
-        lowerPrompt.includes(`${lang} function`) ||
-        lowerPrompt.includes(`${lang} class`)
-      )
-    ) {
-      return true;
-    }
-
-    // 3. Strong code generation keywords with clear programming intent
-    const codeGenerationPatterns = [
-      /implement\s+(a\s+)?function/,
-      /create\s+(a\s+)?class/,
-      /generate\s+(a\s+)?component/,
-      /build\s+(a\s+)?component/,
-      /create\s+(a\s+)?component/,
-      /scaffold\s+(a\s+)?project/,
-      /bootstrap\s+(a\s+)?(app|application|project)/,
-      /build\s+(an?\s+)?api/,
-      /create\s+(an?\s+)?api/,
-      /implement\s+(an?\s+)?api/,
-      /create\s+(a\s+)?module/,
-      /implement\s+(an?\s+)?interface/,
-      /write\s+(a\s+)?test/,
-      /create\s+(a\s+)?test/,
-      /generate\s+(a\s+)?test/,
-      /refactor\s+(the\s+)?code/,
-      /optimize\s+(the\s+)?code/,
-      /fix\s+(the\s+)?bug/,
-      /debug\s+(the\s+)?code/,
-    ];
-    
-    if (codeGenerationPatterns.some(pattern => pattern.test(lowerPrompt))) {
-      return true;
-    }
-
-    // 4. Framework/library specific keywords with creation context
-    const frameworkKeywords = [
-      'react component',
-      'vue component', 
-      'angular component',
-      'express route',
-      'express middleware',
-      'django model',
-      'flask route',
-      'spring boot',
-      'next.js page',
-      'svelte component'
-    ];
-    
-    if (frameworkKeywords.some(keyword => lowerPrompt.includes(keyword))) {
-      return true;
-    }
-
-    // 5. Default to false for ambiguous cases - prefer explicit intent
-    // This avoids misclassifying simple requests as code generation
-    return false;
-  }
+  // Removed isCodeGenerationRequest - all prompts go to orchestrator, AI decides naturally
 
   /**
    * Extract generation context from request

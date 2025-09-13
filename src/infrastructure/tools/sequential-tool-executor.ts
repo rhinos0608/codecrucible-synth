@@ -100,6 +100,81 @@ export class SequentialToolExecutor {
   }
 
   /**
+   * Push a reasoning step to the chain and log it for troubleshooting
+   */
+  private recordReasoningStep(chain: ReasoningStep[], step: ReasoningStep): void {
+    chain.push(step);
+    logger.debug('Reasoning step recorded', step);
+  }
+
+  /**
+   * Detect implicit filesystem/git operations when the model declines to select a tool
+   */
+  private detectImplicitTool(
+    text: string,
+    available: ReadonlyArray<Tool>
+  ): { tool: Tool; args: Record<string, unknown>; reason: string } | null {
+    const lower = text.toLowerCase();
+    const findTool = (name: string): Tool | undefined =>
+      available.find(t => t.function?.name === name || t.name === name);
+
+    if (lower.includes('git status')) {
+      const tool = findTool('git_status');
+      if (tool) return { tool, args: {}, reason: 'git status requested' };
+    }
+
+    if (lower.includes('git add')) {
+      const tool = findTool('git_add');
+      if (tool) return { tool, args: { files: [] }, reason: 'git add requested' };
+    }
+
+    if (lower.includes('git commit')) {
+      const tool = findTool('git_commit');
+      if (tool)
+        return {
+          tool,
+          args: { message: 'auto-commit' },
+          reason: 'git commit requested',
+        };
+    }
+
+    if (lower.includes('list') && (lower.includes('files') || lower.includes('directory'))) {
+      const tool = findTool('filesystem_list_directory') || findTool('filesystem_list');
+      if (tool) return { tool, args: { path: '.' }, reason: 'directory listing requested' };
+    }
+
+    if (lower.includes('read file') || lower.includes('open file')) {
+      const tool = findTool('filesystem_read_file') || findTool('filesystem_read');
+      if (tool) {
+        const match = text.match(/file\s+([^\s"']+)/i);
+        const filePath = match ? match[1].replace(/['"]/g, '') : '';
+        return {
+          tool,
+          args: { file_path: filePath },
+          reason: 'file read requested',
+        };
+      }
+    }
+
+    if (lower.includes('write file') || lower.includes('create file')) {
+      const tool = findTool('filesystem_write_file') || findTool('filesystem_write');
+      if (tool) {
+        const match = text.match(/file\s+([^\s"']+)/i);
+        const filePath = match ? match[1].replace(/['"]/g, '') : '';
+        const contentMatch = text.match(/(?:with|containing)\s+"([^"]*)"/i);
+        const content = contentMatch ? contentMatch[1] : '';
+        return {
+          tool,
+          args: { file_path: filePath, content },
+          reason: 'file write requested',
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Execute tools sequentially with chain-of-thought reasoning
    */
   public async executeWithReasoning(
@@ -169,7 +244,7 @@ export class SequentialToolExecutor {
         `I have ${executionPlan.selectedTools.length} relevant tools available. ` +
         `I'll work through this step by step.`;
 
-      reasoningChain.push({
+      this.recordReasoningStep(reasoningChain, {
         step: 1,
         type: 'thought',
         content: initialThought,
@@ -196,7 +271,7 @@ export class SequentialToolExecutor {
           modelClient
         );
 
-        reasoningChain.push({
+        this.recordReasoningStep(reasoningChain, {
           step: currentStep,
           type: 'thought',
           content: reasoningResult.thought,
@@ -210,7 +285,7 @@ export class SequentialToolExecutor {
 
         // Check if task is complete based on reasoning
         if (reasoningResult.shouldStop) {
-          reasoningChain.push({
+          this.recordReasoningStep(reasoningChain, {
             step: currentStep + 1,
             type: 'conclusion',
             content: reasoningResult.conclusion ?? 'Task completed based on reasoning.',
@@ -282,7 +357,7 @@ export class SequentialToolExecutor {
             }
           }
 
-          reasoningChain.push({
+          this.recordReasoningStep(reasoningChain, {
             step: currentStep + 1,
             type: 'action',
             content: `Executing ${safeToolName} with args: ${JSON.stringify(reasoningResult.toolArgs)}`,
@@ -297,7 +372,7 @@ export class SequentialToolExecutor {
           const normalizedResult = ResponseNormalizer.normalizeToString(actionResult.result);
           const observation = this.generateObservation(normalizedResult, safeToolName);
 
-          reasoningChain.push({
+          this.recordReasoningStep(reasoningChain, {
             step: currentStep + 2,
             type: 'observation',
             content: observation.content,
@@ -328,7 +403,7 @@ export class SequentialToolExecutor {
 
           // Check if this action completed the task
           if (observation.taskComplete) {
-            reasoningChain.push({
+            this.recordReasoningStep(reasoningChain, {
               step: currentStep + 3,
               type: 'conclusion',
               content: observation.completionReason || 'Task completed successfully.',
@@ -340,16 +415,81 @@ export class SequentialToolExecutor {
 
           currentStep += 3; // thought + action + observation
         } else {
-          // No tool selected, might be complete or need different approach
-          reasoningChain.push({
-            step: currentStep + 1,
-            type: 'conclusion',
-            content: 'No specific tool action needed. Providing direct response.',
-            confidence: reasoningResult.confidence,
-            timestamp: new Date(),
-          });
-          taskCompleted = true;
-          currentStep += 2;
+          // No tool selected, attempt to infer default filesystem/git tool
+          const implicit = this.detectImplicitTool(accumulatedContext, availableTools as Tool[]);
+          if (implicit) {
+            logger.info('Defaulting to implicit tool', {
+              tool: implicit.tool.function?.name || implicit.tool.name,
+              reason: implicit.reason,
+            });
+
+            streamingCallbacks?.onStepStart?.(
+              currentStep + 1,
+              'action',
+              `Executing ${implicit.tool.function?.name || implicit.tool.name}`
+            );
+            streamingCallbacks?.onToolExecution?.(
+              implicit.tool.function?.name || implicit.tool.name,
+              implicit.args
+            );
+
+            const actionResult = await this.executeToolWithRetries(
+              implicit.tool,
+              implicit.args,
+              availableTools as Tool[]
+            );
+
+            const toolName = implicit.tool.function?.name || implicit.tool.name || 'unknown-tool';
+
+            this.recordReasoningStep(reasoningChain, {
+              step: currentStep + 1,
+              type: 'action',
+              content: `Auto-executed ${toolName} with args: ${JSON.stringify(implicit.args)}`,
+              toolName,
+              toolArgs: implicit.args,
+              toolResult: actionResult.result,
+              confidence: 0.7,
+              timestamp: new Date(),
+            });
+
+            const normalizedResult = ResponseNormalizer.normalizeToString(actionResult.result);
+            const observation = this.generateObservation(normalizedResult, toolName);
+
+            this.recordReasoningStep(reasoningChain, {
+              step: currentStep + 2,
+              type: 'observation',
+              content: observation.content,
+              confidence: observation.confidence,
+              timestamp: new Date(),
+            });
+
+            streamingCallbacks?.onStepStart?.(currentStep + 2, 'observation', observation.content);
+            streamingCallbacks?.onObservation?.(observation.content, observation.confidence);
+            streamingCallbacks?.onProgress?.(currentStep + 2, maxSteps);
+
+            if (observation.taskComplete) {
+              this.recordReasoningStep(reasoningChain, {
+                step: currentStep + 3,
+                type: 'conclusion',
+                content: observation.completionReason || 'Task completed successfully.',
+                confidence: observation.confidence,
+                timestamp: new Date(),
+              });
+              taskCompleted = true;
+            }
+
+            currentStep += 3;
+          } else {
+            this.recordReasoningStep(reasoningChain, {
+              step: currentStep + 1,
+              type: 'conclusion',
+              content: 'No specific tool action needed. Providing direct response.',
+              confidence: reasoningResult.confidence,
+              timestamp: new Date(),
+            });
+            taskCompleted = true;
+            currentStep += 2;
+          }
         }
       }
 
@@ -588,7 +728,7 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
 
     logger.info('🔧 First attempt failed, trying alternative approaches', {
       toolName,
-      originalError: result.error
+      originalError: result.error,
     });
 
     // Attempt 2: Try alternative argument formats (for common issues)
@@ -596,14 +736,14 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
     for (const [attemptNum, altArgs] of alternatives.entries()) {
       logger.info(`🔧 Retry ${attemptNum + 2}: Trying alternative args`, {
         toolName,
-        altArgs
+        altArgs,
       });
 
       result = await this.executeTool(tool, altArgs, availableTools);
       if (result.success) {
         logger.info('🔧 Tool execution succeeded with alternative args', {
           toolName,
-          attempt: attemptNum + 2
+          attempt: attemptNum + 2,
         });
         return result;
       }
@@ -615,14 +755,14 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
       const similarToolName = similarTool.function?.name || similarTool.name || 'unknown';
       logger.info('🔧 Trying similar tool', {
         originalTool: toolName,
-        similarTool: similarToolName
+        similarTool: similarToolName,
       });
 
       result = await this.executeTool(similarTool, args, availableTools);
       if (result.success) {
         logger.info('🔧 Tool execution succeeded with similar tool', {
           originalTool: toolName,
-          successfulTool: similarToolName
+          successfulTool: similarToolName,
         });
         return result;
       }
@@ -634,13 +774,13 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
     logger.warn('🔧 All tool execution attempts failed', {
       toolName,
       attemptsCount: alternatives.length + similarTools.length + 1,
-      finalError
+      finalError,
     });
 
     return {
       result: finalError,
       success: false,
-      error: finalError
+      error: finalError,
     };
   }
 
@@ -654,7 +794,11 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
       const args = originalArgs as Record<string, unknown>;
 
       // For filesystem tools, try different path formats
-      if (toolName.includes('filesystem') || toolName.includes('file') || toolName.includes('directory')) {
+      if (
+        toolName.includes('filesystem') ||
+        toolName.includes('file') ||
+        toolName.includes('directory')
+      ) {
         if (args.path && typeof args.path === 'string') {
           const originalPath = args.path;
 
@@ -697,12 +841,12 @@ REMEMBER: Use the available tools! Don't just describe what you would do - actua
 
     // Define tool similarity mappings
     const similarityMappings: Record<string, string[]> = {
-      'filesystem_read_file': ['file_read', 'mcp_read_file', 'read_file'],
-      'filesystem_write_file': ['file_write', 'mcp_write_file', 'write_file'],
-      'filesystem_list_directory': ['file_list', 'mcp_list_directory', 'list_directory'],
-      'file_read': ['filesystem_read_file', 'mcp_read_file'],
-      'file_write': ['filesystem_write_file', 'mcp_write_file'],
-      'mcp_list_directory': ['filesystem_list_directory', 'file_list'],
+      filesystem_read_file: ['file_read', 'mcp_read_file', 'read_file'],
+      filesystem_write_file: ['file_write', 'mcp_write_file', 'write_file'],
+      filesystem_list_directory: ['file_list', 'mcp_list_directory', 'list_directory'],
+      file_read: ['filesystem_read_file', 'mcp_read_file'],
+      file_write: ['filesystem_write_file', 'mcp_write_file'],
+      mcp_list_directory: ['filesystem_list_directory', 'file_list'],
     };
 
     const possibleAlternatives = similarityMappings[toolName] || [];

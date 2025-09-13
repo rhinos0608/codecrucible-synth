@@ -416,7 +416,8 @@ export class SequentialToolExecutor {
           currentStep += 3; // thought + action + observation
         } else {
           // No tool selected, attempt to infer default filesystem/git tool
-          const implicit = this.detectImplicitTool(accumulatedContext, availableTools as Tool[]);
+          const contextWithReasoning = `${accumulatedContext}\n${reasoningResult.thought ?? ''}`;
+          const implicit = this.detectImplicitTool(contextWithReasoning, availableTools as Tool[]);
           if (implicit) {
             logger.info('Defaulting to implicit tool', {
               tool: implicit.tool.function?.name || implicit.tool.name,
@@ -454,6 +455,8 @@ export class SequentialToolExecutor {
 
             const normalizedResult = ResponseNormalizer.normalizeToString(actionResult.result);
             const observation = this.generateObservation(normalizedResult, toolName);
+
+            accumulatedContext = `${contextWithReasoning}\n\nPrevious action: ${toolName}\nResult: ${normalizedResult.substring(0, 500)}`;
 
             this.recordReasoningStep(reasoningChain, {
               step: currentStep + 2,

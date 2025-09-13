@@ -72,7 +72,10 @@ export class RustBridgeManager {
   ): Promise<boolean> {
     if (!RustBridgeManager.initializationPromise) {
       const instance = RustBridgeManager.getInstance(config);
-      RustBridgeManager.initializationPromise = instance.initialize();
+      RustBridgeManager.initializationPromise = instance.initialize().catch(error => {
+        RustBridgeManager.initializationPromise = null;
+        throw error;
+      });
     }
     return RustBridgeManager.initializationPromise;
   }
@@ -232,6 +235,9 @@ export class RustBridgeManager {
 
       this.rustModule = null;
       this.health.status = 'failed';
+
+      // Allow future calls to initializeInstance to reinitialize the bridge
+      RustBridgeManager.initializationPromise = null;
 
       logger.info('Rust bridge shut down successfully');
     } catch (error) {

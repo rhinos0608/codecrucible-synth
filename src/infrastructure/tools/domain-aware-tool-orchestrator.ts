@@ -433,11 +433,43 @@ export class DomainAwareToolOrchestrator {
       ]);
     }
 
+    // Ensure core filesystem and git tools are always available
+    const essentialTools = new Set([
+      'file_read',
+      'file_write',
+      'grep_search',
+      'glob_search',
+      'bash_run',
+      'filesystem_read_file',
+      'filesystem_write_file',
+      'filesystem_list_directory',
+      'filesystem_get_stats',
+      'filesystem_file_stats',
+      'filesystem_find_files',
+      'mcp_read_file',
+      'mcp_write_file',
+      'mcp_list_directory',
+      'mcp_execute_command',
+    ]);
+    allAvailableTools.forEach(tool => {
+      const toolName: string = tool.function?.name ?? tool.name;
+      if (essentialTools.has(toolName)) {
+        selectedToolNames.add(toolName);
+      }
+    });
+
     // Filter available tools to match selected tool names
     const selectedTools = allAvailableTools.filter(tool => {
       const toolName: string = tool.function?.name ?? tool.name;
       return selectedToolNames.has(toolName);
     });
+
+    const excludedToolNames = allAvailableTools
+      .map(tool => tool.function?.name ?? tool.name)
+      .filter(name => !selectedToolNames.has(name));
+    if (excludedToolNames.length > 0) {
+      this.logger.debug('Excluded tools after domain filtering', { excludedToolNames });
+    }
 
     const reasoning =
       `Domain: ${analysis.primaryDomain} (${(analysis.confidence * 100).toFixed(0)}% confidence), ` +

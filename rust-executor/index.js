@@ -50,11 +50,79 @@ function resolveKey() {
   return `${platform}-${arch}`;
 }
 
+function createDiagnosticInfo() {
+  const key = resolveKey();
+  const fileToken = key && PLATFORM_ARCH_MAP[key];
+  const expectedFilename = fileToken ? `codecrucible-rust-executor.${fileToken}.node` : 'unknown';
+  const expectedPackage = fileToken ? `@codecrucible/rust-executor-${fileToken}` : 'unknown';
+  
+  return {
+    platform: platform,
+    arch: arch,
+    nodeVersion: process.version,
+    resolvedKey: key,
+    expectedFilename: expectedFilename,
+    expectedPackage: expectedPackage,
+    isMuslDetected: platform === 'linux' ? isMusl() : null,
+    searchPaths: [
+      join(__dirname, expectedFilename),
+      `node_modules/${expectedPackage}`,
+    ],
+    supportedPlatforms: Object.keys(PLATFORM_ARCH_MAP),
+  };
+}
+
 function handleError(message, cause) {
-  const error = new Error(message);
-  if (cause && cause.stack) {
-    error.stack += `\nCaused by: ${cause.stack}`;
+  const diagnostics = createDiagnosticInfo();
+  
+  // Create a comprehensive error message with diagnostics
+  const errorDetails = [
+    `❌ ${message}`,
+    '',
+    '🔍 DIAGNOSTIC INFORMATION:',
+    `   Platform: ${diagnostics.platform}`,
+    `   Architecture: ${diagnostics.arch}`,
+    `   Node.js Version: ${diagnostics.nodeVersion}`,
+    `   Resolved Key: ${diagnostics.resolvedKey || 'UNSUPPORTED'}`,
+    diagnostics.isMuslDetected !== null ? `   Linux ABI: ${diagnostics.isMuslDetected ? 'musl' : 'glibc'}` : '',
+    '',
+    '📁 EXPECTED FILES:',
+    `   Local Binary: ${diagnostics.expectedFilename}`,
+    `   Package Name: ${diagnostics.expectedPackage}`,
+    '',
+    '🔍 SEARCH PATHS:',
+    ...diagnostics.searchPaths.map(path => `   - ${path}`),
+    '',
+    '✅ SUPPORTED PLATFORMS:',
+    ...diagnostics.supportedPlatforms.map(platform => `   - ${platform}`),
+    '',
+    '🛠️  SUGGESTED ACTIONS:',
+    '   1. Run `npm run build:rust` to build the native module',
+    '   2. Check if prebuilt binaries exist for your platform',
+    '   3. Verify Node.js version compatibility (requires Node.js 14+)',
+    '   4. For Linux: ensure correct ABI (glibc vs musl)',
+    '   5. For custom platforms: check if your platform is supported',
+    '',
+    '📖 MORE HELP:',
+    '   - Documentation: docs/RUST-NATIVE-MODULES.md',
+    '   - Build guide: npm run build:rust --help',
+    '   - Issue tracker: https://github.com/codecrucible/issues',
+  ].filter(line => line !== '').join('\n');
+
+  const error = new Error(errorDetails);
+  
+  // Add diagnostic properties for programmatic access
+  error.diagnostics = diagnostics;
+  error.originalMessage = message;
+  error.platformSupported = !!diagnostics.resolvedKey;
+  
+  if (cause) {
+    error.cause = cause;
+    if (cause.stack) {
+      error.stack += `\n\nCaused by: ${cause.stack}`;
+    }
   }
+  
   throw error;
 }
 

@@ -67,7 +67,7 @@ export class RustProviderClient {
       ...config,
     };
 
-    this.bridgeManager = new RustBridgeManager();
+    this.bridgeManager = RustBridgeManager.getInstance();
     this.stats = {
       totalRequests: 0,
       successfulRequests: 0,

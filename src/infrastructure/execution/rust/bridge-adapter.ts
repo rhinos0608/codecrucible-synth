@@ -50,7 +50,7 @@ type NativeExecutor = {
 };
 
 export class BridgeAdapter implements IRustExecutionBridge {
-  private manager = new RustBridgeManager();
+  private manager = RustBridgeManager.getInstance();
   private executor: NativeExecutor | null = null;
   private available = false;
 

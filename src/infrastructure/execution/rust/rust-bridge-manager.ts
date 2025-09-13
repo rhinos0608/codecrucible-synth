@@ -25,14 +25,18 @@ export interface BridgeHealth {
 
 /**
  * Manages the NAPI bridge to the Rust execution module
+ * Implements singleton pattern to prevent redundant initialization
  */
 export class RustBridgeManager {
+  private static instance: RustBridgeManager | null = null;
+  private static initializationPromise: Promise<boolean> | null = null;
+  
   private config: BridgeConfiguration;
   private rustModule: any = null;
   private health: BridgeHealth;
   private healthCheckTimer: NodeJS.Timeout | null = null;
 
-  constructor(config: Partial<BridgeConfiguration> = {}) {
+  private constructor(config: Partial<BridgeConfiguration> = {}) {
     this.config = {
       modulePath: './rust-executor',
       initializationTimeout: 5000,
@@ -47,6 +51,28 @@ export class RustBridgeManager {
       responseTime: 0,
       errorCount: 0,
     };
+  }
+
+  /**
+   * Get the singleton instance of RustBridgeManager
+   */
+  public static getInstance(config: Partial<BridgeConfiguration> = {}): RustBridgeManager {
+    if (!RustBridgeManager.instance) {
+      RustBridgeManager.instance = new RustBridgeManager(config);
+    }
+    return RustBridgeManager.instance;
+  }
+
+  /**
+   * Initialize the singleton instance (idempotent)
+   * Returns the same promise if initialization is already in progress
+   */
+  public static async initializeInstance(config: Partial<BridgeConfiguration> = {}): Promise<boolean> {
+    if (!RustBridgeManager.initializationPromise) {
+      const instance = RustBridgeManager.getInstance(config);
+      RustBridgeManager.initializationPromise = instance.initialize();
+    }
+    return RustBridgeManager.initializationPromise;
   }
 
   /**

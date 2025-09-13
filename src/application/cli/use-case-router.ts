@@ -416,15 +416,31 @@ export class UseCaseRouter {
   /**
    * Check if a prompt is requesting code generation
    *
-   * NOTE: This method has been simplified to rely on AI intelligence rather than hardcoded patterns.
-   * The AI system prompt should handle the decision of whether to generate code or provide explanations.
+   * Improved logic to distinguish between code generation and simple file operations.
+   * Focus on explicit programming intent vs. data/configuration file operations.
    */
   private isCodeGenerationRequest(prompt: string): boolean {
-    // REFINED: Distinguish between code generation and simple file operations
     const lowerPrompt = prompt.toLowerCase();
 
-    // 1. Explicit programming file extensions or language keywords take precedence
-    const codeFileExtensions = ['.ts', '.js', '.py', '.java', '.cpp', '.cs', '.go', '.rs', '.php'];
+    // 1. Explicit simple file operations should NOT trigger code generation
+    const simpleFileOperations = [
+      /^(create|write|add|generate)\s+(a\s+)?readme/,
+      /^(create|write|add|generate)\s+(a\s+)?(file|document)\s+(called|named|with)/,
+      /^(create|write|add|generate)\s+(a\s+)?.*\.(json|yaml|yml|csv|md|txt|xml|ini|conf|config)/,
+      /^write\s+(content|text|data)\s+to/,
+      /^add\s+(content|text|data)\s+to/,
+      /^create\s+(a\s+)?configuration/,
+      /^create\s+(a\s+)?config\s+file/,
+      /^create\s+(a\s+)?package\.json/,
+      /^create\s+(a\s+)?tsconfig\.json/,
+    ];
+    
+    if (simpleFileOperations.some(pattern => pattern.test(lowerPrompt))) {
+      return false;
+    }
+
+    // 2. Explicit programming language and code file extensions
+    const codeFileExtensions = ['.ts', '.js', '.jsx', '.tsx', '.py', '.java', '.cpp', '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt'];
     const languageKeywords = [
       'typescript',
       'javascript',
@@ -435,53 +451,73 @@ export class UseCaseRouter {
       'golang',
       'rust',
       'php',
+      'ruby',
+      'swift',
+      'kotlin'
     ];
+    
+    // Strong indicators: specific language + creation intent
     if (
       codeFileExtensions.some(ext => lowerPrompt.includes(ext)) ||
-      languageKeywords.some(lang => lowerPrompt.includes(`${lang} file`))
+      languageKeywords.some(lang => 
+        lowerPrompt.includes(`${lang} file`) || 
+        lowerPrompt.includes(`${lang} code`) ||
+        lowerPrompt.includes(`${lang} script`) ||
+        lowerPrompt.includes(`${lang} function`) ||
+        lowerPrompt.includes(`${lang} class`)
+      )
     ) {
       return true;
     }
 
-    // 2. Data/text file creation should not trigger code generation
-    const dataFileExtensions = ['.json', '.yaml', '.yml', '.csv', '.md', '.txt'];
-    const dataFilePatterns = [
-      /create.*(json|yaml|yml|csv|markdown|md|text|txt).*file/,
-      /generate.*(json|yaml|yml|csv|markdown|md|text|txt).*file/,
-      /write.*(json|yaml|yml|csv|markdown|md|text|txt).*file/,
-      /create.*file.*with.*content/,
-      /write.*content.*to/,
+    // 3. Strong code generation keywords with clear programming intent
+    const codeGenerationPatterns = [
+      /implement\s+(a\s+)?function/,
+      /create\s+(a\s+)?class/,
+      /generate\s+(a\s+)?component/,
+      /build\s+(a\s+)?component/,
+      /create\s+(a\s+)?component/,
+      /scaffold\s+(a\s+)?project/,
+      /bootstrap\s+(a\s+)?(app|application|project)/,
+      /build\s+(an?\s+)?api/,
+      /create\s+(an?\s+)?api/,
+      /implement\s+(an?\s+)?api/,
+      /create\s+(a\s+)?module/,
+      /implement\s+(an?\s+)?interface/,
+      /write\s+(a\s+)?test/,
+      /create\s+(a\s+)?test/,
+      /generate\s+(a\s+)?test/,
+      /refactor\s+(the\s+)?code/,
+      /optimize\s+(the\s+)?code/,
+      /fix\s+(the\s+)?bug/,
+      /debug\s+(the\s+)?code/,
     ];
-    if (
-      dataFileExtensions.some(ext => lowerPrompt.includes(ext)) ||
-      dataFilePatterns.some(pattern => pattern.test(lowerPrompt))
-    ) {
-      return false;
-    }
-
-    // 3. Strong code generation keywords with programming context
-    const codeGenerationKeywords = [
-      'implement function',
-      'create class',
-      'generate component',
-      'scaffold project',
-      'bootstrap app',
-      'build api',
-      'create module',
-      'implement interface',
-    ];
-    if (codeGenerationKeywords.some(pattern => lowerPrompt.includes(pattern))) {
+    
+    if (codeGenerationPatterns.some(pattern => pattern.test(lowerPrompt))) {
       return true;
     }
 
-    // 4. Programming-specific keywords only count if they appear with creation context
-    const codeKeywords = ['function', 'class', 'component', 'module', 'interface', 'api'];
-    const creationContext = ['implement', 'scaffold', 'bootstrap', 'generate', 'build', 'create'];
-    return codeKeywords.some(
-      keyword =>
-        lowerPrompt.includes(keyword) &&
-        creationContext.some(context => lowerPrompt.includes(context))
-    );
+    // 4. Framework/library specific keywords with creation context
+    const frameworkKeywords = [
+      'react component',
+      'vue component', 
+      'angular component',
+      'express route',
+      'express middleware',
+      'django model',
+      'flask route',
+      'spring boot',
+      'next.js page',
+      'svelte component'
+    ];
+    
+    if (frameworkKeywords.some(keyword => lowerPrompt.includes(keyword))) {
+      return true;
+    }
+
+    // 5. Default to false for ambiguous cases - prefer explicit intent
+    // This avoids misclassifying simple requests as code generation
+    return false;
   }
 
   /**

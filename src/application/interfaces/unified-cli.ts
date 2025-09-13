@@ -453,6 +453,25 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
 
     // Create a session for interactive mode
     this.sessionManager.createSession(this.context.workingDirectory);
+
+    // Start the interactive session handler
+    const { InteractiveSessionHandler } = await import('../cli/interactive-session-handler.js');
+    const sessionHandler = new InteractiveSessionHandler(this.coordinator);
+    
+    // Display welcome message
+    const welcome = `
+${chalk.cyan('🤖 CodeCrucible Interactive Mode')}
+
+Context: ${contextInfo.type || 'Unknown'} ${contextInfo.language ? `(${contextInfo.language})` : ''}
+Confidence: ${contextInfo.confidence ? `${(contextInfo.confidence * 100).toFixed(0)}%` : 'N/A'}
+
+Commands: help, status, suggestions, exit
+Type your request or command:
+`;
+    await this.userInteraction.display(welcome);
+
+    // Start the interactive session
+    await sessionHandler.start();
   }
 
   /**
@@ -493,8 +512,15 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
             return;
           }
 
-          // For piped, default to safe behavior but ensure output is shown.
-          const response = await this.processPrompt(prompt, { dryRun: true });
+          // For piped input, apply the same logic as regular prompts
+          const isCodeGeneration = this.isLikelyCodeGeneration(prompt);
+          const dryRunOption = !isCodeGeneration; // Code generation executes, others are informational
+          
+          if (dryRunOption && this.context.options.verbose) {
+            await this.userInteraction.display('ℹ️  Running in analysis mode (no files will be modified)');
+          }
+          
+          const response = await this.processPrompt(prompt, { dryRun: dryRunOption });
           await this.userInteraction.display(response);
           return;
         }
@@ -579,8 +605,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
           // Determine if this is likely a code generation request
           const isCodeGeneration = this.isLikelyCodeGeneration(prompt);
 
-          // For code generation, default to writing files unless --dry-run is explicitly set
-          // For other prompts, default to dry-run unless --write is explicitly set
+          // Improved logic: Let users and context determine execution mode
           let dryRunOption: boolean;
           if (dryRunFlag) {
             dryRunOption = true; // Explicit --dry-run always takes precedence
@@ -589,7 +614,21 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
           } else if (isCodeGeneration) {
             dryRunOption = false; // Code generation defaults to writing files
           } else {
-            dryRunOption = true; // Other prompts default to dry-run for safety
+            // For non-code generation, use analysis mode by default but allow tool execution
+            // This makes the behavior more predictable - analysis questions get analysis, 
+            // action requests get action (via tool selection in orchestrator)
+            dryRunOption = false; 
+          }
+          
+          // Provide clear feedback about execution mode
+          if (this.context.options.verbose) {
+            if (dryRunOption) {
+              await this.userInteraction.display('🔍 Analysis mode: No files will be modified');
+            } else if (isCodeGeneration) {
+              await this.userInteraction.display('🛠️  Code generation mode: Files may be created/modified');
+            } else {
+              await this.userInteraction.display('⚡ Execution mode: Tools will be used as needed');
+            }
           }
 
           // Check approval for prompt processing

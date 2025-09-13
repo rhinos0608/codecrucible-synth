@@ -13,7 +13,7 @@ pub mod protocol;
 pub mod runtime;
 pub mod security;
 pub mod streaming;
-// pub mod tools; // This line is intentionally commented out to avoid duplicate definition
+pub mod tools;
 pub mod utils;
 
 use crate::protocol::communication::CommunicationHandler;

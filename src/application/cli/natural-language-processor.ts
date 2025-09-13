@@ -5,7 +5,6 @@
  * - Command intent detection and analysis
  * - Request complexity determination
  * - Simple question identification
- * - Code generation request detection
  * - Natural language to operation type mapping
  *
  * This module encapsulates all natural language processing logic for CLI commands.
@@ -18,7 +17,6 @@ export interface ParsedCommand {
   confidence: number;
   operationType?: 'analyze' | 'diagnose' | 'prompt' | 'execute' | 'navigate' | 'suggest';
   parameters?: Record<string, unknown>;
-  isCodeGeneration?: boolean;
   complexity?: 'simple' | 'medium' | 'complex';
 }
 
@@ -63,9 +61,6 @@ export class NaturalLanguageProcessor {
     // Determine complexity if enabled
     const complexity = this.options.complexityAnalysis ? this.determineComplexity(input) : 'medium';
 
-    // Check for special request types
-    const isCodeGeneration = this.isCodeGenerationRequest(input);
-
     // Map intent to operation type
     const operationType = this.mapIntentToOperationType(intent, confidence);
 
@@ -73,16 +68,14 @@ export class NaturalLanguageProcessor {
       intent,
       confidence,
       operationType,
-      isCodeGeneration,
       complexity,
     };
 
     // Log analysis for debugging
     if (confidence > this.options.confidenceThreshold) {
       logger.info(
-        `🎯 NLP Analysis: Intent="${intent}" (${(confidence * 100).toFixed(0)}% confidence), ` +
-          `Type=${operationType}, CodeGen=${isCodeGeneration}, ` +
-          `Complexity=${complexity}`
+          `🎯 NLP Analysis: Intent="${intent}" (${(confidence * 100).toFixed(0)}% confidence), ` +
+          `Type=${operationType}, Complexity=${complexity}`
       );
     }
 
@@ -234,78 +227,6 @@ export class NaturalLanguageProcessor {
     if (input.length > 50) return 'medium';
 
     return 'simple';
-  }
-
-  /**
-   * Check if a prompt is requesting code generation
-   */
-  private isCodeGenerationRequest(prompt: string): boolean {
-    const lowerPrompt = prompt.toLowerCase();
-
-    // EXCLUDE: Help/advice/explanation questions should NEVER generate code files
-    const helpPatterns = [
-      'how do i',
-      'how to',
-      'help me',
-      'explain',
-      'what is',
-      'what are',
-      'why',
-      'when',
-      'where',
-      'fix',
-      'debug',
-      'solve',
-      'resolve',
-      'error',
-      'issue',
-      'problem',
-      'trouble',
-      'advice',
-      'suggest',
-      'recommend',
-      'best practice',
-      'should i',
-      'can you',
-      'could you',
-    ];
-
-    // If it's a help/advice question, definitely not code generation
-    if (helpPatterns.some(pattern => lowerPrompt.includes(pattern))) {
-      return false;
-    }
-
-    // INCLUDE: Only explicit code creation requests with strong intent
-    const strongGenerationKeywords = [
-      'create a',
-      'generate a',
-      'write a',
-      'build a',
-      'implement a',
-      'create class',
-      'create function',
-      'create component',
-      'create module',
-      'generate code',
-      'write code',
-      'build app',
-      'implement feature',
-    ];
-
-    // Check for strong generation patterns first
-    if (strongGenerationKeywords.some(keyword => lowerPrompt.includes(keyword))) {
-      return true;
-    }
-
-    // Weaker keywords only if they appear with creation context
-    const weakKeywords = ['function', 'class', 'component', 'module', 'interface'];
-    const creationContext = ['new', 'create', 'make', 'add', 'build'];
-
-    return weakKeywords.some(
-      keyword =>
-        lowerPrompt.includes(keyword) &&
-        creationContext.some(context => lowerPrompt.includes(context))
-    );
   }
 
   /**

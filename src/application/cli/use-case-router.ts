@@ -30,6 +30,7 @@ import type {
   WorkflowContext,
   WorkflowRequest,
 } from '../../domain/interfaces/workflow-orchestrator.js';
+import { PromptIntentClassifier, type PromptClassification } from '../../infrastructure/classifiers/prompt-intent-classifier.js';
 
 export interface CLIOperationRequest {
   id: string;
@@ -78,6 +79,7 @@ export interface UseCaseRouterOptions {
 export class UseCaseRouter {
   private useCases?: UseCaseDependencies;
   private orchestrator?: IWorkflowOrchestrator;
+  private intentClassifier?: PromptIntentClassifier;
   private isInitialized = false;
 
   public constructor() {
@@ -89,6 +91,7 @@ export class UseCaseRouter {
    */
   public initialize(orchestrator: IWorkflowOrchestrator): void {
     this.orchestrator = orchestrator;
+    this.intentClassifier = new PromptIntentClassifier(orchestrator);
 
     // Initialize dependency container and use cases
     const container = getDependencyContainer();
@@ -208,6 +211,11 @@ export class UseCaseRouter {
       effectiveOperationType = mappedOperation;
     }
 
+    let classification: PromptClassification | null = null;
+    if (effectiveOperationType === 'prompt' && this.intentClassifier) {
+      classification = await this.intentClassifier.classify(enhancedInput);
+    }
+
     // Route to appropriate use case
     // Avoid returning an awaited promise directly
     const result = await this.routeToUseCase(
@@ -215,7 +223,8 @@ export class UseCaseRouter {
       request,
       enhancedInput,
       options,
-      parsedCommand
+      parsedCommand,
+      classification
     );
     // Ensure result is of type CLIOperationResponse
     return result;
@@ -229,7 +238,8 @@ export class UseCaseRouter {
     request: Readonly<CLIOperationRequest>,
     enhancedInput: string,
     options: Readonly<UseCaseRouterOptions>,
-    _parsedCommand: Readonly<ParsedCommand> | null
+    _parsedCommand: Readonly<ParsedCommand> | null,
+    classification: PromptClassification | null
   ): Promise<CLIOperationResponse> {
     switch (operationType) {
       case 'analyze': {
@@ -238,7 +248,12 @@ export class UseCaseRouter {
       }
 
       case 'prompt': {
-        const result: unknown = await this.handlePromptOperation(request, enhancedInput, options);
+        const result: unknown = await this.handlePromptOperation(
+          request,
+          enhancedInput,
+          options,
+          classification
+        );
         return result as CLIOperationResponse;
       }
 
@@ -247,7 +262,12 @@ export class UseCaseRouter {
       case 'suggest':
       default: {
         // Fallback to orchestrator for other operation types
-        const result: unknown = await this.executeViaOrchestrator(request, enhancedInput, options);
+        const result: unknown = await this.executeViaOrchestrator(
+          request,
+          enhancedInput,
+          options,
+          classification
+        );
         return result as CLIOperationResponse;
       }
     }
@@ -339,14 +359,20 @@ export class UseCaseRouter {
   private async handlePromptOperation(
     request: Readonly<CLIOperationRequest>,
     enhancedInput: unknown,
-    options: Readonly<UseCaseRouterOptions>
+    options: Readonly<UseCaseRouterOptions>,
+    classification: PromptClassification | null
   ): Promise<unknown> {
     if (!this.useCases) {
       throw new Error('Use cases not available');
     }
 
     // All prompts go to orchestrator - let AI decide naturally what to do
-    const result = await this.executeViaOrchestrator(request, enhancedInput, options);
+    const result = await this.executeViaOrchestrator(
+      request,
+      enhancedInput,
+      options,
+      classification
+    );
     return result as CLIOperationResponse;
   }
 
@@ -356,7 +382,8 @@ export class UseCaseRouter {
   private async executeViaOrchestrator(
     request: Readonly<CLIOperationRequest>,
     enhancedInput: unknown,
-    options: Readonly<UseCaseRouterOptions>
+    options: Readonly<UseCaseRouterOptions>,
+    classification?: PromptClassification | null
   ): Promise<unknown> {
     if (!this.orchestrator) {
       throw new Error('Orchestrator not available');
@@ -382,6 +409,8 @@ export class UseCaseRouter {
           performanceOptimized: options.enablePerformanceOptimization,
           errorResilience: options.enableErrorResilience,
         },
+        intent: classification?.intent,
+        riskLevel: classification?.riskLevel,
       },
     };
 
@@ -393,8 +422,6 @@ export class UseCaseRouter {
 
     return workflowResponse.result as CLIOperationResponse;
   }
-
-  // Removed isCodeGenerationRequest - all prompts go to orchestrator, AI decides naturally
 
   /**
    * Extract generation context from request
